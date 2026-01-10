@@ -8,8 +8,7 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 *$py.class
-services/__pycache__/
-routers/__pycache__/
+**/*.pyc
 .venv/
 venv/
 env/
@@ -28,7 +27,8 @@ yarn-error.log*
 *.db
 *.sqlite3
 *.sqlite
-# Keep Excel files for now as they are the data source in the repo root
+
+# Excel
 *.xlsx 
 
 # Logs

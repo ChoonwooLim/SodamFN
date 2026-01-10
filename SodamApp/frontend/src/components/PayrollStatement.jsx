@@ -261,10 +261,10 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                 <p className="text-base text-slate-500 mb-8 font-medium italic">{(new Date()).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
                                 <div className="flex justify-center items-center gap-10">
-                                    <span className="text-3xl font-black tracking-[0.5em] text-slate-800">소담김밥 대표</span>
+                                    <span className="text-[21px] font-black tracking-[0.4em] text-slate-800">소담김밥 대표</span>
                                     <div className="relative">
-                                        <span className="text-4xl font-serif font-black text-slate-900 tracking-widest">HONG JI YEON</span>
-                                        <div className="absolute -top-6 -right-16 w-18 h-18 border-[5px] border-red-500 rounded-full flex items-center justify-center text-red-600 font-black text-xl rotate-12 bg-white/10 backdrop-blur-[1px] shadow-sm">
+                                        <span className="text-[26px] font-black text-slate-900 tracking-widest">HONG JI YEON</span>
+                                        <div className="absolute -top-4 -right-12 w-12 h-12 border-[3px] border-red-500 rounded-full flex items-center justify-center text-red-600 font-black text-[14px] rotate-12 bg-white/10 backdrop-blur-[1px] shadow-sm">
                                             (인)
                                         </div>
                                     </div>
