@@ -2,6 +2,7 @@ import React, { useState, useLayoutEffect, useRef } from 'react';
 import { Printer, X } from 'lucide-react';
 
 export default function PayrollStatement({ staff, payroll, onClose }) {
+    console.log("PayrollStatement Render:", { staff, payroll });
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.5);
 
@@ -38,17 +39,38 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
     };
 
     const formatDate = (monthStr) => {
-        const [year, month] = monthStr.split('-');
+        if (!monthStr || typeof monthStr !== 'string') {
+            console.warn("formatDate received invalid monthStr:", monthStr);
+            return '';
+        }
+        const parts = monthStr.split('-');
+        if (parts.length < 2) return monthStr;
+        const [year, month] = parts;
         return `${year}년 ${parseInt(month)}월`;
+    };
+
+    const safeLocaleString = (val) => {
+        if (val === null || val === undefined) return '0';
+        try {
+            return val.toLocaleString();
+        } catch (e) {
+            return String(val);
+        }
     };
 
     let details = { work_breakdown: [], holiday_details: {} };
     try {
         if (payroll.details_json) {
-            details = JSON.parse(payroll.details_json);
+            details = typeof payroll.details_json === 'string'
+                ? JSON.parse(payroll.details_json)
+                : payroll.details_json;
         }
     } catch (e) {
         console.error("Failed to parse payroll details", e);
+    }
+
+    if (!details || typeof details !== 'object') {
+        details = { work_breakdown: [], holiday_details: {} };
     }
 
     return (
@@ -106,15 +128,15 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                 <tbody>
                                     <tr className="h-12">
                                         <td className="w-28 bg-slate-100 font-bold text-center border border-slate-800 text-[14px]">성 명</td>
-                                        <td className="px-5 border border-slate-800 text-2xl font-black tracking-widest">{staff.name}</td>
+                                        <td className="px-5 border border-slate-800 text-2xl font-black tracking-widest">{staff?.name || ''}</td>
                                         <td className="w-28 bg-slate-100 font-bold text-center border border-slate-800 text-[14px]">직 위</td>
-                                        <td className="px-5 border border-slate-800 text-2xl font-bold">{staff.role}</td>
+                                        <td className="px-5 border border-slate-800 text-2xl font-bold">{staff?.role || ''}</td>
                                     </tr>
                                 </tbody>
                             </table>
 
                             {/* Main Content: Earnings and Deductions Side by Side */}
-                            <div className="flex flex-1 border-2 border-slate-800 border-t-0 border-collapse mb-6 min-h-0">
+                            <div className="flex flex-1 border-x-2 border-b-2 border-slate-800 border-t-0 mb-10 min-h-0">
                                 {/* Earnings Table (60%) */}
                                 <div className="w-[60%] border-r-2 border-slate-800 flex flex-col">
                                     <div className="bg-slate-800 text-white font-bold text-center py-2 text-[13px] uppercase tracking-widest">지급 항목 (Earnings)</div>
@@ -132,13 +154,17 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                                         <React.Fragment key={idx}>
                                                             <tr className="border-b border-dotted border-slate-300 h-10">
                                                                 <td className="px-3 border-r border-slate-800">
-                                                                    <div className="font-bold text-[14px] leading-tight">{item.label}</div>
-                                                                    <div className="text-[11px] text-slate-500 leading-tight">
-                                                                        {item.rate.toLocaleString()}원 × {item.hours}H × {item.days}D
+                                                                    <div className="flex items-baseline gap-2">
+                                                                        <div className="font-bold text-[13px] leading-tight whitespace-nowrap">
+                                                                            {(item.label || '').replace('시급(', '근무시간 : ').replace(')', '')}
+                                                                        </div>
+                                                                        <div className="text-[10px] text-slate-500 leading-tight whitespace-nowrap">
+                                                                            ({safeLocaleString(item.rate)}원 × {item.hours || 0}H × {item.days || 0}D)
+                                                                        </div>
                                                                     </div>
                                                                 </td>
                                                                 <td className="px-3 text-right font-bold text-[15px]">
-                                                                    {item.amount.toLocaleString()}
+                                                                    {safeLocaleString(item.amount)}
                                                                 </td>
                                                             </tr>
                                                             {item.dates && (
@@ -153,14 +179,14 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                                 ) : (
                                                     <tr className="border-b border-slate-800 h-10">
                                                         <td className="px-3 border-r border-slate-800 font-bold">기본급</td>
-                                                        <td className="px-3 text-right font-bold">{payroll.base_pay.toLocaleString()}</td>
+                                                        <td className="px-3 text-right font-bold">{safeLocaleString(payroll.base_pay)}</td>
                                                     </tr>
                                                 )}
 
                                                 {payroll.bonus_meal > 0 && (
                                                     <tr className="border-b border-slate-800 h-10">
                                                         <td className="px-3 border-r border-slate-800 font-bold">식비지원</td>
-                                                        <td className="px-3 text-right font-bold">{payroll.bonus_meal.toLocaleString()}</td>
+                                                        <td className="px-3 text-right font-bold">{safeLocaleString(payroll.bonus_meal)}</td>
                                                     </tr>
                                                 )}
 
@@ -181,7 +207,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                                                             {calc && <div className="text-[10px] text-slate-400 font-normal leading-tight">{calc}</div>}
                                                                         </td>
                                                                         <td className="px-3 text-right font-bold text-[13px]">
-                                                                            {amt.toLocaleString()}
+                                                                            {safeLocaleString(amt)}
                                                                         </td>
                                                                     </tr>
                                                                 );
@@ -190,7 +216,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                                         })}
                                                         <tr className="bg-slate-100 border-b border-slate-800 h-9">
                                                             <td className="px-3 border-r border-slate-800 font-black text-right pr-4 italic text-[12px]">주휴수당 합계</td>
-                                                            <td className="px-3 text-right font-black text-[13px]">{payroll.bonus_holiday.toLocaleString()}</td>
+                                                            <td className="px-3 text-right font-black text-[13px]">{safeLocaleString(payroll.bonus_holiday)}</td>
                                                         </tr>
                                                     </>
                                                 )}
@@ -221,7 +247,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                                                 ].map((item, idx) => (
                                                     <tr key={idx} className="border-b border-slate-800 h-10">
                                                         <td className="px-3 border-r border-slate-800 font-bold text-[13px]">{item.label}</td>
-                                                        <td className="px-3 text-right font-bold text-slate-700">{item.val > 0 ? item.val.toLocaleString() : '-'}</td>
+                                                        <td className="px-3 text-right font-bold text-slate-700">{item.val > 0 ? safeLocaleString(item.val) : '-'}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -231,24 +257,24 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                             </div>
 
                             {/* Summary Footer Section */}
-                            <table className="w-full border-4 border-slate-800 border-collapse mb-8">
+                            <table className="w-full border-4 border-slate-800 border-collapse mb-6">
                                 <tbody>
-                                    <tr className="h-14 text-[15px]">
+                                    <tr className="h-10 text-[14px]">
                                         <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">지급총액 (A)</td>
-                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-xl">{(payroll.base_pay + payroll.bonus).toLocaleString()}</td>
+                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-lg">{safeLocaleString((payroll.base_pay || 0) + (payroll.bonus || 0))}</td>
                                         <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">공제총액 (B)</td>
-                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-xl text-red-600">{payroll.deductions.toLocaleString()}</td>
+                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-lg text-red-600">{safeLocaleString(payroll.deductions)}</td>
                                     </tr>
-                                    <tr className="h-20 bg-slate-900 text-white">
-                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-sm uppercase leading-tight">실 수령액<br />(NET PAY)</td>
+                                    <tr className="h-16 bg-slate-900 text-white">
+                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-xs uppercase leading-tight">실 수령액<br />(NET PAY)</td>
                                         <td colSpan="3" className="border-2 border-slate-800 text-center">
-                                            <div className="text-3xl font-black tracking-widest leading-none mb-1">₩ {payroll.total_pay.toLocaleString()}</div>
-                                            <div className="text-[10px] font-medium opacity-60 uppercase tracking-widest">(A - B = 차감 지급액)</div>
+                                            <div className="text-2xl font-black tracking-widest leading-none mb-0.5">₩ {safeLocaleString(payroll.total_pay)}</div>
+                                            <div className="text-[9px] font-medium opacity-60 uppercase tracking-widest">(A - B = 차감 지급액)</div>
                                         </td>
                                     </tr>
-                                    <tr className="h-12 text-[14px]">
+                                    <tr className="h-10 text-[13px]">
                                         <td className="w-1/4 bg-slate-100 font-bold border-2 border-slate-800 text-center">급여 수령 계좌</td>
-                                        <td colSpan="3" className="px-8 border-2 border-slate-800 text-xl font-black text-slate-800 tracking-wider">
+                                        <td colSpan="3" className="px-8 border-2 border-slate-800 text-lg font-black text-slate-800 tracking-wider">
                                             {staff.bank_account || '기록 없음'}
                                         </td>
                                     </tr>

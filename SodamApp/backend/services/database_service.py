@@ -19,9 +19,16 @@ class DatabaseService:
         rev_stmt = select(func.sum(Revenue.amount)).where(Revenue.date >= start_date, Revenue.date < end_date)
         total_revenue = self.session.exec(rev_stmt).one() or 0
         
-        # Expenses
+        # Expenses (General)
         exp_stmt = select(func.sum(Expense.amount)).where(Expense.date >= start_date, Expense.date < end_date)
         total_expense = self.session.exec(exp_stmt).one() or 0
+        
+        # Payroll Expenses
+        month_str = f"{year}-{month:02d}"
+        pay_stmt = select(func.sum(Payroll.total_pay)).where(Payroll.month == month_str)
+        total_payroll = self.session.exec(pay_stmt).one() or 0
+        
+        total_expense += total_payroll
         
         profit = total_revenue - total_expense
         margin = (profit / total_revenue * 100) if total_revenue > 0 else 0

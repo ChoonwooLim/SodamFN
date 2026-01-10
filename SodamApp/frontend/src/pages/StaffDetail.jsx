@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer } from 'lucide-react';
 import api from '../api';
 import PayrollStatement from '../components/PayrollStatement';
+import AttendanceInput from '../components/AttendanceInput';
 
 export default function StaffDetail() {
     const { id } = useParams();
@@ -32,6 +33,8 @@ export default function StaffDetail() {
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
     const [selectedPayroll, setSelectedPayroll] = useState(null); // Selected payroll for statement modal
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [currentBudgetMonth, setCurrentBudgetMonth] = useState(new Date().toISOString().slice(0, 7));
 
     useEffect(() => {
         if (id) fetchStaffDetail();
@@ -55,7 +58,7 @@ export default function StaffDetail() {
         return `${raw.slice(0, 3)}-${raw.slice(3, 7)}-${raw.slice(7, 11)}`;
     };
 
-    const fetchStaffDetail = async () => {
+    const fetchStaffDetail = async (newPayroll = null) => {
         try {
             const res = await api.get(`/hr/staff/${id}`);
             if (res.data.status === 'success') {
@@ -65,6 +68,12 @@ export default function StaffDetail() {
                 setFormData(data);
                 setDocuments(res.data.documents || []);
                 setPayrolls(res.data.payrolls || []);
+
+                // If a new payroll was generated, open its statement automatically
+                if (newPayroll) {
+                    // Try to find the actual updated record in the list or use the passed one
+                    setSelectedPayroll(newPayroll);
+                }
             }
         } catch (error) {
             console.error(error);
@@ -380,9 +389,25 @@ export default function StaffDetail() {
 
                 {/* 5. Payroll History (Full Width) */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-3 mb-6 border-b pb-4">
-                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
-                        <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
+                    <div className="flex items-center justify-between mb-6 border-b pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
+                            <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="month"
+                                value={currentBudgetMonth}
+                                onChange={(e) => setCurrentBudgetMonth(e.target.value)}
+                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                            <button
+                                onClick={() => setIsAttendanceModalOpen(true)}
+                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
+                            >
+                                <Calendar size={16} /> 근무 기록/급여 산출
+                            </button>
+                        </div>
                     </div>
 
                     {payrolls.length === 0 ? (
@@ -435,6 +460,16 @@ export default function StaffDetail() {
                     onClose={() => setSelectedPayroll(null)}
                 />
             )}
+
+            {/* Attendance & Calculation Modal */}
+            <AttendanceInput
+                isOpen={isAttendanceModalOpen}
+                onClose={() => setIsAttendanceModalOpen(false)}
+                staffId={id}
+                staffName={formData.name}
+                month={currentBudgetMonth}
+                onCalculateSuccess={fetchStaffDetail}
+            />
         </div>
     );
 }

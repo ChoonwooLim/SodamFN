@@ -1,6 +1,7 @@
 from typing import Optional, List
 from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
-from datetime import date, time, datetime
+import datetime
+from datetime import time
 
 # --- Financials ---
 
@@ -26,7 +27,7 @@ class Product(SQLModel, table=True):
 
 class Expense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: date
+    date: datetime.date
     amount: int
     category: str  # e.g., "식자재", "월세"
     payment_method: str = "Card"
@@ -37,9 +38,14 @@ class Expense(SQLModel, table=True):
 
 class Revenue(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: date
+    date: datetime.date
     channel: str # Store, Coupang, Baemin
     amount: int
+    description: Optional[str] = None
+
+class CompanyHoliday(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: datetime.date = Field(index=True, unique=True)
     description: Optional[str] = None
 
 # --- Operations (Inventory) ---
@@ -50,7 +56,7 @@ class Inventory(SQLModel, table=True):
     
     current_stock: float = 0.0
     safety_stock: float = 0.0
-    last_checked_at: datetime = Field(default_factory=datetime.now)
+    last_checked_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 # --- HR & Payroll ---
 
@@ -59,7 +65,7 @@ class Staff(SQLModel, table=True):
     name: str
     role: str # e.g., "Manager", "Part-time"
     hourly_wage: int
-    start_date: date
+    start_date: datetime.date
     bank_account: Optional[str] = None
     status: str = Field(default="재직") # 재직 / 퇴사
     
@@ -86,13 +92,13 @@ class StaffDocument(SQLModel, table=True):
     doc_type: str # 'contract', 'health_cert', 'id_copy', 'bank_copy'
     file_path: str
     original_filename: str
-    upload_date: datetime = Field(default_factory=datetime.now)
+    upload_date: datetime.datetime = Field(default_factory=datetime.datetime.now)
     
     staff: Optional[Staff] = Relationship(back_populates="documents")
 
 class Attendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: date
+    date: datetime.date
     check_in: Optional[time] = None
     check_out: Optional[time] = None
     total_hours: float = 0.0
