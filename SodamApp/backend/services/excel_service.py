@@ -292,3 +292,62 @@ class ExcelService:
         except Exception as e:
             print(f"Error adding expense: {e}")
             return {"status": "error", "message": str(e)}
+    def parse_upload(self, file_contents: bytes):
+        """
+        Parses an uploaded Excel file.
+        Expected columns: '날짜', '항목', '금액', '분류' (or similar).
+        Returns a list of dictionaries.
+        """
+        import io
+        try:
+            # Read into pandas
+            df = pd.read_excel(io.BytesIO(file_contents))
+            
+            # Simple column mapping logic
+            # We look for columns that might match
+            cols = df.columns.tolist()
+            
+            # Helper to find column
+            def find_col(keywords):
+                for c in cols:
+                    if any(k in str(c) for k in keywords):
+                        return c
+                return None
+            
+            date_col = find_col(['날짜', 'Date', '일자'])
+            item_col = find_col(['항목', 'Item', '내역', '사용처'])
+            amount_col = find_col(['금액', 'Amount', '비용'])
+            addr_col = find_col(['분류', 'Category']) # Optional
+            
+            if not (date_col and amount_col):
+                return {"status": "error", "message": "필수 컬럼(날짜, 금액)을 찾을 수 없습니다."}
+            
+            results = []
+            for _, row in df.iterrows():
+                try:
+                    d_val = row[date_col]
+                    # Handle date formats
+                    if isinstance(d_val, datetime.datetime):
+                        d_str = d_val.strftime("%Y-%m-%d")
+                    else:
+                        d_str = str(d_val)[:10] # Naive string slice
+                        
+                    amt = row[amount_col]
+                    amt = int(amt) if pd.notna(amt) and str(amt).replace(',','').replace('.','').isdigit() else 0
+                    
+                    item = str(row[item_col]) if item_col and pd.notna(row[item_col]) else "미지정"
+                    cat = str(row[addr_col]) if addr_col and pd.notna(row[addr_col]) else "기타"
+                    
+                    results.append({
+                        "date": d_str,
+                        "item": item,
+                        "amount": amt,
+                        "category": cat
+                    })
+                except Exception as row_e:
+                    continue # Skip bad rows
+                    
+            return {"status": "success", "data": results}
+            
+        except Exception as e:
+            return {"status": "error", "message": f"Excel parsing error: {str(e)}"}

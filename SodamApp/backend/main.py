@@ -3,9 +3,15 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import stats, ocr, expense, hr
+from routers import stats, ocr, expense, hr, upload
+
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title="Sodam Profit API")
+
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Allow CORS for local development
 app.add_middleware(
@@ -20,6 +26,7 @@ app.include_router(stats.router, prefix="/api")
 app.include_router(hr.router, prefix="/api/hr")
 app.include_router(ocr.router, prefix="/api")
 app.include_router(expense.router, prefix="/api")
+app.include_router(upload.router, prefix="/api")
 
 @app.get("/")
 def read_root():

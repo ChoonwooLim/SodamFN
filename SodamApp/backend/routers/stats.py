@@ -6,50 +6,77 @@ from datetime import date
 router = APIRouter()
 
 @router.get("/dashboard")
-def get_dashboard_data():
+def get_dashboard_data(year: int = 2025, month: int = 12):
     try:
         service = DatabaseService()
-        # Default to December (12) for now
-        data = service.get_monthly_summary(month=12)
+        # Summary for selected month
+        data = service.get_monthly_summary(year=year, month=month)
         
-        prev_data = service.get_monthly_summary(month=11)
+        # Previous month calculation
+        if month == 1:
+            prev_year = year - 1
+            prev_month = 12
+        else:
+            prev_year = year
+            prev_month = month - 1
+            
+        prev_data = service.get_monthly_summary(year=prev_year, month=prev_month)
+        
         growth = 0
         if prev_data['revenue'] > 0:
             growth = ((data['revenue'] - prev_data['revenue']) / prev_data['revenue']) * 100
             
+        # 6-Month Trend Calculation
+        monthly_trend = []
+        # Loop backwards 5 times + current = 6 months
+        curr_y, curr_m = year, month
+        
+        # Generate list of (year, month) tuples for last 6 months including current
+        trend_months = []
+        for _ in range(6):
+            trend_months.append((curr_y, curr_m))
+            if curr_m == 1:
+                curr_y -= 1
+                curr_m = 12
+            else:
+                curr_m -= 1
+        
+        # Reverse to show chronological order
+        trend_months.reverse()
+        
+        for y, m in trend_months:
+            summary = service.get_monthly_summary(year=y, month=m)
+            monthly_trend.append({"month": f"{m}월", **summary})
+
         return {
             "status": "success",
             "data": {
-                "month": "12월",
+                "year": year, # Include year in response
+                "month": f"{month}월",
+                "revenue": data['revenue'], 
                 "net_profit": data['profit'],
                 "margin_rate": data['margin'],
                 "revenue_growth": round(growth, 1),
-                "monthly_trend": [
-                    {"name": "8월", "profit": 0}, # Placeholder or fetch real history
-                    {"name": "9월", "profit": 23748853},
-                    {"name": "10월", "profit": 16890562},
-                    {"name": "11월", "profit": 25304912},
-                    {"name": "12월", "profit": data['profit']}
-                ]
+                "monthly_trend": monthly_trend
             }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/revenue")
-def get_revenue_breakdown():
+def get_revenue_breakdown(year: int = 2025, month: int = 12):
     try:
         service = DatabaseService()
-        data = service.get_revenue_breakdown(month=12)
+        data = service.get_revenue_breakdown(year=year, month=month)
         return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/cost")
-def get_cost_breakdown():
+def get_cost_breakdown(year: int = 2025, month: int = 12):
     try:
         service = DatabaseService()
-        data = service.get_top_expenses(month=12)
+        data = service.get_top_expenses(year=year, month=month)
         return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

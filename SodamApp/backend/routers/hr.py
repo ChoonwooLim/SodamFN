@@ -1,11 +1,16 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from services.database_service import DatabaseService
-from models import Staff, Attendance
+from models import Staff, Attendance, StaffDocument
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import date, datetime
+import shutil
+import os
+from sqlmodel import select, col
 
 router = APIRouter()
+
+# --- Pydantic Models ---
 
 class StaffCreate(BaseModel):
     name: str
@@ -14,12 +19,47 @@ class StaffCreate(BaseModel):
     bank_account: Optional[str] = None
     start_date: date = date.today()
 
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    hourly_wage: Optional[int] = None
+    bank_account: Optional[str] = None
+    start_date: Optional[date] = None
+    status: Optional[str] = None
+    phone: Optional[str] = None
+    contract_type: Optional[str] = None
+    insurance_4major: Optional[bool] = None
+    monthly_salary: Optional[int] = None
+    work_schedule: Optional[str] = None
+    doc_contract: Optional[bool] = None
+    doc_health_cert: Optional[bool] = None
+    doc_id_copy: Optional[bool] = None
+    doc_bank_copy: Optional[bool] = None
+
+class AttendanceAction(BaseModel):
+    staff_id: int
+    action: str # "checkin" or "checkout"
+
+# --- Endpoints ---
+
 @router.get("/staff")
-def get_all_staff():
+def get_all_staff(q: Optional[str] = None, status: Optional[str] = None):
     service = DatabaseService()
     try:
-        from sqlmodel import select
-        staffs = service.session.exec(select(Staff)).all()
+        stmt = select(Staff)
+        
+        # Apply Status Filter if Provided
+        if status:
+            stmt = stmt.where(Staff.status == status)
+        elif not q:
+            # Default: If no status AND no query, show only Active
+            stmt = stmt.where(Staff.status == "재직")
+            
+        # Apply Search Query
+        if q:
+            stmt = stmt.where(col(Staff.name).contains(q))
+            
+        staffs = service.session.exec(stmt).all()
         return {"status": "success", "data": staffs}
     finally:
         service.close()
@@ -41,16 +81,100 @@ def create_staff(staff: StaffCreate):
     finally:
         service.close()
 
-class AttendanceAction(BaseModel):
-    staff_id: int
-    action: str # "checkin" or "checkout"
+@router.get("/staff/{staff_id}")
+def get_staff_detail(staff_id: int):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
+            
+        # Fetch Documents
+        documents = service.session.exec(select(StaffDocument).where(StaffDocument.staff_id == staff_id)).all()
+        
+        # Fetch Payrolls (Sorted by Month Descending)
+        from models import Payroll
+        payrolls = service.session.exec(
+            select(Payroll)
+            .where(Payroll.staff_id == staff_id)
+            .order_by(col(Payroll.month).desc())
+        ).all()
+        
+        return {"status": "success", "data": staff, "documents": documents, "payrolls": payrolls}
+    finally:
+        service.close()
+
+@router.put("/staff/{staff_id}")
+def update_staff(staff_id: int, update_data: StaffUpdate):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
+            
+        update_dict = update_data.dict(exclude_unset=True)
+        for key, value in update_dict.items():
+            setattr(staff, key, value)
+            
+        service.session.add(staff)
+        service.session.commit()
+        service.session.refresh(staff)
+        return {"status": "success", "data": staff}
+    finally:
+        service.close()
+
+@router.post("/staff/{staff_id}/document")
+def upload_staff_document(
+    staff_id: int, 
+    doc_type: str = Form(...), 
+    file: UploadFile = File(...)
+):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
+            
+        # Determine Save Path
+        base_dir = "uploads/staff_docs"
+        staff_dir = os.path.join(base_dir, str(staff_id))
+        os.makedirs(staff_dir, exist_ok=True)
+        
+        # Save File
+        timestamp = int(datetime.now().timestamp())
+        filename = f"{doc_type}_{timestamp}_{file.filename}"
+        file_path = os.path.join(staff_dir, filename)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Save to DB
+        new_doc = StaffDocument(
+            staff_id=staff_id,
+            doc_type=doc_type,
+            file_path=file_path, # relative path or full? standardizing on relative for portability usually
+            original_filename=file.filename
+        )
+        service.session.add(new_doc)
+        
+        # Update Staff CheckBox
+        attr_name = f"doc_{doc_type}"
+        if hasattr(staff, attr_name):
+            setattr(staff, attr_name, True)
+            service.session.add(staff)
+            
+        service.session.commit()
+        
+        # Return URL-friendly path if needed, or just path
+        # Frontend will need to prepend server URL
+        return {"status": "success", "file_path": file_path, "filename": filename}
+    finally:
+        service.close()
 
 @router.post("/attendance")
 def log_attendance(payload: AttendanceAction):
     service = DatabaseService()
     try:
-        from sqlmodel import select
-        from datetime import datetime
         today = date.today()
         now_time = datetime.now().time()
         

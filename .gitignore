@@ -29,7 +29,7 @@ yarn-error.log*
 *.sqlite3
 *.sqlite
 # Keep Excel files for now as they are the data source in the repo root
-# *.xlsx 
+*.xlsx 
 
 # Logs
 logs/

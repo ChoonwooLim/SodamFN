@@ -8,15 +8,13 @@ class DatabaseService:
     def __init__(self):
         self.session = Session(engine)
 
-    def get_monthly_summary(self, month: int):
+    def get_monthly_summary(self, month: int, year: int = 2025):
         # Revenue
-        # Filter by month (approximate check for now or exact date range)
-        # Using string matching for YYYY-MM logic or DB date functions
-        start_date = date(2025, month, 1)
+        start_date = date(year, month, 1)
         if month == 12:
-            end_date = date(2026, 1, 1)
+            end_date = date(year + 1, 1, 1)
         else:
-            end_date = date(2025, month + 1, 1)
+            end_date = date(year, month + 1, 1)
             
         rev_stmt = select(func.sum(Revenue.amount)).where(Revenue.date >= start_date, Revenue.date < end_date)
         total_revenue = self.session.exec(rev_stmt).one() or 0
@@ -35,20 +33,20 @@ class DatabaseService:
             "margin": round(margin, 1)
         }
 
-    def get_revenue_breakdown(self, month: int):
-        start_date = date(2025, month, 1)
-        if month == 12: end_date = date(2026, 1, 1)
-        else: end_date = date(2025, month + 1, 1)
+    def get_revenue_breakdown(self, month: int, year: int = 2025):
+        start_date = date(year, month, 1)
+        if month == 12: end_date = date(year + 1, 1, 1)
+        else: end_date = date(year, month + 1, 1)
 
         stmt = select(Revenue.channel, func.sum(Revenue.amount)).where(Revenue.date >= start_date, Revenue.date < end_date).group_by(Revenue.channel)
         results = self.session.exec(stmt).all()
         
         return [{"name": r[0], "value": r[1]} for r in results]
 
-    def get_top_expenses(self, month: int):
-        start_date = date(2025, month, 1)
-        if month == 12: end_date = date(2026, 1, 1)
-        else: end_date = date(2025, month + 1, 1)
+    def get_top_expenses(self, month: int, year: int = 2025):
+        start_date = date(year, month, 1)
+        if month == 12: end_date = date(year + 1, 1, 1)
+        else: end_date = date(year, month + 1, 1)
         
         # Join Expense with Vendor
         # Group by Vendor Name, Sum Amount
