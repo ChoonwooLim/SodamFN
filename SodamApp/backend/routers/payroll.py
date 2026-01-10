@@ -302,8 +302,11 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         service.session.add(existing)
         service.session.commit()
+        service.session.refresh(existing)
         
-        return {"status": "success", "data": existing}
+        print(f"DEBUG: Calculated Payroll: Base={total_base_pay}, Bonus={total_holiday_pay}, Total={net_pay}")
+        
+        return {"status": "success", "data": existing.model_dump()}
         
     finally:
         service.close()

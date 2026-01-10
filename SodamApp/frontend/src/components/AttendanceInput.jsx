@@ -176,10 +176,15 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             console.log("Calculation API result:", result);
             if (result.status === 'success') {
                 alert('급여 산출이 완료되었습니다.');
+
+                // Close modal first
+                console.log("Closing Attendance Modal...");
+                onClose();
+
                 if (onCalculateSuccess) {
+                    console.log("Triggering onCalculateSuccess with:", result.data);
                     onCalculateSuccess(result.data);
                 }
-                onClose();
             } else {
                 alert(result.message || '산출 중 오류가 발생했습니다.');
             }
