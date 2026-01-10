@@ -1,0 +1,39 @@
+# General
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+services/__pycache__/
+routers/__pycache__/
+.venv/
+venv/
+env/
+*.env
+
+# Node.js
+node_modules/
+dist/
+build/
+coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+# Keep Excel files for now as they are the data source in the repo root
+# *.xlsx 
+
+# Logs
+logs/
+*.log
+
+# Render
+.render/
