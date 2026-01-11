@@ -201,3 +201,50 @@ def log_attendance(payload: AttendanceAction):
         return {"status": "success"}
     finally:
         service.close()
+
+@router.delete("/staff/{staff_id}")
+def delete_staff(staff_id: int):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
+            
+        # 1. Delete Documents and Files
+        documents = service.session.exec(select(StaffDocument).where(StaffDocument.staff_id == staff_id)).all()
+        for doc in documents:
+            if os.path.exists(doc.file_path):
+                try:
+                    os.remove(doc.file_path)
+                except Exception as e:
+                    print(f"Error deleting file {doc.file_path}: {e}")
+            service.session.delete(doc)
+            
+        # Clean up staff doc directory if empty
+        base_dir = "uploads/staff_docs"
+        staff_dir = os.path.join(base_dir, str(staff_id))
+        if os.path.exists(staff_dir):
+            try:
+                shutil.rmtree(staff_dir)
+            except Exception as e:
+                print(f"Error removing directory {staff_dir}: {e}")
+
+        # 2. Delete Attendance
+        attendances = service.session.exec(select(Attendance).where(Attendance.staff_id == staff_id)).all()
+        for att in attendances:
+            service.session.delete(att)
+            
+        # 3. Delete Payroll
+        from models import Payroll
+        payrolls = service.session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
+        for pay in payrolls:
+            service.session.delete(pay)
+            
+        # 4. Delete Staff Record
+        service.session.delete(staff)
+        
+        service.session.commit()
+        return {"status": "success", "message": "Staff and all related data deleted"}
+    finally:
+        service.close()
+

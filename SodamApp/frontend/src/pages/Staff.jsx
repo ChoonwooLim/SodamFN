@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter } from 'lucide-react';
+import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter, Trash2 } from 'lucide-react';
 import api from '../api';
 import StaffAddModal from '../components/StaffAddModal';
 
@@ -63,6 +63,24 @@ export default function StaffPage() {
         } catch (error) {
             console.error("Error updating status:", error);
             alert("상태 변경에 실패했습니다.");
+        }
+    };
+
+    const handleDeleteStaff = async (e, staffId, staffName) => {
+        e.stopPropagation();
+
+        if (!window.confirm(`${staffName} 직원의 모든 데이터(급여, 근태, 서류)가 영구 삭제됩니다. 정말 삭제하시겠습니까?`)) return;
+        if (!window.confirm("정말로 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+
+        try {
+            const response = await api.delete(`/hr/staff/${staffId}`);
+            if (response.data.status === 'success') {
+                alert("삭제되었습니다.");
+                fetchStaff(searchTerm);
+            }
+        } catch (error) {
+            console.error("Error deleting staff:", error);
+            alert("삭제에 실패했습니다.");
         }
     };
 
@@ -187,6 +205,13 @@ export default function StaffPage() {
                                             <UserCheck size={14} /> 재직 처리
                                         </button>
                                     )}
+                                    <button
+                                        onClick={(e) => handleDeleteStaff(e, staff.id, staff.name)}
+                                        className="flex items-center gap-1 bg-white text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-50 transition-colors border border-red-100"
+                                        title="직원 정보 삭제"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                     <button className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium">
                                         <ChevronRight size={20} className="text-slate-400" />
                                     </button>
