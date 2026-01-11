@@ -30,11 +30,20 @@ export default function StaffDetail() {
 
     const [documents, setDocuments] = useState([]); // List of uploaded documents
     const [payrolls, setPayrolls] = useState([]); // List of payroll history
+    const [contracts, setContracts] = useState([]); // List of electronic contracts
+    const [user, setUser] = useState(null); // Linked user account
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
     const [selectedPayroll, setSelectedPayroll] = useState(null); // Selected payroll for statement modal
     const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+    const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
     const [currentBudgetMonth, setCurrentBudgetMonth] = useState(new Date().toISOString().slice(0, 7));
+
+    // New Account Form
+    const [accountForm, setAccountForm] = useState({ username: '', password: '' });
+    // New Contract Form
+    const [contractForm, setContractForm] = useState({ title: '표준근로계약서', content: '' });
 
     useEffect(() => {
         if (id) fetchStaffDetail();
@@ -68,6 +77,8 @@ export default function StaffDetail() {
                 setFormData(data);
                 setDocuments(res.data.documents || []);
                 setPayrolls(res.data.payrolls || []);
+                setContracts(res.data.contracts || []);
+                setUser(res.data.user || null);
 
                 // If a new payroll was generated, open its statement automatically
                 if (newPayroll) {
@@ -142,7 +153,35 @@ export default function StaffDetail() {
         }
     };
 
+    const handleCreateAccount = async () => {
+        try {
+            await api.post(`/hr/staff/${id}/account`, accountForm);
+            alert("계정이 생성되었습니다.");
+            setIsAccountModalOpen(false);
+            fetchStaffDetail();
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "계정 생성 실패");
+        }
+    };
+
+    const handleCreateContract = async () => {
+        try {
+            await api.post(`/contracts/`, {
+                staff_id: id,
+                ...contractForm
+            });
+            alert("계약서가 생성되었습니다.");
+            setIsContractModalOpen(false);
+            fetchStaffDetail();
+        } catch (error) {
+            console.error(error);
+            alert("계약서 생성 실패");
+        }
+    };
+
     if (loading) return <div className="p-10 text-center">Loading...</div>;
+
 
     const docTypes = [
         { key: 'contract', label: '근로계약서' },
@@ -237,6 +276,33 @@ export default function StaffDetail() {
                                     />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Login Account Section */}
+                        <div className="mt-6 pt-6 border-t border-slate-100">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-slate-800 text-sm">로그인 계정</h3>
+                                {!user ? (
+                                    <button
+                                        onClick={() => setIsAccountModalOpen(true)}
+                                        className="text-xs font-bold text-blue-600 hover:underline"
+                                    >
+                                        계정 생성
+                                    </button>
+                                ) : (
+                                    <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                                        <CheckSquare size={12} /> 연동됨
+                                    </span>
+                                )}
+                            </div>
+                            {user ? (
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center text-sm">
+                                    <span className="text-slate-500">아이디</span>
+                                    <span className="font-medium text-slate-800">{user.username}</span>
+                                </div>
+                            ) : (
+                                <div className="text-xs text-slate-400 italic">연동된 계정이 없습니다.</div>
+                            )}
                         </div>
                     </div>
 
@@ -385,6 +451,56 @@ export default function StaffDetail() {
                             })}
                         </div>
                     </div>
+
+                    {/* Electronic Contract Management */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="flex items-center justify-between mb-6 border-b pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><FileText size={24} /></div>
+                                <h2 className="text-lg font-bold text-slate-800">전자계약 관리</h2>
+                            </div>
+                            <button
+                                onClick={() => setIsContractModalOpen(true)}
+                                className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
+                            >
+                                <FileText size={14} /> 계약서 작성
+                            </button>
+                        </div>
+
+                        <div className="space-y-3">
+                            {contracts.length === 0 ? (
+                                <div className="text-center py-6 text-slate-400 text-sm italic">
+                                    발송된 전자계약서가 없습니다.
+                                </div>
+                            ) : (
+                                contracts.map(contract => (
+                                    <div key={contract.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${contract.status === 'signed' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'}`}>
+                                                <FileText size={16} />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-bold text-slate-800 truncate">{contract.title}</div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                    {contract.status === 'signed' ? `서명됨 (${new Date(contract.signed_at).toLocaleDateString()})` : '서명 대기 중'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {contract.status === 'signed' && (
+                                            <button
+                                                onClick={() => {
+                                                    window.open(`/contracts/${contract.id}/sign`, '_blank');
+                                                }}
+                                                className="text-xs font-bold text-blue-600 hover:underline shrink-0"
+                                            >
+                                                서명 확인
+                                            </button>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 {/* 5. Payroll History (Full Width) */}
@@ -470,6 +586,99 @@ export default function StaffDetail() {
                 month={currentBudgetMonth}
                 onCalculateSuccess={fetchStaffDetail}
             />
+
+            {/* Account Creation Modal */}
+            {isAccountModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
+                                    <input
+                                        type="text"
+                                        value={accountForm.username}
+                                        onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="아이디 입력"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
+                                    <input
+                                        type="password"
+                                        value={accountForm.password}
+                                        onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="비밀번호 입력"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 flex gap-2">
+                            <button
+                                onClick={() => setIsAccountModalOpen(false)}
+                                className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleCreateAccount}
+                                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                            >
+                                생성하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Contract Creation Modal */}
+            {isContractModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6">
+                            <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
+                                    <input
+                                        type="text"
+                                        value={contractForm.title}
+                                        onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="제목 입력"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
+                                    <textarea
+                                        value={contractForm.content}
+                                        onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
+                                        className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
+                                        placeholder="계약서 전문 또는 주요 내용을 입력하세요."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 flex gap-3">
+                            <button
+                                onClick={() => setIsContractModalOpen(false)}
+                                className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleCreateContract}
+                                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
+                            >
+                                계약서 발송하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

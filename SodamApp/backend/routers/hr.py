@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body
 from services.database_service import DatabaseService
 from models import Staff, Attendance, StaffDocument
 from pydantic import BaseModel
@@ -92,15 +92,26 @@ def get_staff_detail(staff_id: int):
         # Fetch Documents
         documents = service.session.exec(select(StaffDocument).where(StaffDocument.staff_id == staff_id)).all()
         
-        # Fetch Payrolls (Sorted by Month Descending)
-        from models import Payroll
-        payrolls = service.session.exec(
-            select(Payroll)
-            .where(Payroll.staff_id == staff_id)
-            .order_by(col(Payroll.month).desc())
-        ).all()
+        # Fetch Contracts
+        from models import ElectronicContract
+        contracts = service.session.exec(select(ElectronicContract).where(ElectronicContract.staff_id == staff_id)).all()
         
-        return {"status": "success", "data": staff, "documents": documents, "payrolls": payrolls}
+        # Fetch User Account
+        from models import User, Payroll
+        user_account = service.session.exec(select(User).where(User.staff_id == staff_id)).first()
+        user_info = {"username": user_account.username} if user_account else None
+
+        # Fetch Payrolls
+        payrolls = service.session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
+
+        return {
+            "status": "success", 
+            "data": staff, 
+            "documents": documents, 
+            "payrolls": payrolls, 
+            "contracts": contracts,
+            "user": user_info
+        }
     finally:
         service.close()
 
@@ -123,7 +134,36 @@ def update_staff(staff_id: int, update_data: StaffUpdate):
     finally:
         service.close()
 
+@router.post("/staff/{staff_id}/account")
+def create_staff_account(staff_id: int, username: str = Body(..., embed=True), password: str = Body(..., embed=True)):
+    from models import User
+    from routers.auth import get_password_hash
+    service = DatabaseService()
+    try:
+        # Check if username exists
+        existing = service.session.exec(select(User).where(User.username == username)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+            
+        # Check if staff already has account
+        staff_account = service.session.exec(select(User).where(User.staff_id == staff_id)).first()
+        if staff_account:
+            raise HTTPException(status_code=400, detail="Staff already has an account")
+            
+        new_user = User(
+            username=username,
+            hashed_password=get_password_hash(password),
+            role="staff",
+            staff_id=staff_id
+        )
+        service.session.add(new_user)
+        service.session.commit()
+        return {"status": "success", "message": "Account created successfully"}
+    finally:
+        service.close()
+
 @router.post("/staff/{staff_id}/document")
+
 def upload_staff_document(
     staff_id: int, 
     doc_type: str = Form(...), 
@@ -199,6 +239,40 @@ def log_attendance(payload: AttendanceAction):
             
         service.session.commit()
         return {"status": "success"}
+    finally:
+        service.close()
+
+@router.get("/attendance/status/{staff_id}")
+def get_attendance_status(staff_id: int):
+    service = DatabaseService()
+    try:
+        today = date.today()
+        stmt = select(Attendance).where(Attendance.staff_id == staff_id, Attendance.date == today)
+        record = service.session.exec(stmt).first()
+        
+        if not record:
+            return {"status": "success", "data": {"checked_in": False, "checked_out": False}}
+        
+        return {
+            "status": "success", 
+            "data": {
+                "checked_in": record.check_in is not None,
+                "checked_out": record.check_out is not None,
+                "check_in_time": record.check_in,
+                "check_out_time": record.check_out
+            }
+        }
+    finally:
+        service.close()
+
+@router.get("/attendance/history/{staff_id}")
+def get_attendance_history(staff_id: int):
+    service = DatabaseService()
+    try:
+        # Get last 5 records
+        stmt = select(Attendance).where(Attendance.staff_id == staff_id).order_by(Attendance.date.desc()).limit(5)
+        records = service.session.exec(stmt).all()
+        return {"status": "success", "data": records}
     finally:
         service.close()
 

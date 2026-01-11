@@ -85,6 +85,38 @@ class Staff(SQLModel, table=True):
     attendances: List["Attendance"] = Relationship(back_populates="staff")
     payrolls: List["Payroll"] = Relationship(back_populates="staff")
     documents: List["StaffDocument"] = Relationship(back_populates="staff")
+    contracts: List["ElectronicContract"] = Relationship(back_populates="staff")
+    user: Optional["User"] = Relationship(back_populates="staff")
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)
+    hashed_password: Optional[str] = None # Optional for social logins
+    role: str = Field(default="staff") # admin, staff
+    grade: str = Field(default="normal") # normal, vip, vvip, admin
+    
+    # Social Login Fields
+    provider: Optional[str] = None # google, naver, kakao
+    provider_id: Optional[str] = None
+    email: Optional[str] = None
+    real_name: Optional[str] = None
+    profile_image: Optional[str] = None
+    
+    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id")
+    staff: Optional[Staff] = Relationship(back_populates="user")
+
+class ElectronicContract(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    content: str # Can store template text or specific details
+    signature_data: Optional[str] = None # Base64 signature image
+    status: str = Field(default="pending") # pending, signed
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    signed_at: Optional[datetime.datetime] = None
+    
+    staff_id: int = Field(foreign_key="staff.id")
+    staff: Optional[Staff] = Relationship(back_populates="contracts")
+
 
 class StaffDocument(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

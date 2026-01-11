@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import ExpenseConfirm from './pages/ExpenseConfirm';
 import VendorSettings from './pages/VendorSettings';
@@ -7,38 +7,85 @@ import StaffDetail from './pages/StaffDetail';
 import DataInputPage from './pages/DataInputPage';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
+import LoginPage from './pages/Login';
+import ContractMyPage from './pages/ContractMy';
+import ContractSignPage from './pages/ContractSign';
+import SignupPage from './pages/Signup';
+import StaffDashboard from './pages/StaffDashboard';
+
+const ProtectedRoute = ({ children, adminOnly = false }) => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('user_role');
+
+  if (!token) return <Navigate to="/login" replace />;
+
+  if (adminOnly && role !== 'admin') {
+    return <Navigate to="/staff-dashboard" replace />;
+  }
+
+  return children;
+};
+
+const Layout = ({ children }) => {
+  // Use location to trigger re-render on route change
+  // eslint-disable-next-line no-unused-vars
+  const location = useLocation();
+  const role = localStorage.getItem('user_role');
+  const isAdmin = role === 'admin';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+
+  if (isAuthPage) {
+    return <div className="min-h-screen bg-slate-50">{children}</div>;
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* Render Sidebar for Admin (Reactive) */}
+      {isAdmin && <Sidebar />}
+
+      {/* Main Content Area */}
+      <div className={`flex-1 relative min-h-screen ${isAdmin ? 'md:ml-64' : ''}`}>
+        {children}
+
+        {/* Mobile Bottom Navigation - Only visible on small screens for Admin */}
+        {isAdmin && (
+          <div className="md:hidden">
+            <BottomNav />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-50 flex">
-        {/* Desktop Sidebar */}
-        <Sidebar />
+      <Layout>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
 
-        {/* Main Content Area */}
-        <div className="flex-1 md:ml-64 relative min-h-screen">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
 
-            {/* Split Input Routes */}
-            <Route path="/input/revenue" element={<DataInputPage mode="revenue" />} />
-            <Route path="/input/expense" element={<DataInputPage mode="expense" />} />
+          {/* SPLIT INPUT ROUTES */}
+          <Route path="/input/revenue" element={<ProtectedRoute adminOnly><DataInputPage mode="revenue" /></ProtectedRoute>} />
+          <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
-            {/* Backward compatibility / Redirection */}
-            <Route path="/camera" element={<DataInputPage mode="expense" />} />
+          {/* BACKWARD COMPATIBILITY */}
+          <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
-            <Route path="/confirm" element={<ExpenseConfirm />} />
-            <Route path="/settings" element={<VendorSettings />} />
-            <Route path="/staff" element={<StaffPage />} />
-            <Route path="/staff/:id" element={<StaffDetail />} />
-          </Routes>
+          <Route path="/confirm" element={<ProtectedRoute adminOnly><ExpenseConfirm /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
+          <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
+          <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
 
-          {/* Mobile Bottom Navigation - Only visible on small screens */}
-          <div className="md:hidden">
-            <BottomNav />
-          </div>
-        </div>
-      </div>
+          {/* STAFF ROUTES */}
+          <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
+          <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
+          <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />
+        </Routes>
+      </Layout>
     </BrowserRouter>
   );
 }
