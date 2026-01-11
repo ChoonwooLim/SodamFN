@@ -41,7 +41,7 @@ export default function StaffDetail() {
     const [currentBudgetMonth, setCurrentBudgetMonth] = useState(new Date().toISOString().slice(0, 7));
 
     // New Account Form
-    const [accountForm, setAccountForm] = useState({ username: '', password: '' });
+    const [accountForm, setAccountForm] = useState({ username: '', password: '', grade: 'normal' });
     // New Contract Form
     const [contractForm, setContractForm] = useState({ title: '표준근로계약서', content: '' });
 
@@ -162,6 +162,19 @@ export default function StaffDetail() {
         } catch (error) {
             console.error(error);
             alert(error.response?.data?.detail || "계정 생성 실패");
+        }
+    };
+
+    const handleGradeUpdate = async (newGrade) => {
+        if (!user) return;
+        try {
+            await api.put(`/hr/staff/${id}/account/grade`, { grade: newGrade });
+            setMsg("등급이 수정되었습니다.");
+            setTimeout(() => setMsg(""), 3000);
+            fetchStaffDetail();
+        } catch (error) {
+            console.error(error);
+            alert("등급 수정 실패");
         }
     };
 
@@ -296,9 +309,24 @@ export default function StaffDetail() {
                                 )}
                             </div>
                             {user ? (
-                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">아이디</span>
-                                    <span className="font-medium text-slate-800">{user.username}</span>
+                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                                    <div className="flex justify-between items-center text-sm">
+                                        <span className="text-slate-500">아이디</span>
+                                        <span className="font-medium text-slate-800">{user.username}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2">
+                                        <span className="text-slate-500">등급</span>
+                                        <select
+                                            value={user.grade || 'normal'}
+                                            onChange={(e) => handleGradeUpdate(e.target.value)}
+                                            className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                                        >
+                                            <option value="normal">일반 (Normal)</option>
+                                            <option value="vip">VIP</option>
+                                            <option value="vvip">VVIP</option>
+                                            <option value="admin">관리자 (Admin)</option>
+                                        </select>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="text-xs text-slate-400 italic">연동된 계정이 없습니다.</div>

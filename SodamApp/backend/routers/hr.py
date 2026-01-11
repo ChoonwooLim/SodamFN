@@ -99,7 +99,11 @@ def get_staff_detail(staff_id: int):
         # Fetch User Account
         from models import User, Payroll
         user_account = service.session.exec(select(User).where(User.staff_id == staff_id)).first()
-        user_info = {"username": user_account.username} if user_account else None
+        user_info = {
+            "id": user_account.id,
+            "username": user_account.username,
+            "grade": user_account.grade
+        } if user_account else None
 
         # Fetch Payrolls
         payrolls = service.session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
@@ -135,7 +139,12 @@ def update_staff(staff_id: int, update_data: StaffUpdate):
         service.close()
 
 @router.post("/staff/{staff_id}/account")
-def create_staff_account(staff_id: int, username: str = Body(..., embed=True), password: str = Body(..., embed=True)):
+def create_staff_account(
+    staff_id: int, 
+    username: str = Body(..., embed=True), 
+    password: str = Body(..., embed=True),
+    grade: str = Body("normal", embed=True)
+):
     from models import User
     from routers.auth import get_password_hash
     service = DatabaseService()
@@ -154,11 +163,31 @@ def create_staff_account(staff_id: int, username: str = Body(..., embed=True), p
             username=username,
             hashed_password=get_password_hash(password),
             role="staff",
+            grade=grade,
             staff_id=staff_id
         )
         service.session.add(new_user)
         service.session.commit()
         return {"status": "success", "message": "Account created successfully"}
+    finally:
+        service.close()
+
+@router.put("/staff/{staff_id}/account/grade")
+def update_staff_account_grade(
+    staff_id: int,
+    grade: str = Body(..., embed=True)
+):
+    from models import User
+    service = DatabaseService()
+    try:
+        user_account = service.session.exec(select(User).where(User.staff_id == staff_id)).first()
+        if not user_account:
+            raise HTTPException(status_code=404, detail="User account not found for this staff")
+            
+        user_account.grade = grade
+        service.session.add(user_account)
+        service.session.commit()
+        return {"status": "success", "message": "Grade updated successfully"}
     finally:
         service.close()
 
