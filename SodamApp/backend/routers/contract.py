@@ -16,6 +16,9 @@ class ContractCreate(BaseModel):
 
 class ContractSign(BaseModel):
     signature_data: str # Base64 string
+    address: Optional[str] = None
+    resident_number: Optional[str] = None
+    phone: Optional[str] = None
 
 @router.post("/")
 def create_contract(contract: ContractCreate, admin: User = Depends(get_admin_user)):
@@ -80,6 +83,17 @@ def sign_contract(contract_id: int, sign_data: ContractSign, current_user: User 
         contract.status = "signed"
         contract.signed_at = datetime.now()
         
+        # Update Staff Info
+        staff = service.session.get(Staff, current_user.staff_id)
+        if staff:
+            if sign_data.address:
+                staff.address = sign_data.address
+            if sign_data.resident_number:
+                staff.resident_number = sign_data.resident_number
+            if sign_data.phone:
+                staff.phone = sign_data.phone
+            service.session.add(staff)
+        
         service.session.add(contract)
         service.session.commit()
         return {"status": "success", "message": "Contract signed successfully"}
@@ -93,5 +107,45 @@ def get_staff_contracts(staff_id: int, admin: User = Depends(get_admin_user)):
         stmt = select(ElectronicContract).where(ElectronicContract.staff_id == staff_id)
         contracts = service.session.exec(stmt).all()
         return {"status": "success", "data": contracts}
+    finally:
+        service.close()
+class ContractUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+@router.delete("/{contract_id}")
+def delete_contract(contract_id: int, admin: User = Depends(get_admin_user)):
+    service = DatabaseService()
+    try:
+        contract = service.session.get(ElectronicContract, contract_id)
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        
+        service.session.delete(contract)
+        service.session.commit()
+        return {"status": "success", "message": "Contract deleted"}
+    finally:
+        service.close()
+
+@router.put("/{contract_id}")
+def update_contract(contract_id: int, contract_data: ContractUpdate, admin: User = Depends(get_admin_user)):
+    service = DatabaseService()
+    try:
+        contract = service.session.get(ElectronicContract, contract_id)
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+            
+        if contract.status == "signed":
+             raise HTTPException(status_code=400, detail="Cannot edit signed contract")
+
+        if contract_data.title:
+            contract.title = contract_data.title
+        if contract_data.content:
+            contract.content = contract_data.content
+            
+        service.session.add(contract)
+        service.session.commit()
+        service.session.refresh(contract)
+        return {"status": "success", "data": contract}
     finally:
         service.close()

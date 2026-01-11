@@ -71,6 +71,8 @@ class Staff(SQLModel, table=True):
     
     # HR Details
     phone: Optional[str] = None
+    address: Optional[str] = None # Added for contract
+    resident_number: Optional[str] = None # Added for contract
     contract_type: str = Field(default="아르바이트") # 정규직, 아르바이트, 일용직
     insurance_4major: bool = Field(default=False) # 4대보험 가입여부
     monthly_salary: int = Field(default=0) # 월급 (if applicable)

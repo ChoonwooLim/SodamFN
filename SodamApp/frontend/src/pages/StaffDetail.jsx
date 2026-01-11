@@ -213,22 +213,61 @@ export default function StaffDetail() {
         }
     };
 
+    const [editingContractId, setEditingContractId] = useState(null);
+
     const handleCreateContract = async () => {
+        if (!typeof contractForm.content === 'string' || contractForm.content.trim().length === 0) {
+            alert("계약서 내용이 비어있습니다.");
+            return;
+        }
+
         try {
-            await api.post(`/contracts/`, {
-                staff_id: id,
-                ...contractForm
-            });
-            alert("계약서가 생성되었습니다.");
+            if (editingContractId) {
+                // Update existing
+                await api.put(`/contracts/${editingContractId}`, {
+                    title: contractForm.title,
+                    content: contractForm.content
+                });
+                alert("계약서가 수정되었습니다.");
+            } else {
+                // Create new
+                await api.post(`/contracts/`, {
+                    staff_id: id,
+                    ...contractForm
+                });
+                alert("계약서가 생성되었습니다.");
+            }
             setIsContractModalOpen(false);
+            setEditingContractId(null);
             fetchStaffDetail();
         } catch (error) {
             console.error(error);
-            alert("계약서 생성 실패");
+            alert("계약서 저장 실패");
         }
     };
 
+    const handleDeleteContract = async (contractId) => {
+        if (!window.confirm("정말 삭제하시겠습니까?")) return;
+        try {
+            await api.delete(`/contracts/${contractId}`);
+            fetchStaffDetail();
+        } catch (error) {
+            console.error("Failed to delete contract", error);
+            alert("삭제 실패");
+        }
+    };
+
+    const handleEditContract = (contract) => {
+        setContractForm({
+            title: contract.title,
+            content: contract.content
+        });
+        setEditingContractId(contract.id);
+        setIsContractModalOpen(true);
+    };
+
     const handleOpenContractModal = async () => {
+        setEditingContractId(null); // Reset editing state
         try {
             const res = await api.get('/settings/contract_template');
             if (res.data && res.data.value) {
@@ -561,213 +600,276 @@ export default function StaffDetail() {
                                                 </div>
                                             </div>
                                         </div>
-                                        {contract.status === 'signed' && (
-                                            <button
-                                                onClick={() => {
-                                                    window.open(`/contracts/${contract.id}/sign`, '_blank');
-                                                }}
-                                                className="text-xs font-bold text-blue-600 hover:underline shrink-0"
-                                            >
-                                                서명 확인
-                                            </button>
-                                        )}
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* 5. Payroll History (Full Width) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-6 border-b pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="month"
-                                value={currentBudgetMonth}
-                                onChange={(e) => setCurrentBudgetMonth(e.target.value)}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                            <button
-                                onClick={() => setIsAttendanceModalOpen(true)}
-                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
-                            >
-                                <Calendar size={16} /> 근무 기록/급여 산출
-                            </button>
-                        </div>
-                    </div>
-
-                    {payrolls.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400">
-                            지급된 급여 내역이 없습니다.
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 text-slate-600 text-sm">
-                                        <th className="p-3 font-semibold rounded-l-lg">귀속월</th>
-                                        <th className="p-3 font-semibold text-right">기본급</th>
-                                        <th className="p-3 font-semibold text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
-                                        <th className="p-3 font-semibold text-right text-red-500">공제액</th>
-                                        <th className="p-3 font-semibold text-right text-blue-600">실수령액</th>
-                                        <th className="p-3 font-semibold text-center rounded-r-lg">작업</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm">
-                                    {payrolls.map((pay) => (
-                                        <tr key={pay.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 font-medium text-slate-800">{pay.month}</td>
-                                            <td className="p-3 text-right text-slate-600">{pay.base_pay.toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-slate-600">{pay.bonus.toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-red-400">-{pay.deductions.toLocaleString()}원</td>
-                                            <td className="p-3 text-right font-bold text-blue-600">{pay.total_pay.toLocaleString()}원</td>
-                                            <td className="p-3 text-center">
+                                        
+                                        <div className="flex items-center gap-2">
+                                            {contract.status !== 'signed' && (
                                                 <button
-                                                    onClick={() => setSelectedPayroll(pay)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors mx-auto text-xs font-semibold"
+                                                    onClick={() => handleEditContract(contract)}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="수정"
                                                 >
-                                                    <Printer size={14} /> 명세서
+                                                    <Edit2 size={16} />
                                                 </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+                                            )}
+                                            <button
+                                                onClick={() => handleDeleteContract(contract.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            {contract.status === 'signed' && (
+                                                <button
+                                                    onClick={() => window.open(`/contracts/${contract.id}/sign`, '_blank')}
+                                                    className="text-xs font-bold text-blue-600 hover:underline shrink-0 ml-1"
+                                                >
+                                                    확인
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                        <div className="flex items-center gap-2">
+                                            {contract.status !== 'signed' && (
+                                                <button
+                                                    onClick={() => handleEditContract(contract)}
+                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                    title="수정"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => handleDeleteContract(contract.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                            {contract.status === 'signed' && (
+                                                <button
+                                                    onClick={() => window.open(`/contracts/${contract.id}/sign`, '_blank')}
+                                                    className="text-xs font-bold text-blue-600 hover:underline shrink-0 ml-1"
+                                                >
+                                                    확인
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                        {
+                            contract.status === 'signed' && (
+                                <button
+                                    onClick={() => {
+                                        window.open(`/contracts/${contract.id}/sign`, '_blank');
+                                    }}
+                                    className="text-xs font-bold text-blue-600 hover:underline shrink-0"
+                                >
+                                    서명 확인
+                                </button>
+                            )
+                        }
+                    </div>
+                    ))
+                            )}
                 </div>
             </div>
-
-            {/* Payroll Statement Modal */}
-            {selectedPayroll && (
-                <PayrollStatement
-                    staff={formData}
-                    payroll={selectedPayroll}
-                    onClose={() => setSelectedPayroll(null)}
-                />
-            )}
-
-            {/* Attendance & Calculation Modal */}
-            <AttendanceInput
-                isOpen={isAttendanceModalOpen}
-                onClose={() => setIsAttendanceModalOpen(false)}
-                staffId={id}
-                staffName={formData.name}
-                month={currentBudgetMonth}
-                onCalculateSuccess={fetchStaffDetail}
-            />
-
-            {/* Account Creation Modal */}
-            {isAccountModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
-                                    <input
-                                        type="text"
-                                        value={accountForm.username}
-                                        onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="아이디 입력"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
-                                    <input
-                                        type="password"
-                                        value={accountForm.password}
-                                        onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="비밀번호 입력"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-slate-50 p-4 flex gap-2">
-                            <button
-                                onClick={() => setIsAccountModalOpen(false)}
-                                className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={handleCreateAccount}
-                                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
-                            >
-                                생성하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Contract Creation Modal */}
-            {isContractModalOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
-                                    <input
-                                        type="text"
-                                        value={contractForm.title}
-                                        onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
-                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="제목 입력"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            let newContent = contractForm.content;
-                                            newContent = newContent.replace(/{name}/g, formData.name || "");
-                                            newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
-                                            newContent = newContent.replace(/{phone}/g, formData.phone || "");
-                                            const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
-                                            newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
-                                            setContractForm(prev => ({ ...prev, content: newContent }));
-                                        }}
-                                        className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
-                                    >
-                                        정보 자동 입력 (이름, 입사일, 급여 등)
-                                    </button>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
-                                    <textarea
-                                        value={contractForm.content}
-                                        onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
-                                        className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
-                                        placeholder="계약서 전문 또는 주요 내용을 입력하세요."
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-slate-50 p-4 flex gap-3">
-                            <button
-                                onClick={() => setIsContractModalOpen(false)}
-                                className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={handleCreateContract}
-                                className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
-                            >
-                                계약서 발송하기
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
+
+            {/* 5. Payroll History (Full Width) */ }
+    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-6 border-b pb-4">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
+                <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
+            </div>
+            <div className="flex items-center gap-2">
+                <input
+                    type="month"
+                    value={currentBudgetMonth}
+                    onChange={(e) => setCurrentBudgetMonth(e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+                <button
+                    onClick={() => setIsAttendanceModalOpen(true)}
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
+                >
+                    <Calendar size={16} /> 근무 기록/급여 산출
+                </button>
+            </div>
+        </div>
+
+        {payrolls.length === 0 ? (
+            <div className="text-center py-10 text-slate-400">
+                지급된 급여 내역이 없습니다.
+            </div>
+        ) : (
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-50 text-slate-600 text-sm">
+                            <th className="p-3 font-semibold rounded-l-lg">귀속월</th>
+                            <th className="p-3 font-semibold text-right">기본급</th>
+                            <th className="p-3 font-semibold text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
+                            <th className="p-3 font-semibold text-right text-red-500">공제액</th>
+                            <th className="p-3 font-semibold text-right text-blue-600">실수령액</th>
+                            <th className="p-3 font-semibold text-center rounded-r-lg">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody className="text-sm">
+                        {payrolls.map((pay) => (
+                            <tr key={pay.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                <td className="p-3 font-medium text-slate-800">{pay.month}</td>
+                                <td className="p-3 text-right text-slate-600">{pay.base_pay.toLocaleString()}원</td>
+                                <td className="p-3 text-right text-slate-600">{pay.bonus.toLocaleString()}원</td>
+                                <td className="p-3 text-right text-red-400">-{pay.deductions.toLocaleString()}원</td>
+                                <td className="p-3 text-right font-bold text-blue-600">{pay.total_pay.toLocaleString()}원</td>
+                                <td className="p-3 text-center">
+                                    <button
+                                        onClick={() => setSelectedPayroll(pay)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors mx-auto text-xs font-semibold"
+                                    >
+                                        <Printer size={14} /> 명세서
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
+    </div>
+        </div >
+
+        {/* Payroll Statement Modal */ }
+    {
+        selectedPayroll && (
+            <PayrollStatement
+                staff={formData}
+                payroll={selectedPayroll}
+                onClose={() => setSelectedPayroll(null)}
+            />
+        )
+    }
+
+    {/* Attendance & Calculation Modal */ }
+    <AttendanceInput
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
+        staffId={id}
+        staffName={formData.name}
+        month={currentBudgetMonth}
+        onCalculateSuccess={fetchStaffDetail}
+    />
+
+    {/* Account Creation Modal */ }
+    {
+        isAccountModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
+                                <input
+                                    type="text"
+                                    value={accountForm.username}
+                                    onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="아이디 입력"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
+                                <input
+                                    type="password"
+                                    value={accountForm.password}
+                                    onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="비밀번호 입력"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 p-4 flex gap-2">
+                        <button
+                            onClick={() => setIsAccountModalOpen(false)}
+                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={handleCreateAccount}
+                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                        >
+                            생성하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
+    {/* Contract Creation Modal */ }
+    {
+        isContractModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
+                                <input
+                                    type="text"
+                                    value={contractForm.title}
+                                    onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="제목 입력"
+                                />
+                                <button
+                                    onClick={() => {
+                                        let newContent = contractForm.content;
+                                        newContent = newContent.replace(/{name}/g, formData.name || "");
+                                        newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
+                                        newContent = newContent.replace(/{phone}/g, formData.phone || "");
+                                        const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
+                                        newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
+                                        setContractForm(prev => ({ ...prev, content: newContent }));
+                                    }}
+                                    className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                                >
+                                    정보 자동 입력 (이름, 입사일, 급여 등)
+                                </button>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
+                                <textarea
+                                    value={contractForm.content}
+                                    onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
+                                    className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
+                                    placeholder="계약서 전문 또는 주요 내용을 입력하세요."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-slate-50 p-4 flex gap-3">
+                        <button
+                            onClick={() => setIsContractModalOpen(false)}
+                            className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={handleCreateContract}
+                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
+                        >
+                            계약서 발송하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+        </div >
     );
 }
