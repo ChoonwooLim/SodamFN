@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, UserPlus, ChevronRight } from 'lucide-react';
+import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck } from 'lucide-react';
 import api from '../api';
 
 export default function StaffPage() {
@@ -39,6 +39,28 @@ export default function StaffPage() {
     const handleSearch = (e) => {
         e.preventDefault();
         fetchStaff(searchTerm);
+    };
+
+    const handleStatusUpdate = async (e, staffId, currentStatus) => {
+        e.stopPropagation(); // Prevent navigation to detail page
+
+        const newStatus = currentStatus === '재직' ? '퇴사' : '재직';
+        const confirmMsg = newStatus === '퇴사'
+            ? "해당 직원을 퇴직 처리하시겠습니까?"
+            : "해당 직원을 다시 재직 상태로 변경하시겠습니까?";
+
+        if (!window.confirm(confirmMsg)) return;
+
+        try {
+            const response = await api.put(`/hr/staff/${staffId}`, { status: newStatus });
+            if (response.data.status === 'success') {
+                // Refresh list
+                fetchStaff(searchTerm);
+            }
+        } catch (error) {
+            console.error("Error updating status:", error);
+            alert("상태 변경에 실패했습니다.");
+        }
     };
 
     return (
@@ -110,9 +132,26 @@ export default function StaffPage() {
                                     </div>
                                     <div className="text-sm text-slate-500 mt-1">{staff.role} | 시급 {staff.hourly_wage.toLocaleString()}원</div>
                                 </div>
-                                <button className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium">
-                                    <ChevronRight size={20} className="text-slate-400" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {staff.status === '재직' ? (
+                                        <button
+                                            onClick={(e) => handleStatusUpdate(e, staff.id, staff.status)}
+                                            className="flex items-center gap-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors border border-red-100"
+                                        >
+                                            <UserMinus size={14} /> 퇴직 처리
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={(e) => handleStatusUpdate(e, staff.id, staff.status)}
+                                            className="flex items-center gap-1 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-colors border border-emerald-100"
+                                        >
+                                            <UserCheck size={14} /> 재직 처리
+                                        </button>
+                                    )}
+                                    <button className="flex items-center gap-1 bg-slate-100 text-slate-600 px-3 py-2 rounded-xl text-sm font-medium">
+                                        <ChevronRight size={20} className="text-slate-400" />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
