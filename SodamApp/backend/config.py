@@ -1,6 +1,8 @@
 import os
+from dotenv import load_dotenv
 
-# Social Login Credentials (Retrieved from TwinVerse)
+load_dotenv()
+
 # Social Login Credentials (Retrieved from TwinVerse)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
