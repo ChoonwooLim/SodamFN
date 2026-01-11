@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck } from 'lucide-react';
+import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter } from 'lucide-react';
 import api from '../api';
+import StaffAddModal from '../components/StaffAddModal';
 
 export default function StaffPage() {
     const navigate = useNavigate();
@@ -9,6 +10,8 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("재직"); // '재직', '퇴사', 'all'
+    const [sortBy, setBySort] = useState("name"); // 'name', 'start_date', 'wage'
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     useEffect(() => {
         fetchStaff();
@@ -63,6 +66,21 @@ export default function StaffPage() {
         }
     };
 
+    const getSortedStaffs = () => {
+        return [...staffs].sort((a, b) => {
+            if (sortBy === 'name') {
+                return a.name.localeCompare(b.name, 'ko');
+            } else if (sortBy === 'start_date') {
+                return new Date(b.start_date) - new Date(a.start_date); // Newest first
+            } else if (sortBy === 'wage') {
+                return b.hourly_wage - a.hourly_wage; // Highest first
+            }
+            return 0;
+        });
+    };
+
+    const sortedStaffs = getSortedStaffs();
+
     return (
         <div className="min-h-screen bg-slate-50 p-6 pb-24">
             <div className="max-w-5xl mx-auto">
@@ -73,27 +91,48 @@ export default function StaffPage() {
                         </button>
                         <h1 className="text-xl font-bold text-slate-900">직원 관리</h1>
                     </div>
+                    <button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
+                    >
+                        <UserPlus size={18} /> 신규 직원 추가
+                    </button>
                 </header>
 
-                <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between">
-                    {/* Status Tabs */}
-                    <div className="bg-slate-200 p-1 rounded-xl inline-flex self-start">
-                        <button
-                            onClick={() => setStatusFilter("재직")}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '재직' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            재직 직원
-                        </button>
-                        <button
-                            onClick={() => setStatusFilter("퇴사")}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '퇴사' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                        >
-                            퇴사 직원
-                        </button>
+                <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-start md:items-center">
+                    {/* Status Tabs & Sort */}
+                    <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                        <div className="bg-slate-200 p-1 rounded-xl inline-flex self-start">
+                            <button
+                                onClick={() => setStatusFilter("재직")}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '재직' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                재직 직원
+                            </button>
+                            <button
+                                onClick={() => setStatusFilter("퇴사")}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '퇴사' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                퇴사 직원
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <Filter size={16} className="text-slate-400" />
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setBySort(e.target.value)}
+                                className="text-sm font-medium text-slate-600 outline-none bg-transparent"
+                            >
+                                <option value="name">이름순</option>
+                                <option value="start_date">입사일순</option>
+                                <option value="wage">시급 높은순</option>
+                            </select>
+                        </div>
                     </div>
 
                     {/* Search Bar */}
-                    <form onSubmit={handleSearch} className="flex gap-2 flex-1 md:max-w-md">
+                    <form onSubmit={handleSearch} className="flex gap-2 w-full md:max-w-xs lg:max-w-md">
                         <input
                             type="text"
                             value={searchTerm}
@@ -109,13 +148,13 @@ export default function StaffPage() {
                     <div className="text-center py-10">로딩 중...</div>
                 ) : (
                     <div className="space-y-4">
-                        {staffs.length === 0 && (
+                        {sortedStaffs.length === 0 && (
                             <div className="bg-white p-8 rounded-2xl text-center text-slate-500 shadow-sm">
                                 {searchTerm ? "검색 결과가 없습니다." : "등록된 직원이 없습니다."}
                             </div>
                         )}
 
-                        {staffs.map((staff) => (
+                        {sortedStaffs.map((staff) => (
                             <div
                                 key={staff.id}
                                 onClick={() => navigate(`/staff/${staff.id}`)}
@@ -157,6 +196,12 @@ export default function StaffPage() {
                     </div>
                 )}
             </div>
+
+            <StaffAddModal
+                isOpen={isAddModalOpen}
+                onClose={() => setIsAddModalOpen(false)}
+                onSuccess={fetchStaff}
+            />
         </div>
     );
 }
