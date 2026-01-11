@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import stats, ocr, expense, hr, upload, payroll, auth, contract
+from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings
 from init_db import init_db
 
 from fastapi.staticfiles import StaticFiles
@@ -41,6 +41,7 @@ app.include_router(expense.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(contract.router, prefix="/api/contracts")
+app.include_router(settings.router)
 
 @app.get("/")
 def read_root():

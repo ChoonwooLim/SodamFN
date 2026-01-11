@@ -170,3 +170,8 @@ class Payroll(SQLModel, table=True):
     
     staff_id: Optional[int] = Field(default=None, foreign_key="staff.id")
     staff: Optional[Staff] = Relationship(back_populates="payrolls")
+
+class GlobalSetting(SQLModel, table=True):
+    key: str = Field(primary_key=True)
+    value: str
+    description: Optional[str] = None

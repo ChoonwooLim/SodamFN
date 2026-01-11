@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import ExpenseConfirm from './pages/ExpenseConfirm';
-import VendorSettings from './pages/VendorSettings';
+import VendorSettings from './pages/VendorSettings'; // Keeping this for now if referenced elsewhere
+import Settings from './pages/Settings';
 import StaffPage from './pages/Staff';
 import StaffDetail from './pages/StaffDetail';
 import DataInputPage from './pages/DataInputPage';
@@ -76,7 +77,8 @@ export default function App() {
           <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
           <Route path="/confirm" element={<ProtectedRoute adminOnly><ExpenseConfirm /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
+          <Route path="/vendor-settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
           <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
           <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
 

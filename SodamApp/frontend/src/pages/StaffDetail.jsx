@@ -43,7 +43,42 @@ export default function StaffDetail() {
     // New Account Form
     const [accountForm, setAccountForm] = useState({ username: '', password: '', grade: 'normal' });
     // New Contract Form
-    const [contractForm, setContractForm] = useState({ title: '표준근로계약서', content: '' });
+    const [contractForm, setContractForm] = useState({
+        title: '표준근로계약서',
+        content: `표준근로계약서
+
+임춘우(이하 "사업주"라 함)와 {name}(이하 "근로자"라 함)은(는) 다음과 같이
+근로계약을 체결한다.
+
+1. 근로계약기간 : {start_date}부터        년    월      일까지
+2. 근 무 장 소 : 소담김밥 건대본점 매장
+3. 업무의 내용 : 주방업무( )/ 카운터업무( ) / 마감 청소업무(   )
+4. 소정근로시간 :         시   분부터     시   분까지 (휴게시간 : 시 분 ~     시   분)
+5. 근무일/휴일 : 매주 일 근무, 주휴일 매주 요일
+6. 임 금
+- 월(일, 시)급 : {wage} 원
+- 상여금 : 있음(     ), 없음(     )
+- 기타 급여(제 수당 등) : 있음( 주휴수당),  없음(        )
+- 지급일 : 매월(매주 또는 매일) 말일(휴일의 경우는 전일 지급)
+- 지급 방법 : 근로자에게 직접 지급(      ), 예금통장에 입금 (       )
+7. 연차유급휴가
+- 연차유급휴가는 근로기준법에서 정하는 바에 따라 부여함
+8. 근로계약서 교뷰
+- 사업주는 근로계약을 체결함과 동시에 본 계약서를 사본하여 근로자의
+교부요구와 관계없이 근로자에게 교부함(근로기준법 제17조 이행)
+9. 수습 기간
+- 입사 개시 후 3개월은 당사의 업무 수습 근로자의 자격으로 근무한다.
+10. 기타
+- 이 계약에 정함이 없는 사항은 근로기준법령에 의함.
+
+2026년       월    일
+(사업주) 사업체명 : 소담김밥       전 화 : 02- 452-6570
+주 소 : 서울시 광진구 능동로 110 스타시티 영존빌딩 B208호
+                                  대 표 자 :   임  춘 우  (서명)
+
+(근로자) 주 소 :                                                                                연 락 처 : {phone}
+                                       성  명 : {name}                    (서명)`
+    });
 
     useEffect(() => {
         if (id) fetchStaffDetail();
@@ -191,6 +226,18 @@ export default function StaffDetail() {
             console.error(error);
             alert("계약서 생성 실패");
         }
+    };
+
+    const handleOpenContractModal = async () => {
+        try {
+            const res = await api.get('/settings/contract_template');
+            if (res.data && res.data.value) {
+                setContractForm(prev => ({ ...prev, content: res.data.value }));
+            }
+        } catch (error) {
+            console.error("Failed to fetch contract template", error);
+        }
+        setIsContractModalOpen(true);
     };
 
     if (loading) return <div className="p-10 text-center">Loading...</div>;
@@ -488,7 +535,7 @@ export default function StaffDetail() {
                                 <h2 className="text-lg font-bold text-slate-800">전자계약 관리</h2>
                             </div>
                             <button
-                                onClick={() => setIsContractModalOpen(true)}
+                                onClick={handleOpenContractModal}
                                 className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
                             >
                                 <FileText size={14} /> 계약서 작성
@@ -678,6 +725,20 @@ export default function StaffDetail() {
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="제목 입력"
                                     />
+                                    <button
+                                        onClick={() => {
+                                            let newContent = contractForm.content;
+                                            newContent = newContent.replace(/{name}/g, formData.name || "");
+                                            newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
+                                            newContent = newContent.replace(/{phone}/g, formData.phone || "");
+                                            const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
+                                            newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
+                                            setContractForm(prev => ({ ...prev, content: newContent }));
+                                        }}
+                                        className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                                    >
+                                        정보 자동 입력 (이름, 입사일, 급여 등)
+                                    </button>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
