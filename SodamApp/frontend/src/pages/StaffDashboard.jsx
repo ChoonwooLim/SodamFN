@@ -102,6 +102,13 @@ export default function StaffDashboard() {
         setCameraOpen(false);
     };
 
+    const handleLogout = () => {
+        if (window.confirm('로그아웃 하시겠습니까?')) {
+            localStorage.removeItem('token');
+            navigate('/login');
+        }
+    };
+
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
 
     const today = new Date().toLocaleDateString('ko-KR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -117,6 +124,13 @@ export default function StaffDashboard() {
                         <p className="text-slate-500 mt-1">{today} | 오늘도 좋은 하루 되세요.</p>
                     </div>
                     <div className="flex gap-3">
+                        <button
+                            onClick={handleLogout}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-600 rounded-xl shadow-sm border border-slate-200 hover:bg-slate-50 transition-all font-medium"
+                        >
+                            <LogOut size={18} />
+                            <span>로그아웃</span>
+                        </button>
                         <button
                             onClick={handleCameraScan}
                             className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-xl shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all font-medium"
@@ -145,8 +159,8 @@ export default function StaffDashboard() {
                                     onClick={() => handleAttendance('checkin')}
                                     disabled={attendanceStatus.checked_in}
                                     className={`group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 transition-all ${attendanceStatus.checked_in
-                                            ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
-                                            : 'border-blue-100 bg-blue-50/30 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10'
+                                        ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+                                        : 'border-blue-100 bg-blue-50/30 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10'
                                         }`}
                                 >
                                     <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-colors ${attendanceStatus.checked_in ? 'bg-slate-200 text-slate-400' : 'bg-blue-100 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'
@@ -169,8 +183,8 @@ export default function StaffDashboard() {
                                     onClick={() => handleAttendance('checkout')}
                                     disabled={!attendanceStatus.checked_in || attendanceStatus.checked_out}
                                     className={`group relative flex flex-col items-center justify-center p-8 rounded-xl border-2 transition-all ${!attendanceStatus.checked_in || attendanceStatus.checked_out
-                                            ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
-                                            : 'border-orange-100 bg-orange-50/30 hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10'
+                                        ? 'border-slate-100 bg-slate-50 opacity-60 cursor-not-allowed'
+                                        : 'border-orange-100 bg-orange-50/30 hover:border-orange-500 hover:shadow-lg hover:shadow-orange-500/10'
                                         }`}
                                 >
                                     <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-colors ${!attendanceStatus.checked_in || attendanceStatus.checked_out ? 'bg-slate-200 text-slate-400' : 'bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white'
