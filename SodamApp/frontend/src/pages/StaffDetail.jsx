@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer } from 'lucide-react';
+import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer, Edit2, Trash2 } from 'lucide-react';
 import api from '../api';
 import PayrollStatement from '../components/PayrollStatement';
 import AttendanceInput from '../components/AttendanceInput';
@@ -462,7 +462,7 @@ export default function StaffDetail() {
                                     <input
                                         type="text"
                                         name="hourly_wage"
-                                        value={formData.hourly_wage ? formData.hourly_wage.toLocaleString() : ''}
+                                        value={formData.hourly_wage ? Number(formData.hourly_wage).toLocaleString() : ''}
                                         onChange={handleChange}
                                         className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
@@ -473,7 +473,7 @@ export default function StaffDetail() {
                                     <input
                                         type="text"
                                         name="monthly_salary"
-                                        value={formData.monthly_salary ? formData.monthly_salary.toLocaleString() : ''}
+                                        value={formData.monthly_salary ? Number(formData.monthly_salary).toLocaleString() : ''}
                                         onChange={handleChange}
                                         className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
@@ -596,7 +596,7 @@ export default function StaffDetail() {
                                             <div className="min-w-0">
                                                 <div className="text-sm font-bold text-slate-800 truncate">{contract.title}</div>
                                                 <div className="text-[10px] text-slate-400 font-medium">
-                                                    {contract.status === 'signed' ? `서명됨 (${new Date(contract.signed_at).toLocaleDateString()})` : '서명 대기 중'}
+                                                    {contract.status === 'signed' && contract.signed_at ? `서명됨 (${new Date(contract.signed_at).toLocaleDateString()})` : '서명 대기 중'}
                                                 </div>
                                             </div>
                                         </div>
@@ -678,10 +678,10 @@ export default function StaffDetail() {
                                     {payrolls.map((pay) => (
                                         <tr key={pay.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                                             <td className="p-3 font-medium text-slate-800">{pay.month}</td>
-                                            <td className="p-3 text-right text-slate-600">{pay.base_pay.toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-slate-600">{pay.bonus.toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-red-400">-{pay.deductions.toLocaleString()}원</td>
-                                            <td className="p-3 text-right font-bold text-blue-600">{pay.total_pay.toLocaleString()}원</td>
+                                            <td className="p-3 text-right text-slate-600">{(pay.base_pay || 0).toLocaleString()}원</td>
+                                            <td className="p-3 text-right text-slate-600">{(pay.bonus || 0).toLocaleString()}원</td>
+                                            <td className="p-3 text-right text-red-400">-{(pay.deductions || 0).toLocaleString()}원</td>
+                                            <td className="p-3 text-right font-bold text-blue-600">{(pay.total_pay || 0).toLocaleString()}원</td>
                                             <td className="p-3 text-center">
                                                 <button
                                                     onClick={() => setSelectedPayroll(pay)}
