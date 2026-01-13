@@ -175,8 +175,30 @@ export default function ContractSignPage() {
     if (!contract) return <div className="p-10 text-center">계약서를 찾을 수 없습니다.</div>;
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 pb-32">
-            <header className="flex items-center gap-4 mb-6">
+        <div className="min-h-screen bg-slate-50 p-4 pb-32 print:p-0 print:bg-white print:pb-0">
+            {/* Print Styles */}
+            <style>{`
+                @media print {
+                    @page { margin: 15mm; size: A4; }
+                    body { -webkit-print-color-adjust: exact; }
+                    .print-hidden { display: none !important; }
+                    .print-full-width { width: 100% !important; max-width: none !important; }
+                    .print-content { 
+                        font-size: 11pt !important; 
+                        line-height: 1.6 !important; 
+                        white-space: pre-wrap !important;
+                    }
+                    .print-clean {
+                         border: none !important;
+                         box-shadow: none !important;
+                         padding: 0 !important;
+                         margin: 0 !important;
+                    }
+                    .print-break-avoid { page-break-inside: avoid; }
+                }
+            `}</style>
+
+            <header className="flex items-center gap-4 mb-6 print:hidden">
                 <button onClick={() => step > 0 ? setStep(s => s - 1) : navigate(-1)} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
                     <ChevronLeft size={20} />
                 </button>
@@ -188,218 +210,216 @@ export default function ContractSignPage() {
                 </h1>
             </header>
 
-            <div className="max-w-xl mx-auto space-y-6">
+            <div className="max-w-xl mx-auto space-y-6 print:max-w-none print:w-full">
 
-                <div className="max-w-xl mx-auto space-y-6">
+                {/* SIGNED View Mode */}
+                {isSigned ? (
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:print-clean lg:p-10">
+                        <div className="flex items-center gap-2 mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 print:hidden">
+                            <Check size={20} />
+                            <span className="font-bold text-sm">이미 서명된 계약서입니다. ({new Date(contract.signed_at).toLocaleString()})</span>
+                        </div>
 
-                    {/* SIGNED View Mode */}
-                    {isSigned ? (
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 print:shadow-none print:border-none">
-                            <div className="flex items-center gap-2 mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 print:hidden">
-                                <Check size={20} />
-                                <span className="font-bold text-sm">이미 서명된 계약서입니다. ({new Date(contract.signed_at).toLocaleString()})</span>
-                            </div>
+                        {/* Contract Content */}
+                        <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-900 leading-relaxed p-4 border rounded-xl bg-white mb-8 font-serif print:print-clean print:print-content print:border-none">
+                            {contract.content}
+                        </div>
 
-                            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-900 leading-relaxed p-4 border rounded-xl bg-white mb-8 font-serif">
-                                {contract.content}
-                            </div>
-
-                            <div className="mt-8 border-t pt-8">
-                                <div className="flex justify-between items-end">
-                                    <div className="text-sm space-y-1">
-                                        <p><strong>날짜:</strong> {new Date(contract.signed_at).toLocaleDateString()}</p>
-                                        <p><strong>서명인:</strong> {contract.staff?.name || '(이름)'}</p>
-                                    </div>
-                                    <div className="relative w-32 h-32 flex items-center justify-center">
-                                        {contract.signature_data ? (
-                                            <img src={contract.signature_data} alt="서명" className="w-24 h-24 object-contain mix-blend-multiply" />
-                                        ) : (
-                                            <span className="text-xs text-slate-400 border px-2 py-1">서명 데이터 없음</span>
-                                        )}
-                                    </div>
+                        {/* Signature Section */}
+                        <div className="mt-8 border-t pt-8 print:mt-4 print:pt-4 print:border-t-2 print:border-slate-800 print-break-avoid">
+                            <div className="flex justify-between items-end">
+                                <div className="text-sm space-y-2 print:text-base">
+                                    <p><strong>날짜:</strong> {new Date(contract.signed_at).toLocaleDateString()}</p>
+                                    <p><strong>서명인:</strong> {contract.staff?.name || '(이름)'}</p>
                                 </div>
-                            </div>
-
-                            <div className="mt-8 text-center print:hidden">
-                                <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 w-full">
-                                    <Download size={20} /> PDF 저장 / 인쇄
-                                </button>
+                                <div className="relative w-32 h-32 flex items-center justify-center print:w-24 print:h-24">
+                                    {contract.signature_data ? (
+                                        <img src={contract.signature_data} alt="서명" className="w-24 h-24 object-contain mix-blend-multiply print:w-20 print:h-20" />
+                                    ) : (
+                                        <span className="text-xs text-slate-400 border px-2 py-1">서명 데이터 없음</span>
+                                    )}
+                                </div>
                             </div>
                         </div>
-                    ) : (
-                        <>
-                            {/* Step 0: Read */}
-                            {step === 0 && (
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                                    <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed h-[60vh] overflow-y-auto p-2 border rounded-xl bg-slate-50">
-                                        {contract.content}
-                                    </div>
-                                    <div className="mt-4 text-center">
-                                        <p className="text-sm text-slate-500 mb-4">내용을 모두 확인하셨습니까?</p>
-                                        <button onClick={() => setStep(1)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">네, 확인했습니다</button>
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Step 1: Info Input */}
-                            {step === 1 && (
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-                                    <h2 className="font-bold text-lg">필수 정보 입력</h2>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">주소 (Address)</label>
-                                        <input
-                                            value={info.address}
-                                            onChange={e => setInfo({ ...info, address: e.target.value })}
-                                            placeholder="서울시 광진구..."
-                                            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">연락처 (Phone)</label>
-                                        <input
-                                            value={info.phone}
-                                            onChange={e => setInfo({ ...info, phone: e.target.value })}
-                                            placeholder="010-1234-5678"
-                                            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">주민등록번호 (RRN)</label>
-                                        <input
-                                            value={info.resident_number}
-                                            onChange={e => setInfo({ ...info, resident_number: e.target.value })}
-                                            placeholder="000000-0000000"
-                                            className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
-                                        />
-                                    </div>
+                        <div className="mt-8 text-center print:hidden">
+                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 w-full">
+                                <Download size={20} /> PDF 저장 / 인쇄
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {/* Step 0: Read */}
+                        {step === 0 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed h-[60vh] overflow-y-auto p-2 border rounded-xl bg-slate-50">
+                                    {contract.content}
+                                </div>
+                                <div className="mt-4 text-center">
+                                    <p className="text-sm text-slate-500 mb-4">내용을 모두 확인하셨습니까?</p>
+                                    <button onClick={() => setStep(1)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">네, 확인했습니다</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 1: Info Input */}
+                        {step === 1 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                                <h2 className="font-bold text-lg">필수 정보 입력</h2>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">주소 (Address)</label>
+                                    <input
+                                        value={info.address}
+                                        onChange={e => setInfo({ ...info, address: e.target.value })}
+                                        placeholder="서울시 광진구..."
+                                        className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">연락처 (Phone)</label>
+                                    <input
+                                        value={info.phone}
+                                        onChange={e => setInfo({ ...info, phone: e.target.value })}
+                                        placeholder="010-1234-5678"
+                                        className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">주민등록번호 (RRN)</label>
+                                    <input
+                                        value={info.resident_number}
+                                        onChange={e => setInfo({ ...info, resident_number: e.target.value })}
+                                        placeholder="000000-0000000"
+                                        className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (!info.address || !info.phone || !info.resident_number) return alert("모든 정보를 입력해주세요.");
+                                        setStep(2);
+                                    }}
+                                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-4"
+                                >
+                                    다음 단계로
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Step 2: Seal Generation */}
+                        {step === 2 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                                <h2 className="font-bold text-lg">전자도장 만들기</h2>
+
+                                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
                                     <button
-                                        onClick={() => {
-                                            if (!info.address || !info.phone || !info.resident_number) return alert("모든 정보를 입력해주세요.");
-                                            setStep(2);
-                                        }}
-                                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-4"
+                                        onClick={() => setSealMode('auto')}
+                                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${sealMode === 'auto' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
                                     >
-                                        다음 단계로
+                                        자동 생성
+                                    </button>
+                                    <button
+                                        onClick={() => setSealMode('manual')}
+                                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${sealMode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                                    >
+                                        직접 서명
                                     </button>
                                 </div>
-                            )}
 
-                            {/* Step 2: Seal Generation */}
-                            {step === 2 && (
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-                                    <h2 className="font-bold text-lg">전자도장 만들기</h2>
-
-                                    <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-                                        <button
-                                            onClick={() => setSealMode('auto')}
-                                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${sealMode === 'auto' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-                                        >
-                                            자동 생성
-                                        </button>
-                                        <button
-                                            onClick={() => setSealMode('manual')}
-                                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${sealMode === 'manual' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
-                                        >
-                                            직접 서명
-                                        </button>
-                                    </div>
-
-                                    {sealMode === 'auto' ? (
-                                        <div className="space-y-4">
-                                            <div className="flex gap-2">
-                                                <input
-                                                    value={sealName}
-                                                    onChange={e => setSealName(e.target.value)}
-                                                    placeholder="이름 입력 (예: 홍길동)"
-                                                    className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200"
-                                                    maxLength={4}
-                                                />
-                                                <button onClick={generateSeal} className="px-4 bg-slate-900 text-white rounded-xl font-bold text-sm">만들기</button>
-                                            </div>
-                                            <div className="h-40 bg-slate-50 rounded-xl flex items-center justify-center border border-dashed border-slate-300">
-                                                {generatedSeal ? (
-                                                    <img src={generatedSeal} alt="Seal" className="w-24 h-24 object-contain" />
-                                                ) : (
-                                                    <span className="text-slate-400 text-sm">이름을 입력하고 만들기를 누르세요</span>
-                                                )}
-                                            </div>
+                                {sealMode === 'auto' ? (
+                                    <div className="space-y-4">
+                                        <div className="flex gap-2">
+                                            <input
+                                                value={sealName}
+                                                onChange={e => setSealName(e.target.value)}
+                                                placeholder="이름 입력 (예: 홍길동)"
+                                                className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-200"
+                                                maxLength={4}
+                                            />
+                                            <button onClick={generateSeal} className="px-4 bg-slate-900 text-white rounded-xl font-bold text-sm">만들기</button>
                                         </div>
-                                    ) : (
-                                        <div>
-                                            <div className="h-40 bg-slate-50 rounded-xl border border-dashed border-slate-300 overflow-hidden relative">
-                                                <canvas
-                                                    ref={signatureCanvasRef}
-                                                    width={500}
-                                                    height={200}
-                                                    className="w-full h-full cursor-crosshair touch-none"
-                                                    onMouseDown={startDrawing}
-                                                    onMouseMove={draw}
-                                                    onMouseUp={stopDrawing}
-                                                    onMouseOut={stopDrawing}
-                                                    onTouchStart={startDrawing}
-                                                    onTouchMove={draw}
-                                                    onTouchEnd={stopDrawing}
-                                                />
-                                                <button onClick={clearCanvas} className="absolute top-2 right-2 p-1 bg-white rounded shadow text-slate-500"><Eraser size={14} /></button>
-                                            </div>
-                                            <p className="text-xs text-center text-slate-400 mt-2">화면에 직접 서명하세요.</p>
-                                        </div>
-                                    )}
-
-                                    <button
-                                        onClick={() => {
-                                            if (sealMode === 'auto' && !generatedSeal) return alert("도장을 만들어주세요.");
-                                            // For manual mode, we just check at submit time or check canvas valid here (harder).
-                                            setStep(3);
-                                        }}
-                                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-4"
-                                    >
-                                        도장 사용하기
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Step 3: Finalize */}
-                            {step === 3 && (
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
-                                    <h2 className="font-bold text-lg">최종 확인 및 날인</h2>
-
-                                    <div className="space-y-2 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">
-                                        <p><span className="font-bold mr-2">이름:</span> {info.address ? '입력됨' : '-'}</p>
-                                        <p><span className="font-bold mr-2">주소:</span> {info.address}</p>
-                                        <p><span className="font-bold mr-2">연락처:</span> {info.phone}</p>
-                                        <p><span className="font-bold mr-2">주민번호:</span> {info.resident_number}</p>
-                                    </div>
-
-                                    <div className="flex items-center justify-center p-6 border rounded-xl relative">
-                                        <div className="text-slate-300 text-4xl font-serif font-bold opacity-20 absolute z-0 select-none">서명란</div>
-                                        <div className="relative z-10">
+                                        <div className="h-40 bg-slate-50 rounded-xl flex items-center justify-center border border-dashed border-slate-300">
                                             {generatedSeal ? (
-                                                <img src={generatedSeal} alt="Seal" className="w-24 h-24 mix-blend-multiply" />
+                                                <img src={generatedSeal} alt="Seal" className="w-24 h-24 object-contain" />
                                             ) : (
-                                                <div className="w-full h-24 flex items-center justify-center text-slate-500 font-bold border-2 border-slate-300 border-dashed rounded-lg p-4">
-                                                    (직접 서명됨)
-                                                </div>
+                                                <span className="text-slate-400 text-sm">이름을 입력하고 만들기를 누르세요</span>
                                             )}
                                         </div>
                                     </div>
+                                ) : (
+                                    <div>
+                                        <div className="h-40 bg-slate-50 rounded-xl border border-dashed border-slate-300 overflow-hidden relative">
+                                            <canvas
+                                                ref={signatureCanvasRef}
+                                                width={500}
+                                                height={200}
+                                                className="w-full h-full cursor-crosshair touch-none"
+                                                onMouseDown={startDrawing}
+                                                onMouseMove={draw}
+                                                onMouseUp={stopDrawing}
+                                                onMouseOut={stopDrawing}
+                                                onTouchStart={startDrawing}
+                                                onTouchMove={draw}
+                                                onTouchEnd={stopDrawing}
+                                            />
+                                            <button onClick={clearCanvas} className="absolute top-2 right-2 p-1 bg-white rounded shadow text-slate-500"><Eraser size={14} /></button>
+                                        </div>
+                                        <p className="text-xs text-center text-slate-400 mt-2">화면에 직접 서명하세요.</p>
+                                    </div>
+                                )}
 
-                                    <p className="text-xs text-slate-500 text-center">
-                                        위 도장(또는 서명)으로 계약서에 날인하며,<br />입력하신 정보가 계약서에 포함됨을 동의합니다.
-                                    </p>
+                                <button
+                                    onClick={() => {
+                                        if (sealMode === 'auto' && !generatedSeal) return alert("도장을 만들어주세요.");
+                                        // For manual mode, we just check at submit time or check canvas valid here (harder).
+                                        setStep(3);
+                                    }}
+                                    className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-4"
+                                >
+                                    도장 사용하기
+                                </button>
+                            </div>
+                        )}
 
-                                    <button
-                                        onClick={handleSubmit}
-                                        className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 text-lg flex items-center justify-center gap-2"
-                                    >
-                                        <Check size={20} /> 계약 완료하기
-                                    </button>
+                        {/* Step 3: Finalize */}
+                        {step === 3 && (
+                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-6">
+                                <h2 className="font-bold text-lg">최종 확인 및 날인</h2>
+
+                                <div className="space-y-2 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">
+                                    <p><span className="font-bold mr-2">이름:</span> {info.address ? '입력됨' : '-'}</p>
+                                    <p><span className="font-bold mr-2">주소:</span> {info.address}</p>
+                                    <p><span className="font-bold mr-2">연락처:</span> {info.phone}</p>
+                                    <p><span className="font-bold mr-2">주민번호:</span> {info.resident_number}</p>
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
 
+                                <div className="flex items-center justify-center p-6 border rounded-xl relative">
+                                    <div className="text-slate-300 text-4xl font-serif font-bold opacity-20 absolute z-0 select-none">서명란</div>
+                                    <div className="relative z-10">
+                                        {generatedSeal ? (
+                                            <img src={generatedSeal} alt="Seal" className="w-24 h-24 mix-blend-multiply" />
+                                        ) : (
+                                            <div className="w-full h-24 flex items-center justify-center text-slate-500 font-bold border-2 border-slate-300 border-dashed rounded-lg p-4">
+                                                (직접 서명됨)
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <p className="text-xs text-slate-500 text-center">
+                                    위 도장(또는 서명)으로 계약서에 날인하며,<br />입력하신 정보가 계약서에 포함됨을 동의합니다.
+                                </p>
+
+                                <button
+                                    onClick={handleSubmit}
+                                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-200 text-lg flex items-center justify-center gap-2"
+                                >
+                                    <Check size={20} /> 계약 완료하기
+                                </button>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
         </div>
     );

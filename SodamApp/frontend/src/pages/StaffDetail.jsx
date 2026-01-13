@@ -748,235 +748,233 @@ export default function StaffDetail() {
                     </div>
                 )}
             </div>
-        </div >
 
-            {/* Payroll Statement Modal */ }
-    {
-        selectedPayroll && (
-            <PayrollStatement
-                staff={formData}
-                payroll={selectedPayroll}
-                onClose={() => setSelectedPayroll(null)}
+            {/* Payroll Statement Modal */}
+            {
+                selectedPayroll && (
+                    <PayrollStatement
+                        staff={formData}
+                        payroll={selectedPayroll}
+                        onClose={() => setSelectedPayroll(null)}
+                    />
+                )
+            }
+
+            {/* Attendance & Calculation Modal */}
+            <AttendanceInput
+                isOpen={isAttendanceModalOpen}
+                onClose={() => setIsAttendanceModalOpen(false)}
+                staffId={id}
+                staffName={formData.name}
+                month={currentBudgetMonth}
+                onCalculateSuccess={fetchStaffDetail}
             />
-        )
-    }
 
-    {/* Attendance & Calculation Modal */ }
-    <AttendanceInput
-        isOpen={isAttendanceModalOpen}
-        onClose={() => setIsAttendanceModalOpen(false)}
-        staffId={id}
-        staffName={formData.name}
-        month={currentBudgetMonth}
-        onCalculateSuccess={fetchStaffDetail}
-    />
-
-    {/* Account Creation Modal */ }
-    {
-        isAccountModalOpen && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                    <div className="p-6">
-                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
-                                <input
-                                    type="text"
-                                    value={accountForm.username}
-                                    onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="아이디 입력"
-                                />
+            {/* Account Creation Modal */}
+            {
+                isAccountModalOpen && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <div className="p-6">
+                                <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
+                                        <input
+                                            type="text"
+                                            value={accountForm.username}
+                                            onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="아이디 입력"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
+                                        <input
+                                            type="password"
+                                            value={accountForm.password}
+                                            onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="비밀번호 입력"
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
-                                <input
-                                    type="password"
-                                    value={accountForm.password}
-                                    onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="비밀번호 입력"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-slate-50 p-4 flex gap-2">
-                        <button
-                            onClick={() => setIsAccountModalOpen(false)}
-                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                        >
-                            취소
-                        </button>
-                        <button
-                            onClick={handleCreateAccount}
-                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
-                        >
-                            생성하기
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-
-    {/* Contract Creation Modal */ }
-    {
-        isContractModalOpen && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                    <div className="p-6">
-                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
-                                <input
-                                    type="text"
-                                    value={contractForm.title}
-                                    onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
-                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                    placeholder="제목 입력"
-                                />
+                            <div className="bg-slate-50 p-4 flex gap-2">
                                 <button
-                                    onClick={() => {
-                                        let newContent = contractForm.content;
-                                        newContent = newContent.replace(/{name}/g, formData.name || "");
-                                        newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
-                                        newContent = newContent.replace(/{phone}/g, formData.phone || "");
-                                        const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
-                                        newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
-                                        setContractForm(prev => ({ ...prev, content: newContent }));
-                                    }}
-                                    className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                                    onClick={() => setIsAccountModalOpen(false)}
+                                    className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
                                 >
-                                    정보 자동 입력 (이름, 입사일, 급여 등)
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handleCreateAccount}
+                                    className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                                >
+                                    생성하기
                                 </button>
                             </div>
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
-                                <textarea
-                                    value={contractForm.content}
-                                    onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
-                                    className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
-                                    placeholder="계약서 전문 또는 주요 내용을 입력하세요."
-                                />
+                        </div>
+                    </div>
+                )
+            }
+
+            {/* Contract Creation Modal */}
+            {
+                isContractModalOpen && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <div className="p-6">
+                                <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
+                                        <input
+                                            type="text"
+                                            value={contractForm.title}
+                                            onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="제목 입력"
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                let newContent = contractForm.content;
+                                                newContent = newContent.replace(/{name}/g, formData.name || "");
+                                                newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
+                                                newContent = newContent.replace(/{phone}/g, formData.phone || "");
+                                                const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
+                                                newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
+                                                setContractForm(prev => ({ ...prev, content: newContent }));
+                                            }}
+                                            className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                                        >
+                                            정보 자동 입력 (이름, 입사일, 급여 등)
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
+                                        <textarea
+                                            value={contractForm.content}
+                                            onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
+                                            className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
+                                            placeholder="계약서 전문 또는 주요 내용을 입력하세요."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 p-4 flex gap-3">
+                                <button
+                                    onClick={() => setIsContractModalOpen(false)}
+                                    className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    onClick={handleCreateContract}
+                                    className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
+                                >
+                                    계약서 발송하기
+                                </button>
                             </div>
                         </div>
                     </div>
-                    <div className="bg-slate-50 p-4 flex gap-3">
-                        <button
-                            onClick={() => setIsContractModalOpen(false)}
-                            className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                        >
-                            취소
-                        </button>
-                        <button
-                            onClick={handleCreateContract}
-                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
-                        >
-                            계약서 발송하기
-                        </button>
+                )
+            }
+
+            {/* Visa Guide Modal */}
+            {
+                isVisaGuideOpen && (
+                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-blue-100 text-blue-600 p-2 rounded-lg font-bold">ℹ️</span>
+                                    <h2 className="text-lg font-bold text-slate-800">외국인 고용주 체류자격별 안내</h2>
+                                </div>
+                                <button onClick={() => setIsVisaGuideOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                                    ✖
+                                </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
+
+                                {/* H-2 */}
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-blue-600 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                        H-2 (방문취업)
+                                    </h3>
+                                    <div className="bg-blue-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-blue-100">
+                                        <p><strong>✅ 고용 가능 요건:</strong> 특례고용가능확인서 필요.</p>
+                                        <p className="mt-1"><strong>⚠️ 의무사항:</strong> 근로개시일로부터 14일 이내 고용노동부 및 법무부(하이코리아)에 <strong>근로개시 신고</strong> 필수.</p>
+                                        <p className="text-xs text-slate-500 mt-2">* 위반 시 과태료 부과 대상.</p>
+                                    </div>
+                                </div>
+
+                                {/* D-2 */}
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-purple-600 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                        D-2 (유학) / D-4 (어학연수)
+                                    </h3>
+                                    <div className="bg-purple-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-purple-100">
+                                        <p><strong>✅ 시간제 취업 허가:</strong> 학교 유학생 담당자 확인 및 출입국사무소 <strong>'시간제 취업 확인서'</strong> 발급 필수.</p>
+                                        <p className="mt-1"><strong>⏳ 시간 제한:</strong></p>
+                                        <ul className="list-disc pl-4 mt-1 space-y-1 text-xs">
+                                            <li>어학연수생/학부 1~2학년: 주 20시간 이내</li>
+                                            <li>학부 3~4학년/석박사: 주 30시간 이내 (인증대학 기준 상이할 수 있음)</li>
+                                            <li>방학 중: 시간 제한 없음 (단, 허가 자체는 필수)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                {/* E-9 */}
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-emerald-600 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                        E-9 (비전문취업)
+                                    </h3>
+                                    <div className="bg-emerald-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-emerald-100">
+                                        <p><strong>✅ 절차:</strong> EPS(고용허가제) 시스템을 통해서만 알선 및 채용 가능.</p>
+                                        <p className="mt-1"><strong>⚠️ 제한:</strong> 임의로 채용하거나 근무처 변경 시 불법 고용.</p>
+                                    </div>
+                                </div>
+
+                                {/* F-4 */}
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-orange-600 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                                        F-4 (재외동포)
+                                    </h3>
+                                    <div className="bg-orange-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-orange-100">
+                                        <p><strong>✅ 허용 범위:</strong> 대부분의 취업 활동 허용.</p>
+                                        <p className="mt-1"><strong>🚫 제한:</strong> 단순노무행위(건설현장 단순노무 등 일부 업종)는 원칙적 제한. 단, 요식업 서빙/주방보조 등은 통상 허용되는 추세이나 지역/직종별 확인 권장.</p>
+                                    </div>
+                                </div>
+
+                                {/* F-2, F-5, F-6 */}
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-slate-600 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                                        F-2, F-5, F-6 (거주/영주/결혼)
+                                    </h3>
+                                    <div className="bg-slate-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-slate-200">
+                                        <p><strong>✅ 제한 없음:</strong> 내국인과 동일하게 자유로운 취업 활동 가능.</p>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                                <button
+                                    onClick={() => setIsVisaGuideOpen(false)}
+                                    className="w-full bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300"
+                                >
+                                    닫기
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        )
-    }
-
-    {/* Visa Guide Modal */ }
-    {
-        isVisaGuideOpen && (
-            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                    <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <span className="bg-blue-100 text-blue-600 p-2 rounded-lg font-bold">ℹ️</span>
-                            <h2 className="text-lg font-bold text-slate-800">외국인 고용주 체류자격별 안내</h2>
-                        </div>
-                        <button onClick={() => setIsVisaGuideOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
-                            ✖
-                        </button>
-                    </div>
-                    <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
-
-                        {/* H-2 */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-blue-600 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                H-2 (방문취업)
-                            </h3>
-                            <div className="bg-blue-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-blue-100">
-                                <p><strong>✅ 고용 가능 요건:</strong> 특례고용가능확인서 필요.</p>
-                                <p className="mt-1"><strong>⚠️ 의무사항:</strong> 근로개시일로부터 14일 이내 고용노동부 및 법무부(하이코리아)에 <strong>근로개시 신고</strong> 필수.</p>
-                                <p className="text-xs text-slate-500 mt-2">* 위반 시 과태료 부과 대상.</p>
-                            </div>
-                        </div>
-
-                        {/* D-2 */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-purple-600 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                D-2 (유학) / D-4 (어학연수)
-                            </h3>
-                            <div className="bg-purple-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-purple-100">
-                                <p><strong>✅ 시간제 취업 허가:</strong> 학교 유학생 담당자 확인 및 출입국사무소 <strong>'시간제 취업 확인서'</strong> 발급 필수.</p>
-                                <p className="mt-1"><strong>⏳ 시간 제한:</strong></p>
-                                <ul className="list-disc pl-4 mt-1 space-y-1 text-xs">
-                                    <li>어학연수생/학부 1~2학년: 주 20시간 이내</li>
-                                    <li>학부 3~4학년/석박사: 주 30시간 이내 (인증대학 기준 상이할 수 있음)</li>
-                                    <li>방학 중: 시간 제한 없음 (단, 허가 자체는 필수)</li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        {/* E-9 */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-emerald-600 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                E-9 (비전문취업)
-                            </h3>
-                            <div className="bg-emerald-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-emerald-100">
-                                <p><strong>✅ 절차:</strong> EPS(고용허가제) 시스템을 통해서만 알선 및 채용 가능.</p>
-                                <p className="mt-1"><strong>⚠️ 제한:</strong> 임의로 채용하거나 근무처 변경 시 불법 고용.</p>
-                            </div>
-                        </div>
-
-                        {/* F-4 */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-orange-600 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                                F-4 (재외동포)
-                            </h3>
-                            <div className="bg-orange-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-orange-100">
-                                <p><strong>✅ 허용 범위:</strong> 대부분의 취업 활동 허용.</p>
-                                <p className="mt-1"><strong>🚫 제한:</strong> 단순노무행위(건설현장 단순노무 등 일부 업종)는 원칙적 제한. 단, 요식업 서빙/주방보조 등은 통상 허용되는 추세이나 지역/직종별 확인 권장.</p>
-                            </div>
-                        </div>
-
-                        {/* F-2, F-5, F-6 */}
-                        <div className="space-y-2">
-                            <h3 className="font-bold text-slate-600 flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
-                                F-2, F-5, F-6 (거주/영주/결혼)
-                            </h3>
-                            <div className="bg-slate-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-slate-200">
-                                <p><strong>✅ 제한 없음:</strong> 내국인과 동일하게 자유로운 취업 활동 가능.</p>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-                        <button
-                            onClick={() => setIsVisaGuideOpen(false)}
-                            className="w-full bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300"
-                        >
-                            닫기
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
-    }
-        </div >
+                )
+            }
+        </div>
     );
 }
-```
