@@ -38,6 +38,7 @@ export default function StaffDetail() {
     const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+    const [isVisaGuideOpen, setIsVisaGuideOpen] = useState(false);
     const [currentBudgetMonth, setCurrentBudgetMonth] = useState(new Date().toISOString().slice(0, 7));
 
     // New Account Form
@@ -250,10 +251,12 @@ export default function StaffDetail() {
         if (!window.confirm("정말 삭제하시겠습니까?")) return;
         try {
             await api.delete(`/contracts/${contractId}`);
-            fetchStaffDetail();
+            setContracts(prev => prev.filter(c => c.id !== contractId)); // Optimistic update
+            alert("삭제되었습니다.");
         } catch (error) {
             console.error("Failed to delete contract", error);
-            alert("삭제 실패");
+            const errMsg = error.response?.data?.detail || "삭제 실패";
+            alert(`삭제 중 오류가 발생했습니다: ${errMsg}`);
         }
     };
 
@@ -374,462 +377,606 @@ export default function StaffDetail() {
                                         className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>
-                            </div>
-                        </div>
 
-                        {/* Login Account Section */}
-                        <div className="mt-6 pt-6 border-t border-slate-100">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-slate-800 text-sm">로그인 계정</h3>
-                                {!user ? (
-                                    <button
-                                        onClick={() => setIsAccountModalOpen(true)}
-                                        className="text-xs font-bold text-blue-600 hover:underline"
-                                    >
-                                        계정 생성
-                                    </button>
-                                ) : (
-                                    <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
-                                        <CheckSquare size={12} /> 연동됨
-                                    </span>
-                                )}
-                            </div>
-                            {user ? (
-                                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
-                                    <div className="flex justify-between items-center text-sm">
-                                        <span className="text-slate-500">아이디</span>
-                                        <span className="font-medium text-slate-800">{user.username}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2">
-                                        <span className="text-slate-500">등급</span>
+                                <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 mt-2">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">국적 (Nationality)</label>
                                         <select
-                                            value={user.grade || 'normal'}
-                                            onChange={(e) => handleGradeUpdate(e.target.value)}
-                                            className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
+                                            name="nationality"
+                                            value={formData.nationality || 'South Korea'}
+                                            onChange={handleChange}
+                                            className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                         >
-                                            <option value="normal">일반 (Normal)</option>
-                                            <option value="vip">VIP</option>
-                                            <option value="vvip">VVIP</option>
-                                            <option value="admin">관리자 (Admin)</option>
+                                            <option value="South Korea">대한민국 (South Korea)</option>
+                                            <option value="China">중국 (China)</option>
+                                            <option value="Vietnam">베트남 (Vietnam)</option>
+                                            <option value="Philippines">필리핀 (Philippines)</option>
+                                            <option value="Uzbekistan">우즈베키스탄 (Uzbekistan)</option>
+                                            <option value="Other">기타 (Other)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1 flex justify-between items-center">
+                                            비자 종류
+                                            <button
+                                                onClick={() => setIsVisaGuideOpen(true)}
+                                                className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 hover:bg-slate-200 flex items-center gap-1"
+                                            >
+                                                <span className="w-3 h-3 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">?</span>
+                                                고용주 가이드
+                                            </button>
+                                        </label>
+                                        <select
+                                            name="visa_type"
+                                            value={formData.visa_type || ''}
+                                            onChange={handleChange}
+                                            className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        >
+                                            <option value="">선택 안함</option>
+                                            <option value="H-2">H-2 (방문취업)</option>
+                                            <option value="E-9">E-9 (비전문취업)</option>
+                                            <option value="F-2">F-2 (거주)</option>
+                                            <option value="F-4">F-4 (재외동포)</option>
+                                            <option value="F-5">F-5 (영주)</option>
+                                            <option value="F-6">F-6 (결혼이민)</option>
+                                            <option value="D-2">D-2 (유학 - 시간제 취업)</option>
+                                            <option value="D-4">D-4 (어학연수)</option>
                                         </select>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="text-xs text-slate-400 italic">연동된 계정이 없습니다.</div>
-                            )}
+                            </div>
                         </div>
                     </div>
 
-                    {/* 2. Employment & Payment */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-3 mb-6 border-b pb-4">
-                            <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><CreditCard size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">계약 및 급여</h2>
+                    {/* Login Account Section */}
+                    <div className="mt-6 pt-6 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-800 text-sm">로그인 계정</h3>
+                            {!user ? (
+                                <button
+                                    onClick={() => setIsAccountModalOpen(true)}
+                                    className="text-xs font-bold text-blue-600 hover:underline"
+                                >
+                                    계정 생성
+                                </button>
+                            ) : (
+                                <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                                    <CheckSquare size={12} /> 연동됨
+                                </span>
+                            )}
                         </div>
-
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-500 mb-1">계약 형태</label>
+                        {user ? (
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col gap-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500">아이디</span>
+                                    <span className="font-medium text-slate-800">{user.username}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2">
+                                    <span className="text-slate-500">등급</span>
                                     <select
-                                        name="contract_type"
-                                        value={formData.contract_type || '아르바이트'}
-                                        onChange={handleChange}
-                                        className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        value={user.grade || 'normal'}
+                                        onChange={(e) => handleGradeUpdate(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-blue-500"
                                     >
-                                        <option value="정규직">정규직</option>
-                                        <option value="아르바이트">아르바이트</option>
-                                        <option value="일용직">일용직</option>
+                                        <option value="normal">일반 (Normal)</option>
+                                        <option value="vip">VIP</option>
+                                        <option value="vvip">VVIP</option>
+                                        <option value="admin">관리자 (Admin)</option>
                                     </select>
                                 </div>
-                                <div className="flex items-end pb-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            name="insurance_4major"
-                                            checked={formData.insurance_4major || false}
-                                            onChange={handleChange}
-                                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
-                                        />
-                                        <span className="font-medium text-slate-700">4대보험 가입</span>
-                                    </label>
-                                </div>
                             </div>
+                        ) : (
+                            <div className="text-xs text-slate-400 italic">연동된 계정이 없습니다.</div>
+                        )}
+                    </div>
+                </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-500 mb-1">시급</label>
-                                    <input
-                                        type="text"
-                                        name="hourly_wage"
-                                        value={formData.hourly_wage ? Number(formData.hourly_wage).toLocaleString() : ''}
-                                        onChange={handleChange}
-                                        className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                    <span className="absolute mt-[-30px] ml-[130px] text-slate-400 text-sm">원</span>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-500 mb-1">월급 (정규직)</label>
-                                    <input
-                                        type="text"
-                                        name="monthly_salary"
-                                        value={formData.monthly_salary ? Number(formData.monthly_salary).toLocaleString() : ''}
-                                        onChange={handleChange}
-                                        className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
-                                </div>
-                            </div>
+                {/* 2. Employment & Payment */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center gap-3 mb-6 border-b pb-4">
+                        <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><CreditCard size={24} /></div>
+                        <h2 className="text-lg font-bold text-slate-800">계약 및 급여</h2>
+                    </div>
 
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-500 mb-1">급여 계좌</label>
-                                <input
-                                    name="bank_account"
-                                    value={formData.bank_account || ''}
+                                <label className="block text-sm font-medium text-slate-500 mb-1">계약 형태</label>
+                                <select
+                                    name="contract_type"
+                                    value={formData.contract_type || '아르바이트'}
                                     onChange={handleChange}
-                                    placeholder="은행명 계좌번호 예금주"
                                     className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    <option value="정규직">정규직</option>
+                                    <option value="아르바이트">아르바이트</option>
+                                    <option value="일용직">일용직</option>
+                                </select>
+                            </div>
+                            <div className="flex items-end pb-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        name="insurance_4major"
+                                        checked={formData.insurance_4major || false}
+                                        onChange={handleChange}
+                                        className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                    />
+                                    <span className="font-medium text-slate-700">4대보험 가입</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">시급</label>
+                                <input
+                                    type="text"
+                                    name="hourly_wage"
+                                    value={formData.hourly_wage ? Number(formData.hourly_wage).toLocaleString() : ''}
+                                    onChange={handleChange}
+                                    className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <span className="absolute mt-[-30px] ml-[130px] text-slate-400 text-sm">원</span>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">월급 (정규직)</label>
+                                <input
+                                    type="text"
+                                    name="monthly_salary"
+                                    value={formData.monthly_salary ? Number(formData.monthly_salary).toLocaleString() : ''}
+                                    onChange={handleChange}
+                                    className="w-full p-2 rounded border border-slate-200 text-right pr-8 focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-500 mb-1">급여 계좌</label>
+                            <input
+                                name="bank_account"
+                                value={formData.bank_account || ''}
+                                onChange={handleChange}
+                                placeholder="은행명 계좌번호 예금주"
+                                className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. Work Schedule */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center gap-3 mb-6 border-b pb-4">
+                        <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Calendar size={24} /></div>
+                        <h2 className="text-lg font-bold text-slate-800">근무 시간 및 일정</h2>
+                    </div>
+                    <textarea
+                        name="work_schedule"
+                        value={formData.work_schedule || ''}
+                        onChange={handleChange}
+                        placeholder="예: 월-금 09:00 ~ 18:00 (휴게시간 1시간)"
+                        className="w-full h-32 p-3 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                    ></textarea>
+                </div>
+
+                {/* 4. Documents Upload */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center gap-3 mb-6 border-b pb-4">
+                        <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><FileText size={24} /></div>
+                        <h2 className="text-lg font-bold text-slate-800">서류 제출 및 관리</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        {docTypes.map((doc) => {
+                            // Find uploaded doc
+                            const uploadedDoc = documents.find(d => d.doc_type === doc.key);
+                            const fileUrl = uploadedDoc ? `http://localhost:8000/${uploadedDoc.file_path.replace(/\\/g, '/')}` : '#';
+
+                            return (
+                                <div key={doc.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className={`p-2 rounded-full ${uploadedDoc ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'}`}>
+                                            <CheckSquare size={18} />
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-medium text-slate-800">{doc.label}</span>
+                                            {uploadedDoc ? (
+                                                <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block max-w-[150px]">
+                                                    {uploadedDoc.original_filename}
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs text-red-400">미제출</span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <label className="flex items-center gap-1 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 shadow-sm">
+                                            <Upload size={14} />
+                                            업로드
+                                            <input
+                                                type="file"
+                                                className="hidden"
+                                                onChange={(e) => handleFileUpload(e, doc.key)}
+                                            />
+                                        </label>
+                                        {uploadedDoc && (
+                                            <a
+                                                href={fileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
+                                            >
+                                                <Eye size={14} /> 보기
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Electronic Contract Management */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center justify-between mb-6 border-b pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><FileText size={24} /></div>
+                            <h2 className="text-lg font-bold text-slate-800">전자계약 관리</h2>
+                        </div>
+                        <button
+                            onClick={handleOpenContractModal}
+                            className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
+                        >
+                            <FileText size={14} /> 계약서 작성
+                        </button>
+                    </div>
+
+                    <div className="space-y-3">
+                        {contracts.length === 0 ? (
+                            <div className="text-center py-6 text-slate-400 text-sm italic">
+                                발송된 전자계약서가 없습니다.
+                            </div>
+                        ) : (
+                            contracts.map(contract => (
+                                <div key={contract.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${contract.status === 'signed' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'}`}>
+                                            <FileText size={16} />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-bold text-slate-800 truncate">{contract.title}</div>
+                                            <div className="text-[10px] text-slate-400 font-medium">
+                                                {contract.status === 'signed' && contract.signed_at ? `서명됨 (${new Date(contract.signed_at).toLocaleDateString()})` : '서명 대기 중'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        {contract.status !== 'signed' && (
+                                            <button
+                                                onClick={() => handleEditContract(contract)}
+                                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="수정"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleDeleteContract(contract.id)}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="삭제"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                        {contract.status === 'signed' && (
+                                            <button
+                                                onClick={() => window.open(`/contracts/${contract.id}/sign`, '_blank')}
+                                                className="text-xs font-bold text-blue-600 hover:underline shrink-0 ml-1"
+                                            >
+                                                확인
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* 5. Payroll History (Full Width) */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center justify-between mb-6 border-b pb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
+                        <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="month"
+                            value={currentBudgetMonth}
+                            onChange={(e) => setCurrentBudgetMonth(e.target.value)}
+                            className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                        />
+                        <button
+                            onClick={() => setIsAttendanceModalOpen(true)}
+                            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
+                        >
+                            <Calendar size={16} /> 근무 기록/급여 산출
+                        </button>
+                    </div>
+                </div>
+
+                {payrolls.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400">
+                        지급된 급여 내역이 없습니다.
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 text-slate-600 text-sm">
+                                    <th className="p-3 font-semibold rounded-l-lg">귀속월</th>
+                                    <th className="p-3 font-semibold text-right">기본급</th>
+                                    <th className="p-3 font-semibold text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
+                                    <th className="p-3 font-semibold text-right text-red-500">공제액</th>
+                                    <th className="p-3 font-semibold text-right text-blue-600">실수령액</th>
+                                    <th className="p-3 font-semibold text-center rounded-r-lg">작업</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-sm">
+                                {payrolls.map((pay) => (
+                                    <tr key={pay.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                        <td className="p-3 font-medium text-slate-800">{pay.month}</td>
+                                        <td className="p-3 text-right text-slate-600">{(pay.base_pay || 0).toLocaleString()}원</td>
+                                        <td className="p-3 text-right text-slate-600">{(pay.bonus || 0).toLocaleString()}원</td>
+                                        <td className="p-3 text-right text-red-400">-{(pay.deductions || 0).toLocaleString()}원</td>
+                                        <td className="p-3 text-right font-bold text-blue-600">{(pay.total_pay || 0).toLocaleString()}원</td>
+                                        <td className="p-3 text-center">
+                                            <button
+                                                onClick={() => setSelectedPayroll(pay)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors mx-auto text-xs font-semibold"
+                                            >
+                                                <Printer size={14} /> 명세서
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div >
+
+            {/* Payroll Statement Modal */ }
+    {
+        selectedPayroll && (
+            <PayrollStatement
+                staff={formData}
+                payroll={selectedPayroll}
+                onClose={() => setSelectedPayroll(null)}
+            />
+        )
+    }
+
+    {/* Attendance & Calculation Modal */ }
+    <AttendanceInput
+        isOpen={isAttendanceModalOpen}
+        onClose={() => setIsAttendanceModalOpen(false)}
+        staffId={id}
+        staffName={formData.name}
+        month={currentBudgetMonth}
+        onCalculateSuccess={fetchStaffDetail}
+    />
+
+    {/* Account Creation Modal */ }
+    {
+        isAccountModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
+                                <input
+                                    type="text"
+                                    value={accountForm.username}
+                                    onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="아이디 입력"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
+                                <input
+                                    type="password"
+                                    value={accountForm.password}
+                                    onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="비밀번호 입력"
                                 />
                             </div>
                         </div>
                     </div>
-
-                    {/* 3. Work Schedule */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-3 mb-6 border-b pb-4">
-                            <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Calendar size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">근무 시간 및 일정</h2>
-                        </div>
-                        <textarea
-                            name="work_schedule"
-                            value={formData.work_schedule || ''}
-                            onChange={handleChange}
-                            placeholder="예: 월-금 09:00 ~ 18:00 (휴게시간 1시간)"
-                            className="w-full h-32 p-3 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                        ></textarea>
+                    <div className="bg-slate-50 p-4 flex gap-2">
+                        <button
+                            onClick={() => setIsAccountModalOpen(false)}
+                            className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={handleCreateAccount}
+                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
+                        >
+                            생성하기
+                        </button>
                     </div>
+                </div>
+            </div>
+        )
+    }
 
-                    {/* 4. Documents Upload */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex items-center gap-3 mb-6 border-b pb-4">
-                            <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><FileText size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">서류 제출 및 관리</h2>
-                        </div>
-
+    {/* Contract Creation Modal */ }
+    {
+        isContractModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6">
+                        <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
                         <div className="space-y-4">
-                            {docTypes.map((doc) => {
-                                // Find uploaded doc
-                                const uploadedDoc = documents.find(d => d.doc_type === doc.key);
-                                const fileUrl = uploadedDoc ? `http://localhost:8000/${uploadedDoc.file_path.replace(/\\/g, '/')}` : '#';
-
-                                return (
-                                    <div key={doc.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`p-2 rounded-full ${uploadedDoc ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-400'}`}>
-                                                <CheckSquare size={18} />
-                                            </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="font-medium text-slate-800">{doc.label}</span>
-                                                {uploadedDoc ? (
-                                                    <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline truncate block max-w-[150px]">
-                                                        {uploadedDoc.original_filename}
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-xs text-red-400">미제출</span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <label className="flex items-center gap-1 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-50 shadow-sm">
-                                                <Upload size={14} />
-                                                업로드
-                                                <input
-                                                    type="file"
-                                                    className="hidden"
-                                                    onChange={(e) => handleFileUpload(e, doc.key)}
-                                                />
-                                            </label>
-                                            {uploadedDoc && (
-                                                <a
-                                                    href={fileUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center gap-1 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
-                                                >
-                                                    <Eye size={14} /> 보기
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
+                                <input
+                                    type="text"
+                                    value={contractForm.title}
+                                    onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="제목 입력"
+                                />
+                                <button
+                                    onClick={() => {
+                                        let newContent = contractForm.content;
+                                        newContent = newContent.replace(/{name}/g, formData.name || "");
+                                        newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
+                                        newContent = newContent.replace(/{phone}/g, formData.phone || "");
+                                        const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
+                                        newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
+                                        setContractForm(prev => ({ ...prev, content: newContent }));
+                                    }}
+                                    className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
+                                >
+                                    정보 자동 입력 (이름, 입사일, 급여 등)
+                                </button>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
+                                <textarea
+                                    value={contractForm.content}
+                                    onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
+                                    className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
+                                    placeholder="계약서 전문 또는 주요 내용을 입력하세요."
+                                />
+                            </div>
                         </div>
                     </div>
-
-                    {/* Electronic Contract Management */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex items-center justify-between mb-6 border-b pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><FileText size={24} /></div>
-                                <h2 className="text-lg font-bold text-slate-800">전자계약 관리</h2>
-                            </div>
-                            <button
-                                onClick={handleOpenContractModal}
-                                className="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 border border-blue-200"
-                            >
-                                <FileText size={14} /> 계약서 작성
-                            </button>
-                        </div>
-
-                        <div className="space-y-3">
-                            {contracts.length === 0 ? (
-                                <div className="text-center py-6 text-slate-400 text-sm italic">
-                                    발송된 전자계약서가 없습니다.
-                                </div>
-                            ) : (
-                                contracts.map(contract => (
-                                    <div key={contract.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${contract.status === 'signed' ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'}`}>
-                                                <FileText size={16} />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <div className="text-sm font-bold text-slate-800 truncate">{contract.title}</div>
-                                                <div className="text-[10px] text-slate-400 font-medium">
-                                                    {contract.status === 'signed' && contract.signed_at ? `서명됨 (${new Date(contract.signed_at).toLocaleDateString()})` : '서명 대기 중'}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            {contract.status !== 'signed' && (
-                                                <button
-                                                    onClick={() => handleEditContract(contract)}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="수정"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleDeleteContract(contract.id)}
-                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="삭제"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                            {contract.status === 'signed' && (
-                                                <button
-                                                    onClick={() => window.open(`/contracts/${contract.id}/sign`, '_blank')}
-                                                    className="text-xs font-bold text-blue-600 hover:underline shrink-0 ml-1"
-                                                >
-                                                    확인
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                    <div className="bg-slate-50 p-4 flex gap-3">
+                        <button
+                            onClick={() => setIsContractModalOpen(false)}
+                            className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
+                        >
+                            취소
+                        </button>
+                        <button
+                            onClick={handleCreateContract}
+                            className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
+                        >
+                            계약서 발송하기
+                        </button>
                     </div>
                 </div>
+            </div>
+        )
+    }
 
-                {/* 5. Payroll History (Full Width) */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-6 border-b pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
-                        </div>
+    {/* Visa Guide Modal */ }
+    {
+        isVisaGuideOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="p-6 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <input
-                                type="month"
-                                value={currentBudgetMonth}
-                                onChange={(e) => setCurrentBudgetMonth(e.target.value)}
-                                className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                            <button
-                                onClick={() => setIsAttendanceModalOpen(true)}
-                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
-                            >
-                                <Calendar size={16} /> 근무 기록/급여 산출
-                            </button>
+                            <span className="bg-blue-100 text-blue-600 p-2 rounded-lg font-bold">ℹ️</span>
+                            <h2 className="text-lg font-bold text-slate-800">외국인 고용주 체류자격별 안내</h2>
                         </div>
+                        <button onClick={() => setIsVisaGuideOpen(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500">
+                            ✖
+                        </button>
                     </div>
+                    <div className="p-6 overflow-y-auto max-h-[70vh] space-y-6">
 
-                    {payrolls.length === 0 ? (
-                        <div className="text-center py-10 text-slate-400">
-                            지급된 급여 내역이 없습니다.
+                        {/* H-2 */}
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-blue-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                H-2 (방문취업)
+                            </h3>
+                            <div className="bg-blue-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-blue-100">
+                                <p><strong>✅ 고용 가능 요건:</strong> 특례고용가능확인서 필요.</p>
+                                <p className="mt-1"><strong>⚠️ 의무사항:</strong> 근로개시일로부터 14일 이내 고용노동부 및 법무부(하이코리아)에 <strong>근로개시 신고</strong> 필수.</p>
+                                <p className="text-xs text-slate-500 mt-2">* 위반 시 과태료 부과 대상.</p>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 text-slate-600 text-sm">
-                                        <th className="p-3 font-semibold rounded-l-lg">귀속월</th>
-                                        <th className="p-3 font-semibold text-right">기본급</th>
-                                        <th className="p-3 font-semibold text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
-                                        <th className="p-3 font-semibold text-right text-red-500">공제액</th>
-                                        <th className="p-3 font-semibold text-right text-blue-600">실수령액</th>
-                                        <th className="p-3 font-semibold text-center rounded-r-lg">작업</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="text-sm">
-                                    {payrolls.map((pay) => (
-                                        <tr key={pay.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 font-medium text-slate-800">{pay.month}</td>
-                                            <td className="p-3 text-right text-slate-600">{(pay.base_pay || 0).toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-slate-600">{(pay.bonus || 0).toLocaleString()}원</td>
-                                            <td className="p-3 text-right text-red-400">-{(pay.deductions || 0).toLocaleString()}원</td>
-                                            <td className="p-3 text-right font-bold text-blue-600">{(pay.total_pay || 0).toLocaleString()}원</td>
-                                            <td className="p-3 text-center">
-                                                <button
-                                                    onClick={() => setSelectedPayroll(pay)}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors mx-auto text-xs font-semibold"
-                                                >
-                                                    <Printer size={14} /> 명세서
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+
+                        {/* D-2 */}
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-purple-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                D-2 (유학) / D-4 (어학연수)
+                            </h3>
+                            <div className="bg-purple-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-purple-100">
+                                <p><strong>✅ 시간제 취업 허가:</strong> 학교 유학생 담당자 확인 및 출입국사무소 <strong>'시간제 취업 확인서'</strong> 발급 필수.</p>
+                                <p className="mt-1"><strong>⏳ 시간 제한:</strong></p>
+                                <ul className="list-disc pl-4 mt-1 space-y-1 text-xs">
+                                    <li>어학연수생/학부 1~2학년: 주 20시간 이내</li>
+                                    <li>학부 3~4학년/석박사: 주 30시간 이내 (인증대학 기준 상이할 수 있음)</li>
+                                    <li>방학 중: 시간 제한 없음 (단, 허가 자체는 필수)</li>
+                                </ul>
+                            </div>
                         </div>
-                    )}
+
+                        {/* E-9 */}
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-emerald-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                E-9 (비전문취업)
+                            </h3>
+                            <div className="bg-emerald-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-emerald-100">
+                                <p><strong>✅ 절차:</strong> EPS(고용허가제) 시스템을 통해서만 알선 및 채용 가능.</p>
+                                <p className="mt-1"><strong>⚠️ 제한:</strong> 임의로 채용하거나 근무처 변경 시 불법 고용.</p>
+                            </div>
+                        </div>
+
+                        {/* F-4 */}
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-orange-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
+                                F-4 (재외동포)
+                            </h3>
+                            <div className="bg-orange-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-orange-100">
+                                <p><strong>✅ 허용 범위:</strong> 대부분의 취업 활동 허용.</p>
+                                <p className="mt-1"><strong>🚫 제한:</strong> 단순노무행위(건설현장 단순노무 등 일부 업종)는 원칙적 제한. 단, 요식업 서빙/주방보조 등은 통상 허용되는 추세이나 지역/직종별 확인 권장.</p>
+                            </div>
+                        </div>
+
+                        {/* F-2, F-5, F-6 */}
+                        <div className="space-y-2">
+                            <h3 className="font-bold text-slate-600 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                                F-2, F-5, F-6 (거주/영주/결혼)
+                            </h3>
+                            <div className="bg-slate-50 p-3 rounded-xl text-sm text-slate-700 leading-relaxed border border-slate-200">
+                                <p><strong>✅ 제한 없음:</strong> 내국인과 동일하게 자유로운 취업 활동 가능.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                        <button
+                            onClick={() => setIsVisaGuideOpen(false)}
+                            className="w-full bg-slate-200 text-slate-700 py-3 rounded-xl font-bold hover:bg-slate-300"
+                        >
+                            닫기
+                        </button>
+                    </div>
                 </div>
-            </div >
-
-            {/* Payroll Statement Modal */}
-            {
-                selectedPayroll && (
-                    <PayrollStatement
-                        staff={formData}
-                        payroll={selectedPayroll}
-                        onClose={() => setSelectedPayroll(null)}
-                    />
-                )
-            }
-
-            {/* Attendance & Calculation Modal */}
-            <AttendanceInput
-                isOpen={isAttendanceModalOpen}
-                onClose={() => setIsAttendanceModalOpen(false)}
-                staffId={id}
-                staffName={formData.name}
-                month={currentBudgetMonth}
-                onCalculateSuccess={fetchStaffDetail}
-            />
-
-            {/* Account Creation Modal */}
-            {
-                isAccountModalOpen && (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">직원 로그인 계정 생성</h2>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">아이디</label>
-                                        <input
-                                            type="text"
-                                            value={accountForm.username}
-                                            onChange={(e) => setAccountForm({ ...accountForm, username: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="아이디 입력"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">비밀번호</label>
-                                        <input
-                                            type="password"
-                                            value={accountForm.password}
-                                            onChange={(e) => setAccountForm({ ...accountForm, password: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="비밀번호 입력"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 p-4 flex gap-2">
-                                <button
-                                    onClick={() => setIsAccountModalOpen(false)}
-                                    className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                                >
-                                    취소
-                                </button>
-                                <button
-                                    onClick={handleCreateAccount}
-                                    className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700"
-                                >
-                                    생성하기
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Contract Creation Modal */}
-            {
-                isContractModalOpen && (
-                    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                            <div className="p-6">
-                                <h2 className="text-xl font-bold text-slate-900 mb-6 font-primary">전자계약서 작성</h2>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">계약서 제목</label>
-                                        <input
-                                            type="text"
-                                            value={contractForm.title}
-                                            onChange={(e) => setContractForm({ ...contractForm, title: e.target.value })}
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="제목 입력"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                let newContent = contractForm.content;
-                                                newContent = newContent.replace(/{name}/g, formData.name || "");
-                                                newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
-                                                newContent = newContent.replace(/{phone}/g, formData.phone || "");
-                                                const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
-                                                newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
-                                                setContractForm(prev => ({ ...prev, content: newContent }));
-                                            }}
-                                            className="mt-2 text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200"
-                                        >
-                                            정보 자동 입력 (이름, 입사일, 급여 등)
-                                        </button>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-1.5">계약 내용</label>
-                                        <textarea
-                                            value={contractForm.content}
-                                            onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}
-                                            className="w-full h-80 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-blue-500 resize-none font-medium text-slate-700"
-                                            placeholder="계약서 전문 또는 주요 내용을 입력하세요."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-slate-50 p-4 flex gap-3">
-                                <button
-                                    onClick={() => setIsContractModalOpen(false)}
-                                    className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-100"
-                                >
-                                    취소
-                                </button>
-                                <button
-                                    onClick={handleCreateContract}
-                                    className="flex-1 p-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200"
-                                >
-                                    계약서 발송하기
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
+            </div>
+        )
+    }
         </div >
     );
 }
+```

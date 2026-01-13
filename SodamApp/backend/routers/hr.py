@@ -18,6 +18,8 @@ class StaffCreate(BaseModel):
     hourly_wage: int
     bank_account: Optional[str] = None
     start_date: date = date.today()
+    nationality: str = "South Korea"
+    visa_type: Optional[str] = None
 
 class StaffUpdate(BaseModel):
     name: Optional[str] = None
@@ -35,6 +37,8 @@ class StaffUpdate(BaseModel):
     doc_health_cert: Optional[bool] = None
     doc_id_copy: Optional[bool] = None
     doc_bank_copy: Optional[bool] = None
+    nationality: Optional[str] = None
+    visa_type: Optional[str] = None
 
 class AttendanceAction(BaseModel):
     staff_id: int
@@ -73,7 +77,9 @@ def create_staff(staff: StaffCreate):
             role=staff.role,
             hourly_wage=staff.hourly_wage,
             bank_account=staff.bank_account,
-            start_date=staff.start_date
+            start_date=staff.start_date,
+            nationality=staff.nationality,
+            visa_type=staff.visa_type
         )
         service.session.add(new_staff)
         service.session.commit()

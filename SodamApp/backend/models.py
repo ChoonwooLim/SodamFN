@@ -70,6 +70,8 @@ class Staff(SQLModel, table=True):
     status: str = Field(default="재직") # 재직 / 퇴사
     
     # HR Details
+    nationality: str = Field(default="South Korea") # 국적
+    visa_type: Optional[str] = None # 비자 종류 (e.g. H-2, E-9, F-4...)
     phone: Optional[str] = None
     address: Optional[str] = None # Added for contract
     resident_number: Optional[str] = None # Added for contract
