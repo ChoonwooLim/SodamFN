@@ -25,7 +25,23 @@ export default function StaffDetail() {
         doc_contract: false,
         doc_health_cert: false,
         doc_id_copy: false,
-        doc_bank_copy: false
+        doc_id_copy: false,
+        doc_bank_copy: false,
+
+        // Detailed Contract Fields
+        contract_start_date: '',
+        contract_end_date: '',
+        work_start_time: '',
+        work_end_time: '',
+        rest_start_time: '',
+        rest_end_time: '',
+        working_days: '',
+        weekly_holiday: '',
+        job_description: '',
+        bonus_enabled: false,
+        bonus_amount: '',
+        salary_payment_date: '매월 말일',
+        salary_payment_method: '근로자 계좌 입금'
     });
 
     const [documents, setDocuments] = useState([]); // List of uploaded documents
@@ -51,17 +67,17 @@ export default function StaffDetail() {
 임춘우(이하 "사업주"라 함)와 {name}(이하 "근로자"라 함)은(는) 다음과 같이
 근로계약을 체결한다.
 
-1. 근로계약기간 : {start_date}부터        년    월      일까지
+1. 근로계약기간 : {contract_start_date} 부터 {contract_end_date} 까지
 2. 근 무 장 소 : 소담김밥 건대본점 매장
-3. 업무의 내용 : 주방업무( )/ 카운터업무( ) / 마감 청소업무(   )
-4. 소정근로시간 :         시   분부터     시   분까지 (휴게시간 : 시 분 ~     시   분)
-5. 근무일/휴일 : 매주 일 근무, 주휴일 매주 요일
+3. 업무의 내용 : {job_description}
+4. 소정근로시간 : {work_start_time} 부터 {work_end_time} 까지 (휴게시간 : {rest_start_time} ~ {rest_end_time})
+5. 근무일/휴일 : {working_days} 근무, 주휴일 {weekly_holiday}
 6. 임 금
 - 월(일, 시)급 : {wage} 원
-- 상여금 : 있음(     ), 없음(     )
+- 상여금 : {bonus_info}
 - 기타 급여(제 수당 등) : 있음( 주휴수당),  없음(        )
-- 지급일 : 매월(매주 또는 매일) 말일(휴일의 경우는 전일 지급)
-- 지급 방법 : 근로자에게 직접 지급(      ), 예금통장에 입금 (       )
+- 지급일 : {salary_payment_date} (휴일의 경우는 전일 지급)
+- 지급 방법 : {salary_payment_method}
 7. 연차유급휴가
 - 연차유급휴가는 근로기준법에서 정하는 바에 따라 부여함
 8. 근로계약서 교뷰
@@ -77,7 +93,7 @@ export default function StaffDetail() {
 주 소 : 서울시 광진구 능동로 110 스타시티 영존빌딩 B208호
                                   대 표 자 :   임  춘 우  (서명)
 
-(근로자) 주 소 :                                                                                연 락 처 : {phone}
+(근로자) 주 소 : {address}                                                                                연 락 처 : {phone}
                                        성  명 : {name}                    (서명)`
     });
 
@@ -271,14 +287,54 @@ export default function StaffDetail() {
 
     const handleOpenContractModal = async () => {
         setEditingContractId(null); // Reset editing state
+        let template = contractForm.content; // Default
+
         try {
             const res = await api.get('/settings/contract_template');
             if (res.data && res.data.value) {
-                setContractForm(prev => ({ ...prev, content: res.data.value }));
+                template = res.data.value;
             }
         } catch (error) {
             console.error("Failed to fetch contract template", error);
         }
+
+        // --- Auto-Fill Logic ---
+        // Replace placeholders with formData values
+        const wage = formData.contract_type === '정규직'
+            ? formData.monthly_salary
+            : formData.hourly_wage;
+        const formattedWage = wage ? Number(wage).toLocaleString() : '';
+
+        const bonusInfo = formData.bonus_enabled
+            ? `있음 (${formData.bonus_amount || ''})`
+            : '없음';
+
+        const replacements = {
+            '{name}': formData.name || '',
+            '{phone}': formData.phone || '',
+            '{address}': formData.address || '____________________', // No address in Staff model yet? Wait, user asked to input it in ContractSign. But we should add it to Staff too if we can. 
+            // Actually checking models.py -> Staff has address/resident_number fields.
+            '{contract_start_date}': formData.contract_start_date || '____년 __월 __일',
+            '{contract_end_date}': formData.contract_end_date || '____년 __월 __일',
+            '{work_start_time}': formData.work_start_time || '__:__',
+            '{work_end_time}': formData.work_end_time || '__:__',
+            '{rest_start_time}': formData.rest_start_time || '__:__',
+            '{rest_end_time}': formData.rest_end_time || '__:__',
+            '{working_days}': formData.working_days || '______',
+            '{weekly_holiday}': formData.weekly_holiday || '______',
+            '{job_description}': formData.job_description || '______',
+            '{wage}': formattedWage,
+            '{bonus_info}': bonusInfo,
+            '{salary_payment_date}': formData.salary_payment_date || '매월 말일',
+            '{salary_payment_method}': formData.salary_payment_method || '근로자 계좌 입금'
+        };
+
+        let filledContent = template;
+        for (const [key, value] of Object.entries(replacements)) {
+            filledContent = filledContent.replace(new RegExp(key, 'g'), value);
+        }
+
+        setContractForm(prev => ({ ...prev, content: filledContent }));
         setIsContractModalOpen(true);
     };
 
@@ -544,19 +600,186 @@ export default function StaffDetail() {
                     </div>
                 </div>
 
-                {/* 3. Work Schedule */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                {/* 3. Detailed Contract Info (New Section) */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
                     <div className="flex items-center gap-3 mb-6 border-b pb-4">
-                        <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Calendar size={24} /></div>
-                        <h2 className="text-lg font-bold text-slate-800">근무 시간 및 일정</h2>
+                        <div className="p-2 bg-pink-100 text-pink-600 rounded-lg"><FileText size={24} /></div>
+                        <h2 className="text-lg font-bold text-slate-800">상세 근로계약 정보</h2>
                     </div>
-                    <textarea
-                        name="work_schedule"
-                        value={formData.work_schedule || ''}
-                        onChange={handleChange}
-                        placeholder="예: 월-금 09:00 ~ 18:00 (휴게시간 1시간)"
-                        className="w-full h-32 p-3 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                    ></textarea>
+
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">근로계약 시작일</label>
+                                <input
+                                    type="date"
+                                    name="contract_start_date"
+                                    value={formData.contract_start_date || ''}
+                                    onChange={handleChange}
+                                    className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">근로계약 종료일</label>
+                                <input
+                                    type="date"
+                                    name="contract_end_date"
+                                    value={formData.contract_end_date || ''}
+                                    onChange={handleChange}
+                                    className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">근무 시간 (시작 - 종료)</label>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        name="work_start_time"
+                                        value={formData.work_start_time || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">선택</option>
+                                        {Array.from({ length: 48 }).map((_, i) => {
+                                            const h = Math.floor(i / 2).toString().padStart(2, '0');
+                                            const m = (i % 2) * 30 === 0 ? '00' : '30';
+                                            const time = `${h}:${m}`;
+                                            return <option key={time} value={time}>{time}</option>;
+                                        })}
+                                    </select>
+                                    <span>~</span>
+                                    <select
+                                        name="work_end_time"
+                                        value={formData.work_end_time || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">선택</option>
+                                        {Array.from({ length: 48 }).map((_, i) => {
+                                            const h = Math.floor(i / 2).toString().padStart(2, '0');
+                                            const m = (i % 2) * 30 === 0 ? '00' : '30';
+                                            const time = `${h}:${m}`;
+                                            return <option key={time} value={time}>{time}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">휴게 시간 (시작 - 종료)</label>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        name="rest_start_time"
+                                        value={formData.rest_start_time || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">선택</option>
+                                        {Array.from({ length: 48 }).map((_, i) => {
+                                            const h = Math.floor(i / 2).toString().padStart(2, '0');
+                                            const m = (i % 2) * 30 === 0 ? '00' : '30';
+                                            const time = `${h}:${m}`;
+                                            return <option key={time} value={time}>{time}</option>;
+                                        })}
+                                    </select>
+                                    <span>~</span>
+                                    <select
+                                        name="rest_end_time"
+                                        value={formData.rest_end_time || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="">선택</option>
+                                        {Array.from({ length: 48 }).map((_, i) => {
+                                            const h = Math.floor(i / 2).toString().padStart(2, '0');
+                                            const m = (i % 2) * 30 === 0 ? '00' : '30';
+                                            const time = `${h}:${m}`;
+                                            return <option key={time} value={time}>{time}</option>;
+                                        })}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">근무일 (요일)</label>
+                                <input
+                                    name="working_days"
+                                    value={formData.working_days || ''}
+                                    onChange={handleChange}
+                                    placeholder="예: 매주 월~금"
+                                    className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">주휴일</label>
+                                <input
+                                    name="weekly_holiday"
+                                    value={formData.weekly_holiday || ''}
+                                    onChange={handleChange}
+                                    placeholder="예: 매주 일요일"
+                                    className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-500 mb-1">업무의 내용</label>
+                            <input
+                                name="job_description"
+                                value={formData.job_description || ''}
+                                onChange={handleChange}
+                                placeholder="예: 주방 보조 및 설거지"
+                                className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">상여금</label>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <input
+                                        type="checkbox"
+                                        name="bonus_enabled"
+                                        checked={formData.bonus_enabled || false}
+                                        onChange={handleChange}
+                                        className="w-4 h-4"
+                                    />
+                                    <span className="text-sm text-slate-600">상여금 지급 (체크시 내용 입력)</span>
+                                </div>
+                                {formData.bonus_enabled && (
+                                    <input
+                                        name="bonus_amount"
+                                        value={formData.bonus_amount || ''}
+                                        onChange={handleChange}
+                                        placeholder="상여금 지급 기준 및 금액"
+                                        className="w-full p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-500 mb-1">임금 지급</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        name="salary_payment_date"
+                                        value={formData.salary_payment_date || ''}
+                                        onChange={handleChange}
+                                        placeholder="지급일 (매월 말일)"
+                                        className="w-1/2 p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <input
+                                        name="salary_payment_method"
+                                        value={formData.salary_payment_method || ''}
+                                        onChange={handleChange}
+                                        placeholder="방법 (계좌 입금)"
+                                        className="w-1/2 p-2 rounded border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* 4. Documents Upload */}

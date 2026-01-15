@@ -39,6 +39,21 @@ class StaffUpdate(BaseModel):
     doc_bank_copy: Optional[bool] = None
     nationality: Optional[str] = None
     visa_type: Optional[str] = None
+    
+    # Contract Details
+    contract_start_date: Optional[date] = None
+    contract_end_date: Optional[date] = None
+    work_start_time: Optional[str] = None
+    work_end_time: Optional[str] = None
+    rest_start_time: Optional[str] = None
+    rest_end_time: Optional[str] = None
+    working_days: Optional[str] = None
+    weekly_holiday: Optional[str] = None
+    job_description: Optional[str] = None
+    bonus_enabled: Optional[bool] = None
+    bonus_amount: Optional[str] = None
+    salary_payment_date: Optional[str] = None
+    salary_payment_method: Optional[str] = None
 
 class AttendanceAction(BaseModel):
     staff_id: int

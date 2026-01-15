@@ -44,8 +44,15 @@ export default function ContractSignPage() {
                     setIsSigned(true);
                 }
 
-                // Pre-fill fields if available in linked staff (requires backend to send this, 
-                // but currently contract detail might not have it. We could fetch /auth/me or similar)
+                // Pre-fill fields if available in linked staff
+                if (data.staff) {
+                    setInfo(prev => ({
+                        ...prev,
+                        address: data.staff.address || prev.address,
+                        phone: data.staff.phone || prev.phone,
+                        resident_number: data.staff.resident_number || prev.resident_number
+                    }));
+                }
             }
         } catch (error) {
             console.error("Error fetching contract:", error);

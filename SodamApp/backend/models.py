@@ -78,7 +78,27 @@ class Staff(SQLModel, table=True):
     contract_type: str = Field(default="아르바이트") # 정규직, 아르바이트, 일용직
     insurance_4major: bool = Field(default=False) # 4대보험 가입여부
     monthly_salary: int = Field(default=0) # 월급 (if applicable)
-    work_schedule: Optional[str] = None # 근무시간 (e.g. "09:00~18:00")
+    work_schedule: Optional[str] = None # 근무시간 (e.g. "09:00~18:00") - KEEPING FOR BACKWARD COMPAT, but using new fields below
+    
+    # Contract Specific Details (New)
+    contract_start_date: Optional[datetime.date] = None
+    contract_end_date: Optional[datetime.date] = None
+    
+    work_start_time: Optional[str] = None # "09:00"
+    work_end_time: Optional[str] = None # "18:00"
+    rest_start_time: Optional[str] = None # "12:00"
+    rest_end_time: Optional[str] = None # "13:00"
+    
+    working_days: Optional[str] = None # "매주 월~금"
+    weekly_holiday: Optional[str] = None # "매주 일요일" (Contract Item 5)
+    
+    job_description: Optional[str] = None # "주방업무, 홀서빙 등" (Contract Item 3)
+    
+    bonus_enabled: bool = Field(default=False) # 상여금 유무
+    bonus_amount: Optional[str] = None # 상여금 내용 (e.g. "설,추석 각 20만원")
+    
+    salary_payment_date: Optional[str] = Field(default="매월 말일") # 지급일
+    salary_payment_method: Optional[str] = Field(default="근로자 계좌 입금") # 지급방법
     
     # Document Checklist (Submitted?)
     doc_contract: bool = Field(default=False) # 근로계약서

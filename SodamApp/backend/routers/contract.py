@@ -61,6 +61,9 @@ def get_contract_detail(contract_id: int, current_user: User = Depends(get_curre
         if current_user.role != "admin" and current_user.staff_id != contract.staff_id:
             raise HTTPException(status_code=403, detail="Permission denied")
             
+        # Trigger lazy load of staff relationship
+        _ = contract.staff
+            
         return {"status": "success", "data": contract}
     finally:
         service.close()
