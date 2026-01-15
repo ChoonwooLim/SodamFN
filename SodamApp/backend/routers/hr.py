@@ -39,6 +39,8 @@ class StaffUpdate(BaseModel):
     doc_bank_copy: Optional[bool] = None
     nationality: Optional[str] = None
     visa_type: Optional[str] = None
+    address: Optional[str] = None
+    resident_number: Optional[str] = None
     
     # Contract Details
     contract_start_date: Optional[date] = None
