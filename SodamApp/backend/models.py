@@ -98,7 +98,7 @@ class Staff(SQLModel, table=True):
     bonus_amount: Optional[str] = None # 상여금 내용 (e.g. "설,추석 각 20만원")
     
     salary_payment_date: Optional[str] = Field(default="매월 말일") # 지급일
-    salary_payment_method: Optional[str] = Field(default="근로자 계좌 입금") # 지급방법
+    salary_payment_method: Optional[str] = Field(default="근로자 계좌 입금") # 지급 방법
     
     # Document Checklist (Submitted?)
     doc_contract: bool = Field(default=False) # 근로계약서
@@ -106,11 +106,37 @@ class Staff(SQLModel, table=True):
     doc_id_copy: bool = Field(default=False) # 신분증 사본
     doc_bank_copy: bool = Field(default=False) # 통장 사본
     
+    # Relationships
     attendances: List["Attendance"] = Relationship(back_populates="staff")
     payrolls: List["Payroll"] = Relationship(back_populates="staff")
     documents: List["StaffDocument"] = Relationship(back_populates="staff")
     contracts: List["ElectronicContract"] = Relationship(back_populates="staff")
     user: Optional["User"] = Relationship(back_populates="staff")
+
+# --- Finance (Card Sales) ---
+
+class CardSalesApproval(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    approval_date: datetime.date = Field(index=True) # 승인일자
+    approval_time: Optional[str] = None # 승인시간
+    card_corp: str = Field(index=True) # 카드사명 (User-entered or parsed)
+    card_number: Optional[str] = None # 카드번호 (Allow masking)
+    approval_number: Optional[str] = None # 승인번호
+    amount: int # 승인금액
+    installment: Optional[str] = None # 할부개월
+    status: str = Field(default="승인") # 승인 / 취소
+    
+    shop_name: Optional[str] = None # 가맹점명 (from Excel)
+
+class CardPayment(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    payment_date: datetime.date = Field(index=True) # 입금일자
+    card_corp: str = Field(index=True) # 카드사명
+    sales_amount: int = 0 # 매출금액 (승인금액 합계)
+    fees: int = 0 # 수수료
+    vat_on_fees: int = 0 # 수수료 부가세 (if applicable separately, often included in fees for stats)
+    net_deposit: int = 0 # 입금예정액/실입금액
+    bank: Optional[str] = None # 입금은행
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

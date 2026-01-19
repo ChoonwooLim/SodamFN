@@ -25,7 +25,7 @@ export default function StaffDetail() {
         doc_contract: false,
         doc_health_cert: false,
         doc_id_copy: false,
-        doc_id_copy: false,
+
         doc_bank_copy: false,
 
         // Detailed Contract Fields
@@ -249,7 +249,7 @@ export default function StaffDetail() {
             } else {
                 // Create new
                 await api.post(`/contracts/`, {
-                    staff_id: id,
+                    staff_id: parseInt(id),
                     ...contractForm
                 });
                 alert("계약서가 생성되었습니다.");

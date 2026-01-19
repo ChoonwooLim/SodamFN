@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings
+from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings, finance
 from init_db import init_db
 
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +36,7 @@ app.add_middleware(
 app.include_router(stats.router, prefix="/api")
 app.include_router(hr.router, prefix="/api/hr")
 app.include_router(payroll.router, prefix="/api/payroll")
+app.include_router(finance.router, prefix="/api/finance")
 app.include_router(ocr.router, prefix="/api")
 app.include_router(expense.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")

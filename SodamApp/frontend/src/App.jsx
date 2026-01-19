@@ -13,6 +13,7 @@ import ContractMyPage from './pages/ContractMy';
 import ContractSignPage from './pages/ContractSign';
 import SignupPage from './pages/Signup';
 import StaffDashboard from './pages/StaffDashboard';
+import CardSales from './pages/CardSales';
 
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const token = localStorage.getItem('token');
@@ -72,6 +73,9 @@ export default function App() {
           {/* SPLIT INPUT ROUTES */}
           <Route path="/input/revenue" element={<ProtectedRoute adminOnly><DataInputPage mode="revenue" /></ProtectedRoute>} />
           <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
+
+          {/* FINANCE */}
+          <Route path="/finance/card-sales" element={<ProtectedRoute adminOnly><CardSales /></ProtectedRoute>} />
 
           {/* BACKWARD COMPATIBILITY */}
           <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
