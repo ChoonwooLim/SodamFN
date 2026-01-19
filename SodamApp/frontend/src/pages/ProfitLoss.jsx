@@ -26,6 +26,13 @@ const EXPENSE_FIELDS = [
 
 const MONTHS = [7, 8, 9, 10, 11, 12];
 
+const TABS = [
+    { id: 'summary', label: '손익계산서' },
+    { id: 'expenses', label: '세부지출 내역서' },
+    { id: 'revenue', label: '수입 상세' },
+    { id: 'analysis', label: '월별 분석' },
+];
+
 function formatNumber(num) {
     if (num === undefined || num === null) return '-';
     return num.toLocaleString();
@@ -37,6 +44,7 @@ export default function ProfitLoss() {
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [year, setYear] = useState(2025);
+    const [activeTab, setActiveTab] = useState('summary');
 
     useEffect(() => {
         fetchData();
@@ -145,17 +153,178 @@ export default function ProfitLoss() {
 
     if (loading) return <div className="loading">로딩 중...</div>;
 
-    return (
-        <div className="profitloss-page">
-            <div className="page-header">
-                <h1>손익계산서</h1>
-                <div className="year-selector">
-                    <button onClick={() => setYear(y => y - 1)}>◀</button>
-                    <span>{year}년</span>
-                    <button onClick={() => setYear(y => y + 1)}>▶</button>
+    // Render expense detail table
+    const renderExpenseDetail = () => (
+        <div className="expense-detail-section">
+            <h3 className="section-title">📊 세부지출 내역서</h3>
+            <div className="table-container">
+                <table className="pl-table expense-table">
+                    <thead>
+                        <tr>
+                            <th>지출 항목</th>
+                            {MONTHS.map(m => <th key={m}>{m}월</th>)}
+                            <th>합계</th>
+                            <th>월평균</th>
+                            <th>비율</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {EXPENSE_FIELDS.map(field => {
+                            const yearTotal = calcYearTotal(field.key);
+                            const totalExpense = data.reduce((s, d) => s + calcTotalExpense(d), 0);
+                            const percentage = totalExpense > 0 ? ((yearTotal / totalExpense) * 100).toFixed(1) : 0;
+                            return (
+                                <tr key={field.key}>
+                                    <td className="item-name">{field.label}</td>
+                                    {MONTHS.map(m => (
+                                        <td key={m}>{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                                    ))}
+                                    <td className="total">{formatNumber(yearTotal)}</td>
+                                    <td className="average">{formatNumber(calcYearAverage(field.key))}</td>
+                                    <td className="percentage">{percentage}%</td>
+                                </tr>
+                            );
+                        })}
+                        <tr className="subtotal-row">
+                            <td className="item-name"><strong>총합</strong></td>
+                            {MONTHS.map(m => (
+                                <td key={m} className="subtotal">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
+                            ))}
+                            <td className="total"><strong>{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</strong></td>
+                            <td className="average"><strong>{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / 6))}</strong></td>
+                            <td className="percentage">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div className="instructions">
+                <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 지출 대비 비율입니다.</p>
+            </div>
+        </div>
+    );
+
+    // Render revenue detail table
+    const renderRevenueDetail = () => (
+        <div className="revenue-detail-section">
+            <h3 className="section-title">💰 수입 상세 내역</h3>
+            <div className="table-container">
+                <table className="pl-table revenue-table">
+                    <thead>
+                        <tr>
+                            <th>수입 항목</th>
+                            {MONTHS.map(m => <th key={m}>{m}월</th>)}
+                            <th>합계</th>
+                            <th>월평균</th>
+                            <th>비율</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {REVENUE_FIELDS.map(field => {
+                            const yearTotal = calcYearTotal(field.key);
+                            const totalRevenue = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
+                            const percentage = totalRevenue > 0 ? ((yearTotal / totalRevenue) * 100).toFixed(1) : 0;
+                            return (
+                                <tr key={field.key}>
+                                    <td className="item-name">{field.label}</td>
+                                    {MONTHS.map(m => (
+                                        <td key={m}>{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                                    ))}
+                                    <td className="total">{formatNumber(yearTotal)}</td>
+                                    <td className="average">{formatNumber(calcYearAverage(field.key))}</td>
+                                    <td className="percentage">{percentage}%</td>
+                                </tr>
+                            );
+                        })}
+                        <tr className="subtotal-row">
+                            <td className="item-name"><strong>총합</strong></td>
+                            {MONTHS.map(m => (
+                                <td key={m} className="subtotal">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
+                            ))}
+                            <td className="total"><strong>{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</strong></td>
+                            <td className="average"><strong>{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / 6))}</strong></td>
+                            <td className="percentage">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div className="instructions">
+                <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 수입 대비 비율입니다.</p>
+            </div>
+        </div>
+    );
+
+    // Render monthly analysis
+    const renderAnalysis = () => {
+        const totalRevenue = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
+        const totalExpense = data.reduce((s, d) => s + calcTotalExpense(d), 0);
+        const totalProfit = totalRevenue - totalExpense;
+        const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
+
+        return (
+            <div className="analysis-section">
+                <h3 className="section-title">📈 월별 분석</h3>
+
+                <div className="summary-cards">
+                    <div className="summary-card revenue-card">
+                        <div className="card-label">총 수입</div>
+                        <div className="card-value">{formatNumber(totalRevenue)}원</div>
+                        <div className="card-avg">월평균 {formatNumber(Math.round(totalRevenue / 6))}원</div>
+                    </div>
+                    <div className="summary-card expense-card">
+                        <div className="card-label">총 지출</div>
+                        <div className="card-value">{formatNumber(totalExpense)}원</div>
+                        <div className="card-avg">월평균 {formatNumber(Math.round(totalExpense / 6))}원</div>
+                    </div>
+                    <div className="summary-card profit-card">
+                        <div className="card-label">순수익</div>
+                        <div className="card-value">{formatNumber(totalProfit)}원</div>
+                        <div className="card-avg">수익률 {profitMargin}%</div>
+                    </div>
+                </div>
+
+                <div className="monthly-chart">
+                    <h4>월별 손익 추이</h4>
+                    <table className="pl-table">
+                        <thead>
+                            <tr>
+                                <th>구분</th>
+                                {MONTHS.map(m => <th key={m}>{m}월</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr className="revenue-row">
+                                <td>수입</td>
+                                {MONTHS.map(m => (
+                                    <td key={m} className="revenue-positive">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
+                                ))}
+                            </tr>
+                            <tr className="expense-row">
+                                <td>지출</td>
+                                {MONTHS.map(m => (
+                                    <td key={m} className="expense-negative">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
+                                ))}
+                            </tr>
+                            <tr className="profit-row">
+                                <td>손익</td>
+                                {MONTHS.map(m => {
+                                    const profit = calcProfit(getMonthData(m));
+                                    return (
+                                        <td key={m} className={profit >= 0 ? 'profit-positive' : 'profit-negative'}>
+                                            {formatNumber(profit)}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        );
+    };
 
+    // Render the summary table (existing)
+    const renderSummaryTable = () => (
+        <>
             <div className="table-container">
                 <table className="pl-table">
                     <thead>
@@ -243,9 +412,42 @@ export default function ProfitLoss() {
                     </tbody>
                 </table>
             </div>
-
             <div className="instructions">
                 <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+            </div>
+        </>
+    );
+
+    return (
+        <div className="profitloss-page">
+            <div className="page-header">
+                <h1>손익계산서</h1>
+                <div className="year-selector">
+                    <button onClick={() => setYear(y => y - 1)}>◀</button>
+                    <span>{year}년</span>
+                    <button onClick={() => setYear(y => y + 1)}>▶</button>
+                </div>
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="tab-navigation">
+                {TABS.map(tab => (
+                    <button
+                        key={tab.id}
+                        className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
+                        onClick={() => setActiveTab(tab.id)}
+                    >
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="tab-content">
+                {activeTab === 'summary' && renderSummaryTable()}
+                {activeTab === 'expenses' && renderExpenseDetail()}
+                {activeTab === 'revenue' && renderRevenueDetail()}
+                {activeTab === 'analysis' && renderAnalysis()}
             </div>
         </div>
     );
