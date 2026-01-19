@@ -225,3 +225,37 @@ class GlobalSetting(SQLModel, table=True):
     key: str = Field(primary_key=True)
     value: str
     description: Optional[str] = None
+
+# --- Profit/Loss Statement ---
+
+class MonthlyProfitLoss(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    year: int = Field(index=True)
+    month: int = Field(index=True)
+    
+    # 수입 (Revenue)
+    revenue_store: int = 0        # 매장매출
+    revenue_coupang: int = 0      # 쿠팡 정산금
+    revenue_baemin: int = 0       # 배민 정산금
+    revenue_yogiyo: int = 0       # 요기요 정산금
+    revenue_ddangyo: int = 0      # 땡겨요 정산금
+    
+    # 지출 (Expenses)
+    expense_labor: int = 0        # 인건비
+    expense_rent: int = 0         # 임대관리비
+    expense_utility: int = 0      # 제세공과금(기타)
+    expense_vat: int = 0          # 부가가치세
+    expense_biz_tax: int = 0      # 사업소득세
+    expense_income_tax: int = 0   # 근로소득세
+    expense_card_fee: int = 0     # 카드수수료
+    expense_material: int = 0     # 재료비
+    expense_retirement: int = 0   # 퇴직금적립
+
+class DailyExpense(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: datetime.date = Field(index=True)
+    vendor_name: str              # 거래처명
+    amount: int                   # 금액
+    category: Optional[str] = None  # 비용 카테고리 (재료비, 기타 등)
+    note: Optional[str] = None    # 비고
+

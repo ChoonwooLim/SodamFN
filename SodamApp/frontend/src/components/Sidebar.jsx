@@ -28,6 +28,7 @@ export default function Sidebar() {
             { icon: TrendingUp, label: '매출 입력', path: '/input/revenue' },
             { icon: ShoppingBag, label: '매입 입력', path: '/input/expense' },
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
+            { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
             { icon: Receipt, label: '지출 내역', path: '/confirm' },
             { icon: Users, label: '직원 관리', path: '/staff' },
             { icon: Settings, label: '설정', path: '/settings' },
