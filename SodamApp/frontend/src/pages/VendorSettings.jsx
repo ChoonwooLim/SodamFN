@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, GripVertical, Edit2, X, Check } from 'lucide-react';
 import api from '../api';
 import './VendorSettings.css';
 
@@ -10,6 +10,8 @@ export default function VendorSettings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(null);
     const [newVendorName, setNewVendorName] = useState('');
+    const [editingVendor, setEditingVendor] = useState(null); // { originalName, newName }
+
 
     useEffect(() => {
         fetchVendors();
@@ -117,6 +119,55 @@ export default function VendorSettings() {
         saveVendorOrder(newVendors.map(v => v.name));
     };
 
+    // Start editing vendor name
+    const startEditVendor = (vendorName) => {
+        setEditingVendor({ originalName: vendorName, newName: vendorName });
+    };
+
+    // Update vendor name
+    const handleUpdateVendorName = async () => {
+        if (!editingVendor) return;
+        const { originalName, newName } = editingVendor;
+
+        if (!newName.trim()) {
+            alert('거래처 이름을 입력하세요.');
+            return;
+        }
+
+        if (newName.trim() !== originalName && vendors.some(v => v.name === newName.trim())) {
+            alert('이미 존재하는 거래처입니다.');
+            return;
+        }
+
+        setSaving(originalName);
+        try {
+            // Update vendor name in the list
+            const newVendors = vendors.map(v =>
+                v.name === originalName ? { ...v, name: newName.trim() } : v
+            );
+            setVendors(newVendors);
+            saveVendorOrder(newVendors.map(v => v.name));
+
+            // Update on backend - delete old and create new if name changed
+            if (newName.trim() !== originalName) {
+                const vendor = vendors.find(v => v.name === originalName);
+                await api.post('/vendors', { name: newName.trim(), item: vendor?.item || '' });
+            }
+
+            setEditingVendor(null);
+        } catch (error) {
+            console.error('Error updating vendor name:', error);
+            alert('저장 실패');
+        } finally {
+            setSaving(null);
+        }
+    };
+
+    // Cancel editing
+    const handleCancelEdit = () => {
+        setEditingVendor(null);
+    };
+
     return (
         <div className="vendor-settings-page">
             <div className="vendor-settings-container">
@@ -170,7 +221,56 @@ export default function VendorSettings() {
                                     <GripVertical size={16} className="grip-icon" />
                                     {idx + 1}
                                 </span>
-                                <span className="col-name">{vendor.name}</span>
+                                <div className="col-name">
+                                    {editingVendor?.originalName === vendor.name ? (
+                                        <div className="name-edit-container">
+                                            <input
+                                                type="text"
+                                                value={editingVendor.newName}
+                                                onChange={(e) => setEditingVendor({
+                                                    ...editingVendor,
+                                                    newName: e.target.value
+                                                })}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') handleUpdateVendorName();
+                                                    if (e.key === 'Escape') handleCancelEdit();
+                                                }}
+                                                className="name-input"
+                                                autoFocus
+                                            />
+                                            <button
+                                                onClick={handleUpdateVendorName}
+                                                className="action-btn confirm-btn"
+                                                title="확인"
+                                                disabled={saving === vendor.name}
+                                            >
+                                                {saving === vendor.name ? (
+                                                    <div className="mini-spinner"></div>
+                                                ) : (
+                                                    <Check size={16} />
+                                                )}
+                                            </button>
+                                            <button
+                                                onClick={handleCancelEdit}
+                                                className="action-btn cancel-btn"
+                                                title="취소"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="name-display-container">
+                                            <span className="vendor-name-text">{vendor.name}</span>
+                                            <button
+                                                onClick={() => startEditVendor(vendor.name)}
+                                                className="action-btn edit-btn"
+                                                title="이름 수정"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="col-item">
                                     <input
                                         type="text"

@@ -902,3 +902,142 @@
 .vendor-settings-link:hover {
     background: #2563eb;
 }
+
+/* Vendor Controls Banner (with toggle + settings link) */
+.vendor-controls-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    border: 1px solid #bae6fd;
+}
+
+.hide-empty-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #0369a1;
+    font-weight: 500;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #0284c7;
+    cursor: pointer;
+}
+
+.vendor-settings-link-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #1e40af;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .vendor-controls-banner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* Delivery Grid Styles */
+.delivery-summary {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.delivery-grid-container {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.delivery-grid-table {
+    border-collapse: collapse;
+}
+
+.delivery-grid-table .day-label-header {
+    background: #1e3a8a;
+    color: white;
+    font-weight: 600;
+    width: 50px;
+    min-width: 50px;
+    text-align: center;
+    position: sticky;
+    left: 0;
+    top: 0;
+    z-index: 3;
+}
+
+.delivery-grid-table .month-header {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    font-weight: 600;
+    min-width: 100px;
+    text-align: center;
+    padding: 10px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.delivery-grid-table .day-label-cell {
+    background: #fef3c7;
+    font-weight: 500;
+    text-align: center;
+    color: #92400e;
+    width: 50px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+
+.delivery-grid-table .amount-cell {
+    background: white;
+    min-width: 100px;
+    text-align: center;
+}
+
+.delivery-grid-table .amount-cell .cell-value.has-value {
+    color: #059669;
+    font-weight: 600;
+}
+
+.delivery-grid-table .invalid-day {
+    background: #f1f5f9;
+    color: #cbd5e1;
+    text-align: center;
+}
+
+.delivery-grid-table .month-total {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    color: #047857;
+    font-weight: 700;
+    text-align: center;
+    padding: 10px;
+}
+
+.delivery-grid-table .day-totals-row {
+    background: #fef3c7;
+}
+
+.delivery-grid-table .day-totals-row .day-label-cell {
+    background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%);
+    color: #78350f;
+}

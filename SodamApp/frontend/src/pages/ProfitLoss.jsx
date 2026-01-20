@@ -69,14 +69,46 @@ export default function ProfitLoss() {
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
 
-    // Global vendor order (from VendorSettings page)
-    const getVendorOrder = () => {
-        const saved = localStorage.getItem('profitloss_vendor_order');
-        return saved ? JSON.parse(saved) : [];
+    // Global vendor list (from API + localStorage order)
+    const [globalVendors, setGlobalVendors] = useState([]);
+
+    // Hide empty vendors toggle (for monthly expense view)
+    const [hideEmptyVendors, setHideEmptyVendors] = useState(false);
+
+    // Fetch global vendor list from API and merge with localStorage order
+    const fetchGlobalVendors = async () => {
+        try {
+            const res = await axios.get(`${API_URL}/api/vendors`);
+            if (res.data.status === 'success') {
+                const apiVendors = res.data.data;
+                const savedOrder = localStorage.getItem('profitloss_vendor_order');
+                const orderList = savedOrder ? JSON.parse(savedOrder) : [];
+
+                // Merge: first vendors from saved order, then rest from API
+                const orderedVendors = [];
+                orderList.forEach(name => {
+                    const v = apiVendors.find(vendor => vendor.name === name);
+                    if (v) orderedVendors.push(v.name);
+                });
+                // Add any API vendors not in saved order
+                apiVendors.forEach(v => {
+                    if (!orderedVendors.includes(v.name)) {
+                        orderedVendors.push(v.name);
+                    }
+                });
+                setGlobalVendors(orderedVendors);
+            }
+        } catch (err) {
+            console.error('Error fetching global vendors:', err);
+            // Fallback to localStorage
+            const saved = localStorage.getItem('profitloss_vendor_order');
+            if (saved) setGlobalVendors(JSON.parse(saved));
+        }
     };
 
     useEffect(() => {
         fetchData();
+        fetchGlobalVendors();
     }, [year]);
 
     useEffect(() => {
@@ -382,7 +414,7 @@ export default function ProfitLoss() {
         );
     };
 
-    // Render delivery app revenue (쿠팡, 배민, 요기요, 땡겨요)
+    // Render delivery app revenue (쿠팡, 배민, 요기요, 땡겨요) - Excel-like grid
     const renderDeliveryRevenue = (channel) => {
         const channelNames = {
             coupang: '쿠팡이츠',
@@ -390,67 +422,163 @@ export default function ProfitLoss() {
             yogiyo: '요기요',
             ddangyo: '땡겨요'
         };
+        const channelMap = { coupang: 'Coupang', baemin: 'Baemin', yogiyo: 'Yogiyo', ddangyo: 'Ddangyo' };
         const revenueData = deliveryData[channel] || [];
 
-        // Group by month
-        const monthlyData = {};
-        MONTHS.forEach(m => { monthlyData[m] = []; });
+        // 7-12월 표시 (하반기)
+        const displayMonths = [7, 8, 9, 10, 11, 12];
+        const maxDays = 31; // 최대 31일
+
+        // Create grid: month -> { day: { amount, id } }
+        const monthGrid = {};
+        displayMonths.forEach(m => { monthGrid[m] = {}; });
+
         revenueData.forEach(item => {
-            const month = new Date(item.date).getMonth() + 1;
-            if (monthlyData[month]) {
-                monthlyData[month].push(item);
+            const itemDate = new Date(item.date);
+            const month = itemDate.getMonth() + 1;
+            const day = itemDate.getDate();
+            if (monthGrid[month]) {
+                monthGrid[month][day] = { amount: item.amount, id: item.id };
             }
         });
 
         // Calculate monthly totals
         const monthlyTotals = {};
-        MONTHS.forEach(m => {
-            monthlyTotals[m] = monthlyData[m].reduce((sum, item) => sum + item.amount, 0);
+        displayMonths.forEach(m => {
+            monthlyTotals[m] = Object.values(monthGrid[m]).reduce((sum, d) => sum + (d.amount || 0), 0);
         });
         const grandTotal = Object.values(monthlyTotals).reduce((sum, t) => sum + t, 0);
 
+        // Handle cell editing
+        const handleDeliveryCellClick = (month, day, amount, itemId) => {
+            setEditingCell({ type: 'delivery', channel, month, day, id: itemId });
+            setEditValue(amount?.toString() || '0');
+        };
+
+        const handleDeliverySave = async () => {
+            if (!editingCell || editingCell.type !== 'delivery') return;
+
+            const { channel: ch, month, day, id } = editingCell;
+            const amount = parseInt(editValue) || 0;
+            const date = new Date(year, month - 1, day).toISOString().split('T')[0];
+
+            try {
+                if (id && amount > 0) {
+                    // Update existing
+                    await axios.put(`${API_URL}/api/profitloss/delivery/${id}`, {
+                        date, channel: channelMap[ch], amount
+                    });
+                } else if (!id && amount > 0) {
+                    // Create new
+                    await axios.post(`${API_URL}/api/profitloss/delivery`, {
+                        date, channel: channelMap[ch], amount
+                    });
+                } else if (id && amount === 0) {
+                    // Delete if amount is 0
+                    await axios.delete(`${API_URL}/api/profitloss/delivery/${id}`);
+                }
+                fetchDeliveryData(ch);
+            } catch (err) {
+                console.error('Error saving delivery revenue:', err);
+            }
+            setEditingCell(null);
+        };
+
+        const renderDeliveryCell = (month, day) => {
+            const cellData = monthGrid[month]?.[day];
+            const amount = cellData?.amount || 0;
+            const itemId = cellData?.id;
+            const isEditing = editingCell?.type === 'delivery' &&
+                editingCell?.channel === channel &&
+                editingCell?.month === month &&
+                editingCell?.day === day;
+
+            if (isEditing) {
+                return (
+                    <input
+                        type="number"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={handleDeliverySave}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleDeliverySave();
+                            if (e.key === 'Escape') setEditingCell(null);
+                        }}
+                        autoFocus
+                        className="edit-input grid-input"
+                    />
+                );
+            }
+
+            return (
+                <span
+                    className={`cell-value editable ${amount > 0 ? 'has-value' : ''}`}
+                    onClick={() => handleDeliveryCellClick(month, day, amount, itemId)}
+                >
+                    {amount > 0 ? formatNumber(amount) : '-'}
+                </span>
+            );
+        };
+
         return (
             <div className="delivery-section">
-                <h3 className="section-title">🛵 {channelNames[channel]} 정산 내역</h3>
-                <div className="table-container">
-                    <table className="pl-table">
+                <h3 className="section-title">🛵 {channelNames[channel]} 정산금 입금내역_{year}하반기</h3>
+
+                <div className="delivery-summary">
+                    <div className="expense-stat">
+                        <span className="stat-label">총 정산금</span>
+                        <span className="stat-value highlight" style={{ color: '#059669' }}>{formatNumber(grandTotal)}원</span>
+                    </div>
+                    {displayMonths.map(m => (
+                        <div key={m} className="expense-stat">
+                            <span className="stat-label">{m}월</span>
+                            <span className="stat-value">{formatNumber(monthlyTotals[m])}원</span>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="grid-table-container delivery-grid-container">
+                    <table className="expense-grid-table delivery-grid-table">
                         <thead>
                             <tr>
-                                <th>월</th>
-                                <th>입금 내역</th>
-                                <th>월 합계</th>
+                                <th className="day-label-header"></th>
+                                {displayMonths.map(m => (
+                                    <th key={m} className="month-header">{m}월</th>
+                                ))}
                             </tr>
                         </thead>
                         <tbody>
-                            {MONTHS.map(m => (
-                                <tr key={m}>
-                                    <td className="month-cell">{m}월</td>
-                                    <td className="detail-cell">
-                                        {monthlyData[m].length > 0 ? (
-                                            <div className="deposit-list">
-                                                {monthlyData[m].map((item, idx) => (
-                                                    <div key={item.id || idx} className="deposit-item">
-                                                        <span className="deposit-date">{new Date(item.date).getDate()}일</span>
-                                                        <span className="deposit-amount">{formatNumber(item.amount)}원</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <span className="no-data">-</span>
-                                        )}
-                                    </td>
-                                    <td className="total">{formatNumber(monthlyTotals[m])}</td>
+                            {Array.from({ length: maxDays }, (_, i) => i + 1).map(day => (
+                                <tr key={day}>
+                                    <td className="day-label-cell">{day}</td>
+                                    {displayMonths.map(m => {
+                                        // Check if this day exists in this month
+                                        const daysInMonth = new Date(year, m, 0).getDate();
+                                        if (day > daysInMonth) {
+                                            return <td key={m} className="invalid-day">-</td>;
+                                        }
+                                        return (
+                                            <td key={m} className="amount-cell">
+                                                {renderDeliveryCell(m, day)}
+                                            </td>
+                                        );
+                                    })}
                                 </tr>
                             ))}
-                            <tr className="subtotal-row">
-                                <td colSpan="2"><strong>총 합계</strong></td>
-                                <td className="total"><strong>{formatNumber(grandTotal)}원</strong></td>
+                            <tr className="day-totals-row">
+                                <td className="day-label-cell"><strong>합 계</strong></td>
+                                {displayMonths.map(m => (
+                                    <td key={m} className="month-total">
+                                        <strong>{formatNumber(monthlyTotals[m])}</strong>
+                                    </td>
+                                ))}
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
                 <div className="instructions">
-                    <p>💡 정산금 데이터는 손익계산서의 "{channelNames[channel]} 정산금" 항목과 연동됩니다.</p>
+                    <p>💡 셀을 클릭하면 정산금을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
                 </div>
             </div>
         );
@@ -476,12 +604,12 @@ export default function ProfitLoss() {
             vendorGrid[item.vendor_name].ids[day] = item.id;
         });
 
-        // Get global vendor order - ALL vendors from settings are shown in every month
-        const savedOrder = getVendorOrder();
+        // Use global vendor list from state (fetched from API with localStorage order)
+        // This ensures ALL months have the same vendor list in the same order
         const dataVendors = Object.keys(vendorGrid);
 
-        // Use saved order as the base, then add any data vendors not in saved order
-        const orderedVendors = [...savedOrder];
+        // Start with globalVendors, then add any data vendors not in global list
+        const orderedVendors = [...globalVendors];
         dataVendors.forEach(v => {
             if (!orderedVendors.includes(v)) {
                 orderedVendors.push(v);
@@ -496,11 +624,17 @@ export default function ProfitLoss() {
             }
         });
 
-        // Calculate row totals (per vendor)
+        // Calculate row totals (per vendor) - needed to determine which are empty
         const vendorTotals = {};
         vendors.forEach(v => {
             vendorTotals[v] = Object.values(vendorGrid[v].amounts).reduce((sum, amt) => sum + amt, 0);
         });
+
+        // Filter vendors: hide empty ones if toggle is on
+        const emptyVendorCount = vendors.filter(v => vendorTotals[v] === 0).length;
+        const displayVendors = hideEmptyVendors
+            ? vendors.filter(v => vendorTotals[v] > 0)
+            : vendors;
 
         // Calculate column totals (per day)
         const dayTotals = {};
@@ -586,7 +720,7 @@ export default function ProfitLoss() {
                 <div className="expense-summary">
                     <div className="expense-stat">
                         <span className="stat-label">거래처 수</span>
-                        <span className="stat-value">{vendors.length}개</span>
+                        <span className="stat-value">{displayVendors.length}개 {hideEmptyVendors && emptyVendorCount > 0 && <small>(+{emptyVendorCount} 숨김)</small>}</span>
                     </div>
                     <div className="expense-stat">
                         <span className="stat-label">거래 건수</span>
@@ -598,11 +732,23 @@ export default function ProfitLoss() {
                     </div>
                 </div>
 
-                {/* Link to Vendor Settings */}
-                <div className="vendor-settings-banner">
-                    <span>💡 거래처 추가/삭제/순서변경은</span>
-                    <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
-                    <span>에서 설정하세요.</span>
+                {/* Hide Empty Vendors Toggle + Link to Vendor Settings */}
+                <div className="vendor-controls-banner">
+                    <div className="hide-empty-toggle">
+                        <label className="toggle-label">
+                            <input
+                                type="checkbox"
+                                checked={hideEmptyVendors}
+                                onChange={(e) => setHideEmptyVendors(e.target.checked)}
+                            />
+                            <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
+                        </label>
+                    </div>
+                    <div className="vendor-settings-link-container">
+                        <span>💡 거래처 추가/삭제/순서변경은</span>
+                        <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
+                        <span>에서 설정하세요.</span>
+                    </div>
                 </div>
 
                 <div className="grid-table-container">
@@ -617,7 +763,7 @@ export default function ProfitLoss() {
                             </tr>
                         </thead>
                         <tbody>
-                            {vendors.length > 0 ? vendors.map(vendor => (
+                            {displayVendors.length > 0 ? displayVendors.map(vendor => (
                                 <tr key={vendor}>
                                     <td className="vendor-cell">{vendor}</td>
                                     {days.map(d => (
@@ -635,7 +781,7 @@ export default function ProfitLoss() {
                                     </td>
                                 </tr>
                             )}
-                            {vendors.length > 0 && (
+                            {displayVendors.length > 0 && (
                                 <tr className="day-totals-row">
                                     <td className="vendor-cell"><strong>일별 합계</strong></td>
                                     {days.map(d => (

@@ -195,6 +195,74 @@
     font-size: 14px;
 }
 
+/* Name display and edit containers */
+.name-display-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vendor-name-text {
+    flex: 1;
+}
+
+.name-edit-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+}
+
+.name-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 2px solid #3b82f6;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+    background: white;
+}
+
+.name-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.action-btn.edit-btn {
+    background: #f0fdf4;
+    color: #16a34a;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.15s;
+}
+
+.vendor-item:hover .action-btn.edit-btn {
+    opacity: 1;
+}
+
+.action-btn.edit-btn:hover {
+    background: #dcfce7;
+}
+
+.action-btn.confirm-btn {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.action-btn.confirm-btn:hover:not(:disabled) {
+    background: #bbf7d0;
+}
+
+.action-btn.cancel-btn {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.action-btn.cancel-btn:hover {
+    background: #fee2e2;
+}
+
 .col-item {
     display: flex;
     gap: 8px;
