@@ -20,8 +20,11 @@ class Vendor(SQLModel, table=True):
 class Product(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    category: str
+    category: Optional[str] = None
+    spec: Optional[str] = None  # 규격 (용량, 단위 등)
     unit_price: int = 0
+    tax_type: str = Field(default="taxable")  # taxable(과세), tax_free(면세), zero_rated(영세)
+    note: Optional[str] = None  # 비고
     
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
     vendor: Optional[Vendor] = Relationship(back_populates="products")

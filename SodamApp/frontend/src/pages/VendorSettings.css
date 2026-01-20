@@ -241,6 +241,31 @@
     font-weight: 500;
     color: #1e293b;
     min-width: 120px;
+    cursor: pointer;
+}
+
+.vendor-name-display:hover {
+    color: #3b82f6;
+}
+
+.vendor-name-edit-input {
+    font-weight: 500;
+    color: #1e293b;
+    min-width: 120px;
+    padding: 4px 8px;
+    border: 2px solid #3b82f6;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.action-btn-sm.edit {
+    color: #3b82f6;
+    background: #dbeafe;
+}
+
+.action-btn-sm.edit:hover {
+    background: #bfdbfe;
+    color: #1d4ed8;
 }
 
 .item-input-compact {
@@ -295,6 +320,16 @@
 .action-btn-sm.delete:hover {
     background: #fef2f2;
     color: #b91c1c;
+}
+
+.action-btn-sm.product {
+    color: #7c3aed;
+    background: #f5f3ff;
+}
+
+.action-btn-sm.product:hover {
+    background: #ede9fe;
+    color: #6d28d9;
 }
 
 .no-vendors-message {

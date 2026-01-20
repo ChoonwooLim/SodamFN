@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check } from 'lucide-react';
+import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Package } from 'lucide-react';
 import api from '../api';
 import './VendorSettings.css';
+import ProductManagement from '../components/ProductManagement';
 
 // 매입처 카테고리 정의
 const EXPENSE_CATEGORIES = [
@@ -34,6 +35,7 @@ export default function VendorSettings() {
     const [newVendorName, setNewVendorName] = useState('');
     const [newVendorCategory, setNewVendorCategory] = useState('food');
     const [editingVendor, setEditingVendor] = useState(null);
+    const [selectedVendor, setSelectedVendor] = useState(null); // For product management modal
 
     useEffect(() => {
         fetchVendors();
@@ -173,207 +175,267 @@ export default function VendorSettings() {
     };
 
     return (
-        <div className="vendor-settings-page">
-            <div className="vendor-settings-container">
-                <header className="vendor-settings-header">
-                    <button onClick={() => navigate(-1)} className="back-button">
-                        <ChevronLeft size={20} />
-                    </button>
-                    <h1>거래처 관리</h1>
-                </header>
+        <>
+            <div className="vendor-settings-page">
+                <div className="vendor-settings-container">
+                    <header className="vendor-settings-header">
+                        <button onClick={() => navigate(-1)} className="back-button">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <h1>거래처 관리</h1>
+                    </header>
 
-                {/* Tabs */}
-                <div className="vendor-tabs">
-                    <button
-                        className={`vendor-tab ${activeTab === 'expense' ? 'active expense' : ''}`}
-                        onClick={() => setActiveTab('expense')}
-                    >
-                        💰 매입처 (비용)
-                    </button>
-                    <button
-                        className={`vendor-tab ${activeTab === 'revenue' ? 'active revenue' : ''}`}
-                        onClick={() => setActiveTab('revenue')}
-                    >
-                        💵 매출처 (수입)
-                    </button>
-                </div>
-
-                {/* Add New Vendor Form */}
-                <div className="vendor-add-section">
-                    <h3>새 거래처 추가</h3>
-                    <div className="vendor-add-form-row">
-                        <select
-                            value={newVendorCategory}
-                            onChange={(e) => setNewVendorCategory(e.target.value)}
-                            className="category-select"
+                    {/* Tabs */}
+                    <div className="vendor-tabs">
+                        <button
+                            className={`vendor-tab ${activeTab === 'expense' ? 'active expense' : ''}`}
+                            onClick={() => setActiveTab('expense')}
                         >
-                            {getCategories().map(cat => (
-                                <option key={cat.id} value={cat.id}>
-                                    {cat.icon} {cat.label}
-                                </option>
-                            ))}
-                        </select>
-                        <input
-                            type="text"
-                            value={newVendorName}
-                            onChange={(e) => setNewVendorName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddVendor()}
-                            placeholder="거래처 이름 입력"
-                            className="vendor-name-input"
-                        />
-                        <button onClick={handleAddVendor} className="add-vendor-btn">
-                            <Plus size={18} />
-                            추가
+                            💰 매입처 (비용)
+                        </button>
+                        <button
+                            className={`vendor-tab ${activeTab === 'revenue' ? 'active revenue' : ''}`}
+                            onClick={() => setActiveTab('revenue')}
+                        >
+                            💵 매출처 (수입)
                         </button>
                     </div>
-                </div>
 
-                {loading ? (
-                    <div className="loading-spinner">
-                        <div className="spinner"></div>
+                    {/* Add New Vendor Form */}
+                    <div className="vendor-add-section">
+                        <h3>새 거래처 추가</h3>
+                        <div className="vendor-add-form-row">
+                            <select
+                                value={newVendorCategory}
+                                onChange={(e) => setNewVendorCategory(e.target.value)}
+                                className="category-select"
+                            >
+                                {getCategories().map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.icon} {cat.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="text"
+                                value={newVendorName}
+                                onChange={(e) => setNewVendorName(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddVendor()}
+                                placeholder="거래처 이름 입력"
+                                className="vendor-name-input"
+                            />
+                            <button onClick={handleAddVendor} className="add-vendor-btn">
+                                <Plus size={18} />
+                                추가
+                            </button>
+                        </div>
                     </div>
-                ) : (
-                    <div className="vendor-categories">
-                        {/* Uncategorized Vendors Section - only show vendors with no valid category at all */}
-                        {(() => {
-                            const allExpenseCategories = EXPENSE_CATEGORIES.map(c => c.id);
-                            const allRevenueCategories = REVENUE_CATEGORIES.map(c => c.id);
-                            const allValidCategories = [...allExpenseCategories, ...allRevenueCategories];
 
-                            // Only show vendors that have NO valid category at all (not in expense OR revenue)
-                            const uncategorizedVendors = vendors.filter(v =>
-                                !v.category || !allValidCategories.includes(v.category)
-                            );
+                    {loading ? (
+                        <div className="loading-spinner">
+                            <div className="spinner"></div>
+                        </div>
+                    ) : (
+                        <div className="vendor-categories">
+                            {/* Uncategorized Vendors Section - only show vendors with no valid category at all */}
+                            {(() => {
+                                const allExpenseCategories = EXPENSE_CATEGORIES.map(c => c.id);
+                                const allRevenueCategories = REVENUE_CATEGORIES.map(c => c.id);
+                                const allValidCategories = [...allExpenseCategories, ...allRevenueCategories];
 
-                            if (uncategorizedVendors.length === 0) return null;
+                                // Only show vendors that have NO valid category at all (not in expense OR revenue)
+                                const uncategorizedVendors = vendors.filter(v =>
+                                    !v.category || !allValidCategories.includes(v.category)
+                                );
 
-                            return (
-                                <div className="vendor-category-section uncategorized">
-                                    <div className="category-header uncategorized-header">
-                                        <span className="category-icon">⚠️</span>
-                                        <span className="category-label">미분류 업체</span>
-                                        <span className="category-count">{uncategorizedVendors.length}개</span>
-                                    </div>
-                                    <div className="uncategorized-notice">
-                                        아래 업체들의 카테고리를 선택해주세요
-                                    </div>
-                                    <div className="vendor-list-compact">
-                                        {uncategorizedVendors.map((vendor, idx) => (
-                                            <div key={vendor.name} className="vendor-item-compact uncategorized-item">
-                                                <span className="vendor-order">{idx + 1}</span>
-                                                <span className="vendor-name-display">{vendor.name}</span>
-                                                <select
-                                                    value=""
-                                                    onChange={async (e) => {
-                                                        if (!e.target.value) return;
-                                                        // Determine vendor_type based on category
-                                                        const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
-                                                        await handleUpdateVendor(vendor, {
-                                                            category: e.target.value,
-                                                            vendor_type: isExpense ? 'expense' : 'revenue'
-                                                        });
-                                                    }}
-                                                    className="category-assign-select"
-                                                >
-                                                    <option value="">카테고리 선택...</option>
-                                                    <optgroup label="💰 매입처 (비용)">
-                                                        {EXPENSE_CATEGORIES.map(cat => (
-                                                            <option key={cat.id} value={cat.id}>
-                                                                {cat.icon} {cat.label}
-                                                            </option>
-                                                        ))}
-                                                    </optgroup>
-                                                    <optgroup label="💵 매출처 (수입)">
-                                                        {REVENUE_CATEGORIES.map(cat => (
-                                                            <option key={cat.id} value={cat.id}>
-                                                                {cat.icon} {cat.label}
-                                                            </option>
-                                                        ))}
-                                                    </optgroup>
-                                                </select>
-                                                <button
-                                                    onClick={() => handleDeleteVendor(vendor.name)}
-                                                    className="action-btn-sm delete"
-                                                    title="삭제"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                                if (uncategorizedVendors.length === 0) return null;
 
-                        {getCategories().map(category => {
-                            const categoryVendors = getVendorsByCategory(category.id);
-
-                            return (
-                                <div key={category.id} className="vendor-category-section">
-                                    <div className="category-header">
-                                        <span className="category-icon">{category.icon}</span>
-                                        <span className="category-label">{category.label}</span>
-                                        <span className="category-count">{categoryVendors.length}개</span>
-                                    </div>
-
-                                    {categoryVendors.length > 0 ? (
+                                return (
+                                    <div className="vendor-category-section uncategorized">
+                                        <div className="category-header uncategorized-header">
+                                            <span className="category-icon">⚠️</span>
+                                            <span className="category-label">미분류 업체</span>
+                                            <span className="category-count">{uncategorizedVendors.length}개</span>
+                                        </div>
+                                        <div className="uncategorized-notice">
+                                            아래 업체들의 카테고리를 선택해주세요
+                                        </div>
                                         <div className="vendor-list-compact">
-                                            {categoryVendors.map((vendor, idx) => (
-                                                <div key={vendor.name} className="vendor-item-compact">
+                                            {uncategorizedVendors.map((vendor, idx) => (
+                                                <div key={vendor.name} className="vendor-item-compact uncategorized-item">
                                                     <span className="vendor-order">{idx + 1}</span>
                                                     <span className="vendor-name-display">{vendor.name}</span>
-                                                    <input
-                                                        type="text"
-                                                        value={vendor.item || ''}
-                                                        onChange={(e) => {
-                                                            const updated = vendors.map(v =>
-                                                                v.name === vendor.name ? { ...v, item: e.target.value } : v
-                                                            );
-                                                            setVendors(updated);
+                                                    <select
+                                                        value=""
+                                                        onChange={async (e) => {
+                                                            if (!e.target.value) return;
+                                                            // Determine vendor_type based on category
+                                                            const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
+                                                            await handleUpdateVendor(vendor, {
+                                                                category: e.target.value,
+                                                                vendor_type: isExpense ? 'expense' : 'revenue'
+                                                            });
                                                         }}
-                                                        onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
-                                                        placeholder="취급품목"
-                                                        className="item-input-compact"
-                                                    />
-                                                    <div className="vendor-actions-compact">
-                                                        <button
-                                                            onClick={() => handleMoveVendor(vendor, 'up')}
-                                                            disabled={idx === 0}
-                                                            className="action-btn-sm"
-                                                            title="위로"
-                                                        >
-                                                            <ChevronUp size={14} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleMoveVendor(vendor, 'down')}
-                                                            disabled={idx === categoryVendors.length - 1}
-                                                            className="action-btn-sm"
-                                                            title="아래로"
-                                                        >
-                                                            <ChevronDown size={14} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteVendor(vendor.name)}
-                                                            className="action-btn-sm delete"
-                                                            title="삭제"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
+                                                        className="category-assign-select"
+                                                    >
+                                                        <option value="">카테고리 선택...</option>
+                                                        <optgroup label="💰 매입처 (비용)">
+                                                            {EXPENSE_CATEGORIES.map(cat => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.icon} {cat.label}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                        <optgroup label="💵 매출처 (수입)">
+                                                            {REVENUE_CATEGORIES.map(cat => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.icon} {cat.label}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    </select>
+                                                    <button
+                                                        onClick={() => handleDeleteVendor(vendor.name)}
+                                                        className="action-btn-sm delete"
+                                                        title="삭제"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : (
-                                        <div className="no-vendors-message">
-                                            등록된 거래처가 없습니다
+                                    </div>
+                                );
+                            })()}
+
+                            {getCategories().map(category => {
+                                const categoryVendors = getVendorsByCategory(category.id);
+
+                                return (
+                                    <div key={category.id} className="vendor-category-section">
+                                        <div className="category-header">
+                                            <span className="category-icon">{category.icon}</span>
+                                            <span className="category-label">{category.label}</span>
+                                            <span className="category-count">{categoryVendors.length}개</span>
                                         </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
+
+                                        {categoryVendors.length > 0 ? (
+                                            <div className="vendor-list-compact">
+                                                {categoryVendors.map((vendor, idx) => (
+                                                    <div key={vendor.name} className="vendor-item-compact">
+                                                        <span className="vendor-order">{idx + 1}</span>
+                                                        {/* Vendor name - editable when editingVendor matches */}
+                                                        {editingVendor === vendor.name ? (
+                                                            <input
+                                                                type="text"
+                                                                defaultValue={vendor.name}
+                                                                onKeyDown={async (e) => {
+                                                                    if (e.key === 'Enter') {
+                                                                        const newName = e.target.value.trim();
+                                                                        if (newName && newName !== vendor.name) {
+                                                                            // Note: Changing vendor name requires backend support
+                                                                            // For now just update display
+                                                                            await handleUpdateVendor(vendor, { name: newName });
+                                                                        }
+                                                                        setEditingVendor(null);
+                                                                    } else if (e.key === 'Escape') {
+                                                                        setEditingVendor(null);
+                                                                    }
+                                                                }}
+                                                                onBlur={() => setEditingVendor(null)}
+                                                                autoFocus
+                                                                className="vendor-name-edit-input"
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                className="vendor-name-display"
+                                                                onDoubleClick={() => setEditingVendor(vendor.name)}
+                                                                title="더블클릭하여 수정"
+                                                            >
+                                                                {vendor.name}
+                                                            </span>
+                                                        )}
+                                                        <input
+                                                            type="text"
+                                                            value={vendor.item || ''}
+                                                            onChange={(e) => {
+                                                                const updated = vendors.map(v =>
+                                                                    v.name === vendor.name ? { ...v, item: e.target.value } : v
+                                                                );
+                                                                setVendors(updated);
+                                                            }}
+                                                            onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
+                                                            placeholder="취급품목"
+                                                            className="item-input-compact"
+                                                        />
+                                                        <div className="vendor-actions-compact">
+                                                            {/* Edit button for vendor name */}
+                                                            <button
+                                                                onClick={() => setEditingVendor(vendor.name)}
+                                                                className="action-btn-sm edit"
+                                                                title="업체명 수정"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            {/* Only show product button for expense vendors */}
+                                                            {activeTab === 'expense' && (
+                                                                <button
+                                                                    onClick={() => setSelectedVendor(vendor)}
+                                                                    className="action-btn-sm product"
+                                                                    title="취급상품 관리"
+                                                                >
+                                                                    <Package size={14} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleMoveVendor(vendor, 'up')}
+                                                                disabled={idx === 0}
+                                                                className="action-btn-sm"
+                                                                title="위로"
+                                                            >
+                                                                <ChevronUp size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleMoveVendor(vendor, 'down')}
+                                                                disabled={idx === categoryVendors.length - 1}
+                                                                className="action-btn-sm"
+                                                                title="아래로"
+                                                            >
+                                                                <ChevronDown size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteVendor(vendor.name)}
+                                                                className="action-btn-sm delete"
+                                                                title="삭제"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="no-vendors-message">
+                                                등록된 거래처가 없습니다
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+
+            {/* Product Management Modal */}
+            {
+                selectedVendor && (
+                    <ProductManagement
+                        vendor={selectedVendor}
+                        onClose={() => setSelectedVendor(null)}
+                    />
+                )
+            }
+        </>
     );
 }
