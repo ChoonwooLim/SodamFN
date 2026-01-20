@@ -257,7 +257,7 @@ export default function ProductManagement({ vendor, onClose }) {
                                             </>
                                         ) : (
                                             <>
-                                                <td className="id-cell">{product.id}</td>
+                                                <td className="id-cell">{product.product_code || product.id}</td>
                                                 <td>{product.name}</td>
                                                 <td>{product.spec || '-'}</td>
                                                 <td className="price">{formatPrice(product.unit_price)}원</td>

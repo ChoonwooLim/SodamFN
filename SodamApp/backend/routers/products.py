@@ -42,6 +42,7 @@ def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get
             "status": "success",
             "data": [{
                 "id": p.id,
+                "product_code": p.product_code,
                 "name": p.name,
                 "category": p.category,
                 "spec": p.spec,
@@ -63,7 +64,23 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session))
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found")
         
+        # Generate product code: Vendor initials + sequence number
+        # Get vendor name initials (first char of each word, max 3)
+        import re
+        name_parts = re.sub(r'[^\w\s]', '', vendor.name).split()[:3]
+        initials = ''.join([p[0].upper() for p in name_parts if p])
+        if not initials:
+            initials = vendor.name[:3].upper()
+        
+        # Count existing products for this vendor to determine sequence
+        existing_count = len(session.exec(
+            select(Product).where(Product.vendor_id == data.vendor_id)
+        ).all())
+        sequence = str(existing_count + 1).zfill(2)
+        product_code = f"{initials}{sequence}"
+        
         product = Product(
+            product_code=product_code,
             name=data.name,
             vendor_id=data.vendor_id,
             category=data.category or "",  # Default to empty string for NOT NULL constraint
@@ -76,7 +93,7 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session))
         session.commit()
         session.refresh(product)
         
-        return {"status": "success", "data": {"id": product.id}}
+        return {"status": "success", "data": {"id": product.id, "product_code": product_code}}
     except HTTPException:
         raise
     except Exception as e:

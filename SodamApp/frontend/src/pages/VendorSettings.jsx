@@ -329,7 +329,7 @@ export default function VendorSettings() {
                                         {categoryVendors.length > 0 ? (
                                             <div className="vendor-list-compact">
                                                 {categoryVendors.map((vendor, idx) => (
-                                                    <div key={vendor.name} className="vendor-item-compact">
+                                                    <div key={vendor.id} className="vendor-item-compact">
                                                         <span className="vendor-order">{idx + 1}</span>
                                                         {/* Vendor name - editable when editingVendor matches */}
                                                         {editingVendor === vendor.name ? (

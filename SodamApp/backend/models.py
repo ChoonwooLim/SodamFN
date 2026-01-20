@@ -19,6 +19,7 @@ class Vendor(SQLModel, table=True):
 
 class Product(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    product_code: Optional[str] = None  # 업체별 제품코드 (예: MRS01, KST02)
     name: str
     category: Optional[str] = None
     spec: Optional[str] = None  # 규격 (용량, 단위 등)
