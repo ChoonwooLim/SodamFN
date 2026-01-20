@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
-from models import MonthlyProfitLoss, DailyExpense
+from models import MonthlyProfitLoss, DailyExpense, Revenue
 from pydantic import BaseModel
 from typing import Optional, List
 import datetime
@@ -50,6 +50,12 @@ class DailyExpenseCreate(BaseModel):
     amount: int
     category: Optional[str] = None
     note: Optional[str] = None
+
+class DeliveryRevenueCreate(BaseModel):
+    date: datetime.date
+    channel: str  # Coupang, Baemin, Yogiyo, Ddangyo
+    amount: int
+    description: Optional[str] = None
 
 # --- Monthly P/L Endpoints ---
 
@@ -189,3 +195,71 @@ def delete_daily_expense(id: int, session: Session = Depends(get_session)):
     session.delete(record)
     session.commit()
     return {"message": "Deleted successfully"}
+
+# --- Delivery App Revenue Endpoints (쿠팡/배민/요기요/땡겨요) ---
+
+@router.get("/delivery/{channel}/{year}")
+def get_delivery_revenue(channel: str, year: int, session: Session = Depends(get_session)):
+    """Get delivery app revenue for a specific channel and year"""
+    start_date = datetime.date(year, 1, 1)
+    end_date = datetime.date(year + 1, 1, 1)
+    
+    results = session.exec(
+        select(Revenue)
+        .where(Revenue.channel == channel)
+        .where(Revenue.date >= start_date, Revenue.date < end_date)
+        .order_by(Revenue.date)
+    ).all()
+    return results
+
+@router.get("/delivery/{channel}/{year}/{month}")
+def get_delivery_revenue_monthly(channel: str, year: int, month: int, session: Session = Depends(get_session)):
+    """Get delivery app revenue for a specific channel, year and month"""
+    start_date = datetime.date(year, month, 1)
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1)
+    else:
+        end_date = datetime.date(year, month + 1, 1)
+    
+    results = session.exec(
+        select(Revenue)
+        .where(Revenue.channel == channel)
+        .where(Revenue.date >= start_date, Revenue.date < end_date)
+        .order_by(Revenue.date)
+    ).all()
+    return results
+
+@router.post("/delivery")
+def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depends(get_session)):
+    """Create a new delivery revenue entry"""
+    new_revenue = Revenue(**data.model_dump())
+    session.add(new_revenue)
+    session.commit()
+    session.refresh(new_revenue)
+    return new_revenue
+
+@router.put("/delivery/{id}")
+def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Session = Depends(get_session)):
+    """Update a delivery revenue entry"""
+    record = session.get(Revenue, id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    
+    for key, value in data.model_dump().items():
+        setattr(record, key, value)
+    
+    session.add(record)
+    session.commit()
+    session.refresh(record)
+    return record
+
+@router.delete("/delivery/{id}")
+def delete_delivery_revenue(id: int, session: Session = Depends(get_session)):
+    """Delete a delivery revenue entry"""
+    record = session.get(Revenue, id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    session.delete(record)
+    session.commit()
+    return {"message": "Deleted successfully"}
+

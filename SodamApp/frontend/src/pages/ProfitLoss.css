@@ -1,7 +1,8 @@
 .profitloss-page {
-    padding: 24px;
-    max-width: 1400px;
-    margin: 0 auto;
+    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .page-header {
@@ -59,16 +60,21 @@
 .pl-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 14px;
+    font-size: 12px;
+    table-layout: fixed;
 }
 
 .pl-table th,
 .pl-table td {
-    padding: 12px 16px;
+    padding: 8px 4px;
     text-align: right;
     border: 1px solid #e5e7eb;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+/* Column widths are handled by colgroup in JSX */
 
 .pl-table th {
     background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
@@ -88,48 +94,111 @@
     background: #f8fafc;
 }
 
+/* Revenue Section Styling - Soft Blue Pastel */
 .section-header td:first-child {
-    background: #e0e7ff;
-    color: #3730a3;
+    background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
+    color: #1e3a8a;
     font-weight: 700;
+    font-size: 14px;
     text-align: center;
     vertical-align: middle;
+    border-top: 2px solid #93c5fd;
 }
 
+.section-header td:nth-child(2) {
+    background: #eff6ff;
+    color: #3b82f6;
+    font-weight: 600;
+    border-top: 2px solid #bfdbfe;
+}
+
+/* Revenue rows - soft blue theme */
+.revenue-row td:nth-child(2) {
+    background: #f8fafc;
+    color: #475569;
+}
+
+/* Expense Section Header - Soft Rose Pastel */
+.expense-section-header td:first-child {
+    background: linear-gradient(135deg, #fda4af 0%, #fb7185 100%) !important;
+    color: #881337;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+    vertical-align: middle;
+    border-top: 2px solid #fda4af;
+}
+
+.expense-section-header td:nth-child(2) {
+    background: #fff1f2 !important;
+    color: #e11d48;
+    font-weight: 600;
+    border-top: 2px solid #fecdd3;
+}
+
+/* Expense rows - soft rose theme */
+.expense-row td:nth-child(2) {
+    background: #fffbfc;
+    color: #64748b;
+}
+
+/* Subtotal rows - Soft Amber Pastel */
 .subtotal-row {
-    background: #fef3c7;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-top: 1px solid #fcd34d;
+    border-bottom: 1px solid #fcd34d;
 }
 
 .subtotal-row td {
     font-weight: 600;
     color: #92400e;
+    font-size: 13px;
 }
 
+.subtotal-row td:nth-child(2) {
+    background: #fffbeb !important;
+}
+
+/* Profit row - Soft Mint Pastel */
 .profit-row {
-    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
+    border-top: 2px solid #34d399;
+    border-bottom: 2px solid #34d399;
 }
 
 .profit-row td {
     font-weight: 700;
-    font-size: 15px;
+    font-size: 14px;
+    color: #047857 !important;
+}
+
+.profit-row td:first-child,
+.profit-row td:nth-child(2) {
+    background: transparent !important;
+    color: #047857 !important;
 }
 
 .profit-positive {
-    color: #059669;
+    color: #047857 !important;
 }
 
 .profit-negative {
-    color: #dc2626;
+    color: #dc2626 !important;
 }
 
+/* Total column - Soft Green */
 .total {
     background: #f0fdf4 !important;
     font-weight: 600;
+    color: #16a34a;
+    border-left: 1px solid #bbf7d0;
 }
 
+/* Average column - Soft Yellow */
 .average {
-    background: #fef9c3 !important;
+    background: #fefce8 !important;
     font-weight: 600;
+    color: #ca8a04;
 }
 
 .cell-value {
@@ -203,7 +272,8 @@
     background: #f1f5f9;
     padding: 6px;
     border-radius: 12px;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
 }
 
 .tab-button {
@@ -230,7 +300,84 @@
     box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
+/* Dropdown Group */
+.tab-dropdown {
+    position: relative;
+    z-index: 9999;
+}
+
+.tab-button.dropdown-trigger {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    min-width: 150px;
+    padding: 8px 0;
+    animation: dropdownFadeIn 0.15s ease;
+}
+
+.dropdown-menu.month-dropdown {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    min-width: 280px;
+    padding: 12px;
+    gap: 4px;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-size: 14px;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.month-dropdown .dropdown-item {
+    padding: 8px 12px;
+    text-align: center;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: #f1f5f9;
+}
+
+.dropdown-item.active {
+    background: #3b82f6;
+    color: white;
+}
+
 .tab-content {
+    position: relative;
+    z-index: 1;
     animation: fadeIn 0.3s ease;
 }
 
@@ -403,4 +550,232 @@
     .summary-cards {
         grid-template-columns: 1fr;
     }
+}
+
+/* Delivery App Section */
+.delivery-section {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.month-cell {
+    font-weight: 600;
+    background: #f8fafc !important;
+}
+
+.detail-cell {
+    text-align: left !important;
+}
+
+.deposit-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.deposit-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f0f9ff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.deposit-date {
+    color: #0369a1;
+    font-weight: 500;
+}
+
+.deposit-amount {
+    color: #059669;
+    font-weight: 600;
+}
+
+.no-data {
+    color: #9ca3af;
+}
+
+/* Monthly Expense Section */
+.monthly-expense-section {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.expense-summary {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.expense-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px 24px;
+    background: #f8fafc;
+    border-radius: 8px;
+    min-width: 120px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.stat-value.highlight {
+    color: #dc2626;
+}
+
+.vendor-name {
+    font-weight: 500;
+    background: #f1f5f9 !important;
+}
+
+.transaction-list {
+    text-align: left !important;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.transaction-item {
+    display: inline-block;
+    background: #fef9c3;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #854d0e;
+}
+
+.no-data-row {
+    text-align: center !important;
+    padding: 40px !important;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Excel-like Grid Table */
+.grid-table-container {
+    overflow-x: auto;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.expense-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: max-content;
+}
+
+.expense-grid-table th,
+.expense-grid-table td {
+    border: 1px solid #e2e8f0;
+    padding: 4px 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.expense-grid-table .vendor-header {
+    background: #1e3a8a;
+    color: white;
+    font-weight: 600;
+    min-width: 100px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+
+.expense-grid-table .day-header {
+    background: #3b82f6;
+    color: white;
+    font-weight: 500;
+    min-width: 60px;
+}
+
+.expense-grid-table .total-header {
+    background: #059669;
+    color: white;
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.expense-grid-table .vendor-cell {
+    background: #f8fafc;
+    font-weight: 500;
+    text-align: left;
+    padding-left: 10px;
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+
+.expense-grid-table .amount-cell {
+    background: white;
+    min-width: 60px;
+}
+
+.expense-grid-table .amount-cell .cell-value {
+    display: block;
+    padding: 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.expense-grid-table .amount-cell .cell-value:hover {
+    background: #dbeafe;
+}
+
+.expense-grid-table .amount-cell .cell-value.has-value {
+    color: #1e40af;
+    font-weight: 500;
+}
+
+.expense-grid-table .row-total {
+    background: #ecfdf5;
+    font-weight: 600;
+    color: #047857;
+}
+
+.expense-grid-table .day-totals-row {
+    background: #fef3c7;
+}
+
+.expense-grid-table .day-totals-row .vendor-cell {
+    background: #fef3c7;
+}
+
+.expense-grid-table .day-total {
+    font-weight: 500;
+    color: #92400e;
+}
+
+.expense-grid-table .grand-total {
+    background: #dc2626;
+    color: white;
+    font-weight: 700;
+}
+
+.grid-input {
+    width: 60px;
+    padding: 2px 4px;
+    border: 2px solid #3b82f6;
+    border-radius: 3px;
+    font-size: 12px;
+    text-align: right;
 }
