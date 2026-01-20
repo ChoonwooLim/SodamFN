@@ -425,8 +425,8 @@ export default function ProfitLoss() {
         const channelMap = { coupang: 'Coupang', baemin: 'Baemin', yogiyo: 'Yogiyo', ddangyo: 'Ddangyo' };
         const revenueData = deliveryData[channel] || [];
 
-        // 7-12월 표시 (하반기)
-        const displayMonths = [7, 8, 9, 10, 11, 12];
+        // 1-12월 표시 (연간)
+        const displayMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
         const maxDays = 31; // 최대 31일
 
         // Create grid: month -> { day: { amount, id } }
@@ -522,7 +522,7 @@ export default function ProfitLoss() {
 
         return (
             <div className="delivery-section">
-                <h3 className="section-title">🛵 {channelNames[channel]} 정산금 입금내역_{year}하반기</h3>
+                <h3 className="section-title">🛵 {channelNames[channel]} 정산금 입금내역_{year}년</h3>
 
                 <div className="delivery-summary">
                     <div className="expense-stat">
