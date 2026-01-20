@@ -362,19 +362,31 @@ export default function VendorSettings() {
                                                                 {vendor.name}
                                                             </span>
                                                         )}
-                                                        <input
-                                                            type="text"
-                                                            value={vendor.item || ''}
-                                                            onChange={(e) => {
-                                                                const updated = vendors.map(v =>
-                                                                    v.name === vendor.name ? { ...v, item: e.target.value } : v
-                                                                );
-                                                                setVendors(updated);
-                                                            }}
-                                                            onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
-                                                            placeholder="취급품목"
-                                                            className="item-input-compact"
-                                                        />
+                                                        {/* Product Summary Button - Click to open product management */}
+                                                        {activeTab === 'expense' ? (
+                                                            <button
+                                                                onClick={() => setSelectedVendor(vendor)}
+                                                                className="product-summary-btn"
+                                                                title="클릭하여 제품 관리"
+                                                            >
+                                                                <Package size={14} />
+                                                                <span>제품 관리</span>
+                                                            </button>
+                                                        ) : (
+                                                            <input
+                                                                type="text"
+                                                                value={vendor.item || ''}
+                                                                onChange={(e) => {
+                                                                    const updated = vendors.map(v =>
+                                                                        v.name === vendor.name ? { ...v, item: e.target.value } : v
+                                                                    );
+                                                                    setVendors(updated);
+                                                                }}
+                                                                onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
+                                                                placeholder="취급품목"
+                                                                className="item-input-compact"
+                                                            />
+                                                        )}
                                                         <div className="vendor-actions-compact">
                                                             {/* Edit button for vendor name */}
                                                             <button
@@ -384,16 +396,6 @@ export default function VendorSettings() {
                                                             >
                                                                 <Edit2 size={14} />
                                                             </button>
-                                                            {/* Only show product button for expense vendors */}
-                                                            {activeTab === 'expense' && (
-                                                                <button
-                                                                    onClick={() => setSelectedVendor(vendor)}
-                                                                    className="action-btn-sm product"
-                                                                    title="취급상품 관리"
-                                                                >
-                                                                    <Package size={14} />
-                                                                </button>
-                                                            )}
                                                             <button
                                                                 onClick={() => handleMoveVendor(vendor, 'up')}
                                                                 disabled={idx === 0}

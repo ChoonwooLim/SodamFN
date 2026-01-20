@@ -205,6 +205,13 @@
     color: #1e293b;
 }
 
+.products-table td.id-cell {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    width: 50px;
+}
+
 .tax-badge {
     display: inline-block;
     padding: 4px 8px;

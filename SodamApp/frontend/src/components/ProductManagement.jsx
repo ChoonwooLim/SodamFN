@@ -33,7 +33,7 @@ export default function ProductManagement({ vendor, onClose }) {
 
     const fetchProducts = async () => {
         try {
-            const response = await api.get(`/api/products?vendor_id=${vendor.id}`);
+            const response = await api.get(`/products?vendor_id=${vendor.id}`);
             if (response.data.status === 'success') {
                 setProducts(response.data.data);
             }
@@ -57,7 +57,7 @@ export default function ProductManagement({ vendor, onClose }) {
 
         try {
             console.log('Adding product:', { ...newProduct, vendor_id: vendor.id });
-            const response = await api.post('/api/products', {
+            const response = await api.post('/products', {
                 ...newProduct,
                 vendor_id: vendor.id,
                 unit_price: parseInt(newProduct.unit_price) || 0
@@ -74,7 +74,7 @@ export default function ProductManagement({ vendor, onClose }) {
 
     const handleUpdate = async (productId) => {
         try {
-            await api.put(`/api/products/${productId}`, {
+            await api.put(`/products/${productId}`, {
                 ...editProduct,
                 unit_price: parseInt(editProduct.unit_price) || 0
             });
@@ -89,7 +89,7 @@ export default function ProductManagement({ vendor, onClose }) {
         if (!window.confirm('이 제품을 삭제하시겠습니까?')) return;
 
         try {
-            await api.delete(`/api/products/${productId}`);
+            await api.delete(`/products/${productId}`);
             await fetchProducts();
         } catch (error) {
             alert('삭제 실패');
@@ -194,6 +194,7 @@ export default function ProductManagement({ vendor, onClose }) {
                         <table className="products-table">
                             <thead>
                                 <tr>
+                                    <th>ID</th>
                                     <th>제품명</th>
                                     <th>규격</th>
                                     <th>단가</th>
@@ -256,6 +257,7 @@ export default function ProductManagement({ vendor, onClose }) {
                                             </>
                                         ) : (
                                             <>
+                                                <td className="id-cell">{product.id}</td>
                                                 <td>{product.name}</td>
                                                 <td>{product.spec || '-'}</td>
                                                 <td className="price">{formatPrice(product.unit_price)}원</td>
