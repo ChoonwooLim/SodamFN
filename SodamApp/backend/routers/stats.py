@@ -127,6 +127,43 @@ def delete_vendor(vendor_name: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class VendorPatch(BaseModel):
+    name: str = None
+    item: str = None
+    category: str = None
+    vendor_type: str = None
+    order_index: int = None
+
+@router.patch("/vendors/{vendor_id}")
+def patch_vendor(vendor_id: int, payload: VendorPatch):
+    """Update vendor by ID - supports name change"""
+    try:
+        from sqlmodel import Session, select
+        from database import engine
+        from models import Vendor
+        
+        with Session(engine) as session:
+            vendor = session.get(Vendor, vendor_id)
+            if not vendor:
+                return {"status": "error", "message": "Vendor not found"}
+            
+            if payload.name is not None:
+                vendor.name = payload.name
+            if payload.item is not None:
+                vendor.item = payload.item
+            if payload.category is not None:
+                vendor.category = payload.category
+            if payload.vendor_type is not None:
+                vendor.vendor_type = payload.vendor_type
+            if payload.order_index is not None:
+                vendor.order_index = payload.order_index
+            
+            session.add(vendor)
+            session.commit()
+            return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/backup/excel")
 def download_backup():
     try:

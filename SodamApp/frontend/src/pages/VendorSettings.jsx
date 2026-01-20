@@ -155,9 +155,16 @@ export default function VendorSettings() {
     const handleUpdateVendor = async (vendor, updates) => {
         setSaving(vendor.name);
         try {
-            await api.post('/vendors', { ...vendor, ...updates });
+            // Use PATCH for ID-based updates (supports name change)
+            if (vendor.id) {
+                await api.patch(`/vendors/${vendor.id}`, updates);
+            } else {
+                // Fallback to POST for vendors without ID
+                await api.post('/vendors', { ...vendor, ...updates });
+            }
             await fetchVendors();
         } catch (error) {
+            console.error('Update error:', error);
             alert('수정 실패');
         } finally {
             setSaving(null);
