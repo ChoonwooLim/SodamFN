@@ -71,7 +71,14 @@ class DatabaseService:
     def get_vendors(self):
         stmt = select(Vendor)
         results = self.session.exec(stmt).all()
-        return [{"id": v.id, "name": v.name, "item": v.category} for v in results]
+        return [{
+            "id": v.id, 
+            "name": v.name, 
+            "item": getattr(v, 'item', None) or v.category,
+            "category": v.category,
+            "vendor_type": getattr(v, 'vendor_type', 'expense'),
+            "order_index": getattr(v, 'order_index', 0)
+        } for v in results]
 
     def update_vendor_item(self, vendor_name: str, item: str):
         stmt = select(Vendor).where(Vendor.name == vendor_name)
@@ -79,6 +86,42 @@ class DatabaseService:
         if vendor:
             vendor.category = item # Using category field as 'Item/Handling'
             self.session.add(vendor)
+            self.session.commit()
+            return True
+        return False
+
+    def update_vendor_full(self, name: str, item: str = None, category: str = None, 
+                           vendor_type: str = "expense", order_index: int = 0):
+        stmt = select(Vendor).where(Vendor.name == name)
+        vendor = self.session.exec(stmt).first()
+        
+        if vendor:
+            # Update existing vendor
+            if item is not None:
+                vendor.item = item
+            if category is not None:
+                vendor.category = category
+            vendor.vendor_type = vendor_type
+            vendor.order_index = order_index
+        else:
+            # Create new vendor
+            vendor = Vendor(
+                name=name,
+                item=item,
+                category=category,
+                vendor_type=vendor_type,
+                order_index=order_index
+            )
+        
+        self.session.add(vendor)
+        self.session.commit()
+        return True
+
+    def delete_vendor(self, vendor_name: str):
+        stmt = select(Vendor).where(Vendor.name == vendor_name)
+        vendor = self.session.exec(stmt).first()
+        if vendor:
+            self.session.delete(vendor)
             self.session.commit()
             return True
         return False

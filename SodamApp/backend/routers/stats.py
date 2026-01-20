@@ -92,17 +92,38 @@ def get_vendors_list():
 
 class VendorUpdate(BaseModel):
     name: str
-    item: str
+    item: str = None
+    category: str = None
+    vendor_type: str = "expense"
+    order_index: int = 0
 
 @router.post("/vendors")
 def update_vendor(payload: VendorUpdate):
     try:
         service = DatabaseService()
-        success = service.update_vendor_item(payload.name, payload.item)
+        success = service.update_vendor_full(
+            name=payload.name,
+            item=payload.item,
+            category=payload.category,
+            vendor_type=payload.vendor_type,
+            order_index=payload.order_index
+        )
         if success:
             return {"status": "success"}
         else:
              return {"status": "error", "message": "Failed to update"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/vendors/{vendor_name}")
+def delete_vendor(vendor_name: str):
+    try:
+        service = DatabaseService()
+        success = service.delete_vendor(vendor_name)
+        if success:
+            return {"status": "success"}
+        else:
+            return {"status": "error", "message": "Vendor not found"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -8,8 +8,11 @@ from datetime import time
 class Vendor(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-    category: Optional[str] = None
+    category: Optional[str] = None  # 세부 카테고리 (식자재, 소모품, 비품 등)
+    vendor_type: str = Field(default="expense")  # "revenue" or "expense"
+    order_index: int = Field(default=0)  # 표시 순서
     contact_info: Optional[str] = None
+    item: Optional[str] = None  # 취급 품목
     
     products: List["Product"] = Relationship(back_populates="vendor")
     expenses: List["Expense"] = Relationship(back_populates="vendor")
