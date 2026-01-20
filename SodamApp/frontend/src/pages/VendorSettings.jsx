@@ -39,6 +39,15 @@ export default function VendorSettings() {
         fetchVendors();
     }, []);
 
+    // Reset category when tab changes
+    useEffect(() => {
+        if (activeTab === 'expense') {
+            setNewVendorCategory('food');
+        } else {
+            setNewVendorCategory('delivery');
+        }
+    }, [activeTab]);
+
     const fetchVendors = async () => {
         try {
             const response = await api.get('/vendors');
@@ -82,7 +91,8 @@ export default function VendorSettings() {
 
     const handleAddVendor = async () => {
         if (!newVendorName.trim()) return;
-        if (vendors.some(v => v.name === newVendorName.trim())) {
+        // Check duplicates only within the same vendor_type (매입처/매출처 분리)
+        if (vendors.some(v => v.name === newVendorName.trim() && v.vendor_type === activeTab)) {
             alert('이미 존재하는 거래처입니다.');
             return;
         }
@@ -224,11 +234,15 @@ export default function VendorSettings() {
                     </div>
                 ) : (
                     <div className="vendor-categories">
-                        {/* Uncategorized Vendors Section */}
+                        {/* Uncategorized Vendors Section - only show vendors with no valid category at all */}
                         {(() => {
-                            const allCategoryIds = getCategories().map(c => c.id);
+                            const allExpenseCategories = EXPENSE_CATEGORIES.map(c => c.id);
+                            const allRevenueCategories = REVENUE_CATEGORIES.map(c => c.id);
+                            const allValidCategories = [...allExpenseCategories, ...allRevenueCategories];
+
+                            // Only show vendors that have NO valid category at all (not in expense OR revenue)
                             const uncategorizedVendors = vendors.filter(v =>
-                                !v.category || !allCategoryIds.includes(v.category)
+                                !v.category || !allValidCategories.includes(v.category)
                             );
 
                             if (uncategorizedVendors.length === 0) return null;
