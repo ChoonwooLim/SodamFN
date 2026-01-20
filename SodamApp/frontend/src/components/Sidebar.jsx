@@ -31,6 +31,7 @@ export default function Sidebar() {
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
             { icon: Receipt, label: '지출 내역', path: '/confirm' },
             { icon: Users, label: '직원 관리', path: '/staff' },
+            { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: Settings, label: '설정', path: '/settings' },
         ]
         : [

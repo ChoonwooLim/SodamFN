@@ -69,6 +69,12 @@ export default function ProfitLoss() {
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
 
+    // Global vendor order (from VendorSettings page)
+    const getVendorOrder = () => {
+        const saved = localStorage.getItem('profitloss_vendor_order');
+        return saved ? JSON.parse(saved) : [];
+    };
+
     useEffect(() => {
         fetchData();
     }, [year]);
@@ -470,7 +476,25 @@ export default function ProfitLoss() {
             vendorGrid[item.vendor_name].ids[day] = item.id;
         });
 
-        const vendors = Object.keys(vendorGrid).sort();
+        // Get global vendor order - ALL vendors from settings are shown in every month
+        const savedOrder = getVendorOrder();
+        const dataVendors = Object.keys(vendorGrid);
+
+        // Use saved order as the base, then add any data vendors not in saved order
+        const orderedVendors = [...savedOrder];
+        dataVendors.forEach(v => {
+            if (!orderedVendors.includes(v)) {
+                orderedVendors.push(v);
+            }
+        });
+        const vendors = orderedVendors;
+
+        // Initialize vendorGrid for ALL vendors (including those with no data)
+        vendors.forEach(v => {
+            if (!vendorGrid[v]) {
+                vendorGrid[v] = { amounts: {}, ids: {} };
+            }
+        });
 
         // Calculate row totals (per vendor)
         const vendorTotals = {};
@@ -574,6 +598,13 @@ export default function ProfitLoss() {
                     </div>
                 </div>
 
+                {/* Link to Vendor Settings */}
+                <div className="vendor-settings-banner">
+                    <span>💡 거래처 추가/삭제/순서변경은</span>
+                    <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
+                    <span>에서 설정하세요.</span>
+                </div>
+
                 <div className="grid-table-container">
                     <table className="expense-grid-table">
                         <thead>
@@ -599,7 +630,8 @@ export default function ProfitLoss() {
                             )) : (
                                 <tr>
                                     <td colSpan={daysInMonth + 2} className="no-data-row">
-                                        {month}월 비용 데이터가 없습니다. 위에 거래처를 추가하세요.
+                                        {month}월 비용 데이터가 없습니다.
+                                        <a href="/vendor-settings" className="vendor-settings-link">거래처 관리</a>에서 거래처를 추가하세요.
                                     </td>
                                 </tr>
                             )}

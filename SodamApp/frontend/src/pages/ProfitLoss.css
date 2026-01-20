@@ -779,3 +779,126 @@
     font-size: 12px;
     text-align: right;
 }
+
+/* Vendor Management Styles */
+.vendor-add-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+}
+
+.vendor-input {
+    padding: 8px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    width: 200px;
+    transition: border-color 0.2s;
+}
+
+.vendor-input:focus {
+    border-color: #3b82f6;
+    outline: none;
+}
+
+.vendor-add-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.vendor-add-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.action-header {
+    background: #64748b !important;
+    width: 80px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.action-cell {
+    display: flex;
+    gap: 4px;
+    justify-content: center;
+    align-items: center;
+    padding: 4px !important;
+}
+
+.vendor-action-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.vendor-action-btn.move-btn {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.vendor-action-btn.move-btn:hover:not(:disabled) {
+    background: #c7d2fe;
+}
+
+.vendor-action-btn.move-btn:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    cursor: not-allowed;
+}
+
+.vendor-action-btn.delete-btn {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.vendor-action-btn.delete-btn:hover {
+    background: #fecaca;
+    transform: scale(1.1);
+}
+
+/* Vendor Settings Banner */
+.vendor-settings-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #1e40af;
+}
+
+.vendor-settings-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #3b82f6;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    transition: background 0.2s;
+}
+
+.vendor-settings-link:hover {
+    background: #2563eb;
+}
