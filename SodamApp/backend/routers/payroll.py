@@ -8,6 +8,7 @@ from sqlmodel import select, col
 import json
 from utils.payroll_calc_utils import calculate_insurances, calculate_korean_income_tax
 from services.notification_service import NotificationService
+from services.banking_service import BankingService
 from config import FRONTEND_URL
 from routers.auth import get_admin_user
 from models import User
@@ -394,3 +395,30 @@ def send_payroll_statement(staff_id: int = Body(..., embed=True), month: str = B
         return {"status": "success", "solapi_result": result}
     finally:
         service.close()
+
+@router.get("/transfer/biz-account")
+def get_biz_account(admin: User = Depends(get_admin_user)):
+    return {"status": "success", "data": BankingService.get_biz_account()}
+
+@router.put("/transfer/biz-account")
+def update_biz_account(data: dict = Body(...), admin: User = Depends(get_admin_user)):
+    success = BankingService.update_biz_account(
+        bank=data.get("bank", ""),
+        number=data.get("number", ""),
+        holder=data.get("holder", "")
+    )
+    if success:
+        return {"status": "success", "message": "Business account updated"}
+    raise HTTPException(status_code=500, detail="Failed to update business account")
+
+@router.post("/transfer/{payroll_id}")
+def execute_transfer(payroll_id: int, admin: User = Depends(get_admin_user)):
+    result = BankingService.execute_payroll_transfer(payroll_id)
+    if result["status"] == "error":
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+@router.post("/transfer/bulk-data")
+def get_bulk_transfer_data(payroll_ids: List[int] = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+    data = BankingService.get_bulk_transfer_data(payroll_ids)
+    return {"status": "success", "data": data}

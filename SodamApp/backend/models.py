@@ -231,6 +231,10 @@ class Payroll(SQLModel, table=True):
     
     details_json: Optional[str] = None # Detailed breakdown in JSON string
     
+    # Transfer Tracking
+    transfer_status: str = Field(default="대기") # 대기(Pending), 완료(Completed), 실패(Failed)
+    transferred_at: Optional[datetime.datetime] = None
+    
     staff_id: Optional[int] = Field(default=None, foreign_key="staff.id")
     staff: Optional[Staff] = Relationship(back_populates="payrolls")
 
