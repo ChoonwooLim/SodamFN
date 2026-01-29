@@ -22,6 +22,9 @@ export default function StaffDetail() {
         hourly_wage: 0,
         monthly_salary: 0,
         bank_account: '',
+        bank_name: '',
+        account_number: '',
+        account_holder: '',
         work_schedule: '',
         doc_contract: false,
         doc_health_cert: false,
@@ -687,16 +690,34 @@ export default function StaffDetail() {
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-500 mb-1">급여 계좌</label>
-                                    <input
-                                        type="text"
-                                        name="bank_account"
-                                        value={formData.bank_account || ''}
-                                        onChange={handleChange}
-                                        placeholder="은행명 계좌번호 예금주"
-                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                    />
+                                <div className="space-y-3">
+                                    <label className="block text-sm font-medium text-slate-500">급여 계좌</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <input
+                                            type="text"
+                                            name="bank_name"
+                                            value={formData.bank_name || ''}
+                                            onChange={handleChange}
+                                            placeholder="은행명"
+                                            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                        />
+                                        <input
+                                            type="text"
+                                            name="account_number"
+                                            value={formData.account_number || ''}
+                                            onChange={handleChange}
+                                            placeholder="계좌번호"
+                                            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                        />
+                                        <input
+                                            type="text"
+                                            name="account_holder"
+                                            value={formData.account_holder || ''}
+                                            onChange={handleChange}
+                                            placeholder="예금주"
+                                            className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -931,16 +952,6 @@ export default function StaffDetail() {
                                 title="직원에게 근무시간 입력 요청 카톡 발송"
                             >
                                 <MessageSquare size={18} /> 시급입력 요청
-                            </button>
-                            <button
-                                onClick={() => {
-                                    fetchBizAccount();
-                                    setIsBizAccountModalOpen(true);
-                                }}
-                                className="flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-900 shadow-sm transition-all"
-                                title="출금 계좌 설정"
-                            >
-                                <Wallet size={18} /> 출금 계좌 설정
                             </button>
                         </div>
                     </div>

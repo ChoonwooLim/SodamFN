@@ -74,7 +74,10 @@ class Staff(SQLModel, table=True):
     role: str # e.g., "Manager", "Part-time"
     hourly_wage: int
     start_date: datetime.date
-    bank_account: Optional[str] = None
+    bank_account: Optional[str] = None  # Legacy field (combined)
+    bank_name: Optional[str] = None  # 은행명
+    account_number: Optional[str] = None  # 계좌번호
+    account_holder: Optional[str] = None  # 예금주
     status: str = Field(default="재직") # 재직 / 퇴사
     
     # HR Details
@@ -193,13 +196,13 @@ class StaffDocument(SQLModel, table=True):
 
 class Attendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: datetime.date
+    date: datetime.date = Field(index=True)  # Added index for performance
     check_in: Optional[time] = None
     check_out: Optional[time] = None
     total_hours: float = 0.0
     status: str = "Normal" # Normal, Late, Absent
     
-    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id")
+    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)  # Added index
     staff: Optional[Staff] = Relationship(back_populates="attendances")
 
 class Payroll(SQLModel, table=True):

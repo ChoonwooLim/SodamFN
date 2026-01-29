@@ -12,8 +12,10 @@ from models import User
 from services.database_service import DatabaseService
 import config
 
-# Configuration
-SECRET_KEY = "sodam_fn_secret_key_change_me" # In production, use environment variable
+import os
+
+# Configuration - Load from environment variables for security
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "sodam_fn_dev_only_change_in_production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
 

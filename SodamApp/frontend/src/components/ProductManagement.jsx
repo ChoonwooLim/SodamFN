@@ -57,13 +57,11 @@ export default function ProductManagement({ vendor, onClose }) {
         }
 
         try {
-            console.log('Adding product:', { ...newProduct, vendor_id: vendor.id });
             const response = await api.post('/products', {
                 ...newProduct,
                 vendor_id: vendor.id,
                 unit_price: parseInt(newProduct.unit_price) || 0
             });
-            console.log('Response:', response.data);
             await fetchProducts();
             setNewProduct({ name: '', spec: '', unit_price: 0, tax_type: 'taxable', manufacturer: '', note: '' });
             setShowAddForm(false);

@@ -347,6 +347,10 @@ def calculate_payroll(req: PayrollCalculateRequest):
         service.session.commit()
         service.session.refresh(existing)
         
+        # Auto-sync to MonthlyProfitLoss.expense_labor
+        from routers.profitloss import sync_labor_cost
+        sync_labor_cost(year, month_num, service.session)
+        
         print(f"DEBUG: Calculated Payroll: Base={total_base_pay}, Bonus={total_holiday_pay}, Total={net_pay}")
         
         return {"status": "success", "data": existing.model_dump()}

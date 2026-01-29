@@ -16,7 +16,8 @@ if not DATABASE_URL:
 else:
     connect_args = {} # Postgres doesn't need this
 
-engine = create_engine(DATABASE_URL, echo=True, connect_args=connect_args)
+DEBUG_SQL = os.environ.get("DEBUG_SQL", "false").lower() == "true"
+engine = create_engine(DATABASE_URL, echo=DEBUG_SQL, connect_args=connect_args)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

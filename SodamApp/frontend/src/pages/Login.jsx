@@ -87,9 +87,7 @@ export default function LoginPage() {
         formData.append('password', password);
 
         try {
-            console.log("Attempting login for:", username);
             const response = await axios.post('http://localhost:8000/api/auth/login', formData, { timeout: 10000 });
-            console.log("Login successful, processing token...");
             handleLoginSuccess(response.data.access_token);
         } catch (err) {
             console.error("Login Error:", err);
@@ -99,7 +97,6 @@ export default function LoginPage() {
                 setError(err.response?.data?.detail || "아이디 또는 비밀번호가 올바르지 않습니다.");
             }
         } finally {
-            console.log("Login process finished, resetting loading state.");
             setLoading(false);
         }
     };

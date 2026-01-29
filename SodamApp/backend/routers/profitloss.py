@@ -95,7 +95,58 @@ def sync_summary_material_cost(year: int, month: int, session: Session):
     
     session.commit()
 
+
+def sync_labor_cost(year: int, month: int, session: Session):
+    """
+    Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
+    This includes all staff payroll (base pay + bonuses - deductions = net pay to employees)
+    """
+    from models import Payroll
+    from sqlmodel import func
+    
+    month_str = f"{year}-{month:02d}"
+    
+    # Calculate sum of all payroll total_pay for the month
+    total_labor = session.exec(
+        select(func.sum(Payroll.total_pay))
+        .where(Payroll.month == month_str)
+    ).one() or 0
+    
+    # Find or create MonthlyProfitLoss record
+    pl_record = session.exec(
+        select(MonthlyProfitLoss)
+        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    ).first()
+    
+    if pl_record:
+        pl_record.expense_labor = int(total_labor)
+        session.add(pl_record)
+    else:
+        # Create a new record if it doesn't exist
+        pl_record = MonthlyProfitLoss(
+            year=year,
+            month=month,
+            expense_labor=int(total_labor)
+        )
+        session.add(pl_record)
+    
+    session.commit()
+    return int(total_labor)
+
 # --- Monthly P/L Endpoints ---
+
+@router.post("/sync-labor/{year}/{month}")
+def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(get_session)):
+    """
+    Manually sync labor costs from Payroll table to MonthlyProfitLoss.
+    Useful for backfilling existing payroll data.
+    """
+    total_labor = sync_labor_cost(year, month, session)
+    return {
+        "status": "success", 
+        "message": f"{year}년 {month}월 인건비 {total_labor:,}원이 손익계산서에 반영되었습니다.",
+        "total_labor": total_labor
+    }
 
 @router.get("/monthly")
 def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depends(get_session)):

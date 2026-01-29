@@ -120,7 +120,6 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                 status: data.status || 'Normal'
             }));
 
-            console.log("Saving records:", formatted);
 
             const response = await fetch(`http://localhost:8000/api/payroll/attendance`, {
                 method: 'POST',
@@ -153,14 +152,12 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
         setCalculating(true);
         try {
             // First Save
-            console.log("Saving attendance before calculation...");
             const saveSuccess = await handleSave();
             if (!saveSuccess) {
                 console.warn("Save failed, aborting calculation.");
                 return;
             }
 
-            console.log("Triggering calculation API...");
             const response = await fetch(`http://localhost:8000/api/payroll/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -173,16 +170,14 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             }
 
             const result = await response.json();
-            console.log("Calculation API result:", result);
             if (result.status === 'success') {
                 alert('급여 산출이 완료되었습니다.');
 
                 // Close modal first
-                console.log("Closing Attendance Modal...");
                 onClose();
 
                 if (onCalculateSuccess) {
-                    console.log("Triggering onCalculateSuccess with:", result.data);
+                    onCalculateSuccess(result.data);
                     onCalculateSuccess(result.data);
                 }
             } else {
