@@ -57,6 +57,44 @@ class DeliveryRevenueCreate(BaseModel):
     amount: int
     description: Optional[str] = None
 
+# --- Helpers ---
+
+def sync_summary_material_cost(year: int, month: int, session: Session):
+    """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
+    start_date = datetime.date(year, month, 1)
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1)
+    else:
+        end_date = datetime.date(year, month + 1, 1)
+    
+    # Calculate sum of material expenses from DailyExpense
+    from sqlmodel import func
+    total_material = session.exec(
+        select(func.sum(DailyExpense.amount))
+        .where(
+            DailyExpense.date >= start_date, 
+            DailyExpense.date < end_date,
+            DailyExpense.category == "재료비"
+        )
+    ).one() or 0
+    
+    # Find or create summary record
+    pl_record = session.exec(
+        select(MonthlyProfitLoss)
+        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    ).first()
+    
+    if pl_record:
+        pl_record.expense_material = int(total_material)
+        session.add(pl_record)
+    else:
+        # If no summary record exists, we don't necessarily want to create one 
+        # just for material sync, as other fields (rent, labor) would be 0/null.
+        # But for consistency, having a record is usually better.
+        pass
+    
+    session.commit()
+
 # --- Monthly P/L Endpoints ---
 
 @router.get("/monthly")
@@ -71,6 +109,30 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
     # Calculate totals for each record
     output = []
     for r in results:
+        # Auto-sync material cost if it's 0 (backfill)
+        if r.expense_material == 0:
+            start_date = datetime.date(r.year, r.month, 1)
+            if r.month == 12:
+                end_date = datetime.date(r.year + 1, 1, 1)
+            else:
+                end_date = datetime.date(r.year, r.month + 1, 1)
+            
+            from sqlmodel import func
+            total_material = session.exec(
+                select(func.sum(DailyExpense.amount))
+                .where(
+                    DailyExpense.date >= start_date, 
+                    DailyExpense.date < end_date,
+                    DailyExpense.category == "재료비"
+                )
+            ).one() or 0
+            
+            if total_material > 0:
+                r.expense_material = int(total_material)
+                session.add(r)
+                session.commit()
+                session.refresh(r)
+
         total_revenue = r.revenue_store + r.revenue_coupang + r.revenue_baemin + r.revenue_yogiyo + r.revenue_ddangyo
         total_expense = (r.expense_labor + r.expense_rent + r.expense_utility + 
                         r.expense_vat + r.expense_biz_tax + r.expense_income_tax + 
@@ -169,6 +231,10 @@ def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(ge
     session.add(new_expense)
     session.commit()
     session.refresh(new_expense)
+    
+    # Trigger sync to summary
+    sync_summary_material_cost(data.date.year, data.date.month, session)
+    
     return new_expense
 
 @router.put("/expenses/{id}")
