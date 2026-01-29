@@ -18,6 +18,7 @@ class ProductCreate(BaseModel):
     spec: Optional[str] = None
     unit_price: int = 0
     tax_type: str = "taxable"  # taxable, tax_free, zero_rated
+    manufacturer: Optional[str] = None
     note: Optional[str] = None
 
 class ProductUpdate(BaseModel):
@@ -26,6 +27,7 @@ class ProductUpdate(BaseModel):
     spec: Optional[str] = None
     unit_price: Optional[int] = None
     tax_type: Optional[str] = None
+    manufacturer: Optional[str] = None
     note: Optional[str] = None
 
 # Get all products for a vendor
@@ -48,6 +50,7 @@ def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get
                 "spec": p.spec,
                 "unit_price": p.unit_price,
                 "tax_type": p.tax_type,
+                "manufacturer": p.manufacturer,
                 "note": p.note,
                 "vendor_id": p.vendor_id
             } for p in products]
@@ -87,6 +90,7 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session))
             spec=data.spec,
             unit_price=data.unit_price,
             tax_type=data.tax_type,
+            manufacturer=data.manufacturer,
             note=data.note
         )
         session.add(product)
@@ -117,6 +121,8 @@ def update_product(product_id: int, data: ProductUpdate, session: Session = Depe
             product.unit_price = data.unit_price
         if data.tax_type is not None:
             product.tax_type = data.tax_type
+        if data.manufacturer is not None:
+            product.manufacturer = data.manufacturer
         if data.note is not None:
             product.note = data.note
         

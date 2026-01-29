@@ -20,6 +20,7 @@ export default function ProductManagement({ vendor, onClose }) {
         spec: '',
         unit_price: 0,
         tax_type: 'taxable',
+        manufacturer: '',
         note: ''
     });
 
@@ -64,7 +65,7 @@ export default function ProductManagement({ vendor, onClose }) {
             });
             console.log('Response:', response.data);
             await fetchProducts();
-            setNewProduct({ name: '', spec: '', unit_price: 0, tax_type: 'taxable', note: '' });
+            setNewProduct({ name: '', spec: '', unit_price: 0, tax_type: 'taxable', manufacturer: '', note: '' });
             setShowAddForm(false);
         } catch (error) {
             console.error('Add product error:', error.response?.data || error.message);
@@ -103,6 +104,7 @@ export default function ProductManagement({ vendor, onClose }) {
             spec: product.spec || '',
             unit_price: product.unit_price,
             tax_type: product.tax_type,
+            manufacturer: product.manufacturer || '',
             note: product.note || ''
         });
     };
@@ -169,6 +171,12 @@ export default function ProductManagement({ vendor, onClose }) {
                                 </select>
                                 <input
                                     type="text"
+                                    placeholder="제조사"
+                                    value={newProduct.manufacturer}
+                                    onChange={(e) => setNewProduct({ ...newProduct, manufacturer: e.target.value })}
+                                />
+                                <input
+                                    type="text"
                                     placeholder="비고"
                                     value={newProduct.note}
                                     onChange={(e) => setNewProduct({ ...newProduct, note: e.target.value })}
@@ -199,6 +207,7 @@ export default function ProductManagement({ vendor, onClose }) {
                                     <th>규격</th>
                                     <th>단가</th>
                                     <th>과세</th>
+                                    <th>제조사</th>
                                     <th>비고</th>
                                     <th>작업</th>
                                 </tr>
@@ -208,6 +217,7 @@ export default function ProductManagement({ vendor, onClose }) {
                                     <tr key={product.id}>
                                         {editingId === product.id ? (
                                             <>
+                                                <td className="id-cell">{product.product_code || product.id}</td>
                                                 <td>
                                                     <input
                                                         type="text"
@@ -242,6 +252,13 @@ export default function ProductManagement({ vendor, onClose }) {
                                                 <td>
                                                     <input
                                                         type="text"
+                                                        value={editProduct.manufacturer}
+                                                        onChange={(e) => setEditProduct({ ...editProduct, manufacturer: e.target.value })}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
                                                         value={editProduct.note}
                                                         onChange={(e) => setEditProduct({ ...editProduct, note: e.target.value })}
                                                     />
@@ -266,6 +283,7 @@ export default function ProductManagement({ vendor, onClose }) {
                                                         {TAX_TYPES.find(t => t.id === product.tax_type)?.label || product.tax_type}
                                                     </span>
                                                 </td>
+                                                <td>{product.manufacturer || '-'}</td>
                                                 <td>{product.note || '-'}</td>
                                                 <td>
                                                     <button onClick={() => startEdit(product)} className="icon-btn edit">

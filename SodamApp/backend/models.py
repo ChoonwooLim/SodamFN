@@ -25,6 +25,7 @@ class Product(SQLModel, table=True):
     spec: Optional[str] = None  # 규격 (용량, 단위 등)
     unit_price: int = 0
     tax_type: str = Field(default="taxable")  # taxable(과세), tax_free(면세), zero_rated(영세)
+    manufacturer: Optional[str] = None  # 제조사
     note: Optional[str] = None  # 비고
     
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
