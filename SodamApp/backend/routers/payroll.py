@@ -6,6 +6,7 @@ from typing import Optional, List, Dict
 from datetime import date, datetime, timedelta
 from sqlmodel import select, col
 import json
+from utils.payroll_calc_utils import calculate_2026_insurances, calculate_korean_income_tax
 
 router = APIRouter()
 
@@ -151,45 +152,58 @@ def calculate_payroll(req: PayrollCalculateRequest):
         h_stmt = select(CompanyHoliday).where(CompanyHoliday.date >= search_start, CompanyHoliday.date <= search_end)
         company_holidays = {h.date for h in service.session.exec(h_stmt).all()}
 
-        # 1. Base Pay - Only for days IN the target month
+        # 1. Base Pay
         groups = {}
         total_base_pay = 0
-        
-        # Filter attendances belonging to the target month for Base Pay
-        month_attendances = [a for a in all_attendances if a.date.year == target_year and a.date.month == target_month]
-        
-        for att in month_attendances:
-            if att.total_hours <= 0: continue
-            
-            h = att.total_hours
-            rate = staff.hourly_wage
-            amt = int(h * rate)
-            total_base_pay += amt
-            
-            if h not in groups:
-                groups[h] = {
-                    "label": f"시급({h}시간)",
-                    "rate": rate,
-                    "hours": h,
-                    "days": 0,
-                    "amount": 0,
-                    "dates": []
-                }
-            groups[h]["days"] += 1
-            groups[h]["amount"] += amt
-            groups[h]["dates"].append(str(att.date.day))
-            
         work_breakdown = []
-        for h in sorted(groups.keys(), reverse=True):
-            g = groups[h]
+
+        if staff.contract_type == "정규직":
+            # For Regular staff, use fixed monthly salary
+            total_base_pay = staff.monthly_salary or 0
             work_breakdown.append({
-                "label": g["label"],
-                "rate": g["rate"],
-                "hours": g["hours"],
-                "days": g["days"],
-                "amount": g["amount"],
-                "dates": f"{', '.join(g['dates'])}일"
+                "label": "기본급 (정규직)",
+                "rate": total_base_pay,
+                "hours": 0,
+                "days": 0,
+                "amount": total_base_pay,
+                "dates": "월급여"
             })
+        else:
+            # For Part-time/Day-worker, calculate based on attendance
+            # Filter attendances belonging to the target month for Base Pay
+            month_attendances = [a for a in all_attendances if a.date.year == target_year and a.date.month == target_month]
+            
+            for att in month_attendances:
+                if att.total_hours <= 0: continue
+                
+                h = att.total_hours
+                rate = staff.hourly_wage
+                amt = int(h * rate)
+                total_base_pay += amt
+                
+                if h not in groups:
+                    groups[h] = {
+                        "label": f"시급({h}시간)",
+                        "rate": rate,
+                        "hours": h,
+                        "days": 0,
+                        "amount": 0,
+                        "dates": []
+                    }
+                groups[h]["days"] += 1
+                groups[h]["amount"] += amt
+                groups[h]["dates"].append(str(att.date.day))
+                
+            for h in sorted(groups.keys(), reverse=True):
+                g = groups[h]
+                work_breakdown.append({
+                    "label": g["label"],
+                    "rate": g["rate"],
+                    "hours": g["hours"],
+                    "days": g["days"],
+                    "amount": g["amount"],
+                    "dates": f"{', '.join(g['dates'])}일"
+                })
 
         # 2. Weekly Holiday Pay Calculation (Refined)
         # Cutoff Rule: If Sunday <= 1st of next month, stay in current month.
@@ -210,7 +224,8 @@ def calculate_payroll(req: PayrollCalculateRequest):
         holiday_details = {}
         holiday_per_week = [0, 0, 0, 0, 0]
         
-        week_idx = 0
+        if staff.contract_type != "정규직":
+            week_idx = 0
         # Sort keys to process in chronological order
         for key in sorted(weeks.keys()):
             w_atts = weeks[key]
@@ -256,20 +271,42 @@ def calculate_payroll(req: PayrollCalculateRequest):
                 holiday_details[str(week_idx + 1)] = "결근으로 미지급"
             
             week_idx += 1
+        else:
+            # For Regular staff, we can add a note in details
+            holiday_details["info"] = "정규직은 월급에 주휴수당 포함"
 
-        # 3. Deductions
+        # 3. Deductions (Precise 2026 Logic)
         gross_pay = total_base_pay + total_holiday_pay
+        
+        # Non-taxable meal allowance (up to 200,000 KRW monthly)
+        # Assuming for now that some part of the gross pay or a fixed bonus might be meal-related.
+        # If the staff is 'Part-time' (아르바이트), they might not have a separate meal allowance,
+        # but for regular staff, we could subtract up to 200k from the taxable base.
+        meal_allowance = 0
+        if staff.contract_type == "정규직":
+            meal_allowance = min(gross_pay, 200000)
+            
+        taxable_income = max(0, gross_pay - meal_allowance)
         
         d_np, d_hi, d_ei, d_lti, d_it, d_lit = 0, 0, 0, 0, 0, 0
         
         if staff.contract_type == "정규직" or staff.insurance_4major:
-            d_np = int(gross_pay * 0.045 / 10) * 10
-            d_hi = int(gross_pay * 0.03545 / 10) * 10
-            d_lti = int(d_hi * 0.1291 / 10) * 10
-            d_ei = int(gross_pay * 0.009 / 10) * 10
-            d_it = int(gross_pay * 0.01 / 10) * 10 
+            # Calculation using 2026 utility
+            insurances = calculate_2026_insurances(taxable_income)
+            d_np = insurances["np"]
+            d_hi = insurances["hi"]
+            d_lti = insurances["lti"]
+            d_ei = insurances["ei"]
+            
+            # Precise Income Tax using dependents/children
+            d_it = calculate_korean_income_tax(
+                taxable_income, 
+                dependents=staff.dependents_count or 1, 
+                children=staff.children_count or 0
+            )
             d_lit = int(d_it * 0.1 / 10) * 10
         else:
+            # Freelancer/Part-time simplified tax (3.3%)
             d_it = int(gross_pay * 0.03 / 10) * 10
             d_lit = int(d_it * 0.1 / 10) * 10
             

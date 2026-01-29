@@ -41,7 +41,9 @@ export default function StaffDetail() {
         bonus_enabled: false,
         bonus_amount: '',
         salary_payment_date: '매월 말일',
-        salary_payment_method: '근로자 계좌 입금'
+        salary_payment_method: '근로자 계좌 입금',
+        dependents_count: 1,
+        children_count: 0
     });
 
     const [documents, setDocuments] = useState([]); // List of uploaded documents
@@ -431,6 +433,30 @@ export default function StaffDetail() {
                                         onChange={handleChange}
                                         className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">부양가족 수 (본인 포함)</label>
+                                        <input
+                                            type="number"
+                                            name="dependents_count"
+                                            value={formData.dependents_count || 1}
+                                            onChange={handleChange}
+                                            min="1"
+                                            className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">자녀 수 (8~20세)</label>
+                                        <input
+                                            type="number"
+                                            name="children_count"
+                                            value={formData.children_count || 0}
+                                            onChange={handleChange}
+                                            min="0"
+                                            className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>

@@ -88,6 +88,10 @@ class Staff(SQLModel, table=True):
     monthly_salary: int = Field(default=0) # 월급 (if applicable)
     work_schedule: Optional[str] = None # 근무시간 (e.g. "09:00~18:00") - KEEPING FOR BACKWARD COMPAT, but using new fields below
     
+    # Tax Details
+    dependents_count: int = Field(default=1) # 부양가족 수 (본인 포함)
+    children_count: int = Field(default=0) # 8세~20세 자녀 수
+    
     # Contract Specific Details (New)
     contract_start_date: Optional[datetime.date] = None
     contract_end_date: Optional[datetime.date] = None

@@ -20,6 +20,8 @@ class StaffCreate(BaseModel):
     start_date: date = date.today()
     nationality: str = "South Korea"
     visa_type: Optional[str] = None
+    dependents_count: int = 1
+    children_count: int = 0
 
 class StaffUpdate(BaseModel):
     name: Optional[str] = None
@@ -41,6 +43,8 @@ class StaffUpdate(BaseModel):
     visa_type: Optional[str] = None
     address: Optional[str] = None
     resident_number: Optional[str] = None
+    dependents_count: Optional[int] = None
+    children_count: Optional[int] = None
     
     # Contract Details
     contract_start_date: Optional[date] = None
