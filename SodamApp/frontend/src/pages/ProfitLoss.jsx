@@ -460,7 +460,7 @@ export default function ProfitLoss() {
 
             const { channel: ch, month, day, id } = editingCell;
             const amount = parseInt(editValue) || 0;
-            const date = new Date(year, month - 1, day).toISOString().split('T')[0];
+            const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
             try {
                 if (id && amount > 0) {
@@ -655,7 +655,7 @@ export default function ProfitLoss() {
 
             const { month: m, vendor, day, id } = editingCell;
             const amount = parseInt(editValue) || 0;
-            const date = new Date(year, m - 1, day).toISOString().split('T')[0];
+            const date = `${year}-${m.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
             try {
                 if (id && amount > 0) {
