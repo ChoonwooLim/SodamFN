@@ -1,0 +1,12 @@
+{
+    "name": "sodam-fn-root",
+    "private": true,
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "npm run dev --prefix SodamApp/frontend",
+        "install:all": "npm install --prefix SodamApp/frontend && cd SodamApp/backend && python -m venv .venv && .\\.venv\\Scripts\\pip install -r requirements.txt"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}
