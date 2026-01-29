@@ -129,7 +129,10 @@ export default function StaffDetail() {
                 const data = res.data.data;
                 // Format phone on load
                 if (data.phone) data.phone = formatPhoneNumber(data.phone);
-                setFormData(data);
+
+                // Merge with existing formData to preserve fields not in the staff object
+                setFormData(prev => ({ ...prev, ...data }));
+
                 setDocuments(res.data.documents || []);
                 setPayrolls(res.data.payrolls || []);
                 setContracts(res.data.contracts || []);
@@ -1153,5 +1156,3 @@ export default function StaffDetail() {
         </div>
     );
 }
-
-export default StaffDetail;
