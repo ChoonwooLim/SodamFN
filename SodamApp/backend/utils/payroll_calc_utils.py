@@ -1,32 +1,25 @@
 from typing import Dict
 
-def calculate_2026_insurances(gross_pay: int) -> Dict[str, int]:
+def calculate_insurances(gross_pay: int, year: int = 2026) -> Dict[str, int]:
     """
-    Calculates 2026 South Korean 4 major insurance deductions.
-    - National Pension: 4.75% (0.5% increase from 2025)
-    - Health Insurance: 3.595% (0.1% increase from 2024/2025)
-    - Long-term Care: 12.81% of Health Insurance
-    - Employment Insurance: 0.9%
-    Amounts are rounded down to the nearest 10 KRW as per standard practice.
+    Calculates South Korean 4 major insurance deductions based on the year.
+    2026 Rates: NP 4.75%, HI 3.595%, LTI 12.81%
+    2025 Rates: NP 4.5%, HI 3.545%, LTI 12.91%
+    Employment Insurance remains 0.9%.
     """
-    # Gross pay for insurance normally excludes non-taxable meals (up to 200k)
-    # But usually, insurance is calculated based on 'Reported Monthly Income'.
-    # Here we calculate based on the provided gross_pay (which should be taxable gross).
-    
-    # 1. National Pension (국민연금) 4.75%
-    # Cap: min 400,000, max 6,370,000 (2025.07 ~ 2026.06 standard)
+    if year >= 2026:
+        np_rate, hi_rate, lti_multiplier = 0.0475, 0.03595, 0.1281
+    else:
+        # Default to 2025 rates
+        np_rate, hi_rate, lti_multiplier = 0.045, 0.03545, 0.1291
+        
+    # Cap logic (simplified for common ranges)
     np_income = max(400000, min(gross_pay, 6370000))
-    deduction_np = int(np_income * 0.0475 / 10) * 10
-    
-    # 2. Health Insurance (건강보험) 3.595%
-    # Cap: min 280,383, max 127,725,730 (2026 standard)
     hi_income = max(280383, min(gross_pay, 127725730))
-    deduction_hi = int(hi_income * 0.03595 / 10) * 10
     
-    # 3. Long-term Care (장기요양보험) 12.81% of Health Insurance
-    deduction_lti = int(deduction_hi * 0.1281 / 10) * 10
-    
-    # 4. Employment Insurance (고용보험) 0.9%
+    deduction_np = int(np_income * np_rate / 10) * 10
+    deduction_hi = int(hi_income * hi_rate / 10) * 10
+    deduction_lti = int(deduction_hi * lti_multiplier / 10) * 10
     deduction_ei = int(gross_pay * 0.009 / 10) * 10
     
     return {

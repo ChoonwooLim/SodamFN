@@ -6,7 +6,7 @@ from typing import Optional, List, Dict
 from datetime import date, datetime, timedelta
 from sqlmodel import select, col
 import json
-from utils.payroll_calc_utils import calculate_2026_insurances, calculate_korean_income_tax
+from utils.payroll_calc_utils import calculate_insurances, calculate_korean_income_tax
 
 router = APIRouter()
 
@@ -291,8 +291,8 @@ def calculate_payroll(req: PayrollCalculateRequest):
         d_np, d_hi, d_ei, d_lti, d_it, d_lit = 0, 0, 0, 0, 0, 0
         
         if staff.contract_type == "정규직" or staff.insurance_4major:
-            # Calculation using 2026 utility
-            insurances = calculate_2026_insurances(taxable_income)
+            # Calculation using year-aware utility
+            insurances = calculate_insurances(taxable_income, year=target_year)
             d_np = insurances["np"]
             d_hi = insurances["hi"]
             d_lti = insurances["lti"]
