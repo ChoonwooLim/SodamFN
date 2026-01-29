@@ -5,7 +5,9 @@ from datetime import datetime
 from sqlmodel import select
 from models import ElectronicContract, Staff, User
 from services.database_service import DatabaseService
+from services.notification_service import NotificationService
 from routers.auth import get_current_user, get_admin_user
+from config import FRONTEND_URL
 
 router = APIRouter()
 
@@ -150,5 +152,32 @@ def update_contract(contract_id: int, contract_data: ContractUpdate, admin: User
         service.session.commit()
         service.session.refresh(contract)
         return {"status": "success", "data": contract}
+    finally:
+        service.close()
+
+@router.post("/{contract_id}/send")
+def send_contract_alimtalk(contract_id: int, admin: User = Depends(get_admin_user)):
+    service = DatabaseService()
+    try:
+        contract = service.session.get(ElectronicContract, contract_id)
+        if not contract:
+            raise HTTPException(status_code=404, detail="Contract not found")
+        
+        staff = contract.staff
+        if not staff or not staff.phone:
+            raise HTTPException(status_code=400, detail="Staff phone number is missing")
+
+        # Generate Link
+        # URL format should match the frontend route for signing contracts
+        # e.g., http://localhost:5173/contract/sign/1
+        link = f"{FRONTEND_URL}/contract/sign/{contract_id}"
+        
+        result = NotificationService.send_contract_link(
+            phone_num=staff.phone,
+            staff_name=staff.name,
+            link=link
+        )
+        
+        return {"status": "success", "solapi_result": result}
     finally:
         service.close()

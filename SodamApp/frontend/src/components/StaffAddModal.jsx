@@ -8,7 +8,8 @@ export default function StaffAddModal({ isOpen, onClose, onSuccess }) {
         role: 'Staff',
         hourly_wage: 9860, // Default minimum wage or balanced default
         start_date: new Date().toISOString().slice(0, 10),
-        bank_account: ''
+        bank_account: '',
+        email: ''
     });
     const [loading, setLoading] = useState(false);
 
@@ -98,6 +99,18 @@ export default function StaffAddModal({ isOpen, onClose, onSuccess }) {
                             name="start_date"
                             value={formData.start_date}
                             onChange={handleChange}
+                            className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">이메일 주소 (선택)</label>
+                        <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            placeholder="example@email.com"
                             className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                         />
                     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer, Edit2, Trash2 } from 'lucide-react';
+import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer, Edit2, Trash2, MessageSquare } from 'lucide-react';
 import api from '../api';
 import PayrollStatement from '../components/PayrollStatement';
 import AttendanceInput from '../components/AttendanceInput';
@@ -13,6 +13,7 @@ export default function StaffDetail() {
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
+        email: '',
         role: 'Staff',
         status: '재직',
         contract_type: '아르바이트',
@@ -240,28 +241,63 @@ export default function StaffDetail() {
             return;
         }
 
+        if (!contractForm.title || !contractForm.content) return alert("제목과 내용을 입력해주세요.");
         try {
-            if (editingContractId) {
-                // Update existing
-                await api.put(`/contracts/${editingContractId}`, {
-                    title: contractForm.title,
-                    content: contractForm.content
-                });
-                alert("계약서가 수정되었습니다.");
-            } else {
-                // Create new
-                await api.post(`/contracts/`, {
-                    staff_id: parseInt(id),
-                    ...contractForm
-                });
+            const resp = await api.post('/contracts/', { // Changed from /contract/ to /contracts/ to match existing API calls
+                staff_id: parseInt(id), // Ensure staff_id is an integer
+                title: contractForm.title,
+                content: contractForm.content
+            });
+            if (resp.data.status === 'success') {
+                setIsContractModalOpen(false);
+                fetchStaffDetail();
                 alert("계약서가 생성되었습니다.");
             }
-            setIsContractModalOpen(false);
-            setEditingContractId(null);
-            fetchStaffDetail();
         } catch (error) {
             console.error(error);
-            alert("계약서 저장 실패");
+            alert("계약서 생성 실패");
+        }
+    };
+
+    const handleSendContractAlimTalk = async (contractId) => {
+        try {
+            const resp = await api.post(`/contracts/${contractId}/send`); // Changed from /contract/ to /contracts/
+            if (resp.data.status === 'success') {
+                alert("카카오톡으로 계약서 링크를 전송했습니다.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "카카오톡 전송 실패");
+        }
+    };
+
+    const handleSendAttendanceRequest = async () => {
+        try {
+            const resp = await api.post('/payroll/send-attendance-request', {
+                staff_id: id,
+                month: currentBudgetMonth
+            });
+            if (resp.data.status === 'success') {
+                alert(`${currentBudgetMonth} 근무시간 확인 요청을 카카오톡으로 보냈습니다.`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "카카오톡 전송 실패");
+        }
+    };
+
+    const handleSendPayrollStatement = async (payroll) => {
+        try {
+            const resp = await api.post('/payroll/send-statement', {
+                staff_id: id,
+                month: payroll.month
+            });
+            if (resp.data.status === 'success') {
+                alert(`${payroll.month} 급여명세서 링크를 카카오톡으로 보냈습니다.`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "카카오톡 전송 실패");
         }
     };
 
@@ -402,6 +438,17 @@ export default function StaffDetail() {
                                         value={formData.phone || ''}
                                         onChange={handleChange}
                                         placeholder="010-0000-0000"
+                                        className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 mb-1">이메일 주소</label>
+                                    <input
+                                        name="email"
+                                        type="email"
+                                        value={formData.email || ''}
+                                        onChange={handleChange}
+                                        placeholder="example@email.com"
                                         className="w-full p-2 rounded border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
                                     />
                                 </div>
@@ -930,6 +977,15 @@ export default function StaffDetail() {
                                     <div className="flex items-center gap-2">
                                         {contract.status !== 'signed' && (
                                             <button
+                                                onClick={() => handleSendContractAlimTalk(contract.id)}
+                                                className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                title="카톡 전송"
+                                            >
+                                                <MessageSquare size={16} />
+                                            </button>
+                                        )}
+                                        {contract.status !== 'signed' && (
+                                            <button
                                                 onClick={() => handleEditContract(contract)}
                                                 className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                 title="수정"
@@ -977,7 +1033,14 @@ export default function StaffDetail() {
                             onClick={() => setIsAttendanceModalOpen(true)}
                             className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
                         >
-                            <Calendar size={16} /> 근무 기록/급여 산출
+                            <Calendar size={18} /> 출퇴근/정산
+                        </button>
+                        <button
+                            onClick={handleSendAttendanceRequest}
+                            className="flex items-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 shadow-sm transition-all"
+                            title="직원에게 근무시간 입력 요청 카톡 발송"
+                        >
+                            <MessageSquare size={18} /> 시급입력 요청
                         </button>
                     </div>
                 </div>
@@ -1009,12 +1072,21 @@ export default function StaffDetail() {
                                         <td className="p-3 text-right text-red-400">-{(pay.deductions || 0).toLocaleString()}원</td>
                                         <td className="p-3 text-right font-bold text-blue-600">{(pay.total_pay || 0).toLocaleString()}원</td>
                                         <td className="p-3 text-center">
-                                            <button
-                                                onClick={() => setSelectedPayroll(pay)}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors mx-auto text-xs font-semibold"
-                                            >
-                                                <Printer size={14} /> 명세서
-                                            </button>
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={() => setSelectedPayroll(pay)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-xs font-semibold"
+                                                >
+                                                    <Printer size={14} /> 명세서
+                                                </button>
+                                                <button
+                                                    onClick={() => handleSendPayrollStatement(pay)}
+                                                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors text-xs font-semibold"
+                                                    title="카톡 전송"
+                                                >
+                                                    <MessageSquare size={14} /> 전송
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

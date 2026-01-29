@@ -81,6 +81,7 @@ class Staff(SQLModel, table=True):
     nationality: str = Field(default="South Korea") # 국적
     visa_type: Optional[str] = None # 비자 종류 (e.g. H-2, E-9, F-4...)
     phone: Optional[str] = None
+    email: Optional[str] = None # 이메일 주소
     address: Optional[str] = None # Added for contract
     resident_number: Optional[str] = None # Added for contract
     contract_type: str = Field(default="아르바이트") # 정규직, 아르바이트, 일용직

@@ -17,6 +17,7 @@ class StaffCreate(BaseModel):
     role: str
     hourly_wage: int
     bank_account: Optional[str] = None
+    email: Optional[str] = None
     start_date: date = date.today()
     nationality: str = "South Korea"
     visa_type: Optional[str] = None
@@ -31,6 +32,7 @@ class StaffUpdate(BaseModel):
     start_date: Optional[date] = None
     status: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
     contract_type: Optional[str] = None
     insurance_4major: Optional[bool] = None
     monthly_salary: Optional[int] = None

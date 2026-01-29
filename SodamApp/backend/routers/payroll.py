@@ -7,6 +7,11 @@ from datetime import date, datetime, timedelta
 from sqlmodel import select, col
 import json
 from utils.payroll_calc_utils import calculate_insurances, calculate_korean_income_tax
+from services.notification_service import NotificationService
+from config import FRONTEND_URL
+from routers.auth import get_admin_user
+from models import User
+from fastapi import APIRouter, HTTPException, Body, Depends
 
 router = APIRouter()
 
@@ -345,5 +350,47 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         return {"status": "success", "data": existing.model_dump()}
         
+    finally:
+        service.close()
+
+@router.post("/send-attendance-request")
+def send_attendance_request(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff or not staff.phone:
+            raise HTTPException(status_code=400, detail="Staff not found or phone number missing")
+            
+        # Link to staff portal / dashboard where they can see attendance
+        link = f"{FRONTEND_URL}/dashboard"
+        
+        result = NotificationService.send_attendance_request(
+            phone_num=staff.phone,
+            staff_name=staff.name,
+            month=month,
+            link=link
+        )
+        return {"status": "success", "solapi_result": result}
+    finally:
+        service.close()
+
+@router.post("/send-statement")
+def send_payroll_statement(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff or not staff.phone:
+            raise HTTPException(status_code=400, detail="Staff not found or phone number missing")
+            
+        # Link to the specific payroll statement (payslip) for the month
+        link = f"{FRONTEND_URL}/payroll-statement/{staff_id}/{month}"
+        
+        result = NotificationService.send_payroll_statement(
+            phone_num=staff.phone,
+            staff_name=staff.name,
+            month=month,
+            link=link
+        )
+        return {"status": "success", "solapi_result": result}
     finally:
         service.close()
