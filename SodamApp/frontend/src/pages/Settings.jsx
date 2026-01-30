@@ -6,7 +6,7 @@ import api from '../api';
 
 export default function Settings() {
     const [activeTab, setActiveTab] = useState('vendor');
-    const [bizAccount, setBizAccount] = useState({ bank_name: '', account_number: '', holder_name: '' });
+    const [bizAccount, setBizAccount] = useState({ bank: '', number: '', holder: '' });
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -18,9 +18,9 @@ export default function Settings() {
 
     const fetchBizAccount = async () => {
         try {
-            const res = await api.get('/payroll/biz-account');
-            if (res.data) {
-                setBizAccount(res.data);
+            const res = await api.get('/payroll/transfer/biz-account');
+            if (res.data?.data) {
+                setBizAccount(res.data.data);
             }
         } catch (error) {
             console.error('Error fetching biz account:', error);
@@ -31,10 +31,19 @@ export default function Settings() {
         setSaving(true);
         setMessage('');
         try {
-            await api.put('/payroll/biz-account', bizAccount);
+            await api.put('/payroll/transfer/biz-account', bizAccount);
             setMessage('출금계좌 정보가 저장되었습니다.');
         } catch (error) {
-            setMessage('저장 중 오류가 발생했습니다.');
+            console.error('Save biz account error:', error.response?.status, error.response?.data);
+            if (error.response?.status === 401) {
+                setMessage('인증이 필요합니다. 다시 로그인해주세요.');
+            } else if (error.response?.status === 403) {
+                setMessage('권한이 없습니다. 관리자만 접근 가능합니다.');
+            } else if (error.response?.status === 422) {
+                setMessage(`입력값 오류: ${JSON.stringify(error.response?.data?.detail || '알 수 없는 오류')}`);
+            } else {
+                setMessage('저장 중 오류가 발생했습니다.');
+            }
         } finally {
             setSaving(false);
         }
@@ -102,8 +111,8 @@ export default function Settings() {
                             <label className="block text-sm font-medium text-slate-600 mb-1">은행명</label>
                             <input
                                 type="text"
-                                value={bizAccount.bank_name}
-                                onChange={(e) => setBizAccount({ ...bizAccount, bank_name: e.target.value })}
+                                value={bizAccount.bank}
+                                onChange={(e) => setBizAccount({ ...bizAccount, bank: e.target.value })}
                                 placeholder="예: 국민은행"
                                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
@@ -112,8 +121,8 @@ export default function Settings() {
                             <label className="block text-sm font-medium text-slate-600 mb-1">계좌번호</label>
                             <input
                                 type="text"
-                                value={bizAccount.account_number}
-                                onChange={(e) => setBizAccount({ ...bizAccount, account_number: e.target.value })}
+                                value={bizAccount.number}
+                                onChange={(e) => setBizAccount({ ...bizAccount, number: e.target.value })}
                                 placeholder="예: 123-456-789012"
                                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                             />
@@ -122,8 +131,8 @@ export default function Settings() {
                             <label className="block text-sm font-medium text-slate-600 mb-1">예금주</label>
                             <input
                                 type="text"
-                                value={bizAccount.holder_name}
-                                onChange={(e) => setBizAccount({ ...bizAccount, holder_name: e.target.value })}
+                                value={bizAccount.holder}
+                                onChange={(e) => setBizAccount({ ...bizAccount, holder: e.target.value })}
                                 placeholder="예: 소담김밥"
                                 className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                             />

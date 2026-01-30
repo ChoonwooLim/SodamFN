@@ -43,35 +43,48 @@ class BankingService:
     def execute_payroll_transfer(cls, payroll_id: int):
         """
         Executes a payroll transfer.
-        In this implementation, it validates the info and updates the status to 'Completed'.
-        Integration with real banking APIs would happen here.
+        Currently NOT connected to real banking API.
+        This validates all required info to prepare for future real implementation.
         """
         service = DatabaseService()
         try:
+            # 1. 급여 기록 확인
             payroll = service.session.get(Payroll, payroll_id)
             if not payroll:
-                return {"status": "error", "message": "Payroll record not found"}
+                return {"status": "error", "message": "급여 기록을 찾을 수 없습니다."}
             
+            # 2. 직원 정보 및 입금 계좌 확인
             staff = payroll.staff
-            if not staff or not staff.bank_account:
-                return {"status": "error", "message": "Staff bank account info missing"}
-
-            # Simulated Transfer Logic
-            # 1. Check if biz account is set
-            biz_acc = cls.get_biz_account()
-            if not biz_acc["number"]:
-                return {"status": "error", "message": "Representative business account not configured"}
-
-            # 2. Update status
-            payroll.transfer_status = "완료"
-            payroll.transferred_at = datetime.now()
-            service.session.add(payroll)
-            service.session.commit()
+            if not staff:
+                return {"status": "error", "message": "직원 정보를 찾을 수 없습니다."}
             
+            if not staff.bank_name or not staff.bank_account or not staff.bank_holder:
+                return {
+                    "status": "error", 
+                    "message": f"{staff.name}님의 급여 입금 계좌가 설정되지 않았습니다. 직원 정보에서 계좌를 등록해주세요."
+                }
+
+            # 3. 출금 계좌(사업자 계좌) 확인
+            biz_acc = cls.get_biz_account()
+            if not biz_acc["bank"] or not biz_acc["number"] or not biz_acc["holder"]:
+                return {
+                    "status": "error", 
+                    "message": "급여 출금 계좌가 설정되지 않았습니다. 환경설정 > 급여 출금계좌에서 등록해주세요."
+                }
+
+            # 4. 은행 API 미연동 상태 안내
+            # TODO: 실제 은행 API 연동 시 이 부분을 수정
+            # - 오픈뱅킹 API 또는 펌뱅킹 API 연동
+            # - API 키 및 인증 정보 필요
             return {
-                "status": "success", 
-                "message": f"{staff.name}님에게 {payroll.total_pay:,}원 이체 완료",
-                "transferred_at": payroll.transferred_at.isoformat()
+                "status": "error",
+                "message": "⚠️ 은행 API가 아직 연동되지 않았습니다. 실제 이체 기능은 추후 업데이트 예정입니다.",
+                "details": {
+                    "from_account": f"{biz_acc['bank']} {biz_acc['number']} ({biz_acc['holder']})",
+                    "to_account": f"{staff.bank_name} {staff.bank_account} ({staff.bank_holder})",
+                    "amount": payroll.total_pay,
+                    "staff_name": staff.name
+                }
             }
         finally:
             service.close()

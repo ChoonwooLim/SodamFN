@@ -339,10 +339,14 @@ export default function StaffDetail() {
             if (resp.data.status === 'success') {
                 alert(resp.data.message);
                 fetchStaffDetail();
+            } else {
+                // 정상 응답이지만 에러 상태 (validation 실패, API 미연동 등)
+                alert(resp.data.message || "이체를 완료할 수 없습니다.");
             }
         } catch (error) {
             console.error(error);
-            alert(error.response?.data?.detail || "이체 실행 실패");
+            // HTTP 에러 (400, 401, 500 등)
+            alert(error.response?.data?.message || error.response?.data?.detail || "이체 실행 중 오류가 발생했습니다.");
         }
     };
 
