@@ -476,3 +476,235 @@
 .category-assign-select:hover {
     border-color: #d97706;
 }
+
+/* Merge Feature Styles */
+.merge-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #8b5cf6;
+}
+
+.vendor-item-compact.selected-for-merge {
+    background: #f5f3ff;
+    border: 2px solid #8b5cf6;
+}
+
+.merge-action-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.merge-action-bar span {
+    font-weight: 600;
+}
+
+.merge-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: white;
+    color: #7c3aed;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.merge-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.cancel-selection-btn {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.cancel-selection-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Merge Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.merge-modal {
+    background: white;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.merge-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+}
+
+.merge-modal .modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.merge-modal .close-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.merge-modal .close-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.merge-modal .modal-body {
+    padding: 24px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.merge-info {
+    margin: 0 0 20px 0;
+    color: #475569;
+    line-height: 1.6;
+}
+
+.merge-target-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.merge-target-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.merge-target-option:hover {
+    border-color: #8b5cf6;
+    background: #faf5ff;
+}
+
+.merge-target-option.active {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+}
+
+.merge-target-option input[type="radio"] {
+    accent-color: #8b5cf6;
+    width: 18px;
+    height: 18px;
+}
+
+.merge-target-option .vendor-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.merge-target-option .vendor-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.merge-target-option .vendor-category {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.keep-badge {
+    background: #10b981;
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.merge-modal .modal-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 24px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    justify-content: flex-end;
+}
+
+.merge-modal .cancel-btn {
+    padding: 10px 20px;
+    background: #e2e8f0;
+    color: #475569;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.merge-modal .cancel-btn:hover {
+    background: #cbd5e1;
+}
+
+.confirm-merge-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.confirm-merge-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}

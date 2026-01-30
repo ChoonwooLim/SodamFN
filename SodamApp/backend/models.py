@@ -16,6 +16,7 @@ class Vendor(SQLModel, table=True):
     
     products: List["Product"] = Relationship(back_populates="vendor")
     expenses: List["Expense"] = Relationship(back_populates="vendor")
+    daily_expenses: List["DailyExpense"] = Relationship(back_populates="vendor")
 
 class Product(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -270,6 +271,7 @@ class MonthlyProfitLoss(SQLModel, table=True):
     expense_card_fee: int = 0     # 카드수수료
     expense_material: int = 0     # 재료비
     expense_retirement: int = 0   # 퇴직금적립
+    expense_personal: int = 0     # 개인생활비
 
 class DailyExpense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -278,4 +280,7 @@ class DailyExpense(SQLModel, table=True):
     amount: int                   # 금액
     category: Optional[str] = None  # 비용 카테고리 (재료비, 기타 등)
     note: Optional[str] = None    # 비고
+    
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
+    vendor: Optional[Vendor] = Relationship(back_populates="daily_expenses")
 

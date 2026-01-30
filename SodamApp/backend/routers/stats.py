@@ -164,6 +164,69 @@ def patch_vendor(vendor_id: int, payload: VendorPatch):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+from typing import List
+
+class VendorMergeRequest(BaseModel):
+    source_ids: List[int]
+
+@router.post("/vendors/{target_id}/merge")
+def merge_vendors(target_id: int, payload: VendorMergeRequest):
+    """Merge multiple vendors into one target vendor.
+    
+    All DailyExpense records from source vendors will be updated
+    to point to the target vendor, then source vendors are deleted.
+    """
+    try:
+        from sqlmodel import Session, select
+        from database import engine
+        from models import Vendor, DailyExpense
+        
+        with Session(engine) as session:
+            # 1. Get target vendor
+            target = session.get(Vendor, target_id)
+            if not target:
+                raise HTTPException(status_code=404, detail="Target vendor not found")
+            
+            # 2. Validate source IDs
+            if target_id in payload.source_ids:
+                raise HTTPException(status_code=400, detail="Target vendor cannot be in source list")
+            
+            merged_count = 0
+            deleted_vendors = []
+            
+            for source_id in payload.source_ids:
+                source = session.get(Vendor, source_id)
+                if not source:
+                    continue
+                
+                # 3. Update all DailyExpense records
+                expenses = session.exec(
+                    select(DailyExpense).where(DailyExpense.vendor_id == source_id)
+                ).all()
+                
+                for expense in expenses:
+                    expense.vendor_id = target_id
+                    expense.vendor_name = target.name
+                    session.add(expense)
+                    merged_count += 1
+                
+                # 4. Delete source vendor
+                deleted_vendors.append(source.name)
+                session.delete(source)
+            
+            session.commit()
+            
+            return {
+                "status": "success",
+                "merged_expenses": merged_count,
+                "deleted_vendors": deleted_vendors,
+                "target_vendor": target.name
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/backup/excel")
 def download_backup():
     try:

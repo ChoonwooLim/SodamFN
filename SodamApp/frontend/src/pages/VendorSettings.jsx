@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Package } from 'lucide-react';
+import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Package, GitMerge } from 'lucide-react';
 import api from '../api';
 import './VendorSettings.css';
 import ProductManagement from '../components/ProductManagement';
@@ -16,6 +16,7 @@ const EXPENSE_CATEGORIES = [
     { id: 'card_fee', label: '카드수수료', icon: '💳' },
     { id: 'marketing', label: '광고마케팅', icon: '📢' },
     { id: 'insurance', label: '보험', icon: '🛡️' },
+    { id: 'personal', label: '개인생활비', icon: '🏠' },
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
 
@@ -36,6 +37,9 @@ export default function VendorSettings() {
     const [newVendorCategory, setNewVendorCategory] = useState('food');
     const [editingVendor, setEditingVendor] = useState(null);
     const [selectedVendor, setSelectedVendor] = useState(null); // For product management modal
+    const [selectedForMerge, setSelectedForMerge] = useState([]); // Checkbox selection for merge
+    const [showMergeModal, setShowMergeModal] = useState(false);
+    const [mergeTarget, setMergeTarget] = useState(null);
 
     useEffect(() => {
         fetchVendors();
@@ -181,6 +185,53 @@ export default function VendorSettings() {
         return allCategories.find(c => c.id === categoryId)?.icon || '📁';
     };
 
+    // Merge handlers
+    const handleToggleMergeSelect = (vendorId) => {
+        setSelectedForMerge(prev =>
+            prev.includes(vendorId)
+                ? prev.filter(id => id !== vendorId)
+                : [...prev, vendorId]
+        );
+    };
+
+    const handleOpenMergeModal = () => {
+        if (selectedForMerge.length < 2) {
+            alert('병합할 거래처를 2개 이상 선택해주세요.');
+            return;
+        }
+        setShowMergeModal(true);
+        setMergeTarget(selectedForMerge[0]); // Default to first selected
+    };
+
+    const handleMerge = async () => {
+        if (!mergeTarget) return;
+
+        const sourceIds = selectedForMerge.filter(id => id !== mergeTarget);
+        if (sourceIds.length === 0) {
+            alert('병합할 대상 거래처를 선택해주세요.');
+            return;
+        }
+
+        try {
+            const response = await api.post(`/vendors/${mergeTarget}/merge`, {
+                source_ids: sourceIds
+            });
+
+            if (response.data.status === 'success') {
+                alert(`${response.data.merged_expenses}건의 비용 데이터가 병합되었습니다.\n삭제된 거래처: ${response.data.deleted_vendors.join(', ')}`);
+                setShowMergeModal(false);
+                setSelectedForMerge([]);
+                setMergeTarget(null);
+                await fetchVendors();
+            }
+        } catch (error) {
+            console.error('Merge error:', error);
+            alert('병합 실패: ' + (error.response?.data?.detail || error.message));
+        }
+    };
+
+    const getVendorById = (id) => vendors.find(v => v.id === id);
+
     return (
         <>
             <div className="vendor-settings-page">
@@ -237,6 +288,20 @@ export default function VendorSettings() {
                             </button>
                         </div>
                     </div>
+
+                    {/* Merge Button */}
+                    {selectedForMerge.length >= 2 && (
+                        <div className="merge-action-bar">
+                            <span>{selectedForMerge.length}개 선택됨</span>
+                            <button onClick={handleOpenMergeModal} className="merge-btn">
+                                <GitMerge size={18} />
+                                선택 거래처 병합
+                            </button>
+                            <button onClick={() => setSelectedForMerge([])} className="cancel-selection-btn">
+                                선택 취소
+                            </button>
+                        </div>
+                    )}
 
                     {loading ? (
                         <div className="loading-spinner">
@@ -329,7 +394,14 @@ export default function VendorSettings() {
                                         {categoryVendors.length > 0 ? (
                                             <div className="vendor-list-compact">
                                                 {categoryVendors.map((vendor, idx) => (
-                                                    <div key={vendor.id} className="vendor-item-compact">
+                                                    <div key={vendor.id} className={`vendor-item-compact ${selectedForMerge.includes(vendor.id) ? 'selected-for-merge' : ''}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedForMerge.includes(vendor.id)}
+                                                            onChange={() => handleToggleMergeSelect(vendor.id)}
+                                                            className="merge-checkbox"
+                                                            title="병합할 거래처 선택"
+                                                        />
                                                         <span className="vendor-order">{idx + 1}</span>
                                                         {/* Vendor name - editable when editingVendor matches */}
                                                         {editingVendor === vendor.name ? (
@@ -445,6 +517,57 @@ export default function VendorSettings() {
                     />
                 )
             }
+
+            {/* Merge Modal */}
+            {showMergeModal && (
+                <div className="modal-overlay" onClick={() => setShowMergeModal(false)}>
+                    <div className="merge-modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>거래처 병합</h2>
+                            <button onClick={() => setShowMergeModal(false)} className="close-btn">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p className="merge-info">
+                                선택된 {selectedForMerge.length}개의 거래처를 하나로 병합합니다.<br />
+                                <strong>유지할 거래처</strong>를 선택하세요. 나머지는 삭제되고 비용 데이터가 이전됩니다.
+                            </p>
+                            <div className="merge-target-list">
+                                {selectedForMerge.map(id => {
+                                    const v = getVendorById(id);
+                                    if (!v) return null;
+                                    return (
+                                        <label key={id} className={`merge-target-option ${mergeTarget === id ? 'active' : ''}`}>
+                                            <input
+                                                type="radio"
+                                                name="mergeTarget"
+                                                value={id}
+                                                checked={mergeTarget === id}
+                                                onChange={() => setMergeTarget(id)}
+                                            />
+                                            <span className="vendor-info">
+                                                <span className="vendor-name">{v.name}</span>
+                                                <span className="vendor-category">{getCategoryLabel(v.category)}</span>
+                                            </span>
+                                            {mergeTarget === id && <span className="keep-badge">유지</span>}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button onClick={() => setShowMergeModal(false)} className="cancel-btn">
+                                취소
+                            </button>
+                            <button onClick={handleMerge} className="confirm-merge-btn">
+                                <GitMerge size={18} />
+                                병합 실행
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
