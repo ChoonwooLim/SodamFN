@@ -29,6 +29,9 @@ class StaffUpdate(BaseModel):
     role: Optional[str] = None
     hourly_wage: Optional[int] = None
     bank_account: Optional[str] = None
+    bank_name: Optional[str] = None  # 은행명
+    account_number: Optional[str] = None  # 계좌번호
+    account_holder: Optional[str] = None  # 예금주
     start_date: Optional[date] = None
     status: Optional[str] = None
     phone: Optional[str] = None

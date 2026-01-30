@@ -58,7 +58,7 @@ class BankingService:
             if not staff:
                 return {"status": "error", "message": "직원 정보를 찾을 수 없습니다."}
             
-            if not staff.bank_name or not staff.bank_account or not staff.bank_holder:
+            if not staff.bank_name or not staff.account_number or not staff.account_holder:
                 return {
                     "status": "error", 
                     "message": f"{staff.name}님의 급여 입금 계좌가 설정되지 않았습니다. 직원 정보에서 계좌를 등록해주세요."
@@ -81,7 +81,7 @@ class BankingService:
                 "message": "⚠️ 은행 API가 아직 연동되지 않았습니다. 실제 이체 기능은 추후 업데이트 예정입니다.",
                 "details": {
                     "from_account": f"{biz_acc['bank']} {biz_acc['number']} ({biz_acc['holder']})",
-                    "to_account": f"{staff.bank_name} {staff.bank_account} ({staff.bank_holder})",
+                    "to_account": f"{staff.bank_name} {staff.account_number} ({staff.account_holder})",
                     "amount": payroll.total_pay,
                     "staff_name": staff.name
                 }
