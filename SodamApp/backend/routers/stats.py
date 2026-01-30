@@ -138,6 +138,7 @@ class VendorPatch(BaseModel):
 def patch_vendor(vendor_id: int, payload: VendorPatch):
     """Update vendor by ID - supports name change"""
     try:
+        print(f"[PATCH VENDOR] ID: {vendor_id}, Payload: {payload}")
         from sqlmodel import Session, select
         from database import engine
         from models import Vendor
@@ -145,6 +146,7 @@ def patch_vendor(vendor_id: int, payload: VendorPatch):
         with Session(engine) as session:
             vendor = session.get(Vendor, vendor_id)
             if not vendor:
+                print(f"[PATCH VENDOR] Vendor {vendor_id} not found")
                 return {"status": "error", "message": "Vendor not found"}
             
             if payload.name is not None:
@@ -160,8 +162,10 @@ def patch_vendor(vendor_id: int, payload: VendorPatch):
             
             session.add(vendor)
             session.commit()
+            print(f"[PATCH VENDOR] Success: {vendor.name}")
             return {"status": "success"}
     except Exception as e:
+        print(f"[PATCH VENDOR] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 from typing import List
