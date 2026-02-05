@@ -306,6 +306,19 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest):
                     session.add(expense)
                     merged_count += 1
             
+            # 3. Delete source Vendors if they exist
+            # Since these are "uncategorized" vendors appearing in the list, they likely exist in Vendor table.
+            for src_name in payload.source_names:
+                if src_name == payload.target_name:
+                    continue
+                    
+                source_vendors = session.exec(
+                    select(Vendor).where(Vendor.name == src_name)
+                ).all()
+                
+                for sv in source_vendors:
+                    session.delete(sv)
+
             # Also update expenses for target_name itself if they have no ID
             target_expenses = session.exec(
                 select(DailyExpense).where(
@@ -316,7 +329,6 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest):
             for expense in target_expenses:
                 expense.vendor_id = target_vendor.id
                 session.add(expense)
-                # merged_count += 1 # Not counting self-updates as 'merged' perhaps? Or count them.
             
             session.commit()
             
