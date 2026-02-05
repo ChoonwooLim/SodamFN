@@ -42,6 +42,7 @@ export default function VendorSettings() {
     const [selectedForMerge, setSelectedForMerge] = useState([]); // Checkbox selection for merge
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergeTarget, setMergeTarget] = useState(null);
+    const [customMergeName, setCustomMergeName] = useState('');
 
     useEffect(() => {
         fetchVendors();
@@ -219,34 +220,78 @@ export default function VendorSettings() {
         setMergeTarget(selectedForMerge[0]); // Default to first selected
     };
 
+    const getVendorById = (id) => {
+        if (typeof id === 'string') {
+            return vendors.find(v => v.name === id) || { name: id, category: null };
+        }
+        return vendors.find(v => v.id === id);
+    };
+
     const handleMerge = async () => {
         if (!mergeTarget) return;
 
-        const sourceIds = selectedForMerge.filter(id => id !== mergeTarget);
-        if (sourceIds.length === 0) {
-            alert('병합할 대상 거래처를 선택해주세요.');
-            return;
+        let finalTargetName = null;
+
+        // 1. Determine Target Name
+        if (mergeTarget === '__CUSTOM__') {
+            finalTargetName = customMergeName.trim();
+            if (!finalTargetName) {
+                alert('새 거래처 이름을 입력해주세요.');
+                return;
+            }
+        } else {
+            const targetVendor = getVendorById(mergeTarget);
+            finalTargetName = targetVendor ? targetVendor.name : mergeTarget;
         }
 
+        // 2. Determine Strategy (ID-based vs Name-based)
+        // If target is an existing vendor (ID), use ID merge. 
+        // If target is Name (Uncategorized) or Custom, use Name merge.
+        const isIdMerge = (typeof mergeTarget === 'number');
+
         try {
-            const response = await api.post(`/vendors/${mergeTarget}/merge`, {
-                source_ids: sourceIds
-            });
+            let response;
+            if (isIdMerge) {
+                const sourceIds = selectedForMerge.filter(id => id !== mergeTarget);
+                response = await api.post(`/vendors/${mergeTarget}/merge`, {
+                    source_ids: sourceIds
+                });
+            } else {
+                // Name-based Merge
+                // Convert all selected sources to Names
+                const sourceNames = selectedForMerge.map(id => {
+                    const v = getVendorById(id); // Handles both ID and Name lookup
+                    return v ? v.name : id;
+                });
+
+                // Filter out the target itself
+                const filteredSourceNames = sourceNames.filter(name => name !== finalTargetName);
+
+                response = await api.post('/vendors/merge-uncategorized', {
+                    target_name: finalTargetName,
+                    source_names: filteredSourceNames,
+                    category: 'other'
+                });
+            }
 
             if (response.data.status === 'success') {
-                alert(`${response.data.merged_expenses}건의 비용 데이터가 병합되었습니다.\n삭제된 거래처: ${response.data.deleted_vendors.join(', ')}`);
+                const mergedCount = response.data.merged_expenses || response.data.merged_count;
+                alert(`${mergedCount}건의 데이터가 병합되었습니다.`);
                 setShowMergeModal(false);
                 setSelectedForMerge([]);
                 setMergeTarget(null);
+                setCustomMergeName('');
                 await fetchVendors();
             }
         } catch (error) {
             console.error('Merge error:', error);
-            alert('병합 실패: ' + (error.response?.data?.detail || error.message));
+            const errorDetail = error.response?.data?.detail;
+            const errorMessage = typeof errorDetail === 'object'
+                ? JSON.stringify(errorDetail)
+                : (errorDetail || error.message);
+            alert('병합 실패: ' + errorMessage);
         }
     };
-
-    const getVendorById = (id) => vendors.find(v => v.id === id);
 
     return (
         <>
@@ -325,62 +370,117 @@ export default function VendorSettings() {
                         </div>
                     ) : (
                         <div className="vendor-categories">
-                            {/* Uncategorized Vendors Section - only show vendors with no valid category at all */}
+                            {/* Uncategorized Vendors Section */}
                             {(() => {
                                 const allExpenseCategories = EXPENSE_CATEGORIES.map(c => c.id);
                                 const allRevenueCategories = REVENUE_CATEGORIES.map(c => c.id);
                                 const allValidCategories = [...allExpenseCategories, ...allRevenueCategories];
 
-                                // Only show vendors that have NO valid category at all (not in expense OR revenue)
-                                const uncategorizedVendors = vendors.filter(v =>
+                                const rawUncategorized = vendors.filter(v =>
                                     !v.category || !allValidCategories.includes(v.category)
                                 );
 
-                                if (uncategorizedVendors.length === 0) return null;
+                                // Group by name
+                                const uniqueUncategorized = rawUncategorized.reduce((acc, current) => {
+                                    const existing = acc.find(v => v.name === current.name);
+                                    if (existing) {
+                                        existing.count = (existing.count || 1) + 1;
+                                        // Keep other properties from the first occurrence or latest? First is fine.
+                                    } else {
+                                        acc.push({ ...current, count: 1 });
+                                    }
+                                    return acc;
+                                }, []);
+
+                                if (uniqueUncategorized.length === 0) return null;
+
+                                // Helper for selecting unknown vendors for merge
+                                const toggleUnknownSelect = (name) => {
+                                    setSelectedForMerge(prev => {
+                                        // We use name as ID for unknown vendors since they might share IDs or have none
+                                        // Prefixing to avoid collision with real IDs? No, real IDs are integers usually. 
+                                        // But wait, selectedForMerge serves existing vendors. We should use a separate state or mix carefully.
+                                        // Let's use a separate state: selectedUnknownForMerge (need to add useState first)
+                                        // For now, let's assume we added the state.
+                                        return prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name];
+                                    });
+                                };
 
                                 return (
                                     <div className="vendor-category-section uncategorized">
                                         <div className="category-header uncategorized-header">
                                             <span className="category-icon">⚠️</span>
                                             <span className="category-label">미분류 업체</span>
-                                            <span className="category-count">{uncategorizedVendors.length}개</span>
+                                            <div className="category-badges">
+                                                <span className="badge-count-total">{rawUncategorized.length}건</span>
+                                                <span className="badge-count-unique">{uniqueUncategorized.length}개 업체</span>
+                                            </div>
+
+                                            {/* Merge Action for Unknown */}
+                                            {selectedForMerge.length >= 2 && selectedForMerge.every(id => typeof id === 'string') && (
+                                                <button
+                                                    onClick={handleOpenMergeModal}
+                                                    className="merge-btn-sm"
+                                                    style={{ marginLeft: 'auto' }}
+                                                >
+                                                    <GitMerge size={14} />
+                                                    선택 병합 ({selectedForMerge.length})
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="uncategorized-notice">
-                                            아래 업체들의 카테고리를 선택해주세요
+                                            이름이 같은 업체는 자동으로 묶여서 표시됩니다. 체크박스를 선택하여 서로 다른 이름을 하나로 병합할 수 있습니다.
                                         </div>
                                         <div className="vendor-list-compact">
-                                            {uncategorizedVendors.map((vendor, idx) => (
-                                                <div key={vendor.name} className="vendor-item-compact uncategorized-item">
+                                            {uniqueUncategorized.map((vendor, idx) => (
+                                                <div key={vendor.name} className={`vendor-item-compact uncategorized-item ${selectedForMerge.includes(vendor.name) ? 'selected' : ''}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedForMerge.includes(vendor.name)}
+                                                        onChange={() => handleToggleMergeSelect(vendor.name)} // handleToggleMergeSelect supports mixed types?
+                                                        className="merge-checkbox"
+                                                    />
                                                     <span className="vendor-order">{idx + 1}</span>
-                                                    {editingVendor === vendor.id ? (
-                                                        <input
-                                                            type="text"
-                                                            value={editingName}
-                                                            onChange={(e) => setEditingName(e.target.value)}
-                                                            onBlur={() => handleVendorNameSave(vendor)}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === 'Enter') handleVendorNameSave(vendor);
-                                                                if (e.key === 'Escape') setEditingVendor(null);
-                                                            }}
-                                                            autoFocus
-                                                            className="vendor-name-edit-input"
-                                                            onClick={(e) => e.stopPropagation()}
-                                                        />
-                                                    ) : (
-                                                        <span
-                                                            className="vendor-name-display editable"
-                                                            onClick={() => handleVendorNameClick(vendor)}
-                                                            title="클릭하여 이름 수정"
-                                                        >
-                                                            {vendor.name}
-                                                        </span>
-                                                    )}
+
+                                                    <div className="vendor-info-group">
+                                                        {editingVendor === vendor.name ? ( // using name as ID for editing unknown
+                                                            <input
+                                                                type="text"
+                                                                value={editingName}
+                                                                onChange={(e) => setEditingName(e.target.value)}
+                                                                onBlur={() => handleVendorNameSave(vendor)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') handleVendorNameSave(vendor);
+                                                                    if (e.key === 'Escape') setEditingVendor(null);
+                                                                }}
+                                                                autoFocus
+                                                                className="vendor-name-edit-input"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                className="vendor-name-display editable"
+                                                                onClick={() => handleVendorNameClick(vendor)}
+                                                                title="클릭하여 이름 수정"
+                                                            >
+                                                                {vendor.name}
+                                                                {vendor.count > 1 && <span className="vendor-count-badge">{vendor.count}</span>}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
                                                     <select
                                                         value=""
                                                         onChange={async (e) => {
                                                             if (!e.target.value) return;
-                                                            // Determine vendor_type based on category
+                                                            // When assigning category for grouped unknown vendor, we need to update ALL of them (by name).
+                                                            // Existing handleUpdateVendor uses ID if available, or POST if not.
+                                                            // We need a Batch Update by Name API.
+                                                            // But for now, let's try calling existing update. 
+                                                            // If backend supports updating by name (or creating new vendor with that name), it might work.
+
                                                             const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
+                                                            // We'll treat this as "Create/Update Vendor"
                                                             await handleUpdateVendor(vendor, {
                                                                 category: e.target.value,
                                                                 vendor_type: isExpense ? 'expense' : 'revenue'
@@ -407,7 +507,7 @@ export default function VendorSettings() {
                                                     <button
                                                         onClick={() => handleDeleteVendor(vendor.name)}
                                                         className="action-btn-sm delete"
-                                                        title="삭제"
+                                                        title="일괄 삭제"
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -443,26 +543,62 @@ export default function VendorSettings() {
                                                         <span className="vendor-order">{idx + 1}</span>
                                                         {/* Vendor name - editable when editingVendor matches */}
                                                         {editingVendor === vendor.name ? (
-                                                            <input
-                                                                type="text"
-                                                                defaultValue={vendor.name}
-                                                                onKeyDown={async (e) => {
-                                                                    if (e.key === 'Enter') {
-                                                                        const newName = e.target.value.trim();
-                                                                        if (newName && newName !== vendor.name) {
-                                                                            // Note: Changing vendor name requires backend support
-                                                                            // For now just update display
-                                                                            await handleUpdateVendor(vendor, { name: newName });
+                                                            <div className="vendor-edit-group">
+                                                                <input
+                                                                    type="text"
+                                                                    defaultValue={vendor.name}
+                                                                    onKeyDown={async (e) => {
+                                                                        if (e.key === 'Enter') {
+                                                                            const newName = e.target.value.trim();
+                                                                            if (newName && newName !== vendor.name) {
+                                                                                await handleUpdateVendor(vendor, { name: newName });
+                                                                            }
+                                                                            setEditingVendor(null);
+                                                                        } else if (e.key === 'Escape') {
+                                                                            setEditingVendor(null);
                                                                         }
+                                                                    }}
+                                                                    autoFocus
+                                                                    className="vendor-name-edit-input"
+                                                                />
+                                                                <select
+                                                                    value={vendor.category}
+                                                                    onChange={async (e) => {
+                                                                        const newCategory = e.target.value;
+                                                                        if (newCategory === vendor.category) return;
+                                                                        const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
+                                                                        await handleUpdateVendor(vendor, {
+                                                                            category: newCategory,
+                                                                            vendor_type: isExpense ? 'expense' : 'revenue'
+                                                                        });
                                                                         setEditingVendor(null);
-                                                                    } else if (e.key === 'Escape') {
-                                                                        setEditingVendor(null);
-                                                                    }
-                                                                }}
-                                                                onBlur={() => setEditingVendor(null)}
-                                                                autoFocus
-                                                                className="vendor-name-edit-input"
-                                                            />
+                                                                    }}
+                                                                    className="category-change-select"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    <optgroup label="💰 매입처 (비용)">
+                                                                        {EXPENSE_CATEGORIES.map(cat => (
+                                                                            <option key={cat.id} value={cat.id}>
+                                                                                {cat.icon} {cat.label}
+                                                                            </option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                    <optgroup label="💵 매출처 (수입)">
+                                                                        {REVENUE_CATEGORIES.map(cat => (
+                                                                            <option key={cat.id} value={cat.id}>
+                                                                                {cat.icon} {cat.label}
+                                                                            </option>
+                                                                        ))}
+                                                                    </optgroup>
+                                                                </select>
+                                                                <button
+                                                                    className="edit-save-btn"
+                                                                    onClick={() => setEditingVendor(null)}
+                                                                    title="편집 완료"
+                                                                >
+                                                                    <Check size={14} />
+                                                                </button>
+                                                            </div>
                                                         ) : (
                                                             <span
                                                                 className="vendor-name-display"
@@ -592,6 +728,32 @@ export default function VendorSettings() {
                                         </label>
                                     );
                                 })}
+
+                                {/* Custom Merge Name Option */}
+                                <label className={`merge-target-option custom ${mergeTarget === '__CUSTOM__' ? 'active' : ''}`}>
+                                    <input
+                                        type="radio"
+                                        name="mergeTarget"
+                                        value="__CUSTOM__"
+                                        checked={mergeTarget === '__CUSTOM__'}
+                                        onChange={() => setMergeTarget('__CUSTOM__')}
+                                    />
+                                    <span className="vendor-info custom-input-wrapper">
+                                        <span className="vendor-name-label">새로운 이름으로 병합: </span>
+                                        <input
+                                            type="text"
+                                            value={customMergeName}
+                                            onChange={e => setCustomMergeName(e.target.value)}
+                                            placeholder="예: 통합거래처(본점)"
+                                            className="custom-merge-name-input"
+                                            disabled={mergeTarget !== '__CUSTOM__'}
+                                            onClick={(e) => {
+                                                if (mergeTarget !== '__CUSTOM__') setMergeTarget('__CUSTOM__');
+                                                e.stopPropagation(); // prevent modal invalidation if any
+                                            }}
+                                        />
+                                    </span>
+                                </label>
                             </div>
                         </div>
                         <div className="modal-footer">

@@ -241,3 +241,91 @@ def download_backup():
         return {"status": "success", "message": f"Backup saved to {filepath}", "path": filepath}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class UncategorizedMergeRequest(BaseModel):
+    target_name: str
+    source_names: List[str]
+    category: str = "other"
+
+@router.post("/vendors/merge-uncategorized")
+def merge_uncategorized_vendors(payload: UncategorizedMergeRequest):
+    """
+    Merge uncategorized vendors (by name) into a target vendor.
+    1. Find or create target vendor.
+    2. Update DailyExpense records with matching names to point to target vendor.
+    """
+    try:
+        from sqlmodel import Session, select
+        from database import engine
+        from models import Vendor, DailyExpense
+        
+        with Session(engine) as session:
+            # 1. Find or create target vendor
+            # Check if target vendor exists by name
+            target_vendor = session.exec(
+                select(Vendor).where(Vendor.name == payload.target_name)
+            ).first()
+            
+            if not target_vendor:
+                # Create new vendor
+                # Determine vendor_type based on category (heuristic)
+                # This could be improved if frontend sends vendor_type
+                vendor_type = "expense" 
+                if payload.category in ["delivery", "store", "other_revenue"]:
+                     vendor_type = "revenue"
+                
+                target_vendor = Vendor(
+                    name=payload.target_name,
+                    category=payload.category,
+                    vendor_type=vendor_type
+                )
+                session.add(target_vendor)
+                session.commit()
+                session.refresh(target_vendor)
+            
+            merged_count = 0
+            
+            # 2. Update DailyExpenses
+            # We look for expenses that have vendor_name in source_names
+            # And preferably vendor_id IS NULL (but user might want to merge even if some have IDs?)
+            # The prompt implies merging "uncategorized" which usually means no ID.
+            # But let's be safe and update by name mainly.
+            
+            for src_name in payload.source_names:
+                # Skip if source is same as target
+                if src_name == payload.target_name:
+                    continue
+                    
+                expenses = session.exec(
+                    select(DailyExpense).where(DailyExpense.vendor_name == src_name)
+                ).all()
+                
+                for expense in expenses:
+                    expense.vendor_id = target_vendor.id
+                    expense.vendor_name = target_vendor.name
+                    session.add(expense)
+                    merged_count += 1
+            
+            # Also update expenses for target_name itself if they have no ID
+            target_expenses = session.exec(
+                select(DailyExpense).where(
+                    DailyExpense.vendor_name == payload.target_name,
+                    DailyExpense.vendor_id == None
+                )
+            ).all()
+            for expense in target_expenses:
+                expense.vendor_id = target_vendor.id
+                session.add(expense)
+                # merged_count += 1 # Not counting self-updates as 'merged' perhaps? Or count them.
+            
+            session.commit()
+            
+            return {
+                "status": "success",
+                "merged_expenses": merged_count,
+                "target_vendor": target_vendor.name,
+                "target_id": target_vendor.id
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

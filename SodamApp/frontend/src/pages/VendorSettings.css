@@ -735,6 +735,149 @@
     color: #2563eb;
 }
 
-.vendor-name-display.editable:active {
-    background: #e2e8f0;
+
+/* Grouping Badges */
+.category-badges {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.badge-count-total {
+    font-size: 12px;
+    color: #92400e;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    opacity: 0.8;
+}
+
+.badge-count-unique {
+    font-size: 13px;
+    color: #b45309;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Small Merge Button */
+.merge-btn-sm {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background: white;
+    color: #d97706;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 12px !important;
+}
+
+.merge-btn-sm:hover {
+    background: #fffbeb;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+/* Vendor Info Group within Row */
+.vendor-info-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.vendor-count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fef3c7;
+    color: #d97706;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 8px;
+    border: 1px solid #fcd34d;
+}
+
+.vendor-item-compact.selected {
+    background: #fff7ed;
+    border-color: #f97316;
+}
+
+/* Edit Mode Group */
+.vendor-edit-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.category-change-select {
+    padding: 2px 8px;
+    border: 1px solid #3b82f6;
+    border-radius: 4px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    height: 30px;
+}
+
+.edit-save-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #10b981;
+    /* Green check */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.edit-save-btn:hover {
+    background: #059669;
+}
+
+/* Custom Merge Name Input */
+.merge-target-option.custom {
+    align-items: center;
+    padding: 12px;
+}
+
+.custom-input-wrapper {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 8px;
+}
+
+.vendor-name-label {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.custom-merge-name-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.custom-merge-name-input:focus {
+    border-color: #6366f1;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
 }
