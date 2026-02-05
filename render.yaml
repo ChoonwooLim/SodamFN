@@ -15,20 +15,24 @@ services:
       - key: SECRET_KEY
         generateValue: true
 
-  # Frontend Service (Vite + React)
-  - type: static
+  # Frontend Service (Vite + React) - Static Site
+  - type: web
     name: sodam-frontend
-    env: static
+    runtime: static
     region: singapore
     rootDir: SodamApp/frontend
     buildCommand: "npm install && npm run build"
-    staticPublishPath: "./dist"
+    staticPublishPath: ./dist
     envVars:
       - key: VITE_API_URL
         fromService:
           type: web
           name: sodam-backend
           property: url
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
 databases:
   - name: sodam-db
