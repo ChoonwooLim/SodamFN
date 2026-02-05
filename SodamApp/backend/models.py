@@ -263,7 +263,8 @@ class MonthlyProfitLoss(SQLModel, table=True):
     
     # 지출 (Expenses)
     expense_labor: int = 0        # 인건비
-    expense_rent: int = 0         # 임대관리비
+    expense_rent: int = 0         # 임대료 (월세)
+    expense_rent_fee: int = 0     # 임대관리비
     expense_utility: int = 0      # 제세공과금(기타)
     expense_vat: int = 0          # 부가가치세
     expense_biz_tax: int = 0      # 사업소득세

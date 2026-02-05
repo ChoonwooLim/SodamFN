@@ -37,6 +37,7 @@ cors_origins = [
     # Render production
     "https://sodam-frontend.onrender.com",
     "https://sodamfn-frontend.onrender.com",
+    "https://sodamfn.onrender.com",
 ]
 
 # Add custom frontend URL from environment if set

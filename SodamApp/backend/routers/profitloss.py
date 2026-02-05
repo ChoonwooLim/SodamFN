@@ -20,6 +20,7 @@ class MonthlyPLCreate(BaseModel):
     revenue_ddangyo: int = 0
     expense_labor: int = 0
     expense_rent: int = 0
+    expense_rent_fee: int = 0  # 임대관리비
     expense_utility: int = 0
     expense_vat: int = 0
     expense_biz_tax: int = 0
@@ -36,6 +37,7 @@ class MonthlyPLUpdate(BaseModel):
     revenue_ddangyo: Optional[int] = None
     expense_labor: Optional[int] = None
     expense_rent: Optional[int] = None
+    expense_rent_fee: Optional[int] = None  # 임대관리비
     expense_utility: Optional[int] = None
     expense_vat: Optional[int] = None
     expense_biz_tax: Optional[int] = None
@@ -185,7 +187,8 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
                 session.refresh(r)
 
         total_revenue = r.revenue_store + r.revenue_coupang + r.revenue_baemin + r.revenue_yogiyo + r.revenue_ddangyo
-        total_expense = (r.expense_labor + r.expense_rent + r.expense_utility + 
+        expense_rent_fee = getattr(r, 'expense_rent_fee', 0) or 0
+        total_expense = (r.expense_labor + r.expense_rent + expense_rent_fee + r.expense_utility + 
                         r.expense_vat + r.expense_biz_tax + r.expense_income_tax + 
                         r.expense_card_fee + r.expense_material + r.expense_retirement)
         profit = total_revenue - total_expense

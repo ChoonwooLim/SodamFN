@@ -14,7 +14,8 @@ const REVENUE_FIELDS = [
 
 const EXPENSE_FIELDS = [
     { key: 'expense_labor', label: '인건비' },
-    { key: 'expense_rent', label: '임대관리비' },
+    { key: 'expense_rent', label: '임대료' },
+    { key: 'expense_rent_fee', label: '임대관리비' },
     { key: 'expense_utility', label: '제세공과금' },
     { key: 'expense_vat', label: '부가가치세' },
     { key: 'expense_biz_tax', label: '사업소득세' },
