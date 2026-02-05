@@ -1,9 +1,10 @@
 services:
-  # Backend Service
+  # Backend Service (FastAPI + PostgreSQL)
   - type: web
     name: sodam-backend
     env: python
-    region: singapore # Close to Korea
+    region: singapore
+    rootDir: SodamApp/backend
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     envVars:
@@ -11,12 +12,15 @@ services:
         fromDatabase:
           name: sodam-db
           property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
 
-  # Frontend Service
+  # Frontend Service (Vite + React)
   - type: static
     name: sodam-frontend
     env: static
     region: singapore
+    rootDir: SodamApp/frontend
     buildCommand: "npm install && npm run build"
     staticPublishPath: "./dist"
     envVars:
@@ -29,4 +33,4 @@ services:
 databases:
   - name: sodam-db
     region: singapore
-    plan: free # or starter
+    plan: free
