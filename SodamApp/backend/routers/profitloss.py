@@ -61,6 +61,80 @@ class DeliveryRevenueCreate(BaseModel):
 
 # --- Helpers ---
 
+# 거래처 카테고리 → 손익계산서 필드 매핑
+CATEGORY_TO_PL_FIELD = {
+    "임대료": "expense_rent",
+    "임대관리비": "expense_rent_fee",
+    "재료비": "expense_material",
+    "식자재": "expense_material",
+    "제세공과금": "expense_utility",
+    "카드수수료": "expense_card_fee",
+    "부가가치세": "expense_vat",
+    "사업소득세": "expense_biz_tax",
+    "근로소득세": "expense_income_tax",
+    "퇴직금적립": "expense_retirement",
+}
+
+def sync_all_expenses(year: int, month: int, session: Session):
+    """
+    Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
+    Uses vendor.category to determine which P/L field to update.
+    """
+    from sqlmodel import func
+    from models import Vendor
+    
+    start_date = datetime.date(year, month, 1)
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1)
+    else:
+        end_date = datetime.date(year, month + 1, 1)
+    
+    # Get all daily expenses for the month with their vendor info
+    expenses = session.exec(
+        select(DailyExpense)
+        .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
+    ).all()
+    
+    # Build vendor_id → category map
+    vendor_ids = set(e.vendor_id for e in expenses if e.vendor_id)
+    vendors = session.exec(select(Vendor).where(Vendor.id.in_(vendor_ids))).all() if vendor_ids else []
+    vendor_category_map = {v.id: v.category for v in vendors}
+    
+    # Aggregate by category
+    category_totals = {}
+    for expense in expenses:
+        category = None
+        # First try vendor category
+        if expense.vendor_id and vendor_category_map.get(expense.vendor_id):
+            category = vendor_category_map[expense.vendor_id]
+        # Fallback to expense's own category
+        elif expense.category:
+            category = expense.category
+        
+        if category:
+            pl_field = CATEGORY_TO_PL_FIELD.get(category)
+            if pl_field:
+                category_totals[pl_field] = category_totals.get(pl_field, 0) + expense.amount
+    
+    # Find or create P/L record
+    pl_record = session.exec(
+        select(MonthlyProfitLoss)
+        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    ).first()
+    
+    if pl_record:
+        # Update fields from aggregated totals
+        for field, total in category_totals.items():
+            setattr(pl_record, field, total)
+        session.add(pl_record)
+    else:
+        # Create new record with aggregated values
+        pl_record = MonthlyProfitLoss(year=year, month=month, **category_totals)
+        session.add(pl_record)
+    
+    session.commit()
+    return category_totals
+
 def sync_summary_material_cost(year: int, month: int, session: Session):
     """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
     start_date = datetime.date(year, month, 1)
@@ -148,6 +222,19 @@ def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(g
         "status": "success", 
         "message": f"{year}년 {month}월 인건비 {total_labor:,}원이 손익계산서에 반영되었습니다.",
         "total_labor": total_labor
+    }
+
+@router.post("/sync-expenses/{year}/{month}")
+def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get_session)):
+    """
+    Sync all expenses from DailyExpense by vendor category to MonthlyProfitLoss.
+    Aggregates expenses based on vendor.category mapping to P/L fields.
+    """
+    category_totals = sync_all_expenses(year, month, session)
+    return {
+        "status": "success", 
+        "message": f"{year}년 {month}월 비용이 카테고리별로 동기화되었습니다.",
+        "category_totals": category_totals
     }
 
 @router.get("/monthly")
@@ -286,8 +373,8 @@ def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(ge
     session.commit()
     session.refresh(new_expense)
     
-    # Trigger sync to summary
-    sync_summary_material_cost(data.date.year, data.date.month, session)
+    # Trigger sync to P/L summary
+    sync_all_expenses(data.date.year, data.date.month, session)
     
     return new_expense
 
@@ -304,6 +391,10 @@ def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = D
     session.add(record)
     session.commit()
     session.refresh(record)
+    
+    # Trigger sync to P/L summary
+    sync_all_expenses(data.date.year, data.date.month, session)
+    
     return record
 
 @router.delete("/expenses/{id}")

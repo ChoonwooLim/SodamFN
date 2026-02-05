@@ -5,18 +5,19 @@ import api from '../api';
 import './VendorSettings.css';
 import ProductManagement from '../components/ProductManagement';
 
-// 매입처 카테고리 정의
+// 매입처 카테고리 정의 (백엔드 CATEGORY_TO_PL_FIELD와 동기화)
 const EXPENSE_CATEGORIES = [
-    { id: 'food', label: '식자재', icon: '🥬' },
-    { id: 'supplies', label: '소모품', icon: '📦' },
-    { id: 'equipment', label: '비품', icon: '🔧' },
-    { id: 'rent', label: '임대관리', icon: '🏢' },
-    { id: 'utility', label: '제세공과금', icon: '💡' },
-    { id: 'labor', label: '인건비', icon: '👷' },
-    { id: 'card_fee', label: '카드수수료', icon: '💳' },
-    { id: 'marketing', label: '광고마케팅', icon: '📢' },
-    { id: 'insurance', label: '보험', icon: '🛡️' },
-    { id: 'personal', label: '개인생활비', icon: '🏠' },
+    { id: '식자재', label: '식자재', icon: '🥬' },
+    { id: '재료비', label: '재료비', icon: '📦' },
+    { id: '임대료', label: '임대료(월세)', icon: '🏠' },
+    { id: '임대관리비', label: '임대관리비', icon: '🏢' },
+    { id: '제세공과금', label: '제세공과금', icon: '💡' },
+    { id: '인건비', label: '인건비', icon: '👷' },
+    { id: '카드수수료', label: '카드수수료', icon: '💳' },
+    { id: '부가가치세', label: '부가가치세', icon: '📋' },
+    { id: '사업소득세', label: '사업소득세', icon: '📋' },
+    { id: '근로소득세', label: '근로소득세', icon: '📋' },
+    { id: '퇴직금적립', label: '퇴직금적립', icon: '💰' },
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
 
@@ -48,7 +49,7 @@ export default function VendorSettings() {
     // Reset category when tab changes
     useEffect(() => {
         if (activeTab === 'expense') {
-            setNewVendorCategory('food');
+            setNewVendorCategory('식자재');
         } else {
             setNewVendorCategory('delivery');
         }
