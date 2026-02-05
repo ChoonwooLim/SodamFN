@@ -96,9 +96,11 @@ def sync_all_expenses(year: int, month: int, session: Session):
     ).all()
     
     # Build vendor_id → category map
-    vendor_ids = set(e.vendor_id for e in expenses if e.vendor_id)
-    vendors = session.exec(select(Vendor).where(Vendor.id.in_(vendor_ids))).all() if vendor_ids else []
-    vendor_category_map = {v.id: v.category for v in vendors}
+    vendor_ids = [e.vendor_id for e in expenses if e.vendor_id]
+    vendor_category_map = {}
+    if vendor_ids:
+        vendors = session.exec(select(Vendor).where(Vendor.id.in_(vendor_ids))).all()
+        vendor_category_map = {v.id: v.category for v in vendors}
     
     # Aggregate by category
     category_totals = {}
@@ -246,33 +248,9 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
     query = query.order_by(MonthlyProfitLoss.year, MonthlyProfitLoss.month)
     results = session.exec(query).all()
     
-    # Calculate totals for each record
+    # Calculate totals for each record (no auto-sync in GET for performance)
     output = []
     for r in results:
-        # Auto-sync material cost if it's 0 (backfill)
-        if r.expense_material == 0:
-            start_date = datetime.date(r.year, r.month, 1)
-            if r.month == 12:
-                end_date = datetime.date(r.year + 1, 1, 1)
-            else:
-                end_date = datetime.date(r.year, r.month + 1, 1)
-            
-            from sqlmodel import func
-            total_material = session.exec(
-                select(func.sum(DailyExpense.amount))
-                .where(
-                    DailyExpense.date >= start_date, 
-                    DailyExpense.date < end_date,
-                    DailyExpense.category == "재료비"
-                )
-            ).one() or 0
-            
-            if total_material > 0:
-                r.expense_material = int(total_material)
-                session.add(r)
-                session.commit()
-                session.refresh(r)
-
         total_revenue = r.revenue_store + r.revenue_coupang + r.revenue_baemin + r.revenue_yogiyo + r.revenue_ddangyo
         expense_rent_fee = getattr(r, 'expense_rent_fee', 0) or 0
         total_expense = (r.expense_labor + r.expense_rent + expense_rent_fee + r.expense_utility + 
