@@ -17,7 +17,14 @@ else:
     connect_args = {} # Postgres doesn't need this
 
 DEBUG_SQL = os.environ.get("DEBUG_SQL", "false").lower() == "true"
-engine = create_engine(DATABASE_URL, echo=DEBUG_SQL, connect_args=connect_args)
+engine = create_engine(
+    DATABASE_URL, 
+    echo=DEBUG_SQL, 
+    connect_args=connect_args,
+    pool_size=20,
+    max_overflow=10,
+    pool_pre_ping=True
+)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

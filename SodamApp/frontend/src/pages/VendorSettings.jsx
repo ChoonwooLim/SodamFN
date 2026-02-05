@@ -37,6 +37,7 @@ export default function VendorSettings() {
     const [newVendorName, setNewVendorName] = useState('');
     const [newVendorCategory, setNewVendorCategory] = useState('food');
     const [editingVendor, setEditingVendor] = useState(null);
+    const [editingName, setEditingName] = useState(''); // Name being edited
     const [selectedVendor, setSelectedVendor] = useState(null); // For product management modal
     const [selectedForMerge, setSelectedForMerge] = useState([]); // Checkbox selection for merge
     const [showMergeModal, setShowMergeModal] = useState(false);
@@ -174,6 +175,20 @@ export default function VendorSettings() {
         } finally {
             setSaving(null);
         }
+    };
+
+    const handleVendorNameClick = (vendor) => {
+        setEditingVendor(vendor.id);
+        setEditingName(vendor.name);
+    };
+
+    const handleVendorNameSave = async (vendor) => {
+        if (!editingName.trim() || editingName === vendor.name) {
+            setEditingVendor(null);
+            return;
+        }
+        await handleUpdateVendor(vendor, { name: editingName });
+        setEditingVendor(null);
     };
 
     const getCategoryLabel = (categoryId) => {
@@ -337,7 +352,29 @@ export default function VendorSettings() {
                                             {uncategorizedVendors.map((vendor, idx) => (
                                                 <div key={vendor.name} className="vendor-item-compact uncategorized-item">
                                                     <span className="vendor-order">{idx + 1}</span>
-                                                    <span className="vendor-name-display">{vendor.name}</span>
+                                                    {editingVendor === vendor.id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingName}
+                                                            onChange={(e) => setEditingName(e.target.value)}
+                                                            onBlur={() => handleVendorNameSave(vendor)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleVendorNameSave(vendor);
+                                                                if (e.key === 'Escape') setEditingVendor(null);
+                                                            }}
+                                                            autoFocus
+                                                            className="vendor-name-edit-input"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="vendor-name-display editable"
+                                                            onClick={() => handleVendorNameClick(vendor)}
+                                                            title="클릭하여 이름 수정"
+                                                        >
+                                                            {vendor.name}
+                                                        </span>
+                                                    )}
                                                     <select
                                                         value=""
                                                         onChange={async (e) => {

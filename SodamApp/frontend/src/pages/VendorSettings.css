@@ -708,3 +708,33 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
+
+.vendor-name-edit-input {
+    border: 1px solid #3b82f6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    width: 200px;
+    outline: none;
+    background: white;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.vendor-name-display.editable {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.vendor-name-display.editable:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #2563eb;
+}
+
+.vendor-name-display.editable:active {
+    background: #e2e8f0;
+}

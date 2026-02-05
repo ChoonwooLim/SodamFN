@@ -330,18 +330,34 @@ def delete_monthly_profitloss(id: int, session: Session = Depends(get_session)):
 @router.get("/expenses/{year}/{month}")
 def get_daily_expenses(year: int, month: int, session: Session = Depends(get_session)):
     """Get daily expenses for a specific month"""
+    from models import Vendor
+    
     start_date = datetime.date(year, month, 1)
     if month == 12:
         end_date = datetime.date(year + 1, 1, 1)
     else:
         end_date = datetime.date(year, month + 1, 1)
     
-    results = session.exec(
-        select(DailyExpense)
+    # DailyExpense와 Vendor를 조인하여 최신 벤더 정보를 가져옵니다.
+    statement = (
+        select(DailyExpense, Vendor)
+        .join(Vendor, DailyExpense.vendor_id == Vendor.id, isouter=True)
         .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
         .order_by(DailyExpense.date, DailyExpense.vendor_name)
-    ).all()
-    return results
+    )
+    
+    results = session.exec(statement).all()
+    
+    output = []
+    for expense, vendor in results:
+        if vendor:
+            # 벤더가 존재하면 최신 이름과 카테고리로 덮어씁니다 (View 용도)
+            expense.vendor_name = vendor.name
+            if vendor.category:
+                expense.category = vendor.category
+        output.append(expense)
+        
+    return output
 
 @router.post("/expenses")
 def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(get_session)):

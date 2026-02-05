@@ -717,38 +717,40 @@ export default function ProfitLoss() {
 
         return (
             <div className="monthly-expense-section">
-                <h3 className="section-title">📅 {month}월 비용 상세</h3>
-                <div className="expense-summary">
-                    <div className="expense-stat">
-                        <span className="stat-label">거래처 수</span>
-                        <span className="stat-value">{displayVendors.length}개 {hideEmptyVendors && emptyVendorCount > 0 && <small>(+{emptyVendorCount} 숨김)</small>}</span>
+                <div className="sticky-summary-header">
+                    <h3 className="section-title">📅 {month}월 비용 상세</h3>
+                    <div className="expense-summary">
+                        <div className="expense-stat">
+                            <span className="stat-label">거래처 수</span>
+                            <span className="stat-value">{displayVendors.length}개 {hideEmptyVendors && emptyVendorCount > 0 && <small>(+{emptyVendorCount} 숨김)</small>}</span>
+                        </div>
+                        <div className="expense-stat">
+                            <span className="stat-label">거래 건수</span>
+                            <span className="stat-value">{expenses.length}건</span>
+                        </div>
+                        <div className="expense-stat">
+                            <span className="stat-label">총 지출</span>
+                            <span className="stat-value highlight">{formatNumber(grandTotal)}원</span>
+                        </div>
                     </div>
-                    <div className="expense-stat">
-                        <span className="stat-label">거래 건수</span>
-                        <span className="stat-value">{expenses.length}건</span>
-                    </div>
-                    <div className="expense-stat">
-                        <span className="stat-label">총 지출</span>
-                        <span className="stat-value highlight">{formatNumber(grandTotal)}원</span>
-                    </div>
-                </div>
 
-                {/* Hide Empty Vendors Toggle + Link to Vendor Settings */}
-                <div className="vendor-controls-banner">
-                    <div className="hide-empty-toggle">
-                        <label className="toggle-label">
-                            <input
-                                type="checkbox"
-                                checked={hideEmptyVendors}
-                                onChange={(e) => setHideEmptyVendors(e.target.checked)}
-                            />
-                            <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
-                        </label>
-                    </div>
-                    <div className="vendor-settings-link-container">
-                        <span>💡 거래처 추가/삭제/순서변경은</span>
-                        <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
-                        <span>에서 설정하세요.</span>
+                    {/* Hide Empty Vendors Toggle + Link to Vendor Settings */}
+                    <div className="vendor-controls-banner">
+                        <div className="hide-empty-toggle">
+                            <label className="toggle-label">
+                                <input
+                                    type="checkbox"
+                                    checked={hideEmptyVendors}
+                                    onChange={(e) => setHideEmptyVendors(e.target.checked)}
+                                />
+                                <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
+                            </label>
+                        </div>
+                        <div className="vendor-settings-link-container">
+                            <span>💡 거래처 추가/삭제/순서변경은</span>
+                            <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
+                            <span>에서 설정하세요.</span>
+                        </div>
                     </div>
                 </div>
 

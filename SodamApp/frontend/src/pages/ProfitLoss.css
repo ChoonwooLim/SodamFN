@@ -1,8 +1,58 @@
+:root {
+    --summary-header-height: 145px;
+}
+
 .profitloss-page {
     padding: 16px;
     width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
+    /* ... */
+}
+
+/* ... existing code ... */
+
+.sticky-summary-header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background-color: rgba(255, 255, 255, 0.98);
+    padding: 16px 0 8px 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid #e2e8f0;
+    /* max-height ensures it doesn't take up too much space on small screens, but we want full visibility */
+}
+
+/* ... existing code ... */
+
+.expense-grid-table .vendor-header {
+    background: #1e3a8a;
+    color: white;
+    font-weight: 600;
+    min-width: 120px;
+    position: sticky !important;
+    left: 0 !important;
+    top: 0 !important;
+    z-index: 110;
+}
+
+.expense-grid-table .day-header {
+    background: #3b82f6;
+    color: white;
+    font-weight: 500;
+    min-width: 60px;
+    position: sticky;
+    top: 0 !important;
+    z-index: 100;
+}
+
+.expense-grid-table .total-header {
+    background: #059669;
+    color: white;
+    font-weight: 600;
+    min-width: 80px;
+    position: sticky;
+    top: 0 !important;
+    right: 0;
+    z-index: 110;
 }
 
 .page-header {
@@ -608,6 +658,21 @@
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    position: relative;
+    /* Ensure sticky works within */
+}
+
+.sticky-summary-header {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    /* Higher than table headers */
+    background-color: rgba(255, 255, 255, 0.95);
+    /* Slight transparency */
+    backdrop-filter: blur(8px);
+    padding: 16px 0 8px 0;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .expense-summary {
@@ -676,7 +741,9 @@
     background: white;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    max-height: calc(100vh - 350px);
+    /* 중요: 화면 높이에 맞춰 내부 스크롤 생성 */
+    height: calc(100vh - 280px);
+    min-height: 400px;
 }
 
 .expense-grid-table {
@@ -703,7 +770,7 @@
     position: sticky !important;
     left: 0 !important;
     top: 0 !important;
-    z-index: 100;
+    z-index: 110;
 }
 
 .expense-grid-table .day-header {
@@ -712,8 +779,8 @@
     font-weight: 500;
     min-width: 60px;
     position: sticky;
-    top: 0;
-    z-index: 2;
+    top: 0 !important;
+    z-index: 100;
 }
 
 .expense-grid-table .total-header {
@@ -722,9 +789,9 @@
     font-weight: 600;
     min-width: 80px;
     position: sticky;
-    top: 0;
+    top: 0 !important;
     right: 0;
-    z-index: 3;
+    z-index: 110;
 }
 
 .expense-grid-table .vendor-cell {

@@ -8,7 +8,12 @@ from init_db import init_db
 
 from fastapi.staticfiles import StaticFiles
 
+from fastapi.middleware.gzip import GZipMiddleware
+
 app = FastAPI(title="Sodam Profit API")
+
+# Enable Gzip compression for responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 @app.on_event("startup")
 def on_startup():
