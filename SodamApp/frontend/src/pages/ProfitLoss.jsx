@@ -585,6 +585,27 @@ export default function ProfitLoss() {
         );
     };
 
+    // Helper to map Korean category to PL field key
+    const getPlFieldByCategory = (category) => {
+        if (!category) return 'other';
+        const map = {
+            '식자재': 'expense_material',
+            '재료비': 'expense_material',
+            '임대료': 'expense_rent',
+            '임대료(월세)': 'expense_rent',
+            '임대관리비': 'expense_rent_fee',
+            '제세공과금': 'expense_utility',
+            '부가가치세': 'expense_vat',
+            '사업소득세': 'expense_biz_tax',
+            '근로소득세': 'expense_income_tax',
+            '카드수수료': 'expense_card_fee',
+            '퇴직금적립': 'expense_retirement',
+            '인건비': 'expense_labor',
+            '기타비용': 'other'
+        };
+        return map[category] || 'other';
+    };
+
     // Render monthly expense detail (7~12월 비용) - Excel-like grid
     const renderMonthlyExpense = (month) => {
         const expenses = monthlyExpenses[month] || [];
@@ -593,59 +614,93 @@ export default function ProfitLoss() {
         const daysInMonth = new Date(year, month, 0).getDate();
         const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-        // Create grid data structure: vendorName -> { day: amount, items: {day: id} }
+        // Create grid data structure & Capture Vendor Categories
         const vendorGrid = {};
+        const vendorCategoryMap = {}; // vendorName -> category
+
         expenses.forEach(item => {
             const day = new Date(item.date).getDate();
             if (!vendorGrid[item.vendor_name]) {
                 vendorGrid[item.vendor_name] = { amounts: {}, ids: {} };
             }
-            // Accumulate if multiple entries on same day (shouldn't happen normally)
+            // Capture category (prefer latest)
+            if (item.category) {
+                vendorCategoryMap[item.vendor_name] = item.category;
+            }
+
             vendorGrid[item.vendor_name].amounts[day] = (vendorGrid[item.vendor_name].amounts[day] || 0) + item.amount;
             vendorGrid[item.vendor_name].ids[day] = item.id;
         });
 
-        // Use global vendor list from state (fetched from API with localStorage order)
-        // This ensures ALL months have the same vendor list in the same order
+        // Use global vendor list to maintain consistency
         const dataVendors = Object.keys(vendorGrid);
 
-        // Start with globalVendors, then add any data vendors not in global list
-        const orderedVendors = [...globalVendors];
+        // Merge global vendors with data vendors
+        const allVendorNames = [...globalVendors];
         dataVendors.forEach(v => {
-            if (!orderedVendors.includes(v)) {
-                orderedVendors.push(v);
-            }
+            if (!allVendorNames.includes(v)) allVendorNames.push(v);
         });
-        const vendors = orderedVendors;
 
-        // Initialize vendorGrid for ALL vendors (including those with no data)
-        vendors.forEach(v => {
+        // Initialize grid for all vendors
+        allVendorNames.forEach(v => {
             if (!vendorGrid[v]) {
                 vendorGrid[v] = { amounts: {}, ids: {} };
             }
         });
 
-        // Calculate row totals (per vendor) - needed to determine which are empty
+        // Calculate row totals & Filter empty if needed
         const vendorTotals = {};
-        vendors.forEach(v => {
+        allVendorNames.forEach(v => {
             vendorTotals[v] = Object.values(vendorGrid[v].amounts).reduce((sum, amt) => sum + amt, 0);
         });
 
-        // Filter vendors: hide empty ones if toggle is on
-        const emptyVendorCount = vendors.filter(v => vendorTotals[v] === 0).length;
-        const displayVendors = hideEmptyVendors
-            ? vendors.filter(v => vendorTotals[v] > 0)
-            : vendors;
+        const emptyVendorCount = allVendorNames.filter(v => vendorTotals[v] === 0).length;
 
-        // Calculate column totals (per day)
-        const dayTotals = {};
-        days.forEach(d => {
-            dayTotals[d] = vendors.reduce((sum, v) => sum + (vendorGrid[v].amounts[d] || 0), 0);
+        // Actual list of vendors to display
+        const displayVendors = hideEmptyVendors
+            ? allVendorNames.filter(v => vendorTotals[v] > 0)
+            : allVendorNames;
+
+        // Group vendors by Category (mapped to PL fields)
+        const groupedVendors = {};
+        // Initialize groups based on EXPENSE_FIELDS + other
+        EXPENSE_FIELDS.forEach(f => groupedVendors[f.key] = []);
+        groupedVendors['other'] = [];
+
+        displayVendors.forEach(v => {
+            // Find category for this vendor. 
+            // If not in expense data (no transaction this month), try finding in global list?
+            // (Assuming globalVendors state objects have category, but globalVendors is string array based on fetch code)
+            // Wait, fetchGlobalVendors sets globalVendors to names only.
+            // We need category info for vendors with 0 expenses too.
+            // We can infer from vendorCategoryMap if they had past transactions? 
+            // If they have 0 transactions this month, we might not know their category if not cached.
+            // But displayVendors are filtered. If hiding empty, we only care about ones with data.
+            // If showing empty, we might group them in 'other' or need to fetch category map.
+            // For now, use map from current month data. If missing, 'other'.
+
+            const cat = vendorCategoryMap[v];
+            const plKey = getPlFieldByCategory(cat);
+            if (groupedVendors[plKey]) {
+                groupedVendors[plKey].push(v);
+            } else {
+                groupedVendors['other'].push(v);
+            }
         });
 
+        // Calculations for totals
+        const dayTotals = {};
+        days.forEach(d => {
+            dayTotals[d] = displayVendors.reduce((sum, v) => sum + (vendorGrid[v].amounts[d] || 0), 0);
+        });
         const grandTotal = Object.values(vendorTotals).reduce((sum, t) => sum + t, 0);
 
-        // Handle expense cell editing
+        // Helper to calc subtotal for a group
+        const calcGroupDayTotal = (groupVendors, day) => groupVendors.reduce((sum, v) => sum + (vendorGrid[v].amounts[day] || 0), 0);
+        const calcGroupRowTotal = (groupVendors) => groupVendors.reduce((sum, v) => sum + (vendorTotals[v] || 0), 0);
+
+
+        // Handle expense cell editing (existing logic)
         const handleExpenseCellClick = (vendor, day, amount, expenseId) => {
             setEditingCell({ type: 'expense', month, vendor, day, id: expenseId });
             setEditValue(amount?.toString() || '0');
@@ -660,17 +715,10 @@ export default function ProfitLoss() {
 
             try {
                 if (id && amount > 0) {
-                    // Update existing
-                    await axios.put(`${API_URL}/api/profitloss/expenses/${id}`, {
-                        date, vendor_name: vendor, amount
-                    });
+                    await axios.put(`${API_URL}/api/profitloss/expenses/${id}`, { date, vendor_name: vendor, amount });
                 } else if (!id && amount > 0) {
-                    // Create new
-                    await axios.post(`${API_URL}/api/profitloss/expenses`, {
-                        date, vendor_name: vendor, amount
-                    });
+                    await axios.post(`${API_URL}/api/profitloss/expenses`, { date, vendor_name: vendor, amount });
                 } else if (id && amount === 0) {
-                    // Delete if amount is 0
                     await axios.delete(`${API_URL}/api/profitloss/expenses/${id}`);
                 }
                 fetchMonthlyExpenses(m);
@@ -704,7 +752,6 @@ export default function ProfitLoss() {
                     />
                 );
             }
-
             return (
                 <span
                     className={`cell-value editable ${amount > 0 ? 'has-value' : ''}`}
@@ -712,6 +759,42 @@ export default function ProfitLoss() {
                 >
                     {amount > 0 ? formatNumber(amount) : '-'}
                 </span>
+            );
+        };
+
+        // Render Groups
+        const renderCategoryGroup = (plKey, label) => {
+            const groupVendors = groupedVendors[plKey] || [];
+            if (groupVendors.length === 0) return null;
+
+            return (
+                <>
+                    <tr className="category-header-row">
+                        <td colSpan={daysInMonth + 2} className="category-header-cell">
+                            📂 {label} ({groupVendors.length})
+                        </td>
+                    </tr>
+                    {groupVendors.map(vendor => (
+                        <tr key={vendor}>
+                            <td className="vendor-cell indented">{vendor}</td>
+                            {days.map(d => (
+                                <td key={d} className="amount-cell">
+                                    {renderExpenseCell(vendor, d)}
+                                </td>
+                            ))}
+                            <td className="row-total">{formatNumber(vendorTotals[vendor])}</td>
+                        </tr>
+                    ))}
+                    <tr className="category-subtotal-row">
+                        <td className="subtotal-label">↳ {label} 소계</td>
+                        {days.map(d => (
+                            <td key={d} className="subtotal-cell">
+                                {formatNumber(calcGroupDayTotal(groupVendors, d)) || '-'}
+                            </td>
+                        ))}
+                        <td className="subtotal-total">{formatNumber(calcGroupRowTotal(groupVendors))}</td>
+                    </tr>
+                </>
             );
         };
 
@@ -734,7 +817,6 @@ export default function ProfitLoss() {
                         </div>
                     </div>
 
-                    {/* Hide Empty Vendors Toggle + Link to Vendor Settings */}
                     <div className="vendor-controls-banner">
                         <div className="hide-empty-toggle">
                             <label className="toggle-label">
@@ -758,7 +840,7 @@ export default function ProfitLoss() {
                     <table className="expense-grid-table">
                         <thead>
                             <tr>
-                                <th className="vendor-header">거래처</th>
+                                <th className="vendor-header">카테고리 / 거래처</th>
                                 {days.map(d => (
                                     <th key={d} className="day-header">{d}</th>
                                 ))}
@@ -766,33 +848,27 @@ export default function ProfitLoss() {
                             </tr>
                         </thead>
                         <tbody>
-                            {displayVendors.length > 0 ? displayVendors.map(vendor => (
-                                <tr key={vendor}>
-                                    <td className="vendor-cell">{vendor}</td>
-                                    {days.map(d => (
-                                        <td key={d} className="amount-cell">
-                                            {renderExpenseCell(vendor, d)}
-                                        </td>
-                                    ))}
-                                    <td className="row-total">{formatNumber(vendorTotals[vendor])}</td>
-                                </tr>
-                            )) : (
+                            {displayVendors.length > 0 ? (
+                                <>
+                                    {EXPENSE_FIELDS.map(field => renderCategoryGroup(field.key, field.label))}
+                                    {renderCategoryGroup('other', '미분류/기타')}
+
+                                    <tr className="day-totals-row grand-total-row">
+                                        <td className="vendor-cell"><strong>총 합계</strong></td>
+                                        {days.map(d => (
+                                            <td key={d} className="day-total">
+                                                {dayTotals[d] > 0 ? formatNumber(dayTotals[d]) : '-'}
+                                            </td>
+                                        ))}
+                                        <td className="grand-total">{formatNumber(grandTotal)}</td>
+                                    </tr>
+                                </>
+                            ) : (
                                 <tr>
                                     <td colSpan={daysInMonth + 2} className="no-data-row">
                                         {month}월 비용 데이터가 없습니다.
                                         <a href="/vendor-settings" className="vendor-settings-link">거래처 관리</a>에서 거래처를 추가하세요.
                                     </td>
-                                </tr>
-                            )}
-                            {displayVendors.length > 0 && (
-                                <tr className="day-totals-row">
-                                    <td className="vendor-cell"><strong>일별 합계</strong></td>
-                                    {days.map(d => (
-                                        <td key={d} className="day-total">
-                                            {dayTotals[d] > 0 ? formatNumber(dayTotals[d]) : '-'}
-                                        </td>
-                                    ))}
-                                    <td className="grand-total">{formatNumber(grandTotal)}</td>
                                 </tr>
                             )}
                         </tbody>
