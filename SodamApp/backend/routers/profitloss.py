@@ -5,6 +5,12 @@ from models import MonthlyProfitLoss, DailyExpense, Revenue
 from pydantic import BaseModel
 from typing import Optional, List
 import datetime
+from services.profit_loss_service import (
+    sync_all_expenses, 
+    sync_labor_cost, 
+    sync_summary_material_cost, 
+    CATEGORY_TO_PL_FIELD
+)
 
 router = APIRouter(prefix="/api/profitloss", tags=["profitloss"])
 
@@ -62,154 +68,14 @@ class DeliveryRevenueCreate(BaseModel):
 # --- Helpers ---
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
-CATEGORY_TO_PL_FIELD = {
-    "임대료": "expense_rent",
-    "임대관리비": "expense_rent_fee",
-    "재료비": "expense_material",
-    "식자재": "expense_material",
-    "제세공과금": "expense_utility",
-    "카드수수료": "expense_card_fee",
-    "부가가치세": "expense_vat",
-    "사업소득세": "expense_biz_tax",
-    "근로소득세": "expense_income_tax",
-    "퇴직금적립": "expense_retirement",
-}
-
-def sync_all_expenses(year: int, month: int, session: Session):
-    """
-    Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
-    Uses vendor.category to determine which P/L field to update.
-    """
-    from sqlmodel import func
-    from models import Vendor
-    
-    start_date = datetime.date(year, month, 1)
-    if month == 12:
-        end_date = datetime.date(year + 1, 1, 1)
-    else:
-        end_date = datetime.date(year, month + 1, 1)
-    
-    # Get all daily expenses for the month with their vendor info
-    expenses = session.exec(
-        select(DailyExpense)
-        .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
-    ).all()
-    
-    # Build vendor_id → category map
-    vendor_ids = [e.vendor_id for e in expenses if e.vendor_id]
-    vendor_category_map = {}
-    if vendor_ids:
-        vendors = session.exec(select(Vendor).where(Vendor.id.in_(vendor_ids))).all()
-        vendor_category_map = {v.id: v.category for v in vendors}
-    
-    # Aggregate by category
-    category_totals = {}
-    for expense in expenses:
-        category = None
-        # First try vendor category
-        if expense.vendor_id and vendor_category_map.get(expense.vendor_id):
-            category = vendor_category_map[expense.vendor_id]
-        # Fallback to expense's own category
-        elif expense.category:
-            category = expense.category
-        
-        if category:
-            pl_field = CATEGORY_TO_PL_FIELD.get(category)
-            if pl_field:
-                category_totals[pl_field] = category_totals.get(pl_field, 0) + expense.amount
-    
-    # Find or create P/L record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
-    
-    if pl_record:
-        # Update fields from aggregated totals
-        for field, total in category_totals.items():
-            setattr(pl_record, field, total)
-        session.add(pl_record)
-    else:
-        # Create new record with aggregated values
-        pl_record = MonthlyProfitLoss(year=year, month=month, **category_totals)
-        session.add(pl_record)
-    
-    session.commit()
-    return category_totals
-
-def sync_summary_material_cost(year: int, month: int, session: Session):
-    """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
-    start_date = datetime.date(year, month, 1)
-    if month == 12:
-        end_date = datetime.date(year + 1, 1, 1)
-    else:
-        end_date = datetime.date(year, month + 1, 1)
-    
-    # Calculate sum of material expenses from DailyExpense
-    from sqlmodel import func
-    total_material = session.exec(
-        select(func.sum(DailyExpense.amount))
-        .where(
-            DailyExpense.date >= start_date, 
-            DailyExpense.date < end_date,
-            DailyExpense.category == "재료비"
-        )
-    ).one() or 0
-    
-    # Find or create summary record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
-    
-    if pl_record:
-        pl_record.expense_material = int(total_material)
-        session.add(pl_record)
-    else:
-        # If no summary record exists, we don't necessarily want to create one 
-        # just for material sync, as other fields (rent, labor) would be 0/null.
-        # But for consistency, having a record is usually better.
-        pass
-    
-    session.commit()
 
 
-def sync_labor_cost(year: int, month: int, session: Session):
-    """
-    Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
-    This includes all staff payroll (base pay + bonuses - deductions = net pay to employees)
-    """
-    from models import Payroll
-    from sqlmodel import func
-    
-    month_str = f"{year}-{month:02d}"
-    
-    # Calculate sum of all payroll total_pay for the month
-    total_labor = session.exec(
-        select(func.sum(Payroll.total_pay))
-        .where(Payroll.month == month_str)
-    ).one() or 0
-    
-    # Find or create MonthlyProfitLoss record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
-    
-    if pl_record:
-        pl_record.expense_labor = int(total_labor)
-        session.add(pl_record)
-    else:
-        # Create a new record if it doesn't exist
-        pl_record = MonthlyProfitLoss(
-            year=year,
-            month=month,
-            expense_labor=int(total_labor)
-        )
-        session.add(pl_record)
-    
-    session.commit()
-    return int(total_labor)
+
+
+
+
+
+
 
 # --- Monthly P/L Endpoints ---
 

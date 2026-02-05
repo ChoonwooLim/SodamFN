@@ -1,7 +1,9 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from services.database_service import DatabaseService
+from services.profit_loss_service import sync_all_expenses
 from pydantic import BaseModel
 from datetime import date
+from models import DailyExpense, Vendor
 
 router = APIRouter()
 
@@ -163,6 +165,21 @@ def patch_vendor(vendor_id: int, payload: VendorPatch):
             session.add(vendor)
             session.commit()
             print(f"[PATCH VENDOR] Success: {vendor.name}")
+            
+            # --- Auto Sync P/L if category changed ---
+            if payload.category is not None:
+                # Find all months where this vendor has expenses
+                expenses = session.exec(
+                    select(DailyExpense).where(DailyExpense.vendor_id == vendor_id)
+                ).all()
+                
+                affected_months = set((e.date.year, e.date.month) for e in expenses)
+                
+                print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor {vendor.name} category change")
+                for y, m in affected_months:
+                    sync_all_expenses(y, m, session)
+            # -----------------------------------------
+
             return {"status": "success"}
     except Exception as e:
         print(f"[PATCH VENDOR] Error: {str(e)}")
@@ -331,6 +348,20 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest):
                 session.add(expense)
             
             session.commit()
+            
+            # --- Auto Sync P/L after Merge ---
+            # All merged expenses now belong to target_vendor. 
+            # We need to sync months where target_vendor has expenses.
+            # (Fetching again to cover freshly updated/merged ones)
+            all_target_expenses = session.exec(
+                select(DailyExpense).where(DailyExpense.vendor_id == target_vendor.id)
+            ).all()
+            affected_months = set((e.date.year, e.date.month) for e in all_target_expenses)
+            
+            print(f"[SYNC P/L MERGE] Syncing {len(affected_months)} months for {target_vendor.name}")
+            for y, m in affected_months:
+                sync_all_expenses(y, m, session)
+            # ---------------------------------
             
             return {
                 "status": "success",
