@@ -320,7 +320,12 @@ class ExcelService:
                 
                 # 2. Try parsing as HTML (common in Korean finance for .xls files)
                 try:
-                    dfs = pd.read_html(io.BytesIO(content), **kwargs)
+                    # read_html does not support 'nrows', remove it if present
+                    html_kwargs = kwargs.copy()
+                    if 'nrows' in html_kwargs:
+                        del html_kwargs['nrows']
+                        
+                    dfs = pd.read_html(io.BytesIO(content), **html_kwargs)
                     if dfs:
                         # Return the dataframe with the most rows/columns roughly
                         best_df = max(dfs, key=lambda x: x.size)
@@ -331,41 +336,43 @@ class ExcelService:
                 # If all failed
                 raise ValueError(f"Failed to read file. Errors: {'; '.join(error_list)}")
             
-            # Try reading with different header options
-            df = None
-            header_row = 0
-            
-            # First, try to detect the format by reading raw data
+            # Read the file
+            # Note: We skip the 'preview' step with nrows because read_html doesn't support it 
+            # and it causes issues. We'll read the whole file and find headers in-memory.
             try:
-                df_preview = read_excel_safe(file_contents, header=None, nrows=10)
-                
-                # Detect card company by looking for keywords in first few rows
-                preview_text = df_preview.to_string().lower()
-                
-                # Check for "카드이용내역" pattern (Lotte/Shinhan style)
-                if '카드이용내역' in preview_text or '이용일자' in preview_text:
-                    # Find the row with actual headers (이용일자, 이용가맹점, etc.)
-                    for i, row in df_preview.iterrows():
-                        row_text = ' '.join([str(v) for v in row.values if pd.notna(v)])
-                        if '이용일자' in row_text or '승인일자' in row_text:
-                            header_row = i
-                            break
-                            
-                # Check for "거래내역조회" pattern (Bank statement style)
-                if '거래내역조회' in preview_text or '거래일자' in preview_text:
-                    for i, row in df_preview.iterrows():
-                        row_text = ' '.join([str(v) for v in row.values if pd.notna(v)])
-                        if '거래일자' in row_text:
-                            header_row = i
-                            break
-                            
-            except Exception as preview_err:
-                print(f"Preview error: {preview_err}")
-                pass
-            
-            # Read with detected header row
-            df = read_excel_safe(file_contents, header=header_row)
+                df = read_excel_safe(file_contents)
+            except Exception as e:
+                 return {"status": "error", "message": f"파일 읽기 실패: {str(e)}"}
+
+            # Post-load Header Detection
+            # If the first row doesn't look like a header, scan specifically for headers
             cols = [str(c).strip() for c in df.columns.tolist()]
+            
+            # Keywords to identify header row
+            header_keywords = ['이용일자', '승인일자', '거래일자', '날짜', 'Date', '일자']
+            
+            found_header_idx = -1
+            
+            # Check if current columns are already headers
+            if any(k in str(c) for c in cols for k in header_keywords):
+                found_header_idx = -2 # Already good
+            else:
+                # Scan first 20 rows for header
+                for i, row in df.head(20).iterrows():
+                    row_text = ' '.join([str(v) for v in row.values if pd.notna(v)])
+                    if any(k in row_text for k in header_keywords):
+                        found_header_idx = i
+                        break
+            
+            # Apply new header if found
+            if found_header_idx >= 0:
+                # Set row i as header
+                new_header = df.iloc[found_header_idx]
+                df = df.iloc[found_header_idx + 1:]
+                df.columns = new_header
+                cols = [str(c).strip() for c in df.columns.tolist()]
+                
+            # Now proceed with detection
             cols_lower = [c.lower() for c in cols]
             
             # Detect format and map columns
