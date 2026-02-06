@@ -105,8 +105,8 @@ export default function CardSales() {
                         key={tab}
                         onClick={() => setActiveTab(tab)}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab
-                                ? 'bg-white text-blue-600 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-800'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-800'
                             }`}
                     >
                         {tab === 'dashboard' ? '대시보드' : '데이터 업로드'}
@@ -182,7 +182,7 @@ export default function CardSales() {
                             <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
                                 <PieIcon size={18} className="text-indigo-500" /> 카드사별 점유율
                             </h3>
-                            <div className="h-80 w-full flex items-center justify-center">
+                            <div className="h-80 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie

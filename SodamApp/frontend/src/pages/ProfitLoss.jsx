@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import './ProfitLoss.css';
 
@@ -869,7 +869,11 @@ export default function ProfitLoss() {
                         <tbody>
                             {displayVendors.length > 0 ? (
                                 <>
-                                    {EXPENSE_CATEGORIES.map(cat => renderCategoryGroup(cat.id, `${cat.icon} ${cat.label}`))}
+                                    {EXPENSE_CATEGORIES.map(cat => (
+                                        <React.Fragment key={cat.id}>
+                                            {renderCategoryGroup(cat.id, `${cat.icon} ${cat.label}`)}
+                                        </React.Fragment>
+                                    ))}
 
                                     <tr className="day-totals-row grand-total-row">
                                         <td className="vendor-cell"><strong>총 합계</strong></td>
