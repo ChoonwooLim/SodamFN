@@ -42,6 +42,19 @@ export default function VendorSettings() {
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergeTarget, setMergeTarget] = useState(null);
     const [customMergeName, setCustomMergeName] = useState('');
+    const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+
+    const toggleCategory = (categoryId) => {
+        setCollapsedCategories(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(categoryId)) {
+                newSet.delete(categoryId);
+            } else {
+                newSet.add(categoryId);
+            }
+            return newSet;
+        });
+    };
 
     useEffect(() => {
         fetchVendors();
@@ -407,7 +420,11 @@ export default function VendorSettings() {
 
                                 return (
                                     <div className="vendor-category-section uncategorized">
-                                        <div className="category-header uncategorized-header">
+                                        <div
+                                            className="category-header uncategorized-header"
+                                            onClick={() => toggleCategory('uncategorized')}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <span className="category-icon">⚠️</span>
                                             <span className="category-label">미분류 업체</span>
                                             <div className="category-badges">
@@ -415,104 +432,109 @@ export default function VendorSettings() {
                                                 <span className="badge-count-unique">{uniqueUncategorized.length}개 업체</span>
                                             </div>
 
-                                            {/* Merge Action for Unknown */}
-                                            {selectedForMerge.length >= 2 && selectedForMerge.every(id => typeof id === 'string') && (
-                                                <button
-                                                    onClick={handleOpenMergeModal}
-                                                    className="merge-btn-sm"
-                                                    style={{ marginLeft: 'auto' }}
-                                                >
-                                                    <GitMerge size={14} />
-                                                    선택 병합 ({selectedForMerge.length})
-                                                </button>
-                                            )}
+                                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {/* Merge Action for Unknown */}
+                                                {selectedForMerge.length >= 2 && selectedForMerge.every(id => typeof id === 'string') && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenMergeModal(); }}
+                                                        className="merge-btn-sm"
+                                                    >
+                                                        <GitMerge size={14} />
+                                                        선택 병합 ({selectedForMerge.length})
+                                                    </button>
+                                                )}
+                                                {collapsedCategories.has('uncategorized') ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                                            </div>
                                         </div>
                                         <div className="uncategorized-notice">
                                             이름이 같은 업체는 자동으로 묶여서 표시됩니다. 체크박스를 선택하여 서로 다른 이름을 하나로 병합할 수 있습니다.
                                         </div>
-                                        <div className="vendor-list-compact">
-                                            {uniqueUncategorized.map((vendor, idx) => (
-                                                <div key={vendor.name} className={`vendor-item-compact uncategorized-item ${selectedForMerge.includes(vendor.name) ? 'selected' : ''}`}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedForMerge.includes(vendor.name)}
-                                                        onChange={() => handleToggleMergeSelect(vendor.name)} // handleToggleMergeSelect supports mixed types?
-                                                        className="merge-checkbox"
-                                                    />
-                                                    <span className="vendor-order">{idx + 1}</span>
+                                        {!collapsedCategories.has('uncategorized') && (
+                                            <div className="vendor-list-compact">
+                                                {uniqueUncategorized.map((vendor, idx) => (
+                                                    <div key={vendor.name} className={`vendor-item-compact uncategorized-item ${selectedForMerge.includes(vendor.name) ? 'selected' : ''}`}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedForMerge.includes(vendor.name)}
+                                                            onChange={() => handleToggleMergeSelect(vendor.name)} // handleToggleMergeSelect supports mixed types?
+                                                            className="merge-checkbox"
+                                                        />
+                                                        <span className="vendor-order">{idx + 1}</span>
 
-                                                    <div className="vendor-info-group">
-                                                        {editingVendor === vendor.name ? ( // using name as ID for editing unknown
-                                                            <input
-                                                                type="text"
-                                                                value={editingName}
-                                                                onChange={(e) => setEditingName(e.target.value)}
-                                                                onBlur={() => handleVendorNameSave(vendor)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') handleVendorNameSave(vendor);
-                                                                    if (e.key === 'Escape') setEditingVendor(null);
-                                                                }}
-                                                                autoFocus
-                                                                className="vendor-name-edit-input"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            />
-                                                        ) : (
-                                                            <span
-                                                                className="vendor-name-display editable"
-                                                                onClick={() => handleVendorNameClick(vendor)}
-                                                                title="클릭하여 이름 수정"
-                                                            >
-                                                                {vendor.name}
-                                                                {vendor.count > 1 && <span className="vendor-count-badge">{vendor.count}</span>}
-                                                            </span>
-                                                        )}
+                                                        <div className="vendor-info-group">
+                                                            {editingVendor === vendor.name ? ( // using name as ID for editing unknown
+                                                                <input
+                                                                    type="text"
+                                                                    value={editingName}
+                                                                    onChange={(e) => setEditingName(e.target.value)}
+                                                                    onBlur={() => handleVendorNameSave(vendor)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') handleVendorNameSave(vendor);
+                                                                        if (e.key === 'Escape') setEditingVendor(null);
+                                                                    }}
+                                                                    autoFocus
+                                                                    className="vendor-name-edit-input"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                            ) : (
+                                                                <span
+                                                                    className="vendor-name-display editable"
+                                                                    onClick={() => handleVendorNameClick(vendor)}
+                                                                    title="클릭하여 이름 수정"
+                                                                >
+                                                                    {vendor.name}
+                                                                    {vendor.count > 1 && <span className="vendor-count-badge">{vendor.count}</span>}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <select
+                                                            value=""
+                                                            onChange={async (e) => {
+                                                                if (!e.target.value) return;
+                                                                // When assigning category for grouped unknown vendor, we need to update ALL of them (by name).
+                                                                // Existing handleUpdateVendor uses ID if available, or POST if not.
+                                                                // We need a Batch Update by Name API.
+                                                                // But for now, let's try calling existing update. 
+                                                                // If backend supports updating by name (or creating new vendor with that name), it might work.
+
+                                                                const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
+                                                                // We'll treat this as "Create/Update Vendor"
+                                                                await handleUpdateVendor(vendor, {
+                                                                    category: e.target.value,
+                                                                    vendor_type: isExpense ? 'expense' : 'revenue'
+                                                                });
+                                                            }}
+                                                            className="category-assign-select"
+                                                        >
+                                                            <option value="">카테고리 선택...</option>
+                                                            <optgroup label="💰 매입처 (비용)">
+                                                                {EXPENSE_CATEGORIES.map(cat => (
+                                                                    <option key={cat.id} value={cat.id}>
+                                                                        {cat.icon} {cat.label}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+                                                            <optgroup label="💵 매출처 (수입)">
+                                                                {REVENUE_CATEGORIES.map(cat => (
+                                                                    <option key={cat.id} value={cat.id}>
+                                                                        {cat.icon} {cat.label}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+                                                        </select>
+                                                        <button
+                                                            onClick={() => handleDeleteVendor(vendor.name)}
+                                                            className="action-btn-sm delete"
+                                                            title="일괄 삭제"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
                                                     </div>
-
-                                                    <select
-                                                        value=""
-                                                        onChange={async (e) => {
-                                                            if (!e.target.value) return;
-                                                            // When assigning category for grouped unknown vendor, we need to update ALL of them (by name).
-                                                            // Existing handleUpdateVendor uses ID if available, or POST if not.
-                                                            // We need a Batch Update by Name API.
-                                                            // But for now, let's try calling existing update. 
-                                                            // If backend supports updating by name (or creating new vendor with that name), it might work.
-
-                                                            const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
-                                                            // We'll treat this as "Create/Update Vendor"
-                                                            await handleUpdateVendor(vendor, {
-                                                                category: e.target.value,
-                                                                vendor_type: isExpense ? 'expense' : 'revenue'
-                                                            });
-                                                        }}
-                                                        className="category-assign-select"
-                                                    >
-                                                        <option value="">카테고리 선택...</option>
-                                                        <optgroup label="💰 매입처 (비용)">
-                                                            {EXPENSE_CATEGORIES.map(cat => (
-                                                                <option key={cat.id} value={cat.id}>
-                                                                    {cat.icon} {cat.label}
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                        <optgroup label="💵 매출처 (수입)">
-                                                            {REVENUE_CATEGORIES.map(cat => (
-                                                                <option key={cat.id} value={cat.id}>
-                                                                    {cat.icon} {cat.label}
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    </select>
-                                                    <button
-                                                        onClick={() => handleDeleteVendor(vendor.name)}
-                                                        className="action-btn-sm delete"
-                                                        title="일괄 삭제"
-                                                    >
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </div>
+                                                ))}
                                             ))}
-                                        </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })()}
@@ -522,156 +544,176 @@ export default function VendorSettings() {
 
                                 return (
                                     <div key={category.id} className="vendor-category-section">
-                                        <div className="category-header">
+                                        <div
+                                            className="category-header"
+                                            onClick={() => toggleCategory(category.id)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <span className="category-icon">{category.icon}</span>
                                             <span className="category-label">{category.label}</span>
                                             <span className="category-count">{categoryVendors.length}개</span>
+
+                                            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {/* Merge Action for Category */}
+                                                {selectedForMerge.length >= 2 && categoryVendors.some(v => selectedForMerge.includes(v.id)) && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleOpenMergeModal(); }}
+                                                        className="merge-btn-sm"
+                                                    >
+                                                        <GitMerge size={14} />
+                                                        선택 병합 ({selectedForMerge.length})
+                                                    </button>
+                                                )}
+                                                {collapsedCategories.has(category.id) ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                                            </div>
                                         </div>
 
-                                        {categoryVendors.length > 0 ? (
-                                            <div className="vendor-list-compact">
-                                                {categoryVendors.map((vendor, idx) => (
-                                                    <div key={vendor.id} className={`vendor-item-compact ${selectedForMerge.includes(vendor.id) ? 'selected-for-merge' : ''}`}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedForMerge.includes(vendor.id)}
-                                                            onChange={() => handleToggleMergeSelect(vendor.id)}
-                                                            className="merge-checkbox"
-                                                            title="병합할 거래처 선택"
-                                                        />
-                                                        <span className="vendor-order">{idx + 1}</span>
-                                                        {/* Vendor name - editable when editingVendor matches */}
-                                                        {editingVendor === vendor.name ? (
-                                                            <div className="vendor-edit-group">
+                                        {!collapsedCategories.has(category.id) && (
+                                            categoryVendors.length > 0 ? (
+                                                <div className="vendor-list-compact">
+                                                    {categoryVendors.map((vendor, idx) => (
+                                                        <div key={vendor.id} className={`vendor-item-compact ${selectedForMerge.includes(vendor.id) ? 'selected-for-merge' : ''}`}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedForMerge.includes(vendor.id)}
+                                                                onChange={() => handleToggleMergeSelect(vendor.id)}
+                                                                className="merge-checkbox"
+                                                                title="병합할 거래처 선택"
+                                                            />
+                                                            <span className="vendor-order">{idx + 1}</span>
+                                                            {/* Vendor name - editable when editingVendor matches */}
+                                                            {editingVendor === vendor.name ? (
+                                                                <div className="vendor-edit-group">
+                                                                    <input
+                                                                        type="text"
+                                                                        defaultValue={vendor.name}
+                                                                        onKeyDown={async (e) => {
+                                                                            if (e.key === 'Enter') {
+                                                                                const newName = e.target.value.trim();
+                                                                                if (newName && newName !== vendor.name) {
+                                                                                    await handleUpdateVendor(vendor, { name: newName });
+                                                                                }
+                                                                                setEditingVendor(null);
+                                                                            } else if (e.key === 'Escape') {
+                                                                                setEditingVendor(null);
+                                                                            }
+                                                                        }}
+                                                                        autoFocus
+                                                                        className="vendor-name-edit-input"
+                                                                    />
+                                                                    <select
+                                                                        value={vendor.category}
+                                                                        onChange={async (e) => {
+                                                                            const newCategory = e.target.value;
+                                                                            if (newCategory === vendor.category) return;
+                                                                            const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
+                                                                            await handleUpdateVendor(vendor, {
+                                                                                category: newCategory,
+                                                                                vendor_type: isExpense ? 'expense' : 'revenue'
+                                                                            });
+                                                                            setEditingVendor(null);
+                                                                        }}
+                                                                        className="category-change-select"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <optgroup label="💰 매입처 (비용)">
+                                                                            {EXPENSE_CATEGORIES.map(cat => (
+                                                                                <option key={cat.id} value={cat.id}>
+                                                                                    {cat.icon} {cat.label}
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                        <optgroup label="💵 매출처 (수입)">
+                                                                            {REVENUE_CATEGORIES.map(cat => (
+                                                                                <option key={cat.id} value={cat.id}>
+                                                                                    {cat.icon} {cat.label}
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    </select>
+                                                                    <button
+                                                                        className="edit-save-btn"
+                                                                        onClick={() => setEditingVendor(null)}
+                                                                        title="편집 완료"
+                                                                    >
+                                                                        <Check size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <span
+                                                                    className="vendor-name-display"
+                                                                    onDoubleClick={() => setEditingVendor(vendor.name)}
+                                                                    title="더블클릭하여 수정"
+                                                                >
+                                                                    {vendor.name}
+                                                                </span>
+                                                            )}
+                                                            {/* Product Summary Button - Click to open product management */}
+                                                            {activeTab === 'expense' ? (
+                                                                <button
+                                                                    onClick={() => setSelectedVendor(vendor)}
+                                                                    className="product-summary-btn"
+                                                                    title="클릭하여 제품 관리"
+                                                                >
+                                                                    <Package size={14} />
+                                                                    <span>제품 관리</span>
+                                                                </button>
+                                                            ) : (
                                                                 <input
                                                                     type="text"
-                                                                    defaultValue={vendor.name}
-                                                                    onKeyDown={async (e) => {
-                                                                        if (e.key === 'Enter') {
-                                                                            const newName = e.target.value.trim();
-                                                                            if (newName && newName !== vendor.name) {
-                                                                                await handleUpdateVendor(vendor, { name: newName });
-                                                                            }
-                                                                            setEditingVendor(null);
-                                                                        } else if (e.key === 'Escape') {
-                                                                            setEditingVendor(null);
-                                                                        }
+                                                                    value={vendor.item || ''}
+                                                                    onChange={(e) => {
+                                                                        const updated = vendors.map(v =>
+                                                                            v.name === vendor.name ? { ...v, item: e.target.value } : v
+                                                                        );
+                                                                        setVendors(updated);
                                                                     }}
-                                                                    autoFocus
-                                                                    className="vendor-name-edit-input"
+                                                                    onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
+                                                                    placeholder="취급품목"
+                                                                    className="item-input-compact"
                                                                 />
-                                                                <select
-                                                                    value={vendor.category}
-                                                                    onChange={async (e) => {
-                                                                        const newCategory = e.target.value;
-                                                                        if (newCategory === vendor.category) return;
-                                                                        const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
-                                                                        await handleUpdateVendor(vendor, {
-                                                                            category: newCategory,
-                                                                            vendor_type: isExpense ? 'expense' : 'revenue'
-                                                                        });
-                                                                        setEditingVendor(null);
-                                                                    }}
-                                                                    className="category-change-select"
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    <optgroup label="💰 매입처 (비용)">
-                                                                        {EXPENSE_CATEGORIES.map(cat => (
-                                                                            <option key={cat.id} value={cat.id}>
-                                                                                {cat.icon} {cat.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </optgroup>
-                                                                    <optgroup label="💵 매출처 (수입)">
-                                                                        {REVENUE_CATEGORIES.map(cat => (
-                                                                            <option key={cat.id} value={cat.id}>
-                                                                                {cat.icon} {cat.label}
-                                                                            </option>
-                                                                        ))}
-                                                                    </optgroup>
-                                                                </select>
+                                                            )}
+                                                            <div className="vendor-actions-compact">
+                                                                {/* Edit button for vendor name */}
                                                                 <button
-                                                                    className="edit-save-btn"
-                                                                    onClick={() => setEditingVendor(null)}
-                                                                    title="편집 완료"
+                                                                    onClick={() => setEditingVendor(vendor.name)}
+                                                                    className="action-btn-sm edit"
+                                                                    title="업체명 수정"
                                                                 >
-                                                                    <Check size={14} />
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleMoveVendor(vendor, 'up')}
+                                                                    disabled={idx === 0}
+                                                                    className="action-btn-sm"
+                                                                    title="위로"
+                                                                >
+                                                                    <ChevronUp size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleMoveVendor(vendor, 'down')}
+                                                                    disabled={idx === categoryVendors.length - 1}
+                                                                    className="action-btn-sm"
+                                                                    title="아래로"
+                                                                >
+                                                                    <ChevronDown size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteVendor(vendor.name)}
+                                                                    className="action-btn-sm delete"
+                                                                    title="삭제"
+                                                                >
+                                                                    <Trash2 size={14} />
                                                                 </button>
                                                             </div>
-                                                        ) : (
-                                                            <span
-                                                                className="vendor-name-display"
-                                                                onDoubleClick={() => setEditingVendor(vendor.name)}
-                                                                title="더블클릭하여 수정"
-                                                            >
-                                                                {vendor.name}
-                                                            </span>
-                                                        )}
-                                                        {/* Product Summary Button - Click to open product management */}
-                                                        {activeTab === 'expense' ? (
-                                                            <button
-                                                                onClick={() => setSelectedVendor(vendor)}
-                                                                className="product-summary-btn"
-                                                                title="클릭하여 제품 관리"
-                                                            >
-                                                                <Package size={14} />
-                                                                <span>제품 관리</span>
-                                                            </button>
-                                                        ) : (
-                                                            <input
-                                                                type="text"
-                                                                value={vendor.item || ''}
-                                                                onChange={(e) => {
-                                                                    const updated = vendors.map(v =>
-                                                                        v.name === vendor.name ? { ...v, item: e.target.value } : v
-                                                                    );
-                                                                    setVendors(updated);
-                                                                }}
-                                                                onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
-                                                                placeholder="취급품목"
-                                                                className="item-input-compact"
-                                                            />
-                                                        )}
-                                                        <div className="vendor-actions-compact">
-                                                            {/* Edit button for vendor name */}
-                                                            <button
-                                                                onClick={() => setEditingVendor(vendor.name)}
-                                                                className="action-btn-sm edit"
-                                                                title="업체명 수정"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleMoveVendor(vendor, 'up')}
-                                                                disabled={idx === 0}
-                                                                className="action-btn-sm"
-                                                                title="위로"
-                                                            >
-                                                                <ChevronUp size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleMoveVendor(vendor, 'down')}
-                                                                disabled={idx === categoryVendors.length - 1}
-                                                                className="action-btn-sm"
-                                                                title="아래로"
-                                                            >
-                                                                <ChevronDown size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteVendor(vendor.name)}
-                                                                className="action-btn-sm delete"
-                                                                title="삭제"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="no-vendors-message">
-                                                등록된 거래처가 없습니다
-                                            </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="no-vendors-message">
+                                                    등록된 거래처가 없습니다
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 );
@@ -692,81 +734,83 @@ export default function VendorSettings() {
             }
 
             {/* Merge Modal */}
-            {showMergeModal && (
-                <div className="modal-overlay" onClick={() => setShowMergeModal(false)}>
-                    <div className="merge-modal" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h2>거래처 병합</h2>
-                            <button onClick={() => setShowMergeModal(false)} className="close-btn">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="modal-body">
-                            <p className="merge-info">
-                                선택된 {selectedForMerge.length}개의 거래처를 하나로 병합합니다.<br />
-                                <strong>유지할 거래처</strong>를 선택하세요. 나머지는 삭제되고 비용 데이터가 이전됩니다.
-                            </p>
-                            <div className="merge-target-list">
-                                {selectedForMerge.map(id => {
-                                    const v = getVendorById(id);
-                                    if (!v) return null;
-                                    return (
-                                        <label key={id} className={`merge-target-option ${mergeTarget === id ? 'active' : ''}`}>
-                                            <input
-                                                type="radio"
-                                                name="mergeTarget"
-                                                value={id}
-                                                checked={mergeTarget === id}
-                                                onChange={() => setMergeTarget(id)}
-                                            />
-                                            <span className="vendor-info">
-                                                <span className="vendor-name">{v.name}</span>
-                                                <span className="vendor-category">{getCategoryLabel(v.category)}</span>
-                                            </span>
-                                            {mergeTarget === id && <span className="keep-badge">유지</span>}
-                                        </label>
-                                    );
-                                })}
+            {
+                showMergeModal && (
+                    <div className="modal-overlay" onClick={() => setShowMergeModal(false)}>
+                        <div className="merge-modal" onClick={e => e.stopPropagation()}>
+                            <div className="modal-header">
+                                <h2>거래처 병합</h2>
+                                <button onClick={() => setShowMergeModal(false)} className="close-btn">
+                                    <X size={20} />
+                                </button>
+                            </div>
+                            <div className="modal-body">
+                                <p className="merge-info">
+                                    선택된 {selectedForMerge.length}개의 거래처를 하나로 병합합니다.<br />
+                                    <strong>유지할 거래처</strong>를 선택하세요. 나머지는 삭제되고 비용 데이터가 이전됩니다.
+                                </p>
+                                <div className="merge-target-list">
+                                    {selectedForMerge.map(id => {
+                                        const v = getVendorById(id);
+                                        if (!v) return null;
+                                        return (
+                                            <label key={id} className={`merge-target-option ${mergeTarget === id ? 'active' : ''}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="mergeTarget"
+                                                    value={id}
+                                                    checked={mergeTarget === id}
+                                                    onChange={() => setMergeTarget(id)}
+                                                />
+                                                <span className="vendor-info">
+                                                    <span className="vendor-name">{v.name}</span>
+                                                    <span className="vendor-category">{getCategoryLabel(v.category)}</span>
+                                                </span>
+                                                {mergeTarget === id && <span className="keep-badge">유지</span>}
+                                            </label>
+                                        );
+                                    })}
 
-                                {/* Custom Merge Name Option */}
-                                <label className={`merge-target-option custom ${mergeTarget === '__CUSTOM__' ? 'active' : ''}`}>
-                                    <input
-                                        type="radio"
-                                        name="mergeTarget"
-                                        value="__CUSTOM__"
-                                        checked={mergeTarget === '__CUSTOM__'}
-                                        onChange={() => setMergeTarget('__CUSTOM__')}
-                                    />
-                                    <span className="vendor-info custom-input-wrapper">
-                                        <span className="vendor-name-label">새로운 이름으로 병합: </span>
+                                    {/* Custom Merge Name Option */}
+                                    <label className={`merge-target-option custom ${mergeTarget === '__CUSTOM__' ? 'active' : ''}`}>
                                         <input
-                                            type="text"
-                                            value={customMergeName}
-                                            onChange={e => setCustomMergeName(e.target.value)}
-                                            placeholder="예: 통합거래처(본점)"
-                                            className="custom-merge-name-input"
-                                            disabled={mergeTarget !== '__CUSTOM__'}
-                                            onClick={(e) => {
-                                                if (mergeTarget !== '__CUSTOM__') setMergeTarget('__CUSTOM__');
-                                                e.stopPropagation(); // prevent modal invalidation if any
-                                            }}
+                                            type="radio"
+                                            name="mergeTarget"
+                                            value="__CUSTOM__"
+                                            checked={mergeTarget === '__CUSTOM__'}
+                                            onChange={() => setMergeTarget('__CUSTOM__')}
                                         />
-                                    </span>
-                                </label>
+                                        <span className="vendor-info custom-input-wrapper">
+                                            <span className="vendor-name-label">새로운 이름으로 병합: </span>
+                                            <input
+                                                type="text"
+                                                value={customMergeName}
+                                                onChange={e => setCustomMergeName(e.target.value)}
+                                                placeholder="예: 통합거래처(본점)"
+                                                className="custom-merge-name-input"
+                                                disabled={mergeTarget !== '__CUSTOM__'}
+                                                onClick={(e) => {
+                                                    if (mergeTarget !== '__CUSTOM__') setMergeTarget('__CUSTOM__');
+                                                    e.stopPropagation(); // prevent modal invalidation if any
+                                                }}
+                                            />
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button onClick={() => setShowMergeModal(false)} className="cancel-btn">
+                                    취소
+                                </button>
+                                <button onClick={handleMerge} className="confirm-merge-btn">
+                                    <GitMerge size={18} />
+                                    병합 실행
+                                </button>
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <button onClick={() => setShowMergeModal(false)} className="cancel-btn">
-                                취소
-                            </button>
-                            <button onClick={handleMerge} className="confirm-merge-btn">
-                                <GitMerge size={18} />
-                                병합 실행
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </>
     );
 }
