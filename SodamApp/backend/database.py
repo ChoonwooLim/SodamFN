@@ -1,6 +1,10 @@
 from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy.pool import StaticPool, NullPool
 import os
+from dotenv import load_dotenv
+
+# Load .env file if exists (for local development)
+load_dotenv()
 
 # Check for DATABASE_URL environment variable (Render provides this)
 # If not found, fall back to local SQLite
