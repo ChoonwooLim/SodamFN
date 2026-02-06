@@ -166,21 +166,26 @@ def patch_vendor(vendor_id: int, payload: VendorPatch):
             session.commit()
             print(f"[PATCH VENDOR] Success: {vendor.name}")
             
-            # --- Auto Sync P/L if category changed ---
-            if payload.category is not None:
+        # --- Auto Sync P/L if category changed (in separate session) ---
+        if payload.category is not None:
+            with Session(engine) as sync_session:
                 # Find all months where this vendor has expenses
-                expenses = session.exec(
+                expenses = sync_session.exec(
                     select(DailyExpense).where(DailyExpense.vendor_id == vendor_id)
                 ).all()
                 
                 affected_months = set((e.date.year, e.date.month) for e in expenses)
                 
-                print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor {vendor.name} category change")
+                print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor category change")
                 for y, m in affected_months:
-                    sync_all_expenses(y, m, session)
-            # -----------------------------------------
+                    try:
+                        sync_all_expenses(y, m, sync_session)
+                    except Exception as sync_err:
+                        print(f"[SYNC P/L] Error for {y}-{m}: {sync_err}")
+                sync_session.commit()
+        # -----------------------------------------
 
-            return {"status": "success"}
+        return {"status": "success"}
     except Exception as e:
         print(f"[PATCH VENDOR] Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
