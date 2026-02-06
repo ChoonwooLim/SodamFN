@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera as CameraIcon, X, UploadCloud, ChevronLeft, FileSpreadsheet, FileText, TrendingUp, ShoppingBag } from 'lucide-react';
+import { Camera as CameraIcon, X, UploadCloud, ChevronLeft, FileSpreadsheet, FileText, TrendingUp, ShoppingBag, RotateCcw } from 'lucide-react';
 import api from '../api';
+import UploadHistoryList from '../components/UploadHistoryList';
 
 export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
     const isRevenue = mode === 'revenue';
@@ -19,7 +20,7 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
         excelMessage: isRevenue ? "필수 컬럼: 날짜, 금액, 채널(옵션)" : "여러 파일 선택 가능 (필수: 날짜, 항목, 금액)"
     };
 
-    const [activeTab, setActiveTab] = useState('camera'); // 'camera' or 'excel'
+    const [activeTab, setActiveTab] = useState('camera'); // 'camera' or 'excel' or 'history'
     const [loading, setLoading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState('');
     const fileInputRef = useRef(null);
@@ -117,6 +118,45 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
     const bgThemeClass = isRevenue ? "bg-blue-600" : "bg-indigo-600";
     const borderThemeClass = isRevenue ? "border-blue-500" : "border-indigo-500";
 
+    const renderContent = () => {
+        if (activeTab === 'history') {
+            return <UploadHistoryList type={isRevenue ? 'revenue' : 'expense'} />;
+        }
+
+        return (
+            <div
+                onClick={() => activeTab === 'camera' ? fileInputRef.current?.click() : excelInputRef.current?.click()}
+                className="relative group cursor-pointer w-full max-w-sm"
+            >
+                <div className={`absolute inset-0 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 ${activeTab === 'camera' ? themeClass.replace('text', 'bg') : 'bg-emerald-500'}`}></div>
+                <div className={`relative w-full aspect-square bg-slate-800/50 backdrop-blur-xl border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all duration-300 group-hover:scale-105 group-active:scale-95 ${activeTab === 'camera' ? `border-slate-600 group-hover:${borderThemeClass}/50` : 'border-slate-600 group-hover:border-emerald-500/50'}`}>
+                    {loading ? (
+                        <div className="flex flex-col items-center gap-4">
+                            <div className={`w-16 h-16 border-4 border-t-transparent rounded-full animate-spin ${activeTab === 'camera' ? borderThemeClass : 'border-emerald-500'}`}></div>
+                            <p className={`text-sm font-medium animate-pulse ${activeTab === 'camera' ? themeClass : 'text-emerald-400'}`}>
+                                {uploadProgress || '처리 중입니다...'}
+                            </p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transform group-hover:-translate-y-2 transition-transform duration-300 ${activeTab === 'camera' ? `bg-gradient-to-tr ${isRevenue ? 'from-blue-500 to-cyan-600' : 'from-indigo-500 to-purple-600'}` : 'bg-gradient-to-tr from-emerald-500 to-teal-600'}`}>
+                                {activeTab === 'camera' ? <CameraIcon size={32} className="text-white" /> : <FileSpreadsheet size={32} className="text-white" />}
+                            </div>
+                            <div className="text-center">
+                                <p className="font-bold text-lg mb-1">
+                                    {activeTab === 'camera' ? '터치하여 촬영' : '엑셀 파일 선택'}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                    {activeTab === 'camera' ? '또는 갤러리에서 선택' : config.excelMessage}
+                                </p>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="min-h-screen bg-slate-900 text-white flex flex-col relative overflow-hidden">
             <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 ${isRevenue ? 'to-blue-900' : 'to-indigo-900'} opacity-50 z-0`}></div>
@@ -152,38 +192,17 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                         <FileSpreadsheet size={16} />
                         엑셀 업로드
                     </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`flex items-center gap-2 px-6 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${activeTab === 'history' ? 'bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+                    >
+                        <RotateCcw size={16} />
+                        취소/기록
+                    </button>
                 </div>
 
-                <div
-                    onClick={() => activeTab === 'camera' ? fileInputRef.current?.click() : excelInputRef.current?.click()}
-                    className="relative group cursor-pointer w-full max-w-sm"
-                >
-                    <div className={`absolute inset-0 rounded-[2.5rem] blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 ${activeTab === 'camera' ? themeClass.replace('text', 'bg') : 'bg-emerald-500'}`}></div>
-                    <div className={`relative w-full aspect-square bg-slate-800/50 backdrop-blur-xl border-2 border-dashed rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all duration-300 group-hover:scale-105 group-active:scale-95 ${activeTab === 'camera' ? `border-slate-600 group-hover:${borderThemeClass}/50` : 'border-slate-600 group-hover:border-emerald-500/50'}`}>
-                        {loading ? (
-                            <div className="flex flex-col items-center gap-4">
-                                <div className={`w-16 h-16 border-4 border-t-transparent rounded-full animate-spin ${activeTab === 'camera' ? borderThemeClass : 'border-emerald-500'}`}></div>
-                                <p className={`text-sm font-medium animate-pulse ${activeTab === 'camera' ? themeClass : 'text-emerald-400'}`}>
-                                    {uploadProgress || '처리 중입니다...'}
-                                </p>
-                            </div>
-                        ) : (
-                            <>
-                                <div className={`w-20 h-20 rounded-3xl flex items-center justify-center shadow-lg transform group-hover:-translate-y-2 transition-transform duration-300 ${activeTab === 'camera' ? `bg-gradient-to-tr ${isRevenue ? 'from-blue-500 to-cyan-600' : 'from-indigo-500 to-purple-600'}` : 'bg-gradient-to-tr from-emerald-500 to-teal-600'}`}>
-                                    {activeTab === 'camera' ? <CameraIcon size={32} className="text-white" /> : <FileSpreadsheet size={32} className="text-white" />}
-                                </div>
-                                <div className="text-center">
-                                    <p className="font-bold text-lg mb-1">
-                                        {activeTab === 'camera' ? '터치하여 촬영' : '엑셀 파일 선택'}
-                                    </p>
-                                    <p className="text-xs text-slate-400">
-                                        {activeTab === 'camera' ? '또는 갤러리에서 선택' : config.excelMessage}
-                                    </p>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </div>
+                {renderContent()}
+
             </div>
 
             <input
@@ -205,4 +224,3 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
         </div>
     );
 }
-

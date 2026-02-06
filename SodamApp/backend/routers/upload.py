@@ -28,10 +28,11 @@ async def upload_expense_excel(file: UploadFile = File(...)):
     """
     Processes an excel upload and bulk inserts to DailyExpense.
     Also auto-creates/links vendors and syncs P/L.
+    NOW: Tracks UploadHistory for undo functionality.
     """
     import traceback
     from sqlmodel import select
-    from models import Vendor, DailyExpense
+    from models import Vendor, DailyExpense, UploadHistory
     from services.profit_loss_service import sync_all_expenses
     
     try:
@@ -43,12 +44,28 @@ async def upload_expense_excel(file: UploadFile = File(...)):
             return result
         
         expenses_data = result.get("data", [])
+        
+        # --- Create Upload History Record ---
+        with Session(engine) as session:
+            upload_history = UploadHistory(
+                filename=file.filename or "uploaded_file.xlsx",
+                upload_type="expense",
+                record_count=0,
+                status="active"
+            )
+            session.add(upload_history)
+            session.commit()
+            session.refresh(upload_history)
+            upload_id = upload_history.id
+        
         inserted_count = 0
         vendor_created_count = 0
         processed_months = set()
         
         # Phase 1: Insert data
         with Session(engine) as session:
+            # Re-attach upload_history if needed (not strictly necessary if we rely on ID)
+            
             for item in expenses_data:
                 if item['amount'] > 0:
                     item_name = item['item'] or "미지정"
@@ -70,7 +87,8 @@ async def upload_expense_excel(file: UploadFile = File(...)):
                         vendor = Vendor(
                             name=item_name,
                             category=category,
-                            vendor_type="expense"
+                            vendor_type="expense",
+                            created_by_upload_id=upload_id # Track creation source
                         )
                         session.add(vendor)
                         session.flush()  # Get the ID
@@ -83,7 +101,8 @@ async def upload_expense_excel(file: UploadFile = File(...)):
                         vendor_id=vendor.id,
                         amount=item['amount'],
                         category=category,
-                        note=None
+                        note=None,
+                        upload_id=upload_id # Track source
                     )
                     session.add(daily_expense)
                     inserted_count += 1
@@ -91,6 +110,12 @@ async def upload_expense_excel(file: UploadFile = File(...)):
                     # Track months for P/L sync
                     processed_months.add((date_obj.year, date_obj.month))
             
+            # Update History Count
+            upload_record = session.get(UploadHistory, upload_id)
+            if upload_record:
+                upload_record.record_count = inserted_count
+                session.add(upload_record)
+                
             session.commit()
         
         # Phase 2: Sync P/L in a separate session
@@ -107,13 +132,107 @@ async def upload_expense_excel(file: UploadFile = File(...)):
             "status": "success", 
             "message": f"{inserted_count}건의 지출 내역이 저장되었습니다. (신규 거래처 {vendor_created_count}개 생성)",
             "count": inserted_count,
-            "vendors_created": vendor_created_count
+            "vendors_created": vendor_created_count,
+            "upload_id": upload_id
         }
             
     except Exception as e:
         error_detail = f"{str(e)}\n{traceback.format_exc()}"
         print(f"Excel Upload Error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
+
+# --- HISTORY & ROLLBACK ENDPOINTS ---
+
+@router.get("/uploads/history")
+def get_upload_history(type: str = None):
+    from models import UploadHistory
+    from sqlmodel import select, desc
+    
+    with Session(engine) as session:
+        statement = select(UploadHistory).order_by(desc(UploadHistory.created_at)).limit(20)
+        if type:
+            statement = statement.where(UploadHistory.upload_type == type)
+        results = session.exec(statement).all()
+        return results
+
+@router.delete("/uploads/{upload_id}")
+def rollback_upload(upload_id: int):
+    """
+    Rollback an upload by ID.
+    Deletes all expenses created by this upload.
+    Updates UploadHistory status to 'rolled_back'.
+    Optionally deletes vendors created by this upload IF they are not used elsewhere (safe check).
+    """
+    from models import UploadHistory, DailyExpense, Vendor
+    from sqlmodel import select
+    from services.profit_loss_service import sync_all_expenses
+    
+    with Session(engine) as session:
+        history = session.get(UploadHistory, upload_id)
+        if not history:
+            raise HTTPException(status_code=404, detail="Upload not found")
+        
+        if history.status == "rolled_back":
+             raise HTTPException(status_code=400, detail="Already rolled back")
+
+        # 1. Select Expenses to Delete
+        expenses = session.exec(select(DailyExpense).where(DailyExpense.upload_id == upload_id)).all()
+        expense_count = len(expenses)
+        
+        # Track months for re-sync
+        sync_months = set()
+        for exp in expenses:
+            sync_months.add((exp.date.year, exp.date.month))
+            session.delete(exp)
+            
+        # 2. Select Vendors to Delete (created by this upload)
+        # Only delete if they have no other expenses (orphaned)
+        # Actually simplest is to just delete if created_by_upload_id matches.
+        # But if user manually added expenses to this vendor later, we shouldn't delete the vendor?
+        # Let's verify if vendor has other expenses.
+        vendors_created = session.exec(select(Vendor).where(Vendor.created_by_upload_id == upload_id)).all()
+        vendor_delete_count = 0
+        
+        for vendor in vendors_created:
+            # Check for other expenses not from this upload
+            # Since we just deleted all expenses from this upload in the session (but not committed),
+            # counting expenses for this vendor in DB might still show them if not flushed?
+            # session.delete puts them in deleted state.
+            # Let's count remaining expenses.
+            # We can use session.exec with count, filtering DailyExpense.vendor_id == vendor.id.
+            # Since deletion is pending in session, standard count query usually sees pre-transaction state unless we flush.
+            session.flush() # Ensure expenses are marked deleted
+            
+            remaining_expenses_count = session.exec(
+                select(DailyExpense).where(DailyExpense.vendor_id == vendor.id)
+            ).all() # .count() is deprecated/tricky in some versions, len(all) is safe for small sets
+            
+            if len(remaining_expenses_count) == 0:
+                session.delete(vendor)
+                vendor_delete_count += 1
+        
+        # 3. Update History Status
+        history.status = "rolled_back"
+        session.add(history)
+        
+        session.commit()
+        
+        # 4. Re-sync P/L
+        # New session/connection might be safer for complex sync logic if it uses its own session
+        try:
+            with Session(engine) as sync_session:
+                for (year, month) in sync_months:
+                    sync_all_expenses(year, month, sync_session)
+                sync_session.commit()
+        except Exception as e:
+            print(f"Rollback Sync Error: {e}")
+            
+        return {
+            "status": "success",
+            "message": f"Rollback successful. Deleted {expense_count} expenses and {vendor_delete_count} vendors.",
+            "deleted_expenses": expense_count,
+            "deleted_vendors": vendor_delete_count
+        }
 
 # --- REVENUE ENDPOINTS ---
 

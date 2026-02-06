@@ -1,0 +1,75 @@
+.upload-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem 0;
+}
+
+.history-item {
+    display: flex;
+    align_items: center;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 1rem;
+    transition: all 0.2s;
+}
+
+.history-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.history-info {
+    flex: 1;
+    min-width: 0;
+    /* truncate text */
+}
+
+.history-filename {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #f1f5f9;
+}
+
+.history-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.history-count {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+}
+
+.rollback-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+    background: rgba(244, 63, 94, 0.1);
+    /* Rose color */
+    color: #fb7185;
+    transition: all 0.2s;
+}
+
+.rollback-btn:hover:not(:disabled) {
+    background: #f43f5e;
+    color: white;
+    transform: scale(1.05);
+}
+
+.rollback-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

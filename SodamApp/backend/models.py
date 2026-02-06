@@ -14,6 +14,8 @@ class Vendor(SQLModel, table=True):
     contact_info: Optional[str] = None
     item: Optional[str] = None  # 취급 품목
     
+    created_by_upload_id: Optional[int] = Field(default=None) # No FK constraint for simplicity or nullable FK
+    
     products: List["Product"] = Relationship(back_populates="vendor")
     expenses: List["Expense"] = Relationship(back_populates="vendor")
     daily_expenses: List["DailyExpense"] = Relationship(back_populates="vendor")
@@ -287,4 +289,14 @@ class DailyExpense(SQLModel, table=True):
     
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
     vendor: Optional[Vendor] = Relationship(back_populates="daily_expenses")
+    
+    upload_id: Optional[int] = Field(default=None, foreign_key="uploadhistory.id")
+
+class UploadHistory(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str
+    upload_type: str  # 'expense', 'revenue'
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    record_count: int = 0
+    status: str = Field(default="active")  # 'active', 'rolled_back'
 

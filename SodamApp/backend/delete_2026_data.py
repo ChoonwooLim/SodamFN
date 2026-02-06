@@ -5,9 +5,9 @@ from datetime import date
 
 def delete_data():
     with Session(engine) as session:
-        # 1. Delete DailyExpense for Jan/Feb 2026
+        # 1. Delete DailyExpense for Jan 2026 (User Request)
         start_date = date(2026, 1, 1)
-        end_date = date(2026, 2, 28)
+        end_date = date(2026, 1, 31)
         
         statement = select(DailyExpense).where(DailyExpense.date >= start_date).where(DailyExpense.date <= end_date)
         results = session.exec(statement).all()
@@ -41,6 +41,16 @@ def delete_data():
         
         session.commit()
         print("Commit successful.")
+        
+        # 3. Sync Profit/Loss to reflect deletion
+        # Since we deleted expenses, we should re-sync Jan 2026 to update monthly stats (likely to 0 or remaining valid data)
+        try:
+            from services.profit_loss_service import sync_all_expenses
+            sync_all_expenses(2026, 1, session)
+            session.commit()
+            print("P/L Sync for 2026-01 completed.")
+        except Exception as e:
+            print(f"P/L Sync failed: {e}")
 
 if __name__ == "__main__":
     delete_data()
