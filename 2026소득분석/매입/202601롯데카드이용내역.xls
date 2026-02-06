@@ -1,0 +1,2293 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+	xmlns:x="urn:schemas-microsoft-com:office:excel"
+	xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Cache-Control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<meta http-equiv="X-UA-Compatible" content="IE=EmulateIE8" />
+<meta http-equiv="X-UA-Compatible" content="requiresActiveX=true" />
+<meta name="ProgId" content="Excel.Sheet">
+<meta name="Generator" content="Microsoft Excel">
+<style>
+tr{mso-height-source:auto;mso-ruby-visibility:none}
+col{mso-width-source:userset;mso-ruby-visibility:none}
+br{mso-data-placement:same-cell}
+ruby{ruby-align:left}
+ul{margin-top:0}
+
+table{font-family: "맑은 고딕", "Malgun Gothic", "굴림", "Gulim", "Arial", "Helvetica", sans-serif;font-size:10pt;border-collapse:collapse}
+th,td{border:0.5pt solid #808080;text-align:center;color:windowtext;word-break:break-all}
+th{background:#d9d9d9}
+.x-total th, .x-total td{background:#eee;font-weight:700}
+.x-tit1{width:100%;color:windowtext;font-size:20pt;font-weight:700;text-align:center;text-decoration:underline;text-underline-style:single}
+.x-tit2{margin-bottom:0;color:windowtext;font-size:12pt;font-weight:700;text-align:left;vertical-align:bottom;text-decoration:underline;text-underline-style:single}
+.x-tit3{margin-bottom:0;color:windowtext;font-size:10pt;font-weight:700;text-align:left;vertical-align:bottom}
+.x-right{text-align:right}
+.x-left{text-align:left}
+.x-txt{width:100%;text-align:left}
+.x-txtr{width:100%;margin:0;text-align:right}
+.x-mt0{margin-top:0}
+.x-space{border:0}
+</style>
+<title></title>
+</head>
+<body link="blue" vlink="purple">
+
+	<h1 class="x-tit1">카드이용내역</h1>
+	<h2 class="x-tit2">■ 카드이용내역 요약</h2>
+	<table>
+		<thead>
+			<tr>
+				<th scope="col">조회기간</th>
+				<th scope="col">사용처구분</th>
+				<th scope="col">정상∙취소 구분</th>
+				<th scope="col">이용구분</th>
+				<th scope="col">건수합계</th>
+				<th scope="col">금액합계(원)</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td>2026.01.01~2026.01.31</td>
+				<td>
+					
+						전체
+						
+						
+					
+				</td>
+				<td>
+					
+						전체
+						
+						
+					
+				</td>
+				<td>
+					
+						전체
+						
+						
+						
+						
+						
+					
+				</td>
+				<td class="x-right">77건</td>
+				<td class="x-right">1,546,666</td>
+			</tr>
+		</tbody>
+	</table>
+	
+	
+		<h2 class="x-tit2">■ 국내이용내역 상세</h2>
+		<table>
+			<thead>
+				<tr>
+					<th scope="col">이용일자</th>
+					<th scope="col">이용시간</th>
+					<th scope="col">이용카드</th>
+					<th scope="col">이용가맹점</th>
+					<th scope="col">업종</th>
+					<th scope="col">이용금액</th>
+					<th scope="col">이용구분</th>
+					<th scope="col">할부개월</th>
+					<th scope="col">승인번호</th>
+					<th scope="col">취소여부</th>
+					<th scope="col">취소일자</th>
+					<th scope="col">취소금액</th>
+					<th scope="col">포인트사용</th>
+					<th scope="col">온누리상품권사용금액</th>
+					<th scope="col">매입여부</th>
+				</tr>
+			</thead>
+			<tbody>
+				
+					<tr>
+						<td>2026.01.31</td>
+						<td>23:21</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">GS25 강동더리버점</td>
+						<td class="x-left">편의점</td>
+						<td class="x-right">7,300</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>61245239</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.31</td>
+						<td>19:42</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">이마트 푸드마켓 고덕점</td>
+						<td class="x-left">할인점</td>
+						<td class="x-right">31,980</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>38013238</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.30</td>
+						<td>16:33</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">서울특별시(주차장-오프라인)</td>
+						<td class="x-left">주차장</td>
+						<td class="x-right">5,200</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>59486237</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.30</td>
+						<td>11:10</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">3,581</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>47373236</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.30</td>
+						<td>08:59</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">1,647</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>28517235</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.29</td>
+						<td>05:25</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">14,076</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>29553234</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.28</td>
+						<td>08:57</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">헥토파이낸셜_비인증_티유피</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">10,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>35365233</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>18:15</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">주식회사 알파건대본점</td>
+						<td class="x-left">문구</td>
+						<td class="x-right">6,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>51444232</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>17:17</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">주식회사 알파건대본점</td>
+						<td class="x-left">문구</td>
+						<td class="x-right">9,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>37185231</td>
+						<td>Y</td>
+						<td>2026.01.27</td>
+						<td class="x-right">-9,000</td>
+						
+							
+							
+								<td class="x-right"></td>
+								<td class="x-right">0</td>
+							
+						
+						<td>N</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>16:16</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">서울리마치과</td>
+						<td class="x-left">치과</td>
+						<td class="x-right">28,200</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>26754230</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>13:15</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">전기차충전_0_주식회사 이노</td>
+						<td class="x-left">PG_우대</td>
+						<td class="x-right">10,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>67351229</td>
+						<td>Y</td>
+						<td>2026.01.28</td>
+						<td class="x-right">-7,556</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>11:02</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">14,387</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>61950228</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>10:03</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(주) 미래엔텍</td>
+						<td class="x-left">중고품 판매점</td>
+						<td class="x-right">6,600</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>57770227</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.27</td>
+						<td>08:39</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">3,503</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>24606226</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.26</td>
+						<td>17:12</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">넥센타이어강남총판</td>
+						<td class="x-left">자동차관련용품</td>
+						<td class="x-right">290,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>56414225</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.26</td>
+						<td>08:48</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">428</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>68569224</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.25</td>
+						<td>14:57</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">5,994</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>34411223</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.24</td>
+						<td>11:25</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">1,972</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>63065222</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.23</td>
+						<td>20:59</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">이마트 푸드마켓 고덕점</td>
+						<td class="x-left">할인점</td>
+						<td class="x-right">22,870</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>40049221</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.23</td>
+						<td>15:16</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">전주명가콩나물국밥</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">2,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>38798220</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.23</td>
+						<td>10:15</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">3,406</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>61292219</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.23</td>
+						<td>05:21</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">11,088</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>43764218</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.22</td>
+						<td>13:53</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">주식회사 여백스튜디오</td>
+						<td class="x-left">사진관</td>
+						<td class="x-right">28,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>47191217</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.22</td>
+						<td>10:16</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(주)덕소모터스</td>
+						<td class="x-left">자동차정비</td>
+						<td class="x-right">30,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41513216</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.22</td>
+						<td>08:36</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">1,008</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>24332215</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.22</td>
+						<td>06:22</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">21,779</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>39314214</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.21</td>
+						<td>17:16</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">전기차충전(구)_채비(주)_빌링</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">6,329</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>45115213</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.21</td>
+						<td>09:58</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">에스엠하이플러스(주)</td>
+						<td class="x-left">기타교통</td>
+						<td class="x-right">30,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>66640212</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>18:31</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">5,021</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>21055211</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>18:24</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">삼산회관 서울고덕비즈밸리점</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">89,900</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>50119210</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>14:06</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">KT통신요금 납부</td>
+						<td class="x-left">통신비(시청료)</td>
+						<td class="x-right">13,130</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>36366209</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>05:47</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">9,769</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>31429205</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.19</td>
+						<td>19:07</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">심포니오브차이나</td>
+						<td class="x-left">중식</td>
+						<td class="x-right">26,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>43221204</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.19</td>
+						<td>18:36</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">사틴헤어살롱</td>
+						<td class="x-left">미용실</td>
+						<td class="x-right">90,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>27448203</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.19</td>
+						<td>16:43</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">2,072</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>27212202</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.19</td>
+						<td>08:12</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">493</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>38612201</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.18</td>
+						<td>16:29</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">오형제황제누룽지탕</td>
+						<td class="x-left">중식</td>
+						<td class="x-right">28,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>60747200</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.18</td>
+						<td>09:09</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">17,273</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>46687199</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.16</td>
+						<td>20:37</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">GS25 강동더리버점</td>
+						<td class="x-left">편의점</td>
+						<td class="x-right">5,200</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41046198</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.16</td>
+						<td>12:37</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">길동우동 고덕비즈밸리점</td>
+						<td class="x-left">기타일반음식</td>
+						<td class="x-right">8,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>24099197</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.16</td>
+						<td>08:25</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">2,342</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>67896196</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.16</td>
+						<td>05:14</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">11,055</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>33118195</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.15</td>
+						<td>17:57</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">2,011</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>21659194</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.15</td>
+						<td>16:13</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">효성종합개발(주)</td>
+						<td class="x-left">주차장</td>
+						<td class="x-right">3,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>54766193</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.15</td>
+						<td>15:49</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">우래옥</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">50,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>65515192</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.15</td>
+						<td>14:49</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">10,894</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>29215191</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.15</td>
+						<td>08:26</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">2,445</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41101190</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.14</td>
+						<td>20:04</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">GS25 강동더리버점</td>
+						<td class="x-left">편의점</td>
+						<td class="x-right">3,200</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41892189</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.14</td>
+						<td>15:46</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">1,793</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>53177188</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.14</td>
+						<td>08:52</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">나은온누리약국</td>
+						<td class="x-left">약국</td>
+						<td class="x-right">85,900</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>53429187</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.14</td>
+						<td>08:43</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">강내과의원</td>
+						<td class="x-left">내과</td>
+						<td class="x-right">6,700</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>44289186</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.14</td>
+						<td>06:56</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">1,670</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>59619185</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.13</td>
+						<td>08:30</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">918</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>59093184</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.12</td>
+						<td>13:23</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">5,803</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>23802183</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.12</td>
+						<td>09:46</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">3,036</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>30634182</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.11</td>
+						<td>13:05</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">이케아코리아 유한회사 강동지점 비스트로(고객)</td>
+						<td class="x-left">기타일반음식</td>
+						<td class="x-right">1,400</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>45261181</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.10</td>
+						<td>08:00</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">15,868</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>44861180</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.09</td>
+						<td>14:12</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">LG U+ 통신요금 자동이체</td>
+						<td class="x-left">통신비(시청료)</td>
+						<td class="x-right">312,662</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41264179</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.09</td>
+						<td>10:45</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">2,715</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>66370178</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.08</td>
+						<td>16:19</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">서울특별시(주차장-오프라인)</td>
+						<td class="x-left">주차장</td>
+						<td class="x-right">7,200</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>63691177</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.08</td>
+						<td>11:42</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">6,040</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>29635176</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.07</td>
+						<td>17:14</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">하늘후문약국</td>
+						<td class="x-left">약국</td>
+						<td class="x-right">8,400</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>41259175</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.07</td>
+						<td>13:22</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">12,233</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>37627174</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.06</td>
+						<td>12:36</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">3,357</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>62212173</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.05</td>
+						<td>12:09</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">7,081</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>27570172</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>18:37</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">이케아코리아 유한회사 강동지점 비스트로(고객)</td>
+						<td class="x-left">기타일반음식</td>
+						<td class="x-right">700</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>49577171</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>18:15</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">장미시장국밥 아이파크리버몰점</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">1,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>65794170</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>18:10</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">장미시장국밥 아이파크리버몰점</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">11,500</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>59744169</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>15:11</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">배민상회_(주)우아한형제</td>
+						<td class="x-left">PG(온라인)</td>
+						<td class="x-right">33,100</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>30770168</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>13:53</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">유천냉면</td>
+						<td class="x-left">한식(한정식)</td>
+						<td class="x-right">30,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>64168167</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.04</td>
+						<td>13:09</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">5,277</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>42320166</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.03</td>
+						<td>12:51</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">(사)한국자동차협회_한국자동차환</td>
+						<td class="x-left">PG(오프라인)</td>
+						<td class="x-right">6,166</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>52157165</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.02</td>
+						<td>00:00</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">지하철</td>
+						<td class="x-left">기타교통</td>
+						<td class="x-right">1,550</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>75327193</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.01</td>
+						<td>14:28</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">주식회사 주렁주렁</td>
+						<td class="x-left">주차장</td>
+						<td class="x-right">5,000</td>
+						
+							
+								<td>일시불</td>
+								<td>-</td>
+							
+							
+						
+						<td>28307164</td>
+						<td>N</td>
+						<td></td>
+						<td class="x-right">0</td>
+						
+							
+							
+								<td class="x-right">0</td>
+								<td class="x-right">0</td>
+							
+						
+						<td>Y</td>
+					</tr>
+				
+			</tbody>
+		</table>
+	
+	
+	
+		<h2 class="x-tit2">■ 해외이용내역 상세</h2>
+		<table>
+			<thead>
+				<tr>
+					<th scope="col">이용일자</th>
+					<th scope="col">이용시간</th>
+					<th scope="col">이용카드</th>
+					<th scope="col">이용가맹점</th>
+					<th scope="col">국가</th>
+					<th scope="col">도시</th>
+					<th scope="col">현지통화</th>
+					<th scope="col">현지금액</th>
+					<th scope="col">접수금액(＄)</th>
+					<th scope="col">해외서비스 수수료</th>
+					<th scope="col">전신환매도율</th>
+					<th scope="col">환율적용일자</th>
+					<th scope="col">매입여부</th>
+					<th scope="col">청구금액</th>
+					<th scope="col">승인번호</th>
+					<th scope="col">할부개월</th>
+				</tr>
+			</thead>
+			<tbody>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>07:25</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">GOOGLE *TEMPORARY HOLD LONDON</td>
+						<td></td>
+						<td></td>
+						<td></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td></td>
+						<td>N</td>
+						<td class="x-right">0</td>
+						<td>628208</td>
+						<td></td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>06:10</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">PAYPAL *GITHUB INC     4029357</td>
+						<td></td>
+						<td></td>
+						<td></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td></td>
+						<td>N</td>
+						<td class="x-right">0</td>
+						<td>011207</td>
+						<td></td>
+					</tr>
+				
+					<tr>
+						<td>2026.01.20</td>
+						<td>06:10</td>
+						<td>본인 LOCA Professional(0*0*)</td>
+						<td class="x-left">PAYPAL                 4029357</td>
+						<td></td>
+						<td></td>
+						<td></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td class="x-right"></td>
+						<td></td>
+						<td>N</td>
+						<td class="x-right">0</td>
+						<td>786206</td>
+						<td></td>
+					</tr>
+				
+			</tbody>
+		</table>
+	
+	
+	
+	
+	
+
+</body>
+</html>
+

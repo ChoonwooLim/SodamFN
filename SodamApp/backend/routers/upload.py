@@ -28,6 +28,7 @@ async def upload_expense_excel(file: UploadFile = File(...)):
     """
     Processes an excel upload and bulk inserts EXPENSES.
     """
+    import traceback
     try:
         content = await file.read()
         service = ExcelService("dummy_path")
@@ -60,7 +61,9 @@ async def upload_expense_excel(file: UploadFile = File(...)):
         }
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Excel Upload Error: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
 
 # --- REVENUE ENDPOINTS ---
 
