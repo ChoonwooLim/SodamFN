@@ -4,6 +4,8 @@ import { Lock, User, LogIn, AlertCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import './Login.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export default function LoginPage() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -87,7 +89,7 @@ export default function LoginPage() {
         formData.append('password', password);
 
         try {
-            const response = await axios.post('http://localhost:8000/api/auth/login', formData, { timeout: 10000 });
+            const response = await axios.post(`${API_URL}/api/auth/login`, formData, { timeout: 10000 });
             handleLoginSuccess(response.data.access_token);
         } catch (err) {
             console.error("Login Error:", err);
@@ -110,7 +112,7 @@ export default function LoginPage() {
         const top = (window.screen.height / 2) - (height / 2);
 
         window.open(
-            `http://localhost:8000/api/auth/${provider}`,
+            `${API_URL}/api/auth/${provider}`,
             'socialLogin',
             `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
         );

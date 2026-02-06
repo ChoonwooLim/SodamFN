@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Calculator, Calendar } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalculateSuccess }) => {
     const [dailyData, setDailyData] = useState({}); // { day: { hours, status } }
     const [companyHolidays, setCompanyHolidays] = useState([]); // Array of date strings
@@ -24,8 +26,8 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
         setLoading(true);
         try {
             const [attRes, holRes] = await Promise.all([
-                fetch(`http://localhost:8000/api/payroll/attendance/${staffId}/${month}`),
-                fetch(`http://localhost:8000/api/payroll/holidays/${month}`)
+                fetch(`${API_URL}/api/payroll/attendance/${staffId}/${month}`),
+                fetch(`${API_URL}/api/payroll/holidays/${month}`)
             ]);
 
             const attResult = await attRes.json();
@@ -59,10 +61,10 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
 
         try {
             if (isCurrentlyHoliday) {
-                await fetch(`http://localhost:8000/api/payroll/holidays/${dateStr}`, { method: 'DELETE' });
+                await fetch(`${API_URL}/api/payroll/holidays/${dateStr}`, { method: 'DELETE' });
                 setCompanyHolidays(prev => prev.filter(d => d !== dateStr));
             } else {
-                await fetch(`http://localhost:8000/api/payroll/holidays`, {
+                await fetch(`${API_URL}/api/payroll/holidays`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ date: dateStr, description: '임시공휴일' })
@@ -121,7 +123,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             }));
 
 
-            const response = await fetch(`http://localhost:8000/api/payroll/attendance`, {
+            const response = await fetch(`${API_URL}/api/payroll/attendance`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -158,7 +160,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                 return;
             }
 
-            const response = await fetch(`http://localhost:8000/api/payroll/calculate`, {
+            const response = await fetch(`${API_URL}/api/payroll/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ staff_id: staffId, month })

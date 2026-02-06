@@ -845,7 +845,7 @@ export default function StaffDetail() {
                         <div className="space-y-3">
                             {docTypes.map((doc) => {
                                 const uploadedDoc = documents.find(d => d.doc_type === doc.key);
-                                const fileUrl = uploadedDoc ? `http://localhost:8000/${uploadedDoc.file_path.replace(/\\/g, '/')}` : '#';
+                                const fileUrl = uploadedDoc ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/${uploadedDoc.file_path.replace(/\\/g, '/')}` : '#';
                                 return (
                                     <div key={doc.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                                         <div className="flex items-center gap-3 overflow-hidden">

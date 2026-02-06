@@ -4,6 +4,8 @@ import { User, Mail, Lock, UserPlus, AlertCircle, Loader2 } from 'lucide-react';
 import axios from 'axios';
 import './Login.css';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
 export default function SignupPage() {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
@@ -33,7 +35,7 @@ export default function SignupPage() {
         try {
             // In a real app, this would be a signup endpoint
             // For now, we'll hit an endpoint if it exists or simulate
-            await axios.post('http://localhost:8000/api/auth/signup', {
+            await axios.post(`${API_URL}/api/auth/signup`, {
                 username: formData.username,
                 email: formData.email,
                 real_name: formData.real_name,
