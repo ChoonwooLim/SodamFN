@@ -228,7 +228,25 @@ def get_daily_expenses(year: int, month: int, session: Session = Depends(get_ses
 @router.post("/expenses")
 def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(get_session)):
     """Create a new daily expense entry"""
-    new_expense = DailyExpense(**data.model_dump())
+    # Auto-link to Vendor by vendor_name
+    if data.vendor_name:
+        vendor = session.exec(
+            select(Vendor).where(Vendor.name == data.vendor_name)
+        ).first()
+        if not vendor:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"거래처 '{data.vendor_name}'이(가) 거래처 관리에 등록되어 있지 않습니다. 먼저 거래처를 등록해주세요."
+            )
+        # Set vendor_id and sync category from Vendor
+        expense_data = data.model_dump()
+        expense_data['vendor_id'] = vendor.id
+        if vendor.category:
+            expense_data['category'] = vendor.category
+        new_expense = DailyExpense(**expense_data)
+    else:
+        new_expense = DailyExpense(**data.model_dump())
+    
     session.add(new_expense)
     session.commit()
     session.refresh(new_expense)
@@ -245,8 +263,23 @@ def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = D
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
     
+    # Auto-link to Vendor by vendor_name
+    if data.vendor_name:
+        vendor = session.exec(
+            select(Vendor).where(Vendor.name == data.vendor_name)
+        ).first()
+        if not vendor:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"거래처 '{data.vendor_name}'이(가) 거래처 관리에 등록되어 있지 않습니다. 먼저 거래처를 등록해주세요."
+            )
+        record.vendor_id = vendor.id
+        if vendor.category:
+            record.category = vendor.category
+    
     for key, value in data.model_dump().items():
-        setattr(record, key, value)
+        if key not in ['vendor_id']:  # vendor_id is handled above
+            setattr(record, key, value)
     
     session.add(record)
     session.commit()
