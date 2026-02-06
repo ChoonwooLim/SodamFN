@@ -693,6 +693,19 @@ export default function ProfitLoss() {
             }
         });
 
+        // Sort each category: globalVendors order first, then orphan vendors at end
+        Object.keys(groupedVendors).forEach(catId => {
+            groupedVendors[catId].sort((a, b) => {
+                const aIdx = globalVendors.indexOf(a);
+                const bIdx = globalVendors.indexOf(b);
+                // If not in globalVendors (orphan), put at end
+                if (aIdx === -1 && bIdx === -1) return 0;
+                if (aIdx === -1) return 1;
+                if (bIdx === -1) return -1;
+                return aIdx - bIdx;
+            });
+        });
+
         // Calculations for totals
         const dayTotals = {};
         days.forEach(d => {
