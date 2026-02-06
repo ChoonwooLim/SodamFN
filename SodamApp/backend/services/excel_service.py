@@ -294,49 +294,152 @@ class ExcelService:
             return {"status": "error", "message": str(e)}
     def parse_upload(self, file_contents: bytes):
         """
-        Parses an uploaded Excel file.
-        Expected columns: '날짜', '항목', '금액', '분류' (or similar).
-        Returns a list of dictionaries.
+        Smart parser that auto-detects card company format and parses accordingly.
+        Supports: 롯데카드, 신한카드, 삼성카드, KB국민카드, 현대카드, 일반 형식
         """
         import io
         try:
-            # Read into pandas
-            df = pd.read_excel(io.BytesIO(file_contents))
+            # Try reading with different header options
+            df = None
+            header_row = 0
             
-            # Simple column mapping logic
-            # We look for columns that might match
-            cols = df.columns.tolist()
+            # First, try to detect the format by reading raw data
+            try:
+                df_preview = pd.read_excel(io.BytesIO(file_contents), header=None, nrows=10)
+                
+                # Detect card company by looking for keywords in first few rows
+                preview_text = df_preview.to_string().lower()
+                
+                # Check for "카드이용내역" pattern (Lotte/Shinhan style)
+                if '카드이용내역' in preview_text or '이용일자' in preview_text:
+                    # Find the row with actual headers (이용일자, 이용가맹점, etc.)
+                    for i, row in df_preview.iterrows():
+                        row_text = ' '.join([str(v) for v in row.values if pd.notna(v)])
+                        if '이용일자' in row_text or '승인일자' in row_text:
+                            header_row = i
+                            break
+                            
+            except Exception:
+                pass
             
-            # Helper to find column
+            # Read with detected header row
+            df = pd.read_excel(io.BytesIO(file_contents), header=header_row)
+            cols = [str(c).strip() for c in df.columns.tolist()]
+            cols_lower = [c.lower() for c in cols]
+            
+            # Detect format and map columns
+            format_detected = "unknown"
+            date_col = None
+            item_col = None
+            amount_col = None
+            category_col = None
+            
+            # Helper to find column by keywords
             def find_col(keywords):
-                for c in cols:
-                    if any(k in str(c) for k in keywords):
-                        return c
+                for i, c in enumerate(cols):
+                    if any(k in c for k in keywords):
+                        return cols[i]
                 return None
             
-            date_col = find_col(['날짜', 'Date', '일자'])
-            item_col = find_col(['항목', 'Item', '내역', '사용처'])
-            amount_col = find_col(['금액', 'Amount', '비용'])
-            addr_col = find_col(['분류', 'Category']) # Optional
+            # Pattern 1: 롯데카드/신한카드 형식 (이용일자, 이용가맹점, 이용금액)
+            if find_col(['이용일자', '승인일자', '결제일자']):
+                format_detected = "card_statement"
+                date_col = find_col(['이용일자', '승인일자', '결제일자', '거래일자'])
+                item_col = find_col(['이용가맹점', '가맹점명', '가맹점', '사용처', '이용처'])
+                amount_col = find_col(['이용금액', '결제금액', '승인금액', '사용금액', '금액'])
+                category_col = find_col(['업종', '분류', '카테고리'])
+                
+            # Pattern 2: 일반 지출 형식 (날짜, 항목, 금액)
+            elif find_col(['날짜', 'Date', '일자']):
+                format_detected = "standard"
+                date_col = find_col(['날짜', 'Date', '일자'])
+                item_col = find_col(['항목', 'Item', '내역', '사용처', '적요'])
+                amount_col = find_col(['금액', 'Amount', '비용', '지출'])
+                category_col = find_col(['분류', 'Category', '카테고리'])
             
-            if not (date_col and amount_col):
-                return {"status": "error", "message": "필수 컬럼(날짜, 금액)을 찾을 수 없습니다."}
+            # Pattern 3: Fallback - use first few columns
+            else:
+                format_detected = "auto"
+                # Try to find date-like column
+                for c in cols:
+                    if any(x in c for x in ['일', 'date', 'Date', '날']):
+                        date_col = c
+                        break
+                if not date_col and len(cols) > 0:
+                    date_col = cols[0]
+                    
+                # Amount column - look for numbers in column name or data
+                for c in cols:
+                    if any(x in c for x in ['금액', '원', 'amount', 'Amount', '비용']):
+                        amount_col = c
+                        break
+                if not amount_col and len(cols) > 1:
+                    # Try to find a numeric column
+                    for c in cols[1:]:
+                        try:
+                            if df[c].dtype in ['int64', 'float64']:
+                                amount_col = c
+                                break
+                        except:
+                            pass
+                            
+                item_col = find_col(['항목', '가맹점', '내역', '사용처', '적요', '상호'])
+            
+            if not date_col:
+                return {"status": "error", "message": "날짜 컬럼을 찾을 수 없습니다. (이용일자/날짜/Date)"}
+            if not amount_col:
+                return {"status": "error", "message": "금액 컬럼을 찾을 수 없습니다. (이용금액/금액/Amount)"}
             
             results = []
-            for _, row in df.iterrows():
+            skipped = 0
+            
+            for idx, row in df.iterrows():
                 try:
+                    # Parse date
                     d_val = row[date_col]
-                    # Handle date formats
-                    if isinstance(d_val, datetime.datetime):
-                        d_str = d_val.strftime("%Y-%m-%d")
-                    else:
-                        d_str = str(d_val)[:10] # Naive string slice
+                    if pd.isna(d_val):
+                        skipped += 1
+                        continue
                         
-                    amt = row[amount_col]
-                    amt = int(amt) if pd.notna(amt) and str(amt).replace(',','').replace('.','').isdigit() else 0
+                    if isinstance(d_val, (datetime.datetime, datetime.date)):
+                        d_str = d_val.strftime("%Y-%m-%d")
+                    elif isinstance(d_val, str):
+                        # Handle various date formats: 2026.01.31, 2026-01-31, 2026/01/31
+                        d_clean = d_val.strip().replace('.', '-').replace('/', '-')
+                        d_str = d_clean[:10]
+                    else:
+                        d_str = str(d_val)[:10]
                     
-                    item = str(row[item_col]) if item_col and pd.notna(row[item_col]) else "미지정"
-                    cat = str(row[addr_col]) if addr_col and pd.notna(row[addr_col]) else "기타"
+                    # Parse amount
+                    amt = row[amount_col]
+                    if pd.isna(amt):
+                        skipped += 1
+                        continue
+                    
+                    # Handle various number formats: 7,900 / 7900 / 7900.0
+                    if isinstance(amt, (int, float)):
+                        amt = int(abs(amt))
+                    else:
+                        amt_str = str(amt).replace(',', '').replace('원', '').strip()
+                        try:
+                            amt = int(abs(float(amt_str)))
+                        except:
+                            skipped += 1
+                            continue
+                    
+                    if amt == 0:
+                        skipped += 1
+                        continue
+                    
+                    # Parse item/vendor
+                    item = "미지정"
+                    if item_col and pd.notna(row.get(item_col)):
+                        item = str(row[item_col]).strip()
+                    
+                    # Parse category
+                    cat = "기타"
+                    if category_col and pd.notna(row.get(category_col)):
+                        cat = str(row[category_col]).strip()
                     
                     results.append({
                         "date": d_str,
@@ -344,10 +447,23 @@ class ExcelService:
                         "amount": amt,
                         "category": cat
                     })
-                except Exception as row_e:
-                    continue # Skip bad rows
                     
-            return {"status": "success", "data": results}
+                except Exception as row_e:
+                    skipped += 1
+                    continue
+            
+            if not results:
+                return {"status": "error", "message": f"파싱된 데이터가 없습니다. (형식: {format_detected}, 스킵: {skipped}행)"}
+                    
+            return {
+                "status": "success", 
+                "data": results,
+                "format": format_detected,
+                "parsed": len(results),
+                "skipped": skipped
+            }
             
         except Exception as e:
-            return {"status": "error", "message": f"Excel parsing error: {str(e)}"}
+            import traceback
+            return {"status": "error", "message": f"Excel 파싱 오류: {str(e)}"}
+
