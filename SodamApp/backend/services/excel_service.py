@@ -481,6 +481,15 @@ class ExcelService:
                     else:
                         d_str = str(d_val)[:10]
                     
+                    # Validate date format (must be YYYY-MM-DD with at least 10 chars)
+                    if not d_str or len(d_str) < 8 or d_str in ['-', '--', '---']:
+                        skipped += 1
+                        continue
+                    # Additional check: must contain digits
+                    if not any(c.isdigit() for c in d_str):
+                        skipped += 1
+                        continue
+                    
                     # Parse amount
                     amt = row[amount_col]
                     if pd.isna(amt):
