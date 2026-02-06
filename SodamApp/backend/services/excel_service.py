@@ -295,17 +295,34 @@ class ExcelService:
     def parse_upload(self, file_contents: bytes):
         """
         Smart parser that auto-detects card company format and parses accordingly.
-        Supports: 롯데카드, 신한카드, 삼성카드, KB국민카드, 현대카드, 일반 형식
+        Supports: 롯데카드, 신한카드, 삼성카드, KB국민카드, 현대카드, 은행 송금내역, 일반 형식
+        Supports both .xls and .xlsx formats
         """
         import io
         try:
+            # Helper function to read excel with fallback engines
+            def read_excel_safe(content, **kwargs):
+                """Try different engines for .xls/.xlsx compatibility"""
+                engines = ['openpyxl', 'xlrd', None]
+                last_error = None
+                for engine in engines:
+                    try:
+                        if engine:
+                            return pd.read_excel(io.BytesIO(content), engine=engine, **kwargs)
+                        else:
+                            return pd.read_excel(io.BytesIO(content), **kwargs)
+                    except Exception as e:
+                        last_error = e
+                        continue
+                raise last_error
+            
             # Try reading with different header options
             df = None
             header_row = 0
             
             # First, try to detect the format by reading raw data
             try:
-                df_preview = pd.read_excel(io.BytesIO(file_contents), header=None, nrows=10)
+                df_preview = read_excel_safe(file_contents, header=None, nrows=10)
                 
                 # Detect card company by looking for keywords in first few rows
                 preview_text = df_preview.to_string().lower()
@@ -319,11 +336,20 @@ class ExcelService:
                             header_row = i
                             break
                             
-            except Exception:
+                # Check for "거래내역조회" pattern (Bank statement style)
+                if '거래내역조회' in preview_text or '거래일자' in preview_text:
+                    for i, row in df_preview.iterrows():
+                        row_text = ' '.join([str(v) for v in row.values if pd.notna(v)])
+                        if '거래일자' in row_text:
+                            header_row = i
+                            break
+                            
+            except Exception as preview_err:
+                print(f"Preview error: {preview_err}")
                 pass
             
             # Read with detected header row
-            df = pd.read_excel(io.BytesIO(file_contents), header=header_row)
+            df = read_excel_safe(file_contents, header=header_row)
             cols = [str(c).strip() for c in df.columns.tolist()]
             cols_lower = [c.lower() for c in cols]
             
