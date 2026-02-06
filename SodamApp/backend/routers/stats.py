@@ -3,6 +3,7 @@ from services.database_service import DatabaseService
 from services.profit_loss_service import sync_all_expenses
 from pydantic import BaseModel
 from datetime import date
+from typing import Optional, List
 from models import DailyExpense, Vendor
 
 router = APIRouter()
@@ -94,8 +95,8 @@ def get_vendors_list():
 
 class VendorUpdate(BaseModel):
     name: str
-    item: str = None
-    category: str = None
+    item: Optional[str] = None
+    category: Optional[str] = None
     vendor_type: str = "expense"
     order_index: int = 0
 
