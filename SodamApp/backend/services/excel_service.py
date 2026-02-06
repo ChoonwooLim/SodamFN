@@ -6,9 +6,10 @@ import datetime
 EXCEL_PATH = r"C:\WORK\SodamFN\2025실소득분석\소담김밥손익계산서(9~12).xlsx"
 
 class ExcelService:
-    def __init__(self, file_path=EXCEL_PATH):
+    def __init__(self, file_path=None):
         self.file_path = file_path
-        if not os.path.exists(self.file_path):
+        # Only check existence if a real path is provided (not None and not "dummy_path")
+        if self.file_path and self.file_path != "dummy_path" and not os.path.exists(self.file_path):
             raise FileNotFoundError(f"Excel file not found at {self.file_path}")
 
     def get_monthly_summary(self):
