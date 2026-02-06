@@ -16,34 +16,35 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
             image: isRevenue ? '/upload/image/revenue' : '/upload/image/expense',
             excel: isRevenue ? '/upload/excel/revenue' : '/upload/excel/expense'
         },
-        excelMessage: isRevenue ? "필수 컬럼: 날짜, 금액, 채널(옵션)" : "필수 컬럼: 날짜, 항목, 금액, 분류(옵션)"
+        excelMessage: isRevenue ? "필수 컬럼: 날짜, 금액, 채널(옵션)" : "여러 파일 선택 가능 (필수: 날짜, 항목, 금액)"
     };
 
     const [activeTab, setActiveTab] = useState('camera'); // 'camera' or 'excel'
     const [loading, setLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
     const fileInputRef = useRef(null);
     const excelInputRef = useRef(null);
     const navigate = useNavigate();
 
     const handleFileChange = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
         setLoading(true);
-        const formData = new FormData();
-        formData.append('file', file);
 
-        try {
-            const endpoint = activeTab === 'camera' ? config.endpoints.image : config.endpoints.excel;
+        // For camera/image upload, just handle single file
+        if (activeTab === 'camera') {
+            const file = files[0];
+            const formData = new FormData();
+            formData.append('file', file);
 
-            await new Promise(r => setTimeout(r, 800));
+            try {
+                await new Promise(r => setTimeout(r, 800));
+                const response = await api.post(config.endpoints.image, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
 
-            const response = await api.post(endpoint, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            if (response.data.status === 'success') {
-                if (activeTab === 'camera') {
+                if (response.data.status === 'success') {
                     if (isRevenue) {
                         alert("이미지가 성공적으로 분석되었습니다. (Mock)");
                         navigate('/');
@@ -51,18 +52,62 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                         navigate('/confirm', { state: { ...response.data.data } });
                     }
                 } else {
-                    alert(`${response.data.count}건의 내역이 성공적으로 저장되었습니다.`);
-                    navigate('/');
+                    alert('처리 실패: ' + response.data.message);
                 }
-            } else {
-                alert('처리 실패: ' + response.data.message);
+            } catch (error) {
+                console.error("Upload error:", error);
+                alert("업로드 중 오류가 발생했습니다.");
+            } finally {
+                setLoading(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
             }
+            return;
+        }
+
+        // For Excel upload, handle multiple files
+        let totalCount = 0;
+        let successCount = 0;
+        let errorFiles = [];
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                setUploadProgress(`(${i + 1}/${files.length}) ${file.name} 처리 중...`);
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await api.post(config.endpoints.excel, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+
+                    if (response.data.status === 'success') {
+                        totalCount += response.data.count || 0;
+                        successCount++;
+                    } else {
+                        errorFiles.push(`${file.name}: ${response.data.message}`);
+                    }
+                } catch (error) {
+                    console.error(`Upload error for ${file.name}:`, error);
+                    errorFiles.push(`${file.name}: 업로드 실패`);
+                }
+            }
+
+            // Show result summary
+            let message = `${successCount}개 파일 처리 완료, 총 ${totalCount}건 저장됨`;
+            if (errorFiles.length > 0) {
+                message += `\n\n실패한 파일:\n${errorFiles.join('\n')}`;
+            }
+            alert(message);
+            navigate('/');
+
         } catch (error) {
             console.error("Upload error:", error);
             alert("업로드 중 오류가 발생했습니다.");
         } finally {
             setLoading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            setUploadProgress('');
             if (excelInputRef.current) excelInputRef.current.value = '';
         }
     };
@@ -119,7 +164,7 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                             <div className="flex flex-col items-center gap-4">
                                 <div className={`w-16 h-16 border-4 border-t-transparent rounded-full animate-spin ${activeTab === 'camera' ? borderThemeClass : 'border-emerald-500'}`}></div>
                                 <p className={`text-sm font-medium animate-pulse ${activeTab === 'camera' ? themeClass : 'text-emerald-400'}`}>
-                                    처리 중입니다...
+                                    {uploadProgress || '처리 중입니다...'}
                                 </p>
                             </div>
                         ) : (
@@ -152,6 +197,7 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
             <input
                 type="file"
                 accept=".xlsx, .xls"
+                multiple
                 className="hidden"
                 ref={excelInputRef}
                 onChange={handleFileChange}
@@ -159,3 +205,4 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
         </div>
     );
 }
+
