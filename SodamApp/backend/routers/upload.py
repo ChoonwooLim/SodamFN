@@ -47,6 +47,7 @@ async def upload_expense_excel(file: UploadFile = File(...)):
         vendor_created_count = 0
         processed_months = set()
         
+        # Phase 1: Insert data
         with Session(engine) as session:
             for item in expenses_data:
                 if item['amount'] > 0:
@@ -91,15 +92,16 @@ async def upload_expense_excel(file: UploadFile = File(...)):
                     processed_months.add((date_obj.year, date_obj.month))
             
             session.commit()
-            
-            # Sync P/L for all processed months
-            for (year, month) in processed_months:
-                try:
-                    sync_all_expenses(year, month, session)
-                except Exception as sync_err:
-                    print(f"P/L Sync error for {year}-{month}: {sync_err}")
-            
-            session.commit()
+        
+        # Phase 2: Sync P/L in a separate session
+        if processed_months:
+            with Session(engine) as sync_session:
+                for (year, month) in processed_months:
+                    try:
+                        sync_all_expenses(year, month, sync_session)
+                    except Exception as sync_err:
+                        print(f"P/L Sync error for {year}-{month}: {sync_err}")
+                sync_session.commit()
             
         return {
             "status": "success", 

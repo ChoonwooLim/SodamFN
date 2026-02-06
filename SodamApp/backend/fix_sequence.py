@@ -7,9 +7,13 @@ cur = conn.cursor()
 cur.execute("SELECT setval('expense_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM expense))")
 print('Expense sequence reset')
 
-# Also fix DailyExpense just in case
+# Fix DailyExpense sequence
 cur.execute("SELECT setval('dailyexpense_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM dailyexpense))")
 print('DailyExpense sequence reset')
+
+# Fix Vendor sequence
+cur.execute("SELECT setval('vendor_id_seq', (SELECT COALESCE(MAX(id), 0) + 1 FROM vendor))")
+print('Vendor sequence reset')
 
 conn.commit()
 cur.close()
