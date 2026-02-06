@@ -26,38 +26,86 @@ async def upload_expense_image(file: UploadFile = File(...)):
 @router.post("/upload/excel/expense")
 async def upload_expense_excel(file: UploadFile = File(...)):
     """
-    Processes an excel upload and bulk inserts EXPENSES.
+    Processes an excel upload and bulk inserts to DailyExpense.
+    Also auto-creates/links vendors and syncs P/L.
     """
     import traceback
+    from sqlmodel import select
+    from models import Vendor, DailyExpense
+    from services.profit_loss_service import sync_all_expenses
+    
     try:
         content = await file.read()
         service = ExcelService("dummy_path")
-        result = service.parse_upload(content) # Uses the generic/expense parser
+        result = service.parse_upload(content)
         
         if result.get("status") == "error":
             return result
         
         expenses_data = result.get("data", [])
         inserted_count = 0
+        vendor_created_count = 0
+        processed_months = set()
         
         with Session(engine) as session:
             for item in expenses_data:
                 if item['amount'] > 0:
-                    expense = Expense(
-                        date=item['date'],
+                    item_name = item['item'] or "미지정"
+                    category = item['category'] or "기타"
+                    
+                    # Parse date
+                    date_str = item['date']
+                    try:
+                        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                    except:
+                        continue
+                    
+                    # Find or create vendor
+                    vendor = session.exec(
+                        select(Vendor).where(Vendor.name == item_name)
+                    ).first()
+                    
+                    if not vendor:
+                        vendor = Vendor(
+                            name=item_name,
+                            category=category,
+                            vendor_type="expense"
+                        )
+                        session.add(vendor)
+                        session.flush()  # Get the ID
+                        vendor_created_count += 1
+                    
+                    # Create DailyExpense record
+                    daily_expense = DailyExpense(
+                        date=date_obj,
+                        vendor_name=item_name,
+                        vendor_id=vendor.id,
                         amount=item['amount'],
-                        category=item['category'],
-                        description=item['item'],
-                        vendor_id=None
+                        category=category,
+                        note=None
                     )
-                    session.add(expense)
+                    session.add(daily_expense)
                     inserted_count += 1
+                    
+                    # Track months for P/L sync
+                    processed_months.add((date_obj.year, date_obj.month))
+            
+            session.commit()
+            
+            # Sync P/L for all processed months
+            for (year, month) in processed_months:
+                try:
+                    sync_all_expenses(year, month, session)
+                except Exception as sync_err:
+                    print(f"P/L Sync error for {year}-{month}: {sync_err}")
+            
             session.commit()
             
         return {
             "status": "success", 
-            "message": f"{inserted_count}건의 지출 내역이 저장되었습니다.",
-            "count": inserted_count
+            "message": f"{inserted_count}건의 지출 내역이 저장되었습니다. (신규 거래처 {vendor_created_count}개 생성)",
+            "count": inserted_count,
+            "vendors_created": vendor_created_count
         }
             
     except Exception as e:
