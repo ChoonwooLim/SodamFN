@@ -13,33 +13,34 @@ const REVENUE_FIELDS = [
 ];
 
 const EXPENSE_FIELDS = [
-    { key: 'expense_labor', label: '인건비' },
+    { key: 'expense_ingredient', label: '식자재' },
+    { key: 'expense_material', label: '재료비' },
     { key: 'expense_rent', label: '임대료' },
     { key: 'expense_rent_fee', label: '임대관리비' },
     { key: 'expense_utility', label: '제세공과금' },
+    { key: 'expense_card_fee', label: '카드수수료' },
     { key: 'expense_vat', label: '부가가치세' },
     { key: 'expense_biz_tax', label: '사업소득세' },
     { key: 'expense_income_tax', label: '근로소득세' },
-    { key: 'expense_card_fee', label: '카드수수료' },
-    { key: 'expense_material', label: '재료비' },
-    { key: 'expense_retirement', label: '퇴직금적립' },
+    { key: 'expense_other', label: '기타비용' },
+    { key: 'expense_labor', label: '인건비', auto: true },
+    { key: 'expense_retirement', label: '퇴직금적립', auto: true },
 ];
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 // 매입처 카테고리 정의 (VendorSettings.jsx와 동기화)
+// Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
 const EXPENSE_CATEGORIES = [
     { id: '식자재', label: '식자재', icon: '🥬' },
     { id: '재료비', label: '재료비', icon: '📦' },
     { id: '임대료', label: '임대료(월세)', icon: '🏠' },
     { id: '임대관리비', label: '임대관리비', icon: '🏢' },
     { id: '제세공과금', label: '제세공과금', icon: '💡' },
-    { id: '인건비', label: '인건비', icon: '👷' },
     { id: '카드수수료', label: '카드수수료', icon: '💳' },
     { id: '부가가치세', label: '부가가치세', icon: '📋' },
     { id: '사업소득세', label: '사업소득세', icon: '📋' },
     { id: '근로소득세', label: '근로소득세', icon: '📋' },
-    { id: '퇴직금적립', label: '퇴직금적립', icon: '💰' },
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
 

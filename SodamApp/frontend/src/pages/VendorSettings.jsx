@@ -6,18 +6,17 @@ import './VendorSettings.css';
 import ProductManagement from '../components/ProductManagement';
 
 // 매입처 카테고리 정의 (백엔드 CATEGORY_TO_PL_FIELD와 동기화)
+// Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
 const EXPENSE_CATEGORIES = [
     { id: '식자재', label: '식자재', icon: '🥬' },
     { id: '재료비', label: '재료비', icon: '📦' },
     { id: '임대료', label: '임대료(월세)', icon: '🏠' },
     { id: '임대관리비', label: '임대관리비', icon: '🏢' },
     { id: '제세공과금', label: '제세공과금', icon: '💡' },
-    { id: '인건비', label: '인건비', icon: '👷' },
     { id: '카드수수료', label: '카드수수료', icon: '💳' },
     { id: '부가가치세', label: '부가가치세', icon: '📋' },
     { id: '사업소득세', label: '사업소득세', icon: '📋' },
     { id: '근로소득세', label: '근로소득세', icon: '📋' },
-    { id: '퇴직금적립', label: '퇴직금적립', icon: '💰' },
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
 

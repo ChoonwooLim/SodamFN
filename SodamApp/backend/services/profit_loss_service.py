@@ -4,17 +4,19 @@ import datetime
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
 # Note: 인건비는 Payroll 데이터에서 동기화됨 (sync_labor_cost)
+# Note: 퇴직금적립은 인건비의 10%로 자동계산됨 (sync_labor_cost)
 CATEGORY_TO_PL_FIELD = {
+    "식자재": "expense_ingredient",
+    "재료비": "expense_material",
     "임대료": "expense_rent",
     "임대관리비": "expense_rent_fee",
-    "재료비": "expense_material",
-    "식자재": "expense_material",
     "제세공과금": "expense_utility",
     "카드수수료": "expense_card_fee",
     "부가가치세": "expense_vat",
     "사업소득세": "expense_biz_tax",
     "근로소득세": "expense_income_tax",
-    "퇴직금적립": "expense_retirement",
+    "other": "expense_other",
+    "기타비용": "expense_other",
 }
 
 def sync_all_expenses(year: int, month: int, session: Session):
@@ -148,7 +150,7 @@ def sync_summary_material_cost(year: int, month: int, session: Session):
 def sync_labor_cost(year: int, month: int, session: Session):
     """
     Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
-    This includes all staff payroll (base pay + bonuses - deductions = net pay to employees)
+    Also calculates expense_retirement as 10% of labor cost.
     """
     
     month_str = f"{year}-{month:02d}"
@@ -159,6 +161,9 @@ def sync_labor_cost(year: int, month: int, session: Session):
         .where(Payroll.month == month_str)
     ).one() or 0
     
+    # Calculate retirement fund as 10% of labor cost
+    retirement_fund = int(int(total_labor) * 0.1)
+    
     # Find or create MonthlyProfitLoss record
     pl_record = session.exec(
         select(MonthlyProfitLoss)
@@ -167,13 +172,15 @@ def sync_labor_cost(year: int, month: int, session: Session):
     
     if pl_record:
         pl_record.expense_labor = int(total_labor)
+        pl_record.expense_retirement = retirement_fund
         session.add(pl_record)
     else:
         # Create a new record if it doesn't exist
         pl_record = MonthlyProfitLoss(
             year=year,
             month=month,
-            expense_labor=int(total_labor)
+            expense_labor=int(total_labor),
+            expense_retirement=retirement_fund
         )
         session.add(pl_record)
     

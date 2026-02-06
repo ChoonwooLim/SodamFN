@@ -265,14 +265,17 @@ class MonthlyProfitLoss(SQLModel, table=True):
     expense_labor: int = 0        # 인건비
     expense_rent: int = 0         # 임대료 (월세)
     expense_rent_fee: int = 0     # 임대관리비
-    expense_utility: int = 0      # 제세공과금(기타)
+    expense_utility: int = 0      # 제세공과금
     expense_vat: int = 0          # 부가가치세
     expense_biz_tax: int = 0      # 사업소득세
     expense_income_tax: int = 0   # 근로소득세
     expense_card_fee: int = 0     # 카드수수료
+    expense_ingredient: int = 0   # 식자재
     expense_material: int = 0     # 재료비
     expense_retirement: int = 0   # 퇴직금적립
+    expense_other: int = 0        # 기타비용
     expense_personal: int = 0     # 개인생활비
+
 
 class DailyExpense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
