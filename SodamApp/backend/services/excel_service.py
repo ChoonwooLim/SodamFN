@@ -348,6 +348,14 @@ class ExcelService:
                 item_col = find_col(['이용가맹점', '가맹점명', '가맹점', '사용처', '이용처'])
                 amount_col = find_col(['이용금액', '결제금액', '승인금액', '사용금액', '금액'])
                 category_col = find_col(['업종', '분류', '카테고리'])
+            
+            # Pattern 1.5: 신한은행/국민은행 송금내역 형식 (거래일자, 출금(원), 내용)
+            elif find_col(['거래일자']) and find_col(['출금']):
+                format_detected = "bank_transfer"
+                date_col = find_col(['거래일자'])
+                item_col = find_col(['내용', '적요', '거래내용', '메모'])
+                amount_col = find_col(['출금', '출금(원)', '출금액', '이체금액'])
+                category_col = None  # Bank statements usually don't have category
                 
             # Pattern 2: 일반 지출 형식 (날짜, 항목, 금액)
             elif find_col(['날짜', 'Date', '일자']):
