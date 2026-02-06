@@ -125,11 +125,29 @@ class DatabaseService:
         return True
 
     def delete_vendor(self, vendor_name: str):
+        from models import DailyExpense
+        from services.profit_loss_service import sync_all_expenses
+        
         stmt = select(Vendor).where(Vendor.name == vendor_name)
         vendor = self.session.exec(stmt).first()
         if vendor:
+            # Get affected months before deletion
+            expense_stmt = select(DailyExpense).where(DailyExpense.vendor_id == vendor.id)
+            expenses = self.session.exec(expense_stmt).all()
+            affected_months = set((e.date.year, e.date.month) for e in expenses)
+            
+            # Delete associated DailyExpense records first
+            for expense in expenses:
+                self.session.delete(expense)
+            
+            # Then delete the vendor
             self.session.delete(vendor)
             self.session.commit()
+            
+            # Sync P/L for affected months
+            for y, m in affected_months:
+                sync_all_expenses(y, m, self.session)
+            
             return True
         return False
         
