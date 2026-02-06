@@ -7,6 +7,13 @@ import pandas as pd
 class DatabaseService:
     def __init__(self):
         self.session = Session(engine)
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.session.close()
+        return False
 
     def get_monthly_summary(self, month: int, year: int = 2025):
         # Revenue

@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, create_engine, Session
+from sqlalchemy.pool import StaticPool, NullPool
 import os
 
 # Check for DATABASE_URL environment variable (Render provides this)
@@ -17,14 +18,26 @@ else:
     connect_args = {} # Postgres doesn't need this
 
 DEBUG_SQL = os.environ.get("DEBUG_SQL", "false").lower() == "true"
-engine = create_engine(
-    DATABASE_URL, 
-    echo=DEBUG_SQL, 
-    connect_args=connect_args,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True
-)
+
+# Different engine configuration for SQLite vs PostgreSQL
+if DATABASE_URL.startswith("sqlite"):
+    # SQLite: Use NullPool to avoid connection issues
+    engine = create_engine(
+        DATABASE_URL, 
+        echo=DEBUG_SQL, 
+        connect_args=connect_args,
+        poolclass=StaticPool  # Single connection for SQLite
+    )
+else:
+    # PostgreSQL: Use connection pooling
+    engine = create_engine(
+        DATABASE_URL, 
+        echo=DEBUG_SQL, 
+        connect_args=connect_args,
+        pool_size=20,
+        max_overflow=10,
+        pool_pre_ping=True
+    )
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
