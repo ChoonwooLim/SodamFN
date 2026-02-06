@@ -27,6 +27,22 @@ const EXPENSE_FIELDS = [
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+// 매입처 카테고리 정의 (VendorSettings.jsx와 동기화)
+const EXPENSE_CATEGORIES = [
+    { id: '식자재', label: '식자재', icon: '🥬' },
+    { id: '재료비', label: '재료비', icon: '📦' },
+    { id: '임대료', label: '임대료(월세)', icon: '🏠' },
+    { id: '임대관리비', label: '임대관리비', icon: '🏢' },
+    { id: '제세공과금', label: '제세공과금', icon: '💡' },
+    { id: '인건비', label: '인건비', icon: '👷' },
+    { id: '카드수수료', label: '카드수수료', icon: '💳' },
+    { id: '부가가치세', label: '부가가치세', icon: '📋' },
+    { id: '사업소득세', label: '사업소득세', icon: '📋' },
+    { id: '근로소득세', label: '근로소득세', icon: '📋' },
+    { id: '퇴직금적립', label: '퇴직금적립', icon: '💰' },
+    { id: 'other', label: '기타비용', icon: '📋' },
+];
+
 // Main tabs (always visible)
 const MAIN_TABS = [
     { id: 'summary', label: '📊 손익계산서' },
@@ -662,29 +678,16 @@ export default function ProfitLoss() {
             ? allVendorNames.filter(v => vendorTotals[v] > 0)
             : allVendorNames;
 
-        // Group vendors by Category (mapped to PL fields)
+        // Group vendors by VendorSettings category (not P/L fields)
         const groupedVendors = {};
-        // Initialize groups based on EXPENSE_FIELDS + other
-        EXPENSE_FIELDS.forEach(f => groupedVendors[f.key] = []);
-        groupedVendors['other'] = [];
+        // Initialize groups based on EXPENSE_CATEGORIES (matching VendorSettings)
+        EXPENSE_CATEGORIES.forEach(cat => groupedVendors[cat.id] = []);
 
         displayVendors.forEach(v => {
-            // Find category for this vendor. 
-            // If not in expense data (no transaction this month), try finding in global list?
-            // (Assuming globalVendors state objects have category, but globalVendors is string array based on fetch code)
-            // Wait, fetchGlobalVendors sets globalVendors to names only.
-            // We need category info for vendors with 0 expenses too.
-            // We can infer from vendorCategoryMap if they had past transactions? 
-            // If they have 0 transactions this month, we might not know their category if not cached.
-            // But displayVendors are filtered. If hiding empty, we only care about ones with data.
-            // If showing empty, we might group them in 'other' or need to fetch category map.
-            // For now, use map from current month data. If missing, 'other'.
-
             // Use Vendor API category as source of truth, fallback to expense data category
-            const cat = vendorCategoryFromAPI[v] || vendorCategoryMap[v];
-            const plKey = getPlFieldByCategory(cat);
-            if (groupedVendors[plKey]) {
-                groupedVendors[plKey].push(v);
+            const cat = vendorCategoryFromAPI[v] || vendorCategoryMap[v] || 'other';
+            if (groupedVendors[cat]) {
+                groupedVendors[cat].push(v);
             } else {
                 groupedVendors['other'].push(v);
             }
@@ -852,8 +855,7 @@ export default function ProfitLoss() {
                         <tbody>
                             {displayVendors.length > 0 ? (
                                 <>
-                                    {EXPENSE_FIELDS.map(field => renderCategoryGroup(field.key, field.label))}
-                                    {renderCategoryGroup('other', '미분류/기타')}
+                                    {EXPENSE_CATEGORIES.map(cat => renderCategoryGroup(cat.id, `${cat.icon} ${cat.label}`))}
 
                                     <tr className="day-totals-row grand-total-row">
                                         <td className="vendor-cell"><strong>총 합계</strong></td>
