@@ -70,8 +70,10 @@ export default function ProfitLoss() {
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
 
-    // Global vendor list (from API + localStorage order)
+    // Global vendor list (from API + localStorage order) - now stores full vendor objects
     const [globalVendors, setGlobalVendors] = useState([]);
+    // Vendor category map (vendorName -> category) from Vendor API
+    const [vendorCategoryFromAPI, setVendorCategoryFromAPI] = useState({});
 
     // Hide empty vendors toggle (for monthly expense view)
     const [hideEmptyVendors, setHideEmptyVendors] = useState(false);
@@ -82,28 +84,27 @@ export default function ProfitLoss() {
             const res = await axios.get(`${API_URL}/api/vendors`);
             if (res.data.status === 'success') {
                 const apiVendors = res.data.data;
-                const savedOrder = localStorage.getItem('profitloss_vendor_order');
-                const orderList = savedOrder ? JSON.parse(savedOrder) : [];
 
-                // Merge: first vendors from saved order, then rest from API
-                const orderedVendors = [];
-                orderList.forEach(name => {
-                    const v = apiVendors.find(vendor => vendor.name === name);
-                    if (v) orderedVendors.push(v.name);
-                });
-                // Add any API vendors not in saved order
+                // Build category map from Vendor API (source of truth)
+                const categoryMap = {};
                 apiVendors.forEach(v => {
-                    if (!orderedVendors.includes(v.name)) {
-                        orderedVendors.push(v.name);
+                    if (v.name && v.category) {
+                        categoryMap[v.name] = v.category;
                     }
                 });
+                setVendorCategoryFromAPI(categoryMap);
+
+                // Sort by order_index then by name
+                apiVendors.sort((a, b) => (a.order_index || 999) - (b.order_index || 999));
+
+                // Extract vendor names in order
+                const orderedVendors = apiVendors
+                    .filter(v => v.vendor_type === 'expense')
+                    .map(v => v.name);
                 setGlobalVendors(orderedVendors);
             }
         } catch (err) {
             console.error('Error fetching global vendors:', err);
-            // Fallback to localStorage
-            const saved = localStorage.getItem('profitloss_vendor_order');
-            if (saved) setGlobalVendors(JSON.parse(saved));
         }
     };
 
@@ -679,7 +680,8 @@ export default function ProfitLoss() {
             // If showing empty, we might group them in 'other' or need to fetch category map.
             // For now, use map from current month data. If missing, 'other'.
 
-            const cat = vendorCategoryMap[v];
+            // Use Vendor API category as source of truth, fallback to expense data category
+            const cat = vendorCategoryFromAPI[v] || vendorCategoryMap[v];
             const plKey = getPlFieldByCategory(cat);
             if (groupedVendors[plKey]) {
                 groupedVendors[plKey].push(v);
