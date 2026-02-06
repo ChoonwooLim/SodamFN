@@ -303,9 +303,11 @@ class ExcelService:
         try:
             # Helper function to read excel with fallback engines
             def read_excel_safe(content, **kwargs):
-                """Try different engines for .xls/.xlsx compatibility"""
+                """Try different engines for .xls/.xlsx compatibility and handle HTML masquerading as Excel"""
+                error_list = []
+                
+                # 1. Try standard Excel engines
                 engines = ['openpyxl', 'xlrd', None]
-                last_error = None
                 for engine in engines:
                     try:
                         if engine:
@@ -313,9 +315,21 @@ class ExcelService:
                         else:
                             return pd.read_excel(io.BytesIO(content), **kwargs)
                     except Exception as e:
-                        last_error = e
+                        error_list.append(f"Engine {engine}: {str(e)}")
                         continue
-                raise last_error
+                
+                # 2. Try parsing as HTML (common in Korean finance for .xls files)
+                try:
+                    dfs = pd.read_html(io.BytesIO(content), **kwargs)
+                    if dfs:
+                        # Return the dataframe with the most rows/columns roughly
+                        best_df = max(dfs, key=lambda x: x.size)
+                        return best_df
+                except Exception as e:
+                    error_list.append(f"HTML Parser: {str(e)}")
+                
+                # If all failed
+                raise ValueError(f"Failed to read file. Errors: {'; '.join(error_list)}")
             
             # Try reading with different header options
             df = None
