@@ -3,6 +3,7 @@ from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll
 import datetime
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
+# Note: 인건비는 Payroll 데이터에서 동기화됨 (sync_labor_cost)
 CATEGORY_TO_PL_FIELD = {
     "임대료": "expense_rent",
     "임대관리비": "expense_rent_fee",
