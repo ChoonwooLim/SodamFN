@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
-from models import MonthlyProfitLoss, DailyExpense, Revenue
+from models import MonthlyProfitLoss, DailyExpense, Revenue, Vendor
 from pydantic import BaseModel
 from typing import Optional, List
 import datetime
