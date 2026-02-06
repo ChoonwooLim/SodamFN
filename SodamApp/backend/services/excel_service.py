@@ -460,9 +460,24 @@ class ExcelService:
                     if isinstance(d_val, (datetime.datetime, datetime.date)):
                         d_str = d_val.strftime("%Y-%m-%d")
                     elif isinstance(d_val, str):
-                        # Handle various date formats: 2026.01.31, 2026-01-31, 2026/01/31
-                        d_clean = d_val.strip().replace('.', '-').replace('/', '-')
-                        d_str = d_clean[:10]
+                        # Handle various date formats
+                        d_clean = d_val.strip()
+                        
+                        # Korean format: "2026년 01월 31일" or "2026년01월31일"
+                        if '년' in d_clean:
+                            import re
+                            match = re.search(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일?', d_clean)
+                            if match:
+                                year, month, day = match.groups()
+                                d_str = f"{year}-{int(month):02d}-{int(day):02d}"
+                            else:
+                                # Only year and month: "2026년 01월" - skip this row
+                                skipped += 1
+                                continue
+                        else:
+                            # Standard formats: 2026.01.31, 2026-01-31, 2026/01/31
+                            d_clean = d_clean.replace('.', '-').replace('/', '-')
+                            d_str = d_clean[:10]
                     else:
                         d_str = str(d_val)[:10]
                     
