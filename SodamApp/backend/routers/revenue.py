@@ -8,6 +8,7 @@ from datetime import date, datetime
 from sqlmodel import Session, select, func, col
 from database import engine
 from models import DailyExpense, Vendor
+from services.profit_loss_service import sync_revenue_to_pl
 
 router = APIRouter()
 
@@ -198,6 +199,9 @@ def create_daily_revenue(payload: RevenueCreate):
         session.commit()
         session.refresh(expense)
 
+        # Sync to MonthlyProfitLoss
+        sync_revenue_to_pl(date_obj.year, date_obj.month, session)
+
         return {
             "status": "success",
             "id": expense.id,
@@ -235,6 +239,9 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate):
         session.add(expense)
         session.commit()
 
+        # Sync to MonthlyProfitLoss
+        sync_revenue_to_pl(expense.date.year, expense.date.month, session)
+
         return {"status": "success", "message": "매출 내역이 수정되었습니다."}
 
 
@@ -248,7 +255,12 @@ def delete_daily_revenue(expense_id: int):
         if not expense:
             raise HTTPException(status_code=404, detail="Record not found")
 
+        expense_year = expense.date.year
+        expense_month = expense.date.month
         session.delete(expense)
         session.commit()
+
+        # Sync to MonthlyProfitLoss
+        sync_revenue_to_pl(expense_year, expense_month, session)
 
         return {"status": "success", "message": "매출 내역이 삭제되었습니다."}

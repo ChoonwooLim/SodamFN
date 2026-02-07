@@ -9,6 +9,7 @@ from services.profit_loss_service import (
     sync_all_expenses, 
     sync_labor_cost, 
     sync_summary_material_cost, 
+    sync_delivery_revenue_to_pl,
     CATEGORY_TO_PL_FIELD
 )
 
@@ -340,6 +341,10 @@ def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depe
     session.add(new_revenue)
     session.commit()
     session.refresh(new_revenue)
+
+    # Sync to MonthlyProfitLoss
+    sync_delivery_revenue_to_pl(new_revenue.date.year, new_revenue.date.month, session)
+
     return new_revenue
 
 @router.put("/delivery/{id}")
@@ -355,6 +360,10 @@ def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Sessi
     session.add(record)
     session.commit()
     session.refresh(record)
+
+    # Sync to MonthlyProfitLoss
+    sync_delivery_revenue_to_pl(record.date.year, record.date.month, session)
+
     return record
 
 @router.delete("/delivery/{id}")
@@ -363,7 +372,13 @@ def delete_delivery_revenue(id: int, session: Session = Depends(get_session)):
     record = session.get(Revenue, id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
+    record_year = record.date.year
+    record_month = record.date.month
     session.delete(record)
     session.commit()
+
+    # Sync to MonthlyProfitLoss
+    sync_delivery_revenue_to_pl(record_year, record_month, session)
+
     return {"message": "Deleted successfully"}
 

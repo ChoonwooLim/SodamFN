@@ -1033,3 +1033,395 @@
     padding: 0;
     min-height: 200px;
 }
+
+/* ═══════════════════════════════════════════════════
+   수입상세 (Revenue Detail) — Annual 12-month Matrix
+   ═══════════════════════════════════════════════════ */
+
+.revenue-detail-mode {
+    padding: 16px;
+}
+
+.rd-section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+}
+
+.rd-table-container {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: white;
+}
+
+.rd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    min-width: 1000px;
+}
+
+.rd-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.rd-table th {
+    padding: 10px 6px;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    font-size: 0.78rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.rd-item-header {
+    text-align: left !important;
+    padding-left: 14px !important;
+    min-width: 110px;
+}
+
+.rd-total-header,
+.rd-avg-header,
+.rd-pct-header {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.rd-table tbody tr {
+    transition: background 0.15s;
+}
+
+.rd-table tbody tr:hover {
+    background: #f1f5f9;
+}
+
+.rd-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.rd-table tbody tr:nth-child(even):hover {
+    background: #f1f5f9;
+}
+
+.rd-item-name {
+    padding: 8px 8px 8px 14px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    border-right: 1px solid #e2e8f0;
+}
+
+.rd-amount-cell {
+    padding: 4px 2px;
+    text-align: center;
+    border-right: 1px solid #f1f5f9;
+    min-width: 70px;
+}
+
+.rd-cell-value {
+    display: block;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.rd-cell-value.has-value {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.rd-cell-value:hover {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.rd-edit-input {
+    width: 100%;
+    padding: 4px 6px;
+    border: 2px solid #667eea;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.8rem;
+    outline: none;
+    background: #eef2ff;
+}
+
+.rd-row-total,
+.rd-row-avg,
+.rd-row-pct {
+    padding: 8px 6px;
+    text-align: center;
+    font-weight: 600;
+    white-space: nowrap;
+    border-left: 1px solid #e2e8f0;
+}
+
+.rd-row-total {
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.rd-row-avg {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.rd-row-pct {
+    background: #fefce8;
+    color: #a16207;
+}
+
+.rd-grand-total-row {
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%) !important;
+    border-top: 2px solid #059669;
+}
+
+.rd-grand-total-row td {
+    padding: 10px 6px;
+    text-align: center;
+}
+
+.rd-grand-total-row .rd-item-name {
+    border-right: 1px solid #e2e8f0;
+}
+
+.rd-grand-cell {
+    font-weight: 700;
+    color: #047857;
+}
+
+.rd-grand-total {
+    font-weight: 700;
+    color: #047857;
+    font-size: 0.88rem;
+    border-left: 1px solid #e2e8f0;
+}
+
+.rd-grand-avg {
+    font-weight: 600;
+    color: #1d4ed8;
+    border-left: 1px solid #e2e8f0;
+}
+
+.rd-grand-pct {
+    font-weight: 600;
+    color: #a16207;
+    border-left: 1px solid #e2e8f0;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   배달앱 (Delivery App) — Channel Tabs + Day × Month Grid
+   ═══════════════════════════════════════════════════ */
+
+.delivery-app-mode {
+    padding: 16px;
+}
+
+/* Channel Tabs */
+.delivery-channel-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.delivery-channel-btn {
+    padding: 8px 18px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    background: white;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delivery-channel-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+    background: #eef2ff;
+}
+
+.delivery-channel-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.del-section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 14px 0;
+}
+
+/* Summary Bar */
+.del-summary-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 14px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    border: 1px solid #d1fae5;
+}
+
+.del-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 65px;
+}
+
+.del-stat.highlight {
+    padding: 6px 14px;
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #059669;
+    margin-right: 6px;
+}
+
+.del-stat-label {
+    font-size: 0.72rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.del-stat-value {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.del-stat.highlight .del-stat-value {
+    color: #059669;
+    font-size: 0.88rem;
+}
+
+/* Grid */
+.del-grid-container {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: white;
+}
+
+.del-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    min-width: 900px;
+}
+
+.del-grid-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.del-grid-table th {
+    padding: 8px 4px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.76rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.del-day-header {
+    width: 36px;
+}
+
+.del-day-label {
+    padding: 4px 6px;
+    text-align: center;
+    font-weight: 600;
+    color: #475569;
+    background: #f8fafc;
+    border-right: 1px solid #e2e8f0;
+    width: 36px;
+}
+
+.del-amount-cell {
+    padding: 2px;
+    text-align: center;
+    border-right: 1px solid #f1f5f9;
+    min-width: 62px;
+}
+
+.del-cell-value {
+    display: block;
+    padding: 3px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #94a3b8;
+    font-size: 0.76rem;
+}
+
+.del-cell-value.has-value {
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.del-cell-value:hover {
+    background: #e0e7ff;
+    color: #3730a3;
+}
+
+.del-edit-input {
+    width: 100%;
+    padding: 3px 4px;
+    border: 2px solid #667eea;
+    border-radius: 3px;
+    text-align: center;
+    font-size: 0.76rem;
+    outline: none;
+    background: #eef2ff;
+}
+
+.del-invalid {
+    text-align: center;
+    color: #cbd5e1;
+    background: #f8fafc;
+    font-size: 0.72rem;
+}
+
+.del-totals-row {
+    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%) !important;
+    border-top: 2px solid #059669;
+}
+
+.del-totals-row td {
+    padding: 6px 4px;
+    text-align: center;
+}
+
+.del-month-total {
+    font-weight: 700;
+    color: #047857;
+    font-size: 0.8rem;
+}
+
+.del-grid-table tbody tr {
+    transition: background 0.15s;
+}
+
+.del-grid-table tbody tr:hover {
+    background: #f1f5f9;
+}
+
+.del-grid-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.del-grid-table tbody tr:nth-child(even):hover {
+    background: #f1f5f9;
+}

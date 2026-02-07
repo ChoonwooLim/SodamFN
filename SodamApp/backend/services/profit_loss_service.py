@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func
-from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll
+from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, Revenue
 import datetime
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
@@ -113,6 +113,140 @@ def sync_all_expenses(year: int, month: int, session: Session):
     
     session.commit()
     return category_totals
+
+
+# ── Revenue vendor name → P/L revenue field mapping ──
+# Delivery vendors are matched by keyword in vendor name
+DELIVERY_NAME_TO_PL_FIELD = {
+    "쿠팡": "revenue_coupang",
+    "coupang": "revenue_coupang",
+    "배민": "revenue_baemin",
+    "배달의민족": "revenue_baemin",
+    "baemin": "revenue_baemin",
+    "요기요": "revenue_yogiyo",
+    "yogiyo": "revenue_yogiyo",
+    "땡겨요": "revenue_ddangyo",
+    "ddangyo": "revenue_ddangyo",
+}
+
+def _match_delivery_pl_field(vendor_name: str) -> str:
+    """Match a delivery vendor name to its P/L revenue field."""
+    name_lower = vendor_name.lower()
+    for keyword, field in DELIVERY_NAME_TO_PL_FIELD.items():
+        if keyword.lower() in name_lower:
+            return field
+    # Fallback: unrecognized delivery vendor goes to store
+    return "revenue_store"
+
+
+def sync_revenue_to_pl(year: int, month: int, session: Session):
+    """
+    Aggregate DailyExpense from revenue-type vendors and update
+    MonthlyProfitLoss.revenue_store only.
+    Delivery fields are managed by sync_delivery_revenue_to_pl.
+    """
+    start_date = datetime.date(year, month, 1)
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1)
+    else:
+        end_date = datetime.date(year, month + 1, 1)
+
+    # Get all revenue vendors
+    revenue_vendors = session.exec(
+        select(Vendor).where(Vendor.vendor_type == "revenue")
+    ).all()
+    vendor_map = {v.id: v for v in revenue_vendors}
+    vendor_ids = list(vendor_map.keys())
+
+    # Aggregate store revenue from DailyExpense
+    store_total = 0
+    if vendor_ids:
+        expenses = session.exec(
+            select(DailyExpense)
+            .where(
+                DailyExpense.vendor_id.in_(vendor_ids),
+                DailyExpense.date >= start_date,
+                DailyExpense.date < end_date,
+            )
+        ).all()
+
+        for expense in expenses:
+            vendor = vendor_map.get(expense.vendor_id)
+            if not vendor:
+                continue
+            # All DailyExpense revenue goes to revenue_store
+            store_total += (expense.amount or 0)
+
+    # Find or create P/L record
+    pl_record = session.exec(
+        select(MonthlyProfitLoss)
+        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    ).first()
+
+    if pl_record:
+        pl_record.revenue_store = store_total
+        session.add(pl_record)
+    else:
+        pl_record = MonthlyProfitLoss(year=year, month=month, revenue_store=store_total)
+        session.add(pl_record)
+
+    session.commit()
+    return {"revenue_store": store_total}
+
+
+# ── Channel → P/L delivery field mapping ──
+CHANNEL_TO_PL_FIELD = {
+    "Coupang": "revenue_coupang",
+    "Baemin": "revenue_baemin",
+    "Yogiyo": "revenue_yogiyo",
+    "Ddangyo": "revenue_ddangyo",
+}
+
+
+def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
+    """
+    Aggregate Revenue table entries (delivery app settlements) by channel
+    for a given month and update MonthlyProfitLoss delivery revenue fields.
+    """
+    start_date = datetime.date(year, month, 1)
+    if month == 12:
+        end_date = datetime.date(year + 1, 1, 1)
+    else:
+        end_date = datetime.date(year, month + 1, 1)
+
+    # Get all Revenue entries for this month
+    revenues = session.exec(
+        select(Revenue)
+        .where(Revenue.date >= start_date, Revenue.date < end_date)
+    ).all()
+
+    # Aggregate by channel → P/L field
+    delivery_totals = {}
+    for rev in revenues:
+        pl_field = CHANNEL_TO_PL_FIELD.get(rev.channel)
+        if pl_field:
+            delivery_totals[pl_field] = delivery_totals.get(pl_field, 0) + (rev.amount or 0)
+
+    # All delivery fields we manage
+    managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
+
+    # Find or create P/L record
+    pl_record = session.exec(
+        select(MonthlyProfitLoss)
+        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    ).first()
+
+    if pl_record:
+        for field in managed_fields:
+            setattr(pl_record, field, delivery_totals.get(field, 0))
+        session.add(pl_record)
+    else:
+        pl_record = MonthlyProfitLoss(year=year, month=month, **delivery_totals)
+        session.add(pl_record)
+
+    session.commit()
+    return delivery_totals
+
 
 def sync_summary_material_cost(year: int, month: int, session: Session):
     """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""

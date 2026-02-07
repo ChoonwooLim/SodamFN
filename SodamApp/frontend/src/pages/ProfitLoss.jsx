@@ -44,20 +44,11 @@ const EXPENSE_CATEGORIES = [
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
 
-// Main tabs (always visible)
+// Main tabs (always visible) — 수입상세/배달앱은 매출관리로 이동
 const MAIN_TABS = [
     { id: 'summary', label: '📊 손익계산서' },
     { id: 'expenses', label: '💰 세부지출' },
-    { id: 'revenue', label: '💵 수입상세' },
     { id: 'analysis', label: '📈 월별분석' },
-];
-
-// Delivery app group
-const DELIVERY_TABS = [
-    { id: 'coupang', label: '쿠팡이츠' },
-    { id: 'baemin', label: '배달의민족' },
-    { id: 'yogiyo', label: '요기요' },
-    { id: 'ddangyo', label: '땡겨요' },
 ];
 
 // Monthly expense group (1-12)
@@ -80,10 +71,8 @@ export default function ProfitLoss() {
     const [activeTab, setActiveTab] = useState('summary');
 
     // Dropdown group state
-    const [openDropdown, setOpenDropdown] = useState(null); // 'delivery' or 'monthly'
+    const [openDropdown, setOpenDropdown] = useState(null); // 'monthly'
 
-    // Delivery app data
-    const [deliveryData, setDeliveryData] = useState({});
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
 
@@ -131,10 +120,6 @@ export default function ProfitLoss() {
     }, [year]);
 
     useEffect(() => {
-        // Fetch delivery data when switching to delivery tabs
-        if (['coupang', 'baemin', 'yogiyo', 'ddangyo'].includes(activeTab)) {
-            fetchDeliveryData(activeTab);
-        }
         // Fetch monthly expense data
         if (activeTab.startsWith('month_')) {
             const month = parseInt(activeTab.split('_')[1]);
@@ -150,16 +135,6 @@ export default function ProfitLoss() {
             console.error('Error fetching P/L data:', err);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchDeliveryData = async (channel) => {
-        try {
-            const channelMap = { coupang: 'Coupang', baemin: 'Baemin', yogiyo: 'Yogiyo', ddangyo: 'Ddangyo' };
-            const res = await axios.get(`${API_URL}/api/profitloss/delivery/${channelMap[channel]}/${year}`);
-            setDeliveryData(prev => ({ ...prev, [channel]: res.data }));
-        } catch (err) {
-            console.error('Error fetching delivery data:', err);
         }
     };
 
@@ -314,55 +289,7 @@ export default function ProfitLoss() {
         </div>
     );
 
-    // Render revenue detail table
-    const renderRevenueDetail = () => (
-        <div className="revenue-detail-section">
-            <h3 className="section-title">💰 수입 상세 내역</h3>
-            <div className="table-container">
-                <table className="pl-table revenue-table">
-                    <thead>
-                        <tr>
-                            <th>수입 항목</th>
-                            {MONTHS.map(m => <th key={m}>{m}월</th>)}
-                            <th>합계</th>
-                            <th>월평균</th>
-                            <th>비율</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {REVENUE_FIELDS.map(field => {
-                            const yearTotal = calcYearTotal(field.key);
-                            const totalRevenue = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
-                            const percentage = totalRevenue > 0 ? ((yearTotal / totalRevenue) * 100).toFixed(1) : 0;
-                            return (
-                                <tr key={field.key}>
-                                    <td className="item-name">{field.label}</td>
-                                    {MONTHS.map(m => (
-                                        <td key={m}>{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
-                                    ))}
-                                    <td className="total">{formatNumber(yearTotal)}</td>
-                                    <td className="average">{formatNumber(calcYearAverage(field.key))}</td>
-                                    <td className="percentage">{percentage}%</td>
-                                </tr>
-                            );
-                        })}
-                        <tr className="subtotal-row">
-                            <td className="item-name"><strong>총합</strong></td>
-                            {MONTHS.map(m => (
-                                <td key={m} className="subtotal">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
-                            ))}
-                            <td className="total"><strong>{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</strong></td>
-                            <td className="average"><strong>{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / 6))}</strong></td>
-                            <td className="percentage">100%</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div className="instructions">
-                <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 수입 대비 비율입니다.</p>
-            </div>
-        </div>
-    );
+    // Note: renderRevenueDetail() has been moved to RevenueManagement page
 
     // Render monthly analysis
     const renderAnalysis = () => {
@@ -433,175 +360,7 @@ export default function ProfitLoss() {
         );
     };
 
-    // Render delivery app revenue (쿠팡, 배민, 요기요, 땡겨요) - Excel-like grid
-    const renderDeliveryRevenue = (channel) => {
-        const channelNames = {
-            coupang: '쿠팡이츠',
-            baemin: '배달의민족',
-            yogiyo: '요기요',
-            ddangyo: '땡겨요'
-        };
-        const channelMap = { coupang: 'Coupang', baemin: 'Baemin', yogiyo: 'Yogiyo', ddangyo: 'Ddangyo' };
-        const revenueData = deliveryData[channel] || [];
-
-        // 1-12월 표시 (연간)
-        const displayMonths = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-        const maxDays = 31; // 최대 31일
-
-        // Create grid: month -> { day: { amount, id } }
-        const monthGrid = {};
-        displayMonths.forEach(m => { monthGrid[m] = {}; });
-
-        revenueData.forEach(item => {
-            const itemDate = new Date(item.date);
-            const month = itemDate.getMonth() + 1;
-            const day = itemDate.getDate();
-            if (monthGrid[month]) {
-                monthGrid[month][day] = { amount: item.amount, id: item.id };
-            }
-        });
-
-        // Calculate monthly totals
-        const monthlyTotals = {};
-        displayMonths.forEach(m => {
-            monthlyTotals[m] = Object.values(monthGrid[m]).reduce((sum, d) => sum + (d.amount || 0), 0);
-        });
-        const grandTotal = Object.values(monthlyTotals).reduce((sum, t) => sum + t, 0);
-
-        // Handle cell editing
-        const handleDeliveryCellClick = (month, day, amount, itemId) => {
-            setEditingCell({ type: 'delivery', channel, month, day, id: itemId });
-            setEditValue(amount?.toString() || '0');
-        };
-
-        const handleDeliverySave = async () => {
-            if (!editingCell || editingCell.type !== 'delivery') return;
-
-            const { channel: ch, month, day, id } = editingCell;
-            const amount = parseInt(editValue) || 0;
-            const date = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-
-            try {
-                if (id && amount > 0) {
-                    // Update existing
-                    await axios.put(`${API_URL}/api/profitloss/delivery/${id}`, {
-                        date, channel: channelMap[ch], amount
-                    });
-                } else if (!id && amount > 0) {
-                    // Create new
-                    await axios.post(`${API_URL}/api/profitloss/delivery`, {
-                        date, channel: channelMap[ch], amount
-                    });
-                } else if (id && amount === 0) {
-                    // Delete if amount is 0
-                    await axios.delete(`${API_URL}/api/profitloss/delivery/${id}`);
-                }
-                fetchDeliveryData(ch);
-            } catch (err) {
-                console.error('Error saving delivery revenue:', err);
-            }
-            setEditingCell(null);
-        };
-
-        const renderDeliveryCell = (month, day) => {
-            const cellData = monthGrid[month]?.[day];
-            const amount = cellData?.amount || 0;
-            const itemId = cellData?.id;
-            const isEditing = editingCell?.type === 'delivery' &&
-                editingCell?.channel === channel &&
-                editingCell?.month === month &&
-                editingCell?.day === day;
-
-            if (isEditing) {
-                return (
-                    <input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={handleDeliverySave}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleDeliverySave();
-                            if (e.key === 'Escape') setEditingCell(null);
-                        }}
-                        autoFocus
-                        className="edit-input grid-input"
-                    />
-                );
-            }
-
-            return (
-                <span
-                    className={`cell-value editable ${amount > 0 ? 'has-value' : ''}`}
-                    onClick={() => handleDeliveryCellClick(month, day, amount, itemId)}
-                >
-                    {amount > 0 ? formatNumber(amount) : '-'}
-                </span>
-            );
-        };
-
-        return (
-            <div className="delivery-section">
-                <h3 className="section-title">🛵 {channelNames[channel]} 정산금 입금내역_{year}년</h3>
-
-                <div className="delivery-summary">
-                    <div className="expense-stat">
-                        <span className="stat-label">총 정산금</span>
-                        <span className="stat-value highlight" style={{ color: '#059669' }}>{formatNumber(grandTotal)}원</span>
-                    </div>
-                    {displayMonths.map(m => (
-                        <div key={m} className="expense-stat">
-                            <span className="stat-label">{m}월</span>
-                            <span className="stat-value">{formatNumber(monthlyTotals[m])}원</span>
-                        </div>
-                    ))}
-                </div>
-
-                <div className="grid-table-container delivery-grid-container">
-                    <table className="expense-grid-table delivery-grid-table">
-                        <thead>
-                            <tr>
-                                <th className="day-label-header"></th>
-                                {displayMonths.map(m => (
-                                    <th key={m} className="month-header">{m}월</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Array.from({ length: maxDays }, (_, i) => i + 1).map(day => (
-                                <tr key={day}>
-                                    <td className="day-label-cell">{day}</td>
-                                    {displayMonths.map(m => {
-                                        // Check if this day exists in this month
-                                        const daysInMonth = new Date(year, m, 0).getDate();
-                                        if (day > daysInMonth) {
-                                            return <td key={m} className="invalid-day">-</td>;
-                                        }
-                                        return (
-                                            <td key={m} className="amount-cell">
-                                                {renderDeliveryCell(m, day)}
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                            <tr className="day-totals-row">
-                                <td className="day-label-cell"><strong>합 계</strong></td>
-                                {displayMonths.map(m => (
-                                    <td key={m} className="month-total">
-                                        <strong>{formatNumber(monthlyTotals[m])}</strong>
-                                    </td>
-                                ))}
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="instructions">
-                    <p>💡 셀을 클릭하면 정산금을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
-                </div>
-            </div>
-        );
-    };
+    // Note: renderDeliveryRevenue() has been moved to RevenueManagement page
 
     // Helper to map Korean category to PL field key
     const getPlFieldByCategory = (category) => {
@@ -1031,29 +790,6 @@ export default function ProfitLoss() {
                     </button>
                 ))}
 
-                {/* Delivery Apps Dropdown */}
-                <div className="tab-dropdown">
-                    <button
-                        className={`tab-button dropdown-trigger ${DELIVERY_TABS.some(t => t.id === activeTab) ? 'active' : ''}`}
-                        onClick={() => setOpenDropdown(openDropdown === 'delivery' ? null : 'delivery')}
-                    >
-                        🛵 배달앱 ▾
-                    </button>
-                    {openDropdown === 'delivery' && (
-                        <div className="dropdown-menu">
-                            {DELIVERY_TABS.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    className={`dropdown-item ${activeTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => { setActiveTab(tab.id); setOpenDropdown(null); }}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
                 {/* Monthly Expenses Dropdown */}
                 <div className="tab-dropdown">
                     <button
@@ -1082,12 +818,7 @@ export default function ProfitLoss() {
             <div className="tab-content">
                 {activeTab === 'summary' && renderSummaryTable()}
                 {activeTab === 'expenses' && renderExpenseDetail()}
-                {activeTab === 'revenue' && renderRevenueDetail()}
                 {activeTab === 'analysis' && renderAnalysis()}
-                {activeTab === 'coupang' && renderDeliveryRevenue('coupang')}
-                {activeTab === 'baemin' && renderDeliveryRevenue('baemin')}
-                {activeTab === 'yogiyo' && renderDeliveryRevenue('yogiyo')}
-                {activeTab === 'ddangyo' && renderDeliveryRevenue('ddangyo')}
                 {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
             </div>
         </div>
