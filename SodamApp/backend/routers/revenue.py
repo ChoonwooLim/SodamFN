@@ -7,8 +7,16 @@ from typing import Optional, List
 from datetime import date, datetime
 from sqlmodel import Session, select, func, col
 from database import engine
-from models import DailyExpense, Vendor
+from models import DailyExpense, Vendor, Revenue
 from services.profit_loss_service import sync_revenue_to_pl
+
+# Channel name (in Revenue table) → keyword to match delivery vendor names
+CHANNEL_KEYWORDS = {
+    "Coupang": "쿠팡",
+    "Baemin": "배달의민족",
+    "Yogiyo": "요기요",
+    "Ddangyo": "땡겨요",
+}
 
 router = APIRouter()
 
@@ -79,7 +87,7 @@ def get_daily_revenue(year: int, month: int):
                 "item": v.item if v else None,
             })
 
-        # Also return vendor list for dropdowns
+        # Build vendor list for dropdowns
         vendors_list = [
             {
                 "id": v.id,
@@ -89,6 +97,36 @@ def get_daily_revenue(year: int, month: int):
             }
             for v in revenue_vendors
         ]
+
+        # ── Also fetch Revenue table entries (배달앱 data) ──
+        # Map delivery channels to vendor IDs
+        delivery_vendors = [v for v in revenue_vendors if v.category == "delivery"]
+        channel_to_vendor = {}
+        for ch_key, keyword in CHANNEL_KEYWORDS.items():
+            for v in delivery_vendors:
+                if keyword in v.name:
+                    channel_to_vendor[ch_key] = v
+                    break
+
+        revenue_entries = session.exec(
+            select(Revenue)
+            .where(Revenue.date >= start_date, Revenue.date < end_date)
+        ).all()
+
+        for rev in revenue_entries:
+            v = channel_to_vendor.get(rev.channel)
+            if v:
+                result.append({
+                    "id": f"rev_{rev.id}",  # prefix to distinguish from DailyExpense
+                    "date": str(rev.date),
+                    "vendor_id": v.id,
+                    "vendor_name": v.name,
+                    "amount": rev.amount or 0,
+                    "note": rev.description or "배달앱 정산",
+                    "category": "delivery",
+                    "item": v.item,
+                    "source": "delivery_app",  # flag for frontend
+                })
 
         return {"status": "success", "data": result, "vendors": vendors_list}
 
@@ -159,6 +197,37 @@ def get_revenue_summary(year: int, month: int):
             if vname not in by_vendor_map:
                 by_vendor_map[vname] = {"name": vname, "category": cat, "total": 0}
             by_vendor_map[vname]["total"] += amount
+
+        # ── Also include Revenue table entries (배달앱 data) ──
+        delivery_vendors = [v for v in revenue_vendors if v.category == "delivery"]
+        channel_to_vendor = {}
+        for ch_key, keyword in CHANNEL_KEYWORDS.items():
+            for v in delivery_vendors:
+                if keyword in v.name:
+                    channel_to_vendor[ch_key] = v
+                    break
+
+        revenue_entries = session.exec(
+            select(Revenue)
+            .where(Revenue.date >= start_date, Revenue.date < end_date)
+        ).all()
+
+        for rev in revenue_entries:
+            v = channel_to_vendor.get(rev.channel)
+            if v:
+                amount = rev.amount or 0
+                total += amount
+                by_category["delivery"] = by_category.get("delivery", 0) + amount
+
+                day_str = str(rev.date)
+                if day_str not in by_day_map:
+                    by_day_map[day_str] = {"date": day_str, "total": 0, "store": 0, "delivery": 0}
+                by_day_map[day_str]["total"] += amount
+                by_day_map[day_str]["delivery"] += amount
+
+                if v.name not in by_vendor_map:
+                    by_vendor_map[v.name] = {"name": v.name, "category": "delivery", "total": 0}
+                by_vendor_map[v.name]["total"] += amount
 
         by_day = sorted(by_day_map.values(), key=lambda x: x["date"])
         by_vendor = sorted(by_vendor_map.values(), key=lambda x: x["total"], reverse=True)

@@ -412,9 +412,10 @@ export default function RevenueManagement() {
     const renderGridCell = (vendorId, day) => {
         const amount = vendorGrid[vendorId]?.amounts[day] || 0;
         const expenseId = vendorGrid[vendorId]?.ids[day];
+        const isDeliveryApp = typeof expenseId === 'string' && expenseId.startsWith('rev_');
         const isEditing = editingCell?.vendorId === vendorId && editingCell?.day === day;
 
-        if (isEditing) {
+        if (isEditing && !isDeliveryApp) {
             return (
                 <input
                     type="number"
@@ -428,6 +429,16 @@ export default function RevenueManagement() {
                     autoFocus
                     className="grid-edit-input"
                 />
+            );
+        }
+        if (isDeliveryApp) {
+            return (
+                <span
+                    className={`grid-cell-value has-value delivery-app-value`}
+                    title="배달앱에서 관리"
+                >
+                    {formatNumber(amount)}
+                </span>
             );
         }
         return (
