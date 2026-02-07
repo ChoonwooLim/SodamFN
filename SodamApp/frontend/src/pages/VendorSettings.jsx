@@ -451,31 +451,33 @@ export default function VendorSettings() {
                                 </div>
                             </div>
                         </div>
-                        <h3>새 거래처 추가</h3>
-                        <div className="vendor-add-form-row">
-                            <select
-                                value={newVendorCategory}
-                                onChange={(e) => setNewVendorCategory(e.target.value)}
-                                className="category-select"
-                            >
-                                {getCategories().map(cat => (
-                                    <option key={cat.id} value={cat.id}>
-                                        {cat.icon} {cat.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <input
-                                type="text"
-                                value={newVendorName}
-                                onChange={(e) => setNewVendorName(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddVendor()}
-                                placeholder="거래처 이름 입력"
-                                className="vendor-name-input"
-                            />
-                            <button onClick={handleAddVendor} className="add-vendor-btn">
-                                <Plus size={18} />
-                                추가
-                            </button>
+                        <div className="vendor-add-section">
+                            <h3>새 거래처 추가</h3>
+                            <div className="vendor-add-form-row">
+                                <select
+                                    value={newVendorCategory}
+                                    onChange={(e) => setNewVendorCategory(e.target.value)}
+                                    className="category-select"
+                                >
+                                    {getCategories().map(cat => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.icon} {cat.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="text"
+                                    value={newVendorName}
+                                    onChange={(e) => setNewVendorName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddVendor()}
+                                    placeholder="거래처 이름 입력"
+                                    className="vendor-name-input"
+                                />
+                                <button onClick={handleAddVendor} className="add-vendor-btn">
+                                    <Plus size={18} />
+                                    추가
+                                </button>
+                            </div>
                         </div>
                     </div>
                     {/* Merge Button */}
@@ -834,42 +836,6 @@ export default function VendorSettings() {
                                                 <span className="category-label">{category.label}</span>
                                                 <span className="category-count">{categoryVendors.length}개</span>
                                                 <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    {/* Add Store Button */}
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            const name = prompt("추가할 매장 이름을 입력하세요 (예: 강남점)");
-                                                            if (name) {
-                                                                try {
-                                                                    // 1. Cash Revenue
-                                                                    await handleCreateVendor({
-                                                                        name: `${name} 현금매출`,
-                                                                        category: 'store',
-                                                                        vendor_type: 'revenue',
-                                                                        item: `${name}:cash`
-                                                                    });
-                                                                    // 2. Automated Card Companies
-                                                                    const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
-                                                                    for (const company of CARD_COMPANIES) {
-                                                                        await handleCreateVendor({
-                                                                            name: `${name} ${company}`,
-                                                                            category: 'store',
-                                                                            vendor_type: 'revenue',
-                                                                            item: `${name}:card`
-                                                                        });
-                                                                    }
-                                                                } catch (error) {
-                                                                    console.error("매장 추가 실패:", error);
-                                                                    alert("매장 추가에 실패했습니다.");
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="action-btn-sm"
-                                                        style={{ fontSize: '12px', padding: '4px 8px', width: 'auto' }}
-                                                        title="매장 추가"
-                                                    >
-                                                        <Plus size={14} /> 매장 추가
-                                                    </button>
                                                     {collapsedCategories.has(category.id) ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
                                                 </div>
                                             </div>
@@ -888,24 +854,7 @@ export default function VendorSettings() {
                                                                         <Trash2 size={14} />
                                                                     </button>
                                                                 </div>
-                                                                {/* Optional: Add Vendor for this store specific? */}
-                                                                <button
-                                                                    className="action-btn-sm"
-                                                                    onClick={() => {
-                                                                        const vName = prompt(`'${storeName}'에 추가할 매출처(카드사 등) 이름을 입력하세요:`);
-                                                                        if (vName) {
-                                                                            handleCreateVendor({
-                                                                                name: vName,
-                                                                                category: 'store',
-                                                                                vendor_type: 'revenue',
-                                                                                item: `${storeName}:card`
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    title={`${storeName}에 항목 추가`}
-                                                                >
-                                                                    <Plus size={12} /> 추가
-                                                                </button>
+
                                                             </div>
                                                             {/* Cash Section */}
                                                             <div className="store-sub-section">
