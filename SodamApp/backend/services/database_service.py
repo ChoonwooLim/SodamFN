@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func
-from models import Vendor, Expense, Revenue, Product, Inventory, Staff, Attendance, Payroll
+from models import Vendor, Expense, Revenue, Product, Inventory, Staff, Attendance, Payroll, DailyExpense
 from database import engine
 from datetime import date
 import pandas as pd
@@ -76,16 +76,29 @@ class DatabaseService:
         return [{"vendor": r[0], "amount": r[1], "item": r[2]} for r in results]
 
     def get_vendors(self):
-        stmt = select(Vendor)
+        # Join Vendor with DailyExpense to get stats
+        # We need to use left join and group by Vendor.id
+        stmt = select(
+            Vendor,
+            func.max(DailyExpense.date).label("last_transaction_date"),
+            func.count(DailyExpense.id).label("transaction_count"),
+            func.sum(DailyExpense.amount).label("total_transaction_amount")
+        ).outerjoin(DailyExpense, Vendor.id == DailyExpense.vendor_id).group_by(Vendor.id)
+        
         results = self.session.exec(stmt).all()
+        
         return [{
-            "id": v.id, 
-            "name": v.name, 
-            "item": getattr(v, 'item', None) or v.category,
-            "category": v.category,
-            "vendor_type": getattr(v, 'vendor_type', 'expense'),
-            "order_index": getattr(v, 'order_index', 0)
-        } for v in results]
+            "id": row[0].id, 
+            "name": row[0].name, 
+            "item": getattr(row[0], 'item', None) or row[0].category,
+            "category": row[0].category,
+            "vendor_type": getattr(row[0], 'vendor_type', 'expense'),
+            "order_index": getattr(row[0], 'order_index', 0),
+            # Add stats to response
+            "last_transaction_date": row[1],
+            "transaction_count": row[2] or 0,
+            "total_transaction_amount": row[3] or 0
+        } for row in results]
 
     def update_vendor_item(self, vendor_name: str, item: str):
         stmt = select(Vendor).where(Vendor.name == vendor_name)

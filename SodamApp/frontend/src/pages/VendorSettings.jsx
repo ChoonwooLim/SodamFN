@@ -43,6 +43,12 @@ export default function VendorSettings() {
     const [mergeTarget, setMergeTarget] = useState(null);
     const [customMergeName, setCustomMergeName] = useState('');
     const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+    // Sorting State
+    const [sortBy, setSortBy] = useState('name'); // 'name', 'recent', 'frequency', 'amount'
+
+    const handleSortChange = (e) => {
+        setSortBy(e.target.value);
+    };
 
     const toggleCategory = (categoryId) => {
         setCollapsedCategories(prev => {
@@ -88,9 +94,26 @@ export default function VendorSettings() {
     const getCategories = () => activeTab === 'expense' ? EXPENSE_CATEGORIES : REVENUE_CATEGORIES;
 
     const getVendorsByCategory = (category) => {
-        return vendors.filter(v =>
+        const filtered = vendors.filter(v =>
             v.vendor_type === activeTab && v.category === category
         );
+
+        // Apply Sorting
+        return filtered.sort((a, b) => {
+            if (sortBy === 'name') {
+                return (a.order_index || 0) - (b.order_index || 0) || a.name.localeCompare(b.name);
+            } else if (sortBy === 'recent') {
+                // Latest date first. Handle nulls (never transacted)
+                const dateA = a.last_transaction_date ? new Date(a.last_transaction_date) : new Date(0);
+                const dateB = b.last_transaction_date ? new Date(b.last_transaction_date) : new Date(0);
+                return dateB - dateA;
+            } else if (sortBy === 'frequency') {
+                return (b.transaction_count || 0) - (a.transaction_count || 0);
+            } else if (sortBy === 'amount') {
+                return (b.total_transaction_amount || 0) - (a.total_transaction_amount || 0);
+            }
+            return 0;
+        });
     };
 
     const handleSave = async (vendor) => {
@@ -313,27 +336,36 @@ export default function VendorSettings() {
                         <button onClick={() => navigate(-1)} className="back-button">
                             <ChevronLeft size={20} />
                         </button>
-                        <h1>거래처 관리</h1>
+                        <h1>설정</h1>
                     </header>
+                    <div className="vendor-settings-content">
+                        <div className="settings-top-bar">
+                            <div className="tabs">
+                                <button
+                                    className={`tab ${activeTab === 'expense' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('expense')}
+                                >
+                                    지출 관리 (매입)
+                                </button>
+                                <button
+                                    className={`tab ${activeTab === 'revenue' ? 'active' : ''}`}
+                                    onClick={() => setActiveTab('revenue')}
+                                >
+                                    수입 관리 (매출)
+                                </button>
+                            </div>
 
-                    {/* Tabs */}
-                    <div className="vendor-tabs">
-                        <button
-                            className={`vendor-tab ${activeTab === 'expense' ? 'active expense' : ''}`}
-                            onClick={() => setActiveTab('expense')}
-                        >
-                            💰 매입처 (비용)
-                        </button>
-                        <button
-                            className={`vendor-tab ${activeTab === 'revenue' ? 'active revenue' : ''}`}
-                            onClick={() => setActiveTab('revenue')}
-                        >
-                            💵 매출처 (수입)
-                        </button>
-                    </div>
-
-                    {/* Add New Vendor Form */}
-                    <div className="vendor-add-section">
+                            {/* Sorting Control */}
+                            <div className="sorting-control">
+                                <span className="sort-label">정렬: </span>
+                                <select value={sortBy} onChange={handleSortChange} className="sort-select">
+                                    <option value="name">가나다순 (기본)</option>
+                                    <option value="recent">최근 거래일자순</option>
+                                    <option value="frequency">거래 빈도순 (많이)</option>
+                                    <option value="amount">거래 총액순 (높은금액)</option>
+                                </select>
+                            </div>
+                        </div>
                         <h3>새 거래처 추가</h3>
                         <div className="vendor-add-form-row">
                             <select
