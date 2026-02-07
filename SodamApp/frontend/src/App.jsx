@@ -18,6 +18,7 @@ const SignupPage = React.lazy(() => import('./pages/Signup'));
 const StaffDashboard = React.lazy(() => import('./pages/StaffDashboard'));
 const CardSales = React.lazy(() => import('./pages/CardSales'));
 const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
+const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -83,12 +84,12 @@ export default function App() {
             <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
 
             {/* SPLIT INPUT ROUTES */}
-            <Route path="/input/revenue" element={<ProtectedRoute adminOnly><DataInputPage mode="revenue" /></ProtectedRoute>} />
             <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
             {/* FINANCE */}
             <Route path="/finance/card-sales" element={<ProtectedRoute adminOnly><CardSales /></ProtectedRoute>} />
             <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
+            <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
 
             {/* BACKWARD COMPATIBILITY */}
             <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />

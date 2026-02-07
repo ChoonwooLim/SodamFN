@@ -1,0 +1,1035 @@
+/* ═══════════════════════════════════════════════════
+   Revenue Management Page — Premium Styles
+   ═══════════════════════════════════════════════════ */
+
+.revenue-page {
+    min-height: 100vh;
+    background: #f1f5f9;
+    padding: 0;
+}
+
+/* ── Top Header ── */
+.revenue-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    padding: 24px 32px 20px;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+.revenue-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.revenue-header h1 {
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.revenue-month-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.revenue-month-nav button {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.revenue-month-nav button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.revenue-month-label {
+    font-size: 16px;
+    font-weight: 700;
+    min-width: 120px;
+    text-align: center;
+}
+
+/* ── Summary Cards ── */
+.revenue-summary-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding: 0 32px;
+    margin-top: -8px;
+    position: relative;
+    z-index: 5;
+}
+
+.revenue-summary-card {
+    background: white;
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.revenue-summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.revenue-summary-card .card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.revenue-summary-card .card-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.revenue-summary-card.total {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.revenue-summary-card.total .card-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.revenue-summary-card.total .card-value {
+    color: white;
+}
+
+/* ── Tab Bar ── */
+.revenue-tab-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px 0;
+    background: transparent;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.revenue-tab {
+    padding: 10px 20px;
+    border-radius: 12px 12px 0 0;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+.revenue-tab.active {
+    background: white;
+    color: #0f172a;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.revenue-tab:hover:not(.active) {
+    background: #cbd5e1;
+}
+
+/* ── View Mode Toggle ── */
+.view-mode-toggle {
+    display: flex;
+    gap: 0;
+    background: #e2e8f0;
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.view-mode-btn {
+    padding: 7px 16px;
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 8px;
+    color: #64748b;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.view-mode-btn.active {
+    background: white;
+    color: #0f172a;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.view-mode-btn:hover:not(.active) {
+    color: #334155;
+}
+
+/* ── Content Area ── */
+.revenue-content {
+    background: white;
+    margin: 0 32px 32px;
+    border-radius: 0 16px 16px 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    min-height: 400px;
+}
+
+/* ── Toolbar ── */
+.revenue-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.revenue-toolbar .count-badge {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.revenue-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.revenue-add-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+/* ── Table ── */
+.revenue-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.revenue-table thead th {
+    background: #f8fafc;
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.revenue-table thead th:last-child {
+    text-align: center;
+}
+
+.revenue-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s;
+}
+
+.revenue-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.revenue-table tbody td {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #334155;
+    vertical-align: middle;
+}
+
+.revenue-table .td-date {
+    font-weight: 600;
+    color: #0f172a;
+    white-space: nowrap;
+    width: 100px;
+}
+
+.revenue-table .td-vendor {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.revenue-table .td-category {
+    width: 100px;
+}
+
+.revenue-table .td-amount {
+    font-weight: 700;
+    color: #0f172a;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    min-width: 120px;
+}
+
+.revenue-table .td-note {
+    color: #64748b;
+    font-size: 12px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.revenue-table .td-actions {
+    text-align: center;
+    white-space: nowrap;
+    width: 80px;
+}
+
+.cat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.cat-badge.store {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.cat-badge.delivery {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.cat-badge.other {
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+/* ── Action Buttons ── */
+.rev-action-btn {
+    background: none;
+    border: none;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: all 0.15s;
+}
+
+.rev-action-btn:hover {
+    color: #3b82f6;
+    background: #eff6ff;
+}
+
+.rev-action-btn.delete:hover {
+    color: #ef4444;
+    background: #fef2f2;
+}
+
+/* ── Modal ── */
+.revenue-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    animation: fadeIn 0.2s ease;
+}
+
+.revenue-modal {
+    background: white;
+    border-radius: 20px;
+    width: 480px;
+    max-width: 90vw;
+    padding: 28px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+}
+
+.revenue-modal h2 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.revenue-modal .form-group {
+    margin-bottom: 16px;
+}
+
+.revenue-modal .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.revenue-modal .form-input,
+.revenue-modal .form-select {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #0f172a;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.revenue-modal .form-input:focus,
+.revenue-modal .form-select:focus {
+    border-color: #3b82f6;
+}
+
+.revenue-modal .form-input.amount {
+    font-size: 20px;
+    font-weight: 700;
+    text-align: right;
+}
+
+.revenue-modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.modal-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+}
+
+.modal-btn.primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.modal-btn.primary:hover {
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+.modal-btn.secondary {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.modal-btn.secondary:hover {
+    background: #e2e8f0;
+}
+
+/* ── Inline Edit ── */
+.inline-edit-input {
+    padding: 4px 8px;
+    border: 2px solid #3b82f6;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.inline-edit-input.amount {
+    text-align: right;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    width: 120px;
+}
+
+/* ── Empty State ── */
+.revenue-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+}
+
+.revenue-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.revenue-empty h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #64748b;
+    margin: 0 0 4px;
+}
+
+.revenue-empty p {
+    font-size: 13px;
+    margin: 0;
+}
+
+/* ── Day Group Header ── */
+.day-group-header td {
+    background: #f8fafc;
+    padding: 10px 16px;
+    font-weight: 700;
+    font-size: 13px;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.day-group-header .day-total {
+    text-align: right;
+    font-weight: 800;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Animations ── */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Loading ── */
+.revenue-loading {
+    text-align: center;
+    padding: 60px;
+}
+
+.revenue-loading .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ═══════════════════════════════════════════════════
+   GRID VIEW — Monthly Full Grid
+   ═══════════════════════════════════════════════════ */
+
+.revenue-content.grid-mode {
+    border-radius: 0 16px 16px 16px;
+    padding-bottom: 16px;
+}
+
+/* ── Grid Header Bar ── */
+.grid-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.grid-stats {
+    display: flex;
+    gap: 24px;
+}
+
+.grid-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.grid-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.grid-stat-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.grid-stat-value.highlight {
+    color: #059669;
+}
+
+.grid-stat-value small {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.grid-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.hide-empty-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+    cursor: pointer;
+}
+
+.hide-empty-toggle input[type="checkbox"] {
+    accent-color: #3b82f6;
+}
+
+.vendor-settings-link {
+    font-size: 12px;
+    font-weight: 700;
+    color: #3b82f6;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.vendor-settings-link:hover {
+    text-decoration: underline;
+}
+
+/* ── Grid Table Wrapper ── */
+.grid-table-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: 70vh;
+    position: relative;
+}
+
+/* ── Grid Table ── */
+.revenue-grid-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.revenue-grid-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.grid-vendor-header {
+    position: sticky;
+    left: 0;
+    z-index: 12;
+    background: #f1f5f9 !important;
+    min-width: 140px;
+    max-width: 160px;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-align: left;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.grid-day-header {
+    padding: 8px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    background: #f1f5f9;
+    text-align: center;
+    min-width: 60px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.grid-total-header {
+    position: sticky;
+    right: 0;
+    z-index: 12;
+    background: #e8f0fe !important;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #1e40af;
+    text-align: right;
+    min-width: 90px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+/* ── Category Header ── */
+.grid-category-header td,
+.grid-category-cell {
+    background: #f8fafc;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #334155;
+    border-top: 2px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* ── Vendor Cell ── */
+.grid-vendor-cell {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: white;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* ── Amount Cell ── */
+.grid-amount-cell {
+    padding: 2px 3px;
+    text-align: right;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+}
+
+/* ── Grid cell values ── */
+.grid-cell-value {
+    display: block;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    color: #94a3b8;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    min-height: 24px;
+    line-height: 24px;
+}
+
+.grid-cell-value:hover {
+    background: #eff6ff;
+    color: #3b82f6;
+}
+
+.grid-cell-value.has-value {
+    color: #0f172a;
+    font-weight: 600;
+}
+
+/* ── Grid Edit Input ── */
+.grid-edit-input {
+    width: 100%;
+    padding: 3px 6px;
+    border: 2px solid #3b82f6;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+    outline: none;
+    background: #eff6ff;
+    color: #0f172a;
+    box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Row Total ── */
+.grid-row-total {
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    background: #fafbff;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    text-align: right;
+    border-bottom: 1px solid #f1f5f9;
+    border-left: 2px solid #e8ecf2;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Subtotal ── */
+.grid-subtotal-row {
+    background: #f8fafc;
+}
+
+.grid-subtotal-label {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background: #f8fafc;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    white-space: nowrap;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.grid-subtotal-cell {
+    padding: 6px 6px;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    font-variant-numeric: tabular-nums;
+}
+
+.grid-subtotal-total {
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    background: #eef2ff;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #1e40af;
+    text-align: right;
+    border-bottom: 2px solid #e2e8f0;
+    border-left: 2px solid #e8ecf2;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Grand Total ── */
+.grid-grand-total-row {
+    background: #f1f5f9;
+}
+
+.grid-grand-total-row .grid-vendor-cell {
+    background: #f1f5f9;
+    border-top: 2px solid #cbd5e1;
+}
+
+.grid-day-total {
+    padding: 8px 6px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
+    background: #f1f5f9;
+    border-top: 2px solid #cbd5e1;
+    font-variant-numeric: tabular-nums;
+}
+
+.grid-grand-total {
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    background: #dbeafe;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 900;
+    color: #1e40af;
+    text-align: right;
+    border-top: 2px solid #cbd5e1;
+    border-left: 2px solid #e8ecf2;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Grid Instructions ── */
+.grid-instructions {
+    padding: 12px 20px;
+    text-align: center;
+}
+
+.grid-instructions p {
+    font-size: 12px;
+    color: #94a3b8;
+    margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════
+   UPLOAD VIEW — Image / Excel Upload
+   ═══════════════════════════════════════════════════ */
+
+.revenue-content.upload-mode {
+    border-radius: 0 16px 16px 16px;
+    padding: 24px 20px;
+}
+
+.upload-section {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.upload-tabs {
+    display: flex;
+    gap: 0;
+    background: #f1f5f9;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 24px;
+}
+
+.upload-tab-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.2s;
+}
+
+.upload-tab-btn.active.camera {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.upload-tab-btn.active.excel {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.upload-tab-btn.active.history {
+    background: #475569;
+    color: white;
+    box-shadow: 0 2px 8px rgba(71, 85, 105, 0.3);
+}
+
+.upload-tab-btn:hover:not(.active) {
+    color: #334155;
+    background: #e2e8f0;
+}
+
+.upload-drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 48px 24px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 24px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: #f8fafc;
+}
+
+.upload-drop-zone:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    transform: scale(1.02);
+}
+
+.upload-drop-zone:active {
+    transform: scale(0.98);
+}
+
+.upload-icon-box {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.upload-icon-box.camera {
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+}
+
+.upload-icon-box.excel {
+    background: linear-gradient(135deg, #10b981, #14b8a6);
+}
+
+.upload-main-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.upload-sub-text {
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: center;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.upload-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.upload-loading p {
+    font-size: 13px;
+    color: #3b82f6;
+    font-weight: 600;
+    margin: 0;
+}
+
+.upload-history-wrapper {
+    padding: 0;
+    min-height: 200px;
+}

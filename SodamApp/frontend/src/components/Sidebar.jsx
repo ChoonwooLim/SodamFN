@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, TrendingUp, ShoppingBag, FileSignature, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3 } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -25,7 +25,7 @@ export default function Sidebar() {
     const menuItems = user.role === 'admin'
         ? [
             { icon: LayoutDashboard, label: '대시보드', path: '/' },
-            { icon: TrendingUp, label: '매출 입력', path: '/input/revenue' },
+            { icon: BarChart3, label: '매출 관리', path: '/revenue' },
             { icon: ShoppingBag, label: '매입 입력', path: '/input/expense' },
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
