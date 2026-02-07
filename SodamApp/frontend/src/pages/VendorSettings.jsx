@@ -22,9 +22,8 @@ const EXPENSE_CATEGORIES = [
 
 // 매출처 카테고리 정의
 const REVENUE_CATEGORIES = [
-    { id: 'delivery', label: '배달앱', icon: '🛵' },
+    { id: 'delivery', label: '배달앱매출', icon: '🛵' },
     { id: 'store', label: '매장매출', icon: '🏪' },
-    { id: 'other_revenue', label: '기타매출', icon: '💰' },
 ];
 
 export default function VendorSettings() {
@@ -46,8 +45,16 @@ export default function VendorSettings() {
     // Sorting State
     const [sortBy, setSortBy] = useState('name'); // 'name', 'recent', 'frequency', 'amount'
 
+    // Monthly Stats State
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
     const handleSortChange = (e) => {
         setSortBy(e.target.value);
+    };
+
+    const handleMonthChange = (e) => {
+        const [year, month] = e.target.value.split('-');
+        setSelectedDate(new Date(year, month - 1));
     };
 
     const toggleCategory = (categoryId) => {
@@ -64,7 +71,7 @@ export default function VendorSettings() {
 
     useEffect(() => {
         fetchVendors();
-    }, []);
+    }, [selectedDate]);
 
     // Reset category when tab changes
     useEffect(() => {
@@ -77,7 +84,9 @@ export default function VendorSettings() {
 
     const fetchVendors = async () => {
         try {
-            const response = await api.get('/vendors');
+            const year = selectedDate.getFullYear();
+            const month = selectedDate.getMonth() + 1;
+            const response = await api.get(`/vendors?year=${year}&month=${month}`);
             if (response.data.status === 'success') {
                 const apiVendors = response.data.data;
                 // Sort by order_index
@@ -356,14 +365,25 @@ export default function VendorSettings() {
                             </div>
 
                             {/* Sorting Control */}
-                            <div className="sorting-control">
-                                <span className="sort-label">정렬: </span>
-                                <select value={sortBy} onChange={handleSortChange} className="sort-select">
-                                    <option value="name">가나다순 (기본)</option>
-                                    <option value="recent">최근 거래일자순</option>
-                                    <option value="frequency">거래 빈도순 (많이)</option>
-                                    <option value="amount">거래 총액순 (높은금액)</option>
-                                </select>
+                            <div className="controls-right">
+                                <div className="month-control">
+                                    <span className="control-label">기간: </span>
+                                    <input
+                                        type="month"
+                                        value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`}
+                                        onChange={handleMonthChange}
+                                        className="month-input"
+                                    />
+                                </div>
+                                <div className="sorting-control">
+                                    <span className="control-label">정렬: </span>
+                                    <select value={sortBy} onChange={handleSortChange} className="sort-select">
+                                        <option value="name">가나다순 (기본)</option>
+                                        <option value="recent">최근 거래일자순</option>
+                                        <option value="frequency">거래 빈도순 (많이)</option>
+                                        <option value="amount">거래 총액순 (높은금액)</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         <h3>새 거래처 추가</h3>
@@ -564,7 +584,6 @@ export default function VendorSettings() {
                                                         </button>
                                                     </div>
                                                 ))}
-                                            ))}
                                             </div>
                                         )}
                                     </div>
@@ -612,74 +631,82 @@ export default function VendorSettings() {
                                                                 className="merge-checkbox"
                                                                 title="병합할 거래처 선택"
                                                             />
-                                                            <span className="vendor-order">{idx + 1}</span>
-                                                            {/* Vendor name - editable when editingVendor matches */}
-                                                            {editingVendor === vendor.name ? (
-                                                                <div className="vendor-edit-group">
-                                                                    <input
-                                                                        type="text"
-                                                                        defaultValue={vendor.name}
-                                                                        onKeyDown={async (e) => {
-                                                                            if (e.key === 'Enter') {
-                                                                                const newName = e.target.value.trim();
-                                                                                if (newName && newName !== vendor.name) {
-                                                                                    await handleUpdateVendor(vendor, { name: newName });
+                                                            <div className="vendor-info-group">
+                                                                <span className="vendor-order">{idx + 1}</span>
+                                                                {/* Vendor name - editable when editingVendor matches */}
+                                                                {editingVendor === vendor.name ? (
+                                                                    <div className="vendor-edit-group">
+                                                                        <input
+                                                                            type="text"
+                                                                            defaultValue={vendor.name}
+                                                                            onKeyDown={async (e) => {
+                                                                                if (e.key === 'Enter') {
+                                                                                    const newName = e.target.value.trim();
+                                                                                    if (newName && newName !== vendor.name) {
+                                                                                        await handleUpdateVendor(vendor, { name: newName });
+                                                                                    }
+                                                                                    setEditingVendor(null);
+                                                                                } else if (e.key === 'Escape') {
+                                                                                    setEditingVendor(null);
                                                                                 }
+                                                                            }}
+                                                                            autoFocus
+                                                                            className="vendor-name-edit-input"
+                                                                        />
+                                                                        <select
+                                                                            value={vendor.category}
+                                                                            onChange={async (e) => {
+                                                                                const newCategory = e.target.value;
+                                                                                if (newCategory === vendor.category) return;
+                                                                                const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
+                                                                                await handleUpdateVendor(vendor, {
+                                                                                    category: newCategory,
+                                                                                    vendor_type: isExpense ? 'expense' : 'revenue'
+                                                                                });
                                                                                 setEditingVendor(null);
-                                                                            } else if (e.key === 'Escape') {
-                                                                                setEditingVendor(null);
-                                                                            }
-                                                                        }}
-                                                                        autoFocus
-                                                                        className="vendor-name-edit-input"
-                                                                    />
-                                                                    <select
-                                                                        value={vendor.category}
-                                                                        onChange={async (e) => {
-                                                                            const newCategory = e.target.value;
-                                                                            if (newCategory === vendor.category) return;
-                                                                            const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
-                                                                            await handleUpdateVendor(vendor, {
-                                                                                category: newCategory,
-                                                                                vendor_type: isExpense ? 'expense' : 'revenue'
-                                                                            });
-                                                                            setEditingVendor(null);
-                                                                        }}
-                                                                        className="category-change-select"
-                                                                        onClick={(e) => e.stopPropagation()}
+                                                                            }}
+                                                                            className="category-change-select"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            <optgroup label="💰 매입처 (비용)">
+                                                                                {EXPENSE_CATEGORIES.map(cat => (
+                                                                                    <option key={cat.id} value={cat.id}>
+                                                                                        {cat.icon} {cat.label}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </optgroup>
+                                                                            <optgroup label="💵 매출처 (수입)">
+                                                                                {REVENUE_CATEGORIES.map(cat => (
+                                                                                    <option key={cat.id} value={cat.id}>
+                                                                                        {cat.icon} {cat.label}
+                                                                                    </option>
+                                                                                ))}
+                                                                            </optgroup>
+                                                                        </select>
+                                                                        <button
+                                                                            className="edit-save-btn"
+                                                                            onClick={() => setEditingVendor(null)}
+                                                                            title="편집 완료"
+                                                                        >
+                                                                            <Check size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <span
+                                                                        className="vendor-name-display"
+                                                                        onDoubleClick={() => setEditingVendor(vendor.name)}
+                                                                        title="더블클릭하여 수정"
                                                                     >
-                                                                        <optgroup label="💰 매입처 (비용)">
-                                                                            {EXPENSE_CATEGORIES.map(cat => (
-                                                                                <option key={cat.id} value={cat.id}>
-                                                                                    {cat.icon} {cat.label}
-                                                                                </option>
-                                                                            ))}
-                                                                        </optgroup>
-                                                                        <optgroup label="💵 매출처 (수입)">
-                                                                            {REVENUE_CATEGORIES.map(cat => (
-                                                                                <option key={cat.id} value={cat.id}>
-                                                                                    {cat.icon} {cat.label}
-                                                                                </option>
-                                                                            ))}
-                                                                        </optgroup>
-                                                                    </select>
-                                                                    <button
-                                                                        className="edit-save-btn"
-                                                                        onClick={() => setEditingVendor(null)}
-                                                                        title="편집 완료"
-                                                                    >
-                                                                        <Check size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <span
-                                                                    className="vendor-name-display"
-                                                                    onDoubleClick={() => setEditingVendor(vendor.name)}
-                                                                    title="더블클릭하여 수정"
-                                                                >
-                                                                    {vendor.name}
-                                                                </span>
-                                                            )}
+                                                                        {vendor.name}
+                                                                    </span>
+                                                                )}
+                                                                {/* Monthly Amount Display */}
+                                                                {Number(vendor.total_transaction_amount) > 0 && (
+                                                                    <span className="vendor-monthly-amount">
+                                                                        ₩{Math.floor(Number(vendor.total_transaction_amount)).toLocaleString()}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             {/* Product Summary Button - Click to open product management */}
                                                             {activeTab === 'expense' ? (
                                                                 <button

@@ -75,15 +75,29 @@ class DatabaseService:
         results = self.session.exec(stmt).all()
         return [{"vendor": r[0], "amount": r[1], "item": r[2]} for r in results]
 
-    def get_vendors(self):
+    def get_vendors(self, year: int = None, month: int = None):
         # Join Vendor with DailyExpense to get stats
         # We need to use left join and group by Vendor.id
+        
+        # Base join condition
+        join_condition = (Vendor.id == DailyExpense.vendor_id)
+        
+        # Add date filtering to join condition if provided
+        if year and month:
+            from datetime import date
+            import calendar
+            start_date = date(year, month, 1)
+            _, last_day = calendar.monthrange(year, month)
+            end_date = date(year, month, last_day)
+            
+            join_condition = join_condition & (DailyExpense.date >= start_date) & (DailyExpense.date <= end_date)
+            
         stmt = select(
             Vendor,
             func.max(DailyExpense.date).label("last_transaction_date"),
             func.count(DailyExpense.id).label("transaction_count"),
             func.sum(DailyExpense.amount).label("total_transaction_amount")
-        ).outerjoin(DailyExpense, Vendor.id == DailyExpense.vendor_id).group_by(Vendor.id)
+        ).outerjoin(DailyExpense, join_condition).group_by(Vendor.id)
         
         results = self.session.exec(stmt).all()
         

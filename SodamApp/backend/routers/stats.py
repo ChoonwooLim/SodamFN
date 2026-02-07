@@ -85,10 +85,10 @@ def get_cost_breakdown(year: int = 2025, month: int = 12):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/vendors")
-def get_vendors_list():
+def get_vendors_list(year: Optional[int] = None, month: Optional[int] = None):
     try:
         with DatabaseService() as service:
-            data = service.get_vendors()
+            data = service.get_vendors(year=year, month=month)
             return {"status": "success", "data": data}
     except Exception as e:
         return {"status": "error", "message": str(e)}
