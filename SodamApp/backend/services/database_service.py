@@ -101,7 +101,7 @@ class DatabaseService:
         
         results = self.session.exec(stmt).all()
         
-        return [{
+        vendor_list = [{
             "id": row[0].id, 
             "name": row[0].name, 
             "item": getattr(row[0], 'item', None) or row[0].category,
@@ -113,6 +113,62 @@ class DatabaseService:
             "transaction_count": row[2] or 0,
             "total_transaction_amount": row[3] or 0
         } for row in results]
+
+        # ── Merge Revenue table data for delivery vendors ──
+        # Map Revenue.channel → delivery vendor by keyword matching
+        CHANNEL_KEYWORDS = {
+            "Coupang": "쿠팡",
+            "Baemin": "배달의민족",
+            "Yogiyo": "요기요",
+            "Ddangyo": "땡겨요",
+        }
+
+        delivery_vendors = [v for v in vendor_list if v["category"] == "delivery"]
+        if delivery_vendors:
+            # Build channel→vendor mapping
+            channel_to_vendor_ids = {}
+            for ch_key, keyword in CHANNEL_KEYWORDS.items():
+                for v in delivery_vendors:
+                    if keyword in v["name"]:
+                        channel_to_vendor_ids.setdefault(ch_key, []).append(v["id"])
+
+            # Query Revenue table for matching period
+            rev_query = select(
+                Revenue.channel,
+                func.count(Revenue.id).label("rev_count"),
+                func.sum(Revenue.amount).label("rev_total"),
+                func.max(Revenue.date).label("rev_last_date"),
+            ).group_by(Revenue.channel)
+
+            if year and month:
+                rev_query = rev_query.where(
+                    Revenue.date >= start_date,
+                    Revenue.date <= end_date,
+                )
+
+            rev_results = self.session.exec(rev_query).all()
+
+            # Merge Revenue stats into matching vendor entries
+            vendor_by_id = {v["id"]: v for v in vendor_list}
+            for rev_row in rev_results:
+                channel = rev_row[0]
+                rev_count = rev_row[1] or 0
+                rev_total = rev_row[2] or 0
+                rev_last = rev_row[3]
+
+                target_ids = channel_to_vendor_ids.get(channel, [])
+                for vid in target_ids:
+                    v = vendor_by_id.get(vid)
+                    if v:
+                        v["transaction_count"] += rev_count
+                        v["total_transaction_amount"] += rev_total
+                        # Update last_transaction_date if Revenue has more recent
+                        if rev_last:
+                            rev_last_str = str(rev_last)
+                            if not v["last_transaction_date"] or rev_last_str > str(v["last_transaction_date"]):
+                                v["last_transaction_date"] = rev_last_str
+
+        return vendor_list
 
     def update_vendor_item(self, vendor_name: str, item: str):
         stmt = select(Vendor).where(Vendor.name == vendor_name)
