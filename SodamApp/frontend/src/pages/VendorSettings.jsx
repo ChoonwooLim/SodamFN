@@ -47,6 +47,9 @@ export default function VendorSettings() {
     // Add Store Modal State
     const [isAddStoreModalOpen, setIsAddStoreModalOpen] = useState(false);
     const [newStoreName, setNewStoreName] = useState('');
+    // Add Card Company State
+    const [addingCardStore, setAddingCardStore] = useState(null); // storeName currently adding card to
+    const [newCardName, setNewCardName] = useState('');
 
     const handleCreateVendor = async (vendorData) => {
         try {
@@ -871,17 +874,87 @@ export default function VendorSettings() {
                                                             </div>
                                                             {/* Card Section */}
                                                             <div className="store-sub-section">
-                                                                <div className="store-sub-header">
+                                                                <div
+                                                                    className="store-sub-header"
+                                                                    onClick={() => toggleCategory(`card-${storeName}`)}
+                                                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                                                >
                                                                     <span>💳 카드매출</span>
                                                                     <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'normal' }}>({group.card.length}개)</span>
+                                                                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center' }}>
+                                                                        {collapsedCategories.has(`card-${storeName}`) ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="store-sub-content">
-                                                                    {group.card.length > 0 ? (
-                                                                        group.card.map((vendor, idx) => renderVendorItem(vendor, idx, group.card, true))
-                                                                    ) : (
-                                                                        <div className="padding-md text-gray-400 text-sm text-center">등록된 카드사 없음</div>
-                                                                    )}
-                                                                </div>
+                                                                {!collapsedCategories.has(`card-${storeName}`) && (
+                                                                    <div className="store-sub-content">
+                                                                        {group.card.length > 0 ? (
+                                                                            group.card.map((vendor, idx) => renderVendorItem(vendor, idx, group.card, true))
+                                                                        ) : (
+                                                                            <div className="padding-md text-gray-400 text-sm text-center">등록된 카드사 없음</div>
+                                                                        )}
+                                                                        {/* Add Card Company Inline */}
+                                                                        {addingCardStore === storeName ? (
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderTop: '1px dashed #e2e8f0' }}>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={newCardName}
+                                                                                    onChange={(e) => setNewCardName(e.target.value)}
+                                                                                    onKeyDown={async (e) => {
+                                                                                        if (e.key === 'Enter' && newCardName.trim()) {
+                                                                                            await handleCreateVendor({
+                                                                                                name: `${storeName} ${newCardName.trim()}`,
+                                                                                                category: 'store',
+                                                                                                vendor_type: 'revenue',
+                                                                                                item: `${storeName}:card`
+                                                                                            });
+                                                                                            setNewCardName('');
+                                                                                            setAddingCardStore(null);
+                                                                                        }
+                                                                                        if (e.key === 'Escape') {
+                                                                                            setNewCardName('');
+                                                                                            setAddingCardStore(null);
+                                                                                        }
+                                                                                    }}
+                                                                                    placeholder="카드사 이름 (예: 국민카드)"
+                                                                                    autoFocus
+                                                                                    style={{ flex: 1, padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', outline: 'none' }}
+                                                                                />
+                                                                                <button
+                                                                                    onClick={async () => {
+                                                                                        if (!newCardName.trim()) return;
+                                                                                        await handleCreateVendor({
+                                                                                            name: `${storeName} ${newCardName.trim()}`,
+                                                                                            category: 'store',
+                                                                                            vendor_type: 'revenue',
+                                                                                            item: `${storeName}:card`
+                                                                                        });
+                                                                                        setNewCardName('');
+                                                                                        setAddingCardStore(null);
+                                                                                    }}
+                                                                                    style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                                                >
+                                                                                    추가
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={() => { setNewCardName(''); setAddingCardStore(null); }}
+                                                                                    style={{ padding: '6px 8px', background: '#f1f5f9', color: '#64748b', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
+                                                                                >
+                                                                                    취소
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div
+                                                                                onClick={() => setAddingCardStore(storeName)}
+                                                                                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderTop: '1px dashed #e2e8f0', cursor: 'pointer', color: '#94a3b8', fontSize: '13px', transition: 'color 0.2s' }}
+                                                                                onMouseEnter={(e) => e.currentTarget.style.color = '#3b82f6'}
+                                                                                onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+                                                                            >
+                                                                                <Plus size={14} />
+                                                                                <span>카드사 추가</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             {/* Others/Unclassified in Store */}
                                                             {group.other.length > 0 && (
