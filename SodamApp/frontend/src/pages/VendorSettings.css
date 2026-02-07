@@ -614,6 +614,54 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* Store Revenue Nested Layout */
+.store-nested-container {
+    padding: 10px;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.store-group-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 12px;
+    padding-left: 4px;
+    border-left: 4px solid #3b82f6;
+    line-height: 1.2;
+}
+
+.store-sub-section {
+    margin-bottom: 16px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.store-sub-header {
+    padding: 10px 16px;
+    background: #f1f5f9;
+    font-size: 14px;
+    font-weight: 600;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.store-sub-content {
+    padding: 4px 0;
+}
+
+.card-company-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 8px;
+    padding: 8px;
+}
+
 .cancel-selection-btn {
     padding: 8px 16px;
     background: rgba(255, 255, 255, 0.2);

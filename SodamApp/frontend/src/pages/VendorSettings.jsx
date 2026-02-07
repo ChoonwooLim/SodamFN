@@ -4,7 +4,6 @@ import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Chec
 import api from '../api';
 import './VendorSettings.css';
 import ProductManagement from '../components/ProductManagement';
-
 // 매입처 카테고리 정의 (백엔드 CATEGORY_TO_PL_FIELD와 동기화)
 // Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
 const EXPENSE_CATEGORIES = [
@@ -19,13 +18,11 @@ const EXPENSE_CATEGORIES = [
     { id: '근로소득세', label: '근로소득세', icon: '📋' },
     { id: 'other', label: '기타비용', icon: '📋' },
 ];
-
 // 매출처 카테고리 정의
 const REVENUE_CATEGORIES = [
     { id: 'delivery', label: '배달앱매출', icon: '🛵' },
     { id: 'store', label: '매장매출', icon: '🏪' },
 ];
-
 export default function VendorSettings() {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
@@ -44,19 +41,61 @@ export default function VendorSettings() {
     const [collapsedCategories, setCollapsedCategories] = useState(new Set());
     // Sorting State
     const [sortBy, setSortBy] = useState('name'); // 'name', 'recent', 'frequency', 'amount'
-
     // Monthly Stats State
     const [selectedDate, setSelectedDate] = useState(new Date());
 
+    // Add Store Modal State
+    const [isAddStoreModalOpen, setIsAddStoreModalOpen] = useState(false);
+    const [newStoreName, setNewStoreName] = useState('');
+
+    const handleCreateVendor = async (vendorData) => {
+        try {
+            await api.post('/vendors', {
+                ...vendorData,
+                order_index: vendorData.order_index || 100
+            });
+            await fetchVendors();
+        } catch (error) {
+            console.error("Failed to create vendor:", error);
+            throw error;
+        }
+    };
+
+    const handleAddStore = async () => {
+        if (!newStoreName.trim()) return;
+        const name = newStoreName.trim();
+        try {
+            await handleCreateVendor({
+                name: `${name} 현금매출`,
+                category: 'store',
+                vendor_type: 'revenue',
+                item: `${name}:cash`
+            });
+
+            // Automated Card Companies
+            const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
+
+            for (const company of CARD_COMPANIES) {
+                await handleCreateVendor({
+                    name: `${name} ${company}`,
+                    category: 'store',
+                    vendor_type: 'revenue',
+                    item: `${name}:card`
+                });
+            }
+            setNewStoreName('');
+            setIsAddStoreModalOpen(false);
+        } catch (error) {
+            alert("매장 추가에 실패했습니다.");
+        }
+    };
     const handleSortChange = (e) => {
         setSortBy(e.target.value);
     };
-
     const handleMonthChange = (e) => {
         const [year, month] = e.target.value.split('-');
         setSelectedDate(new Date(year, month - 1));
     };
-
     const toggleCategory = (categoryId) => {
         setCollapsedCategories(prev => {
             const newSet = new Set(prev);
@@ -68,11 +107,9 @@ export default function VendorSettings() {
             return newSet;
         });
     };
-
     useEffect(() => {
         fetchVendors();
     }, [selectedDate]);
-
     // Reset category when tab changes
     useEffect(() => {
         if (activeTab === 'expense') {
@@ -81,7 +118,6 @@ export default function VendorSettings() {
             setNewVendorCategory('delivery');
         }
     }, [activeTab]);
-
     const fetchVendors = async () => {
         try {
             const year = selectedDate.getFullYear();
@@ -99,14 +135,11 @@ export default function VendorSettings() {
             setLoading(false);
         }
     };
-
     const getCategories = () => activeTab === 'expense' ? EXPENSE_CATEGORIES : REVENUE_CATEGORIES;
-
     const getVendorsByCategory = (category) => {
         const filtered = vendors.filter(v =>
             v.vendor_type === activeTab && v.category === category
         );
-
         // Apply Sorting
         return filtered.sort((a, b) => {
             if (sortBy === 'name') {
@@ -124,7 +157,6 @@ export default function VendorSettings() {
             return 0;
         });
     };
-
     const handleSave = async (vendor) => {
         setSaving(vendor.name);
         try {
@@ -141,17 +173,53 @@ export default function VendorSettings() {
             setSaving(null);
         }
     };
-
     const handleAddVendor = async () => {
         if (!newVendorName.trim()) return;
+
+        // Custom Logic for 'Store Revenue'
+        if (activeTab === 'revenue' && newVendorCategory === 'store') {
+            const storeName = newVendorName.trim();
+            // Check if store already exists (by checking if any vendor has item starts with storeName:)
+            const exists = vendors.some(v => v.category === 'store' && v.item && v.item.startsWith(`${storeName}:`));
+            if (exists) {
+                alert('이미 존재하는 매장입니다.');
+                return;
+            }
+
+            try {
+                // 1. Cash Revenue
+                await handleCreateVendor({
+                    name: `${storeName} 현금매출`,
+                    category: 'store',
+                    vendor_type: 'revenue',
+                    item: `${storeName}:cash`
+                });
+
+                // 2. Automated Card Companies
+                const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
+
+                for (const company of CARD_COMPANIES) {
+                    await handleCreateVendor({
+                        name: `${storeName} ${company}`,
+                        category: 'store',
+                        vendor_type: 'revenue',
+                        item: `${storeName}:card`
+                    });
+                }
+
+                setNewVendorName('');
+            } catch (error) {
+                alert('매장 추가 실패');
+            }
+            return;
+        }
+
         // Check duplicates only within the same vendor_type (매입처/매출처 분리)
         if (vendors.some(v => v.name === newVendorName.trim() && v.vendor_type === activeTab)) {
             alert('이미 존재하는 거래처입니다.');
             return;
         }
-
         const maxOrder = Math.max(0, ...vendors.filter(v => v.vendor_type === activeTab && v.category === newVendorCategory).map(v => v.order_index || 0));
-
         const newVendor = {
             name: newVendorName.trim(),
             item: '',
@@ -159,7 +227,6 @@ export default function VendorSettings() {
             vendor_type: activeTab,
             order_index: maxOrder + 1
         };
-
         try {
             await api.post('/vendors', newVendor);
             await fetchVendors();
@@ -168,32 +235,48 @@ export default function VendorSettings() {
             alert('거래처 추가 실패');
         }
     };
-
-    const handleDeleteVendor = async (vendorName) => {
-        if (!window.confirm(`"${vendorName}" 거래처를 삭제하시겠습니까?`)) return;
-
+    const handleDeleteVendor = async (vendor) => {
+        if (!window.confirm(`"${vendor.name}" 거래처를 삭제하시겠습니까?`)) return;
         try {
-            await api.delete(`/vendors/${encodeURIComponent(vendorName)}`);
+            if (vendor.id) {
+                await api.delete(`/vendors/id/${vendor.id}`);
+            } else {
+                await api.delete(`/vendors/${encodeURIComponent(vendor.name)}`);
+            }
             await fetchVendors();
         } catch (error) {
             alert('삭제 실패');
         }
     };
 
+    const handleDeleteStore = async (storeName) => {
+        if (!window.confirm(`"${storeName}" 매장 그룹을 삭제하시겠습니까?\n포함된 현금/카드 매출 항목이 모두 삭제됩니다.`)) return;
+
+        // Find all vendors in this store group
+        const groupVendors = vendors.filter(v => v.category === 'store' && v.item && v.item.startsWith(`${storeName}:`));
+
+        try {
+            for (const v of groupVendors) {
+                if (v.id) {
+                    await api.delete(`/vendors/id/${v.id}`);
+                }
+            }
+            await fetchVendors();
+        } catch (error) {
+            console.error(error);
+            alert('매장 삭제 실패');
+        }
+    };
     const handleMoveVendor = async (vendor, direction) => {
         const sameCategory = vendors.filter(v => v.vendor_type === vendor.vendor_type && v.category === vendor.category);
         const currentIndex = sameCategory.findIndex(v => v.name === vendor.name);
         const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-
         if (newIndex < 0 || newIndex >= sameCategory.length) return;
-
         const otherVendor = sameCategory[newIndex];
-
         // Swap order_index
         const tempOrder = vendor.order_index;
         vendor.order_index = otherVendor.order_index;
         otherVendor.order_index = tempOrder;
-
         try {
             await api.post('/vendors', vendor);
             await api.post('/vendors', otherVendor);
@@ -202,7 +285,6 @@ export default function VendorSettings() {
             console.error('Move failed:', error);
         }
     };
-
     const handleUpdateVendor = async (vendor, updates) => {
         setSaving(vendor.name);
         try {
@@ -221,12 +303,10 @@ export default function VendorSettings() {
             setSaving(null);
         }
     };
-
     const handleVendorNameClick = (vendor) => {
         setEditingVendor(vendor.id);
         setEditingName(vendor.name);
     };
-
     const handleVendorNameSave = async (vendor) => {
         if (!editingName.trim() || editingName === vendor.name) {
             setEditingVendor(null);
@@ -235,17 +315,14 @@ export default function VendorSettings() {
         await handleUpdateVendor(vendor, { name: editingName });
         setEditingVendor(null);
     };
-
     const getCategoryLabel = (categoryId) => {
         const allCategories = [...EXPENSE_CATEGORIES, ...REVENUE_CATEGORIES];
         return allCategories.find(c => c.id === categoryId)?.label || categoryId;
     };
-
     const getCategoryIcon = (categoryId) => {
         const allCategories = [...EXPENSE_CATEGORIES, ...REVENUE_CATEGORIES];
         return allCategories.find(c => c.id === categoryId)?.icon || '📁';
     };
-
     // Merge handlers
     const handleToggleMergeSelect = (vendorId) => {
         setSelectedForMerge(prev =>
@@ -254,7 +331,6 @@ export default function VendorSettings() {
                 : [...prev, vendorId]
         );
     };
-
     const handleOpenMergeModal = () => {
         if (selectedForMerge.length < 2) {
             alert('병합할 거래처를 2개 이상 선택해주세요.');
@@ -263,19 +339,15 @@ export default function VendorSettings() {
         setShowMergeModal(true);
         setMergeTarget(selectedForMerge[0]); // Default to first selected
     };
-
     const getVendorById = (id) => {
         if (typeof id === 'string') {
             return vendors.find(v => v.name === id) || { name: id, category: null };
         }
         return vendors.find(v => v.id === id);
     };
-
     const handleMerge = async () => {
         if (!mergeTarget) return;
-
         let finalTargetName = null;
-
         // 1. Determine Target Name
         if (mergeTarget === '__CUSTOM__') {
             finalTargetName = customMergeName.trim();
@@ -287,12 +359,10 @@ export default function VendorSettings() {
             const targetVendor = getVendorById(mergeTarget);
             finalTargetName = targetVendor ? targetVendor.name : mergeTarget;
         }
-
         // 2. Determine Strategy (ID-based vs Name-based)
         // If target is an existing vendor (ID), use ID merge. 
         // If target is Name (Uncategorized) or Custom, use Name merge.
         const isIdMerge = (typeof mergeTarget === 'number');
-
         try {
             let response;
             if (isIdMerge) {
@@ -307,17 +377,14 @@ export default function VendorSettings() {
                     const v = getVendorById(id); // Handles both ID and Name lookup
                     return v ? v.name : id;
                 });
-
                 // Filter out the target itself
                 const filteredSourceNames = sourceNames.filter(name => name !== finalTargetName);
-
                 response = await api.post('/vendors/merge-uncategorized', {
                     target_name: finalTargetName,
                     source_names: filteredSourceNames,
                     category: 'other'
                 });
             }
-
             if (response.data.status === 'success') {
                 const mergedCount = response.data.merged_expenses || response.data.merged_count;
                 alert(`${mergedCount}건의 데이터가 병합되었습니다.`);
@@ -336,7 +403,6 @@ export default function VendorSettings() {
             alert('병합 실패: ' + errorMessage);
         }
     };
-
     return (
         <>
             <div className="vendor-settings-page">
@@ -363,7 +429,6 @@ export default function VendorSettings() {
                                     수입 관리 (매출)
                                 </button>
                             </div>
-
                             {/* Sorting Control */}
                             <div className="controls-right">
                                 <div className="month-control">
@@ -413,7 +478,6 @@ export default function VendorSettings() {
                             </button>
                         </div>
                     </div>
-
                     {/* Merge Button */}
                     {selectedForMerge.length >= 2 && (
                         <div className="merge-action-bar">
@@ -427,7 +491,6 @@ export default function VendorSettings() {
                             </button>
                         </div>
                     )}
-
                     {loading ? (
                         <div className="loading-spinner">
                             <div className="spinner"></div>
@@ -439,11 +502,9 @@ export default function VendorSettings() {
                                 const allExpenseCategories = EXPENSE_CATEGORIES.map(c => c.id);
                                 const allRevenueCategories = REVENUE_CATEGORIES.map(c => c.id);
                                 const allValidCategories = [...allExpenseCategories, ...allRevenueCategories];
-
                                 const rawUncategorized = vendors.filter(v =>
                                     !v.category || !allValidCategories.includes(v.category)
                                 );
-
                                 // Group by name
                                 const uniqueUncategorized = rawUncategorized.reduce((acc, current) => {
                                     const existing = acc.find(v => v.name === current.name);
@@ -455,9 +516,7 @@ export default function VendorSettings() {
                                     }
                                     return acc;
                                 }, []);
-
                                 if (uniqueUncategorized.length === 0) return null;
-
                                 // Helper for selecting unknown vendors for merge
                                 const toggleUnknownSelect = (name) => {
                                     setSelectedForMerge(prev => {
@@ -469,7 +528,6 @@ export default function VendorSettings() {
                                         return prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name];
                                     });
                                 };
-
                                 return (
                                     <div className="vendor-category-section uncategorized">
                                         <div
@@ -483,7 +541,6 @@ export default function VendorSettings() {
                                                 <span className="badge-count-total">{rawUncategorized.length}건</span>
                                                 <span className="badge-count-unique">{uniqueUncategorized.length}개 업체</span>
                                             </div>
-
                                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {/* Merge Action for Unknown */}
                                                 {selectedForMerge.length >= 2 && selectedForMerge.every(id => typeof id === 'string') && (
@@ -512,7 +569,6 @@ export default function VendorSettings() {
                                                             className="merge-checkbox"
                                                         />
                                                         <span className="vendor-order">{idx + 1}</span>
-
                                                         <div className="vendor-info-group">
                                                             {editingVendor === vendor.name ? ( // using name as ID for editing unknown
                                                                 <input
@@ -539,7 +595,6 @@ export default function VendorSettings() {
                                                                 </span>
                                                             )}
                                                         </div>
-
                                                         <select
                                                             value=""
                                                             onChange={async (e) => {
@@ -549,7 +604,6 @@ export default function VendorSettings() {
                                                                 // We need a Batch Update by Name API.
                                                                 // But for now, let's try calling existing update. 
                                                                 // If backend supports updating by name (or creating new vendor with that name), it might work.
-
                                                                 const isExpense = EXPENSE_CATEGORIES.some(c => c.id === e.target.value);
                                                                 // We'll treat this as "Create/Update Vendor"
                                                                 await handleUpdateVendor(vendor, {
@@ -589,10 +643,313 @@ export default function VendorSettings() {
                                     </div>
                                 );
                             })()}
-
                             {getCategories().map(category => {
                                 const categoryVendors = getVendorsByCategory(category.id);
-
+                                const renderVendorItem = (vendor, idx, list, isNested = false) => (
+                                    <div key={vendor.id} className={`vendor-item-compact ${selectedForMerge.includes(vendor.id) ? 'selected-for-merge' : ''}`} style={isNested ? { borderBottom: '1px solid #f1f5f9' } : {}}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedForMerge.includes(vendor.id)}
+                                            onChange={() => handleToggleMergeSelect(vendor.id)}
+                                            className="merge-checkbox"
+                                            title="병합할 거래처 선택"
+                                        />
+                                        <div className="vendor-info-group">
+                                            <span className="vendor-order">{idx + 1}</span>
+                                            {editingVendor === vendor.name ? (
+                                                <div className="vendor-edit-group">
+                                                    <input
+                                                        type="text"
+                                                        defaultValue={vendor.name}
+                                                        onKeyDown={async (e) => {
+                                                            if (e.key === 'Enter') {
+                                                                const newName = e.target.value.trim();
+                                                                if (newName && newName !== vendor.name) {
+                                                                    await handleUpdateVendor(vendor, { name: newName });
+                                                                }
+                                                                setEditingVendor(null);
+                                                            } else if (e.key === 'Escape') {
+                                                                setEditingVendor(null);
+                                                            }
+                                                        }}
+                                                        autoFocus
+                                                        className="vendor-name-edit-input"
+                                                    />
+                                                    <select
+                                                        value={vendor.category}
+                                                        onChange={async (e) => {
+                                                            const newCategory = e.target.value;
+                                                            if (newCategory === vendor.category) return;
+                                                            const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
+                                                            await handleUpdateVendor(vendor, {
+                                                                category: newCategory,
+                                                                vendor_type: isExpense ? 'expense' : 'revenue'
+                                                            });
+                                                            setEditingVendor(null);
+                                                        }}
+                                                        className="category-change-select"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <optgroup label="💰 매입처 (비용)">
+                                                            {EXPENSE_CATEGORIES.map(cat => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.icon} {cat.label}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                        <optgroup label="💵 매출처 (수입)">
+                                                            {REVENUE_CATEGORIES.map(cat => (
+                                                                <option key={cat.id} value={cat.id}>
+                                                                    {cat.icon} {cat.label}
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    </select>
+                                                    <button
+                                                        className="edit-save-btn"
+                                                        onClick={() => setEditingVendor(null)}
+                                                        title="편집 완료"
+                                                    >
+                                                        <Check size={14} />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span
+                                                    className="vendor-name-display"
+                                                    onDoubleClick={() => setEditingVendor(vendor.name)}
+                                                    title="더블클릭하여 수정"
+                                                >
+                                                    {(() => {
+                                                        // Strip Store Name prefix if nested
+                                                        if (isNested && vendor.item && vendor.item.includes(':')) {
+                                                            const [storeName] = vendor.item.split(':');
+                                                            if (vendor.name.startsWith(storeName + ' ')) {
+                                                                return vendor.name.substring(storeName.length + 1);
+                                                            }
+                                                            // Also handle connected case if spaces differ? 
+                                                            if (vendor.name.startsWith(storeName)) { // heuristic
+                                                                return vendor.name.substring(storeName.length).trim();
+                                                            }
+                                                        }
+                                                        return vendor.name;
+                                                    })()}
+                                                </span>
+                                            )}
+                                            {Number(vendor.total_transaction_amount) > 0 && (
+                                                <span className="vendor-monthly-amount">
+                                                    ₩{Math.floor(Number(vendor.total_transaction_amount)).toLocaleString()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {activeTab === 'expense' ? (
+                                            <button
+                                                onClick={() => setSelectedVendor(vendor)}
+                                                className="product-summary-btn"
+                                                title="클릭하여 제품 관리"
+                                            >
+                                                <Package size={14} />
+                                                <span>제품 관리</span>
+                                            </button>
+                                        ) : (
+                                            <input
+                                                type="text"
+                                                value={vendor.item || ''}
+                                                onChange={(e) => {
+                                                    const updated = vendors.map(v =>
+                                                        v.name === vendor.name ? { ...v, item: e.target.value } : v
+                                                    );
+                                                    setVendors(updated);
+                                                }}
+                                                onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
+                                                placeholder="취급품목"
+                                                className="item-input-compact"
+                                            />
+                                        )}
+                                        <div className="vendor-actions-compact">
+                                            <button
+                                                onClick={() => setEditingVendor(vendor.name)}
+                                                className="action-btn-sm edit"
+                                                title="업체명 수정"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleMoveVendor(vendor, 'up')}
+                                                disabled={idx === 0}
+                                                className="action-btn-sm"
+                                                title="위로"
+                                            >
+                                                <ChevronUp size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleMoveVendor(vendor, 'down')}
+                                                disabled={idx === list.length - 1}
+                                                className="action-btn-sm"
+                                                title="아래로"
+                                            >
+                                                <ChevronDown size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDeleteVendor(vendor)}
+                                                className="action-btn-sm delete"
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                                if (category.id === 'store') {
+                                    // 1. Group by Store Name (from item "StoreName:Type")
+                                    const storeGroups = {};
+                                    // Default group just in case
+                                    categoryVendors.forEach(v => {
+                                        const itemStr = v.item || '';
+                                        let storeName = '소담김밥'; // Default
+                                        let type = 'other';
+                                        if (itemStr && itemStr.includes(':')) {
+                                            const parts = itemStr.split(':');
+                                            storeName = parts[0];
+                                            type = parts[1];
+                                        } else {
+                                            // Fallback for legacy or unmigrated
+                                            if (itemStr === 'cash') type = 'cash';
+                                            else if (itemStr === 'card') type = 'card';
+                                        }
+                                        if (!storeGroups[storeName]) {
+                                            storeGroups[storeName] = { cash: [], card: [], other: [] };
+                                        }
+                                        if (type === 'cash') storeGroups[storeName].cash.push(v);
+                                        else if (type === 'card') storeGroups[storeName].card.push(v);
+                                        else storeGroups[storeName].other.push(v);
+                                    });
+                                    return (
+                                        <div key={category.id} className="vendor-category-section">
+                                            <div
+                                                className="category-header"
+                                                onClick={() => toggleCategory(category.id)}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                <span className="category-icon">{category.icon}</span>
+                                                <span className="category-label">{category.label}</span>
+                                                <span className="category-count">{categoryVendors.length}개</span>
+                                                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {/* Add Store Button */}
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            const name = prompt("추가할 매장 이름을 입력하세요 (예: 강남점)");
+                                                            if (name) {
+                                                                try {
+                                                                    // 1. Cash Revenue
+                                                                    await handleCreateVendor({
+                                                                        name: `${name} 현금매출`,
+                                                                        category: 'store',
+                                                                        vendor_type: 'revenue',
+                                                                        item: `${name}:cash`
+                                                                    });
+                                                                    // 2. Automated Card Companies
+                                                                    const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
+                                                                    for (const company of CARD_COMPANIES) {
+                                                                        await handleCreateVendor({
+                                                                            name: `${name} ${company}`,
+                                                                            category: 'store',
+                                                                            vendor_type: 'revenue',
+                                                                            item: `${name}:card`
+                                                                        });
+                                                                    }
+                                                                } catch (error) {
+                                                                    console.error("매장 추가 실패:", error);
+                                                                    alert("매장 추가에 실패했습니다.");
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="action-btn-sm"
+                                                        style={{ fontSize: '12px', padding: '4px 8px', width: 'auto' }}
+                                                        title="매장 추가"
+                                                    >
+                                                        <Plus size={14} /> 매장 추가
+                                                    </button>
+                                                    {collapsedCategories.has(category.id) ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                                                </div>
+                                            </div>
+                                            {!collapsedCategories.has(category.id) && (
+                                                <div className="store-nested-container">
+                                                    {Object.entries(storeGroups).map(([storeName, group]) => (
+                                                        <div key={storeName} style={{ marginBottom: '24px' }}>
+                                                            <div className="store-group-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <span>{storeName}</span>
+                                                                    <button
+                                                                        className="action-btn-sm delete"
+                                                                        onClick={() => handleDeleteStore(storeName)}
+                                                                        title={`${storeName} 매장 삭제`}
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                                {/* Optional: Add Vendor for this store specific? */}
+                                                                <button
+                                                                    className="action-btn-sm"
+                                                                    onClick={() => {
+                                                                        const vName = prompt(`'${storeName}'에 추가할 매출처(카드사 등) 이름을 입력하세요:`);
+                                                                        if (vName) {
+                                                                            handleCreateVendor({
+                                                                                name: vName,
+                                                                                category: 'store',
+                                                                                vendor_type: 'revenue',
+                                                                                item: `${storeName}:card`
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    title={`${storeName}에 항목 추가`}
+                                                                >
+                                                                    <Plus size={12} /> 추가
+                                                                </button>
+                                                            </div>
+                                                            {/* Cash Section */}
+                                                            <div className="store-sub-section">
+                                                                <div className="store-sub-header">
+                                                                    <span>💵 현금매출</span>
+                                                                </div>
+                                                                <div className="store-sub-content">
+                                                                    {group.cash.length > 0 ? (
+                                                                        group.cash.map((vendor, idx) => renderVendorItem(vendor, idx, group.cash, true))
+                                                                    ) : (
+                                                                        <div className="padding-md text-gray-400 text-sm text-center">등록된 현금매출처 없음</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {/* Card Section */}
+                                                            <div className="store-sub-section">
+                                                                <div className="store-sub-header">
+                                                                    <span>💳 카드매출</span>
+                                                                    <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 'normal' }}>({group.card.length}개)</span>
+                                                                </div>
+                                                                <div className="store-sub-content">
+                                                                    {group.card.length > 0 ? (
+                                                                        group.card.map((vendor, idx) => renderVendorItem(vendor, idx, group.card, true))
+                                                                    ) : (
+                                                                        <div className="padding-md text-gray-400 text-sm text-center">등록된 카드사 없음</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            {/* Others/Unclassified in Store */}
+                                                            {group.other.length > 0 && (
+                                                                <div className="store-sub-section">
+                                                                    <div className="store-sub-header">기타</div>
+                                                                    <div className="store-sub-content">
+                                                                        {group.other.map((vendor, idx) => renderVendorItem(vendor, idx, group.other, true))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }
                                 return (
                                     <div key={category.id} className="vendor-category-section">
                                         <div
@@ -603,7 +960,6 @@ export default function VendorSettings() {
                                             <span className="category-icon">{category.icon}</span>
                                             <span className="category-label">{category.label}</span>
                                             <span className="category-count">{categoryVendors.length}개</span>
-
                                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                 {/* Merge Action for Category */}
                                                 {selectedForMerge.length >= 2 && categoryVendors.some(v => selectedForMerge.includes(v.id)) && (
@@ -618,155 +974,10 @@ export default function VendorSettings() {
                                                 {collapsedCategories.has(category.id) ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
                                             </div>
                                         </div>
-
                                         {!collapsedCategories.has(category.id) && (
                                             categoryVendors.length > 0 ? (
                                                 <div className="vendor-list-compact">
-                                                    {categoryVendors.map((vendor, idx) => (
-                                                        <div key={vendor.id} className={`vendor-item-compact ${selectedForMerge.includes(vendor.id) ? 'selected-for-merge' : ''}`}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedForMerge.includes(vendor.id)}
-                                                                onChange={() => handleToggleMergeSelect(vendor.id)}
-                                                                className="merge-checkbox"
-                                                                title="병합할 거래처 선택"
-                                                            />
-                                                            <div className="vendor-info-group">
-                                                                <span className="vendor-order">{idx + 1}</span>
-                                                                {/* Vendor name - editable when editingVendor matches */}
-                                                                {editingVendor === vendor.name ? (
-                                                                    <div className="vendor-edit-group">
-                                                                        <input
-                                                                            type="text"
-                                                                            defaultValue={vendor.name}
-                                                                            onKeyDown={async (e) => {
-                                                                                if (e.key === 'Enter') {
-                                                                                    const newName = e.target.value.trim();
-                                                                                    if (newName && newName !== vendor.name) {
-                                                                                        await handleUpdateVendor(vendor, { name: newName });
-                                                                                    }
-                                                                                    setEditingVendor(null);
-                                                                                } else if (e.key === 'Escape') {
-                                                                                    setEditingVendor(null);
-                                                                                }
-                                                                            }}
-                                                                            autoFocus
-                                                                            className="vendor-name-edit-input"
-                                                                        />
-                                                                        <select
-                                                                            value={vendor.category}
-                                                                            onChange={async (e) => {
-                                                                                const newCategory = e.target.value;
-                                                                                if (newCategory === vendor.category) return;
-                                                                                const isExpense = EXPENSE_CATEGORIES.some(c => c.id === newCategory);
-                                                                                await handleUpdateVendor(vendor, {
-                                                                                    category: newCategory,
-                                                                                    vendor_type: isExpense ? 'expense' : 'revenue'
-                                                                                });
-                                                                                setEditingVendor(null);
-                                                                            }}
-                                                                            className="category-change-select"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                        >
-                                                                            <optgroup label="💰 매입처 (비용)">
-                                                                                {EXPENSE_CATEGORIES.map(cat => (
-                                                                                    <option key={cat.id} value={cat.id}>
-                                                                                        {cat.icon} {cat.label}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </optgroup>
-                                                                            <optgroup label="💵 매출처 (수입)">
-                                                                                {REVENUE_CATEGORIES.map(cat => (
-                                                                                    <option key={cat.id} value={cat.id}>
-                                                                                        {cat.icon} {cat.label}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </optgroup>
-                                                                        </select>
-                                                                        <button
-                                                                            className="edit-save-btn"
-                                                                            onClick={() => setEditingVendor(null)}
-                                                                            title="편집 완료"
-                                                                        >
-                                                                            <Check size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                ) : (
-                                                                    <span
-                                                                        className="vendor-name-display"
-                                                                        onDoubleClick={() => setEditingVendor(vendor.name)}
-                                                                        title="더블클릭하여 수정"
-                                                                    >
-                                                                        {vendor.name}
-                                                                    </span>
-                                                                )}
-                                                                {/* Monthly Amount Display */}
-                                                                {Number(vendor.total_transaction_amount) > 0 && (
-                                                                    <span className="vendor-monthly-amount">
-                                                                        ₩{Math.floor(Number(vendor.total_transaction_amount)).toLocaleString()}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {/* Product Summary Button - Click to open product management */}
-                                                            {activeTab === 'expense' ? (
-                                                                <button
-                                                                    onClick={() => setSelectedVendor(vendor)}
-                                                                    className="product-summary-btn"
-                                                                    title="클릭하여 제품 관리"
-                                                                >
-                                                                    <Package size={14} />
-                                                                    <span>제품 관리</span>
-                                                                </button>
-                                                            ) : (
-                                                                <input
-                                                                    type="text"
-                                                                    value={vendor.item || ''}
-                                                                    onChange={(e) => {
-                                                                        const updated = vendors.map(v =>
-                                                                            v.name === vendor.name ? { ...v, item: e.target.value } : v
-                                                                        );
-                                                                        setVendors(updated);
-                                                                    }}
-                                                                    onBlur={() => handleUpdateVendor(vendor, { item: vendor.item })}
-                                                                    placeholder="취급품목"
-                                                                    className="item-input-compact"
-                                                                />
-                                                            )}
-                                                            <div className="vendor-actions-compact">
-                                                                {/* Edit button for vendor name */}
-                                                                <button
-                                                                    onClick={() => setEditingVendor(vendor.name)}
-                                                                    className="action-btn-sm edit"
-                                                                    title="업체명 수정"
-                                                                >
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleMoveVendor(vendor, 'up')}
-                                                                    disabled={idx === 0}
-                                                                    className="action-btn-sm"
-                                                                    title="위로"
-                                                                >
-                                                                    <ChevronUp size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleMoveVendor(vendor, 'down')}
-                                                                    disabled={idx === categoryVendors.length - 1}
-                                                                    className="action-btn-sm"
-                                                                    title="아래로"
-                                                                >
-                                                                    <ChevronDown size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteVendor(vendor.name)}
-                                                                    className="action-btn-sm delete"
-                                                                    title="삭제"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
+                                                    {categoryVendors.map((vendor, idx) => renderVendorItem(vendor, idx, categoryVendors))}
                                                 </div>
                                             ) : (
                                                 <div className="no-vendors-message">
@@ -781,7 +992,6 @@ export default function VendorSettings() {
                     )}
                 </div>
             </div>
-
             {/* Product Management Modal */}
             {
                 selectedVendor && (
@@ -791,7 +1001,6 @@ export default function VendorSettings() {
                     />
                 )
             }
-
             {/* Merge Modal */}
             {
                 showMergeModal && (
@@ -829,7 +1038,6 @@ export default function VendorSettings() {
                                             </label>
                                         );
                                     })}
-
                                     {/* Custom Merge Name Option */}
                                     <label className={`merge-target-option custom ${mergeTarget === '__CUSTOM__' ? 'active' : ''}`}>
                                         <input
@@ -870,6 +1078,43 @@ export default function VendorSettings() {
                     </div>
                 )
             }
+            {/* Add Store Modal */}
+            {isAddStoreModalOpen && (
+                <div className="modal-overlay" onClick={() => setIsAddStoreModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>매장 추가</h3>
+                            <button className="close-btn" onClick={() => setIsAddStoreModalOpen(false)}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-group">
+                                <label>매장 이름</label>
+                                <input
+                                    type="text"
+                                    value={newStoreName}
+                                    onChange={(e) => setNewStoreName(e.target.value)}
+                                    placeholder="예: 강남점, 부산점"
+                                    className="modal-input"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleAddStore();
+                                        if (e.key === 'Escape') setIsAddStoreModalOpen(false);
+                                    }}
+                                />
+                            </div>
+                            <p className="modal-help-text">
+                                매장을 추가하면 해당 매장의 '현금매출'과 '카드매출' 항목이 자동으로 생성됩니다.
+                            </p>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="cancel-btn" onClick={() => setIsAddStoreModalOpen(false)}>취소</button>
+                            <button className="confirm-btn" onClick={handleAddStore}>추가</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
