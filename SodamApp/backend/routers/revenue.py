@@ -126,6 +126,7 @@ def get_daily_revenue(year: int, month: int):
                     "category": "delivery",
                     "item": v.item,
                     "source": "delivery_app",  # flag for frontend
+                    "_channel": rev.channel,  # channel key for edit API
                 })
 
         return {"status": "success", "data": result, "vendors": vendors_list}

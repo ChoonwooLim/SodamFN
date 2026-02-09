@@ -184,11 +184,14 @@ export default function RevenueManagement() {
     };
 
     const openEditModal = (record) => {
+        const isDeliveryApp = typeof record.id === 'string' && record.id.startsWith('rev_');
         setForm({
             vendor_id: record.vendor_id,
             date: record.date,
             amount: String(record.amount),
-            note: record.note || ''
+            note: record.note || '',
+            _isDeliveryApp: isDeliveryApp,
+            _channel: record._channel || null,
         });
         setModalMode('edit');
         setEditingId(record.id);
@@ -209,12 +212,24 @@ export default function RevenueManagement() {
                     note: form.note || null,
                 });
             } else {
-                await api.put(`/revenue/daily/${editingId}`, {
-                    vendor_id: Number(form.vendor_id),
-                    date: form.date,
-                    amount: Number(form.amount),
-                    note: form.note || null,
-                });
+                // Check if editing a Revenue table entry (delivery app)
+                const isDeliveryApp = typeof editingId === 'string' && editingId.startsWith('rev_');
+                if (isDeliveryApp) {
+                    const realId = editingId.replace('rev_', '');
+                    await axios.put(`${API_URL}/api/profitloss/delivery/${realId}`, {
+                        date: form.date,
+                        amount: Number(form.amount),
+                        description: form.note || null,
+                        channel: form._channel || 'Coupang',
+                    });
+                } else {
+                    await api.put(`/revenue/daily/${editingId}`, {
+                        vendor_id: Number(form.vendor_id),
+                        date: form.date,
+                        amount: Number(form.amount),
+                        note: form.note || null,
+                    });
+                }
             }
             setShowModal(false);
             fetchData();
@@ -227,9 +242,15 @@ export default function RevenueManagement() {
     const handleDelete = async (id) => {
         if (!window.confirm('이 매출 내역을 삭제하시겠습니까?')) return;
         try {
-            await api.delete(`/revenue/daily/${id}`);
+            // Check if deleting a Revenue table entry (delivery app)
+            const isDeliveryApp = typeof id === 'string' && id.startsWith('rev_');
+            if (isDeliveryApp) {
+                const realId = id.replace('rev_', '');
+                await axios.delete(`${API_URL}/api/profitloss/delivery/${realId}`);
+            } else {
+                await api.delete(`/revenue/daily/${id}`);
+            }
             fetchData();
-
         } catch (err) {
             console.error(err);
             alert('삭제 실패');
@@ -339,12 +360,12 @@ export default function RevenueManagement() {
     const daysInMonth = new Date(year, month, 0).getDate();
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-    // Build vendor grid: vendorId -> { amounts: { day: amount }, ids: { day: expenseId } }
+    // Build vendor grid: vendorId -> { amounts: { day: amount }, ids: { day: expenseId }, channels: { day: channel } }
     const vendorGrid = {};
     const filteredVendors = tab === 'all' ? vendors : vendors.filter(v => v.category === tab);
 
     filteredVendors.forEach(v => {
-        vendorGrid[v.id] = { amounts: {}, ids: {} };
+        vendorGrid[v.id] = { amounts: {}, ids: {}, channels: {} };
     });
 
     // Populate from data
@@ -354,6 +375,9 @@ export default function RevenueManagement() {
         if (vendorGrid[item.vendor_id]) {
             vendorGrid[item.vendor_id].amounts[day] = (vendorGrid[item.vendor_id].amounts[day] || 0) + item.amount;
             vendorGrid[item.vendor_id].ids[day] = item.id;
+            if (item._channel) {
+                vendorGrid[item.vendor_id].channels[day] = item._channel;
+            }
         }
     });
 
@@ -393,9 +417,20 @@ export default function RevenueManagement() {
         const { vendorId, day, id } = editingCell;
         const amount = parseInt(editValue) || 0;
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const isDeliveryApp = typeof id === 'string' && id.startsWith('rev_');
 
         try {
-            if (id && amount > 0) {
+            if (isDeliveryApp) {
+                const realId = id.replace('rev_', '');
+                const channel = vendorGrid[vendorId]?.channels[day] || 'Coupang';
+                if (amount > 0) {
+                    await axios.put(`${API_URL}/api/profitloss/delivery/${realId}`, {
+                        amount, date: dateStr, channel, description: null
+                    });
+                } else {
+                    await axios.delete(`${API_URL}/api/profitloss/delivery/${realId}`);
+                }
+            } else if (id && amount > 0) {
                 await api.put(`/revenue/daily/${id}`, { amount, date: dateStr, vendor_id: vendorId });
             } else if (!id && amount > 0) {
                 await api.post('/revenue/daily', { vendor_id: vendorId, date: dateStr, amount, note: null });
@@ -412,10 +447,9 @@ export default function RevenueManagement() {
     const renderGridCell = (vendorId, day) => {
         const amount = vendorGrid[vendorId]?.amounts[day] || 0;
         const expenseId = vendorGrid[vendorId]?.ids[day];
-        const isDeliveryApp = typeof expenseId === 'string' && expenseId.startsWith('rev_');
         const isEditing = editingCell?.vendorId === vendorId && editingCell?.day === day;
 
-        if (isEditing && !isDeliveryApp) {
+        if (isEditing) {
             return (
                 <input
                     type="number"
@@ -429,16 +463,6 @@ export default function RevenueManagement() {
                     autoFocus
                     className="grid-edit-input"
                 />
-            );
-        }
-        if (isDeliveryApp) {
-            return (
-                <span
-                    className={`grid-cell-value has-value delivery-app-value`}
-                    title="배달앱에서 관리"
-                >
-                    {formatNumber(amount)}
-                </span>
             );
         }
         return (
