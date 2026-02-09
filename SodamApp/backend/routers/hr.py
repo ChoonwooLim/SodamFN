@@ -38,6 +38,7 @@ class StaffUpdate(BaseModel):
     email: Optional[str] = None
     contract_type: Optional[str] = None
     insurance_4major: Optional[bool] = None
+    insurance_base_salary: Optional[int] = None  # 보수월액
     monthly_salary: Optional[int] = None
     work_schedule: Optional[str] = None
     doc_contract: Optional[bool] = None

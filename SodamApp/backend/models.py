@@ -92,6 +92,7 @@ class Staff(SQLModel, table=True):
     resident_number: Optional[str] = None # Added for contract
     contract_type: str = Field(default="아르바이트") # 정규직, 아르바이트, 일용직
     insurance_4major: bool = Field(default=False) # 4대보험 가입여부
+    insurance_base_salary: int = Field(default=0) # 보수월액 (4대보험 산정 기준 신고 월 보수액)
     monthly_salary: int = Field(default=0) # 월급 (if applicable)
     work_schedule: Optional[str] = None # 근무시간 (e.g. "09:00~18:00") - KEEPING FOR BACKWARD COMPAT, but using new fields below
     
@@ -218,6 +219,7 @@ class Payroll(SQLModel, table=True):
     
     # Detailed Bonus (Earnings)
     bonus_meal: int = 0 # 식비지원
+    bonus_tax_support: int = 0 # 제세공과금 지원금 (정규직용 - 회사 부담 세금/보험)
     bonus_holiday: int = 0 # 주휴수당
     
     # Weekly Holiday Allowance

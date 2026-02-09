@@ -31,12 +31,22 @@ def sync_all_expenses(year: int, month: int, session: Session):
     else:
         end_date = datetime.date(year, month + 1, 1)
     
+    # Get all revenue vendor IDs to exclude from expense aggregation
+    revenue_vendor_ids = set(
+        v.id for v in session.exec(
+            select(Vendor).where(Vendor.vendor_type == "revenue")
+        ).all()
+    )
+
     # Get all daily expenses for the month with their vendor info
     expenses = session.exec(
         select(DailyExpense)
         .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
     ).all()
     
+    # Filter out revenue vendor expenses
+    expenses = [e for e in expenses if e.vendor_id not in revenue_vendor_ids]
+
     # Build vendor_id → category map
     vendor_ids = [e.vendor_id for e in expenses if e.vendor_id]
     vendor_category_map = {}
@@ -141,57 +151,12 @@ def _match_delivery_pl_field(vendor_name: str) -> str:
 
 def sync_revenue_to_pl(year: int, month: int, session: Session):
     """
-    Aggregate DailyExpense from revenue-type vendors and update
-    MonthlyProfitLoss.revenue_store only.
-    Delivery fields are managed by sync_delivery_revenue_to_pl.
+    Unified revenue P/L sync: updates both store and delivery revenue fields.
+    Calls sync_delivery_revenue_to_pl internally for delivery channels.
     """
-    start_date = datetime.date(year, month, 1)
-    if month == 12:
-        end_date = datetime.date(year + 1, 1, 1)
-    else:
-        end_date = datetime.date(year, month + 1, 1)
-
-    # Get all revenue vendors
-    revenue_vendors = session.exec(
-        select(Vendor).where(Vendor.vendor_type == "revenue")
-    ).all()
-    vendor_map = {v.id: v for v in revenue_vendors}
-    vendor_ids = list(vendor_map.keys())
-
-    # Aggregate store revenue from DailyExpense
-    store_total = 0
-    if vendor_ids:
-        expenses = session.exec(
-            select(DailyExpense)
-            .where(
-                DailyExpense.vendor_id.in_(vendor_ids),
-                DailyExpense.date >= start_date,
-                DailyExpense.date < end_date,
-            )
-        ).all()
-
-        for expense in expenses:
-            vendor = vendor_map.get(expense.vendor_id)
-            if not vendor:
-                continue
-            # All DailyExpense revenue goes to revenue_store
-            store_total += (expense.amount or 0)
-
-    # Find or create P/L record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
-
-    if pl_record:
-        pl_record.revenue_store = store_total
-        session.add(pl_record)
-    else:
-        pl_record = MonthlyProfitLoss(year=year, month=month, revenue_store=store_total)
-        session.add(pl_record)
-
-    session.commit()
-    return {"revenue_store": store_total}
+    # sync_delivery_revenue_to_pl handles both delivery fields AND revenue_store
+    result = sync_delivery_revenue_to_pl(year, month, session)
+    return result
 
 
 # ── Channel → P/L delivery field mapping ──

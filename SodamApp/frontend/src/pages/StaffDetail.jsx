@@ -47,7 +47,8 @@ export default function StaffDetail() {
         salary_payment_date: '매월 말일',
         salary_payment_method: '근로자 계좌 입금',
         dependents_count: 1,
-        children_count: 0
+        children_count: 0,
+        insurance_base_salary: 0
     });
 
     const [documents, setDocuments] = useState([]); // List of uploaded documents
@@ -164,7 +165,7 @@ export default function StaffDetail() {
         }
 
         // Handle number inputs with commas
-        if (name === 'hourly_wage' || name === 'monthly_salary') {
+        if (name === 'hourly_wage' || name === 'monthly_salary' || name === 'insurance_base_salary') {
             newValue = value.replace(/,/g, '');
             if (isNaN(newValue) && newValue !== '-') return; // Allow empty or negative temporarily? strict for now
             if (newValue === '') {
@@ -693,6 +694,22 @@ export default function StaffDetail() {
                                         <span className="absolute right-3 top-[34px] text-slate-400 text-sm">원</span>
                                     </div>
                                 </div>
+
+                                {/* 보수월액 - visible when 4대보험 or 정규직 */}
+                                {(formData.insurance_4major || formData.contract_type === '정규직') && (
+                                    <div className="relative">
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">보수월액 <span className="text-xs text-slate-400">(4대보험 산정기준)</span></label>
+                                        <input
+                                            type="text"
+                                            name="insurance_base_salary"
+                                            value={formData.insurance_base_salary ? Number(formData.insurance_base_salary).toLocaleString() : ''}
+                                            onChange={handleChange}
+                                            className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-amber-500 outline-none font-bold"
+                                            placeholder="0 (미입력시 총급여 기준)"
+                                        />
+                                        <span className="absolute right-3 top-[34px] text-slate-400 text-sm">원</span>
+                                    </div>
+                                )}
 
                                 <div className="space-y-3">
                                     <label className="block text-sm font-medium text-slate-500">급여 계좌</label>

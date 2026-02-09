@@ -297,8 +297,11 @@ def calculate_payroll(req: PayrollCalculateRequest):
         d_np, d_hi, d_ei, d_lti, d_it, d_lit = 0, 0, 0, 0, 0, 0
         
         if staff.contract_type == "정규직" or staff.insurance_4major:
-            # Calculation using year-aware utility
-            insurances = calculate_insurances(taxable_income, year=target_year)
+            insurances = calculate_insurances(
+                taxable_income, 
+                year=target_year,
+                insurance_base=staff.insurance_base_salary or 0
+            )
             d_np = insurances["np"]
             d_hi = insurances["hi"]
             d_lti = insurances["lti"]
@@ -318,6 +321,12 @@ def calculate_payroll(req: PayrollCalculateRequest):
             
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
+        
+        # Tax Support (제세공과금 지원금) for Regular Staff
+        tax_support = 0
+        if staff.contract_type == "정규직":
+            # Company reimburses all deductions
+            tax_support = total_deductions
 
         # 4. Save to Payroll Table
         details_json = json.dumps({
@@ -340,7 +349,8 @@ def calculate_payroll(req: PayrollCalculateRequest):
         existing.deduction_lti = d_lti
         existing.deduction_it = d_it
         existing.deduction_lit = d_lit
-        existing.total_pay = net_pay
+        existing.bonus_tax_support = tax_support
+        existing.total_pay = net_pay + tax_support  # For 정규직: net_pay + tax_support = gross_pay + tax_support
         existing.details_json = details_json
         
         service.session.add(existing)
@@ -349,7 +359,7 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         # Auto-sync to MonthlyProfitLoss.expense_labor
         from routers.profitloss import sync_labor_cost
-        sync_labor_cost(year, month_num, service.session)
+        sync_labor_cost(target_year, target_month, service.session)
         
         print(f"DEBUG: Calculated Payroll: Base={total_base_pay}, Bonus={total_holiday_pay}, Total={net_pay}")
         

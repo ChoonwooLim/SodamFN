@@ -196,7 +196,7 @@ def delete_monthly_profitloss(id: int, session: Session = Depends(get_session)):
 
 @router.get("/expenses/{year}/{month}")
 def get_daily_expenses(year: int, month: int, session: Session = Depends(get_session)):
-    """Get daily expenses for a specific month"""
+    """Get daily expenses for a specific month (revenue vendors excluded)"""
     from models import Vendor
     
     start_date = datetime.date(year, month, 1)
@@ -206,10 +206,14 @@ def get_daily_expenses(year: int, month: int, session: Session = Depends(get_ses
         end_date = datetime.date(year, month + 1, 1)
     
     # DailyExpense와 Vendor를 조인하여 최신 벤더 정보를 가져옵니다.
+    # revenue vendor는 제외 (매출관리에서 별도 관리)
     statement = (
         select(DailyExpense, Vendor)
         .join(Vendor, DailyExpense.vendor_id == Vendor.id, isouter=True)
-        .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
+        .where(
+            DailyExpense.date >= start_date,
+            DailyExpense.date < end_date,
+        )
         .order_by(DailyExpense.date, DailyExpense.vendor_name)
     )
     
@@ -217,8 +221,10 @@ def get_daily_expenses(year: int, month: int, session: Session = Depends(get_ses
     
     output = []
     for expense, vendor in results:
+        # Skip revenue vendor expenses — they belong to 매출관리, not 월별비용
+        if vendor and vendor.vendor_type == "revenue":
+            continue
         if vendor:
-            # 벤더가 존재하면 최신 이름과 카테고리로 덮어씁니다 (View 용도)
             expense.vendor_name = vendor.name
             if vendor.category:
                 expense.category = vendor.category

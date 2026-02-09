@@ -366,7 +366,7 @@ export default function ProfitLoss() {
     const getPlFieldByCategory = (category) => {
         if (!category) return 'other';
         const map = {
-            '식자재': 'expense_material',
+            '식자재': 'expense_ingredient',
             '재료비': 'expense_material',
             '임대료': 'expense_rent',
             '임대료(월세)': 'expense_rent',
