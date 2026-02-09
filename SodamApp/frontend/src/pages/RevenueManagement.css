@@ -516,6 +516,100 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ── Cash Row — green tint ── */
+.revenue-table .cash-row {
+    background: linear-gradient(90deg, #f0fdf4 0%, #f0fdf480 70%, transparent 100%);
+}
+
+.revenue-table .cash-row:hover {
+    background: #ecfdf5;
+}
+
+.revenue-table .cash-row .td-amount.cash-amount {
+    color: #059669;
+    font-weight: 800;
+}
+
+.cash-label {
+    color: #059669;
+    font-weight: 700;
+}
+
+.cat-badge.cash {
+    background: #dcfce7;
+    color: #059669;
+}
+
+/* ── Card Row — blue tint ── */
+.revenue-table .card-row {
+    background: linear-gradient(90deg, #eff6ff 0%, #eff6ff80 70%, transparent 100%);
+}
+
+.revenue-table .card-row:hover {
+    background: #dbeafe;
+}
+
+.revenue-table .card-row .td-vendor {
+    color: #3b82f6;
+}
+
+/* ── Card Toggle Bar ── */
+.card-toggle-row {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.card-toggle-row td {
+    background: #eef2ff;
+    border-bottom: 1px solid #e0e7ff;
+    padding: 8px 16px;
+}
+
+.card-toggle-row:hover td {
+    background: #e0e7ff;
+}
+
+.card-toggle-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4f46e5;
+    white-space: nowrap;
+}
+
+.card-toggle-icon {
+    font-size: 10px;
+    width: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s;
+}
+
+.card-toggle-label {
+    font-weight: 800;
+}
+
+.card-toggle-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: #818cf8;
+    background: #e0e7ff;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.card-toggle-amount {
+    text-align: right;
+    font-weight: 800;
+    font-size: 13px;
+    color: #4338ca;
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+}
+
 /* ── Animations ── */
 @keyframes fadeIn {
     from {

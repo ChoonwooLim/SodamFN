@@ -72,6 +72,12 @@ export default function RevenueManagement() {
     // Grid: hide empty vendors
     const [hideEmpty, setHideEmpty] = useState(false);
 
+    // List: collapse card items per date group
+    const [collapsedCards, setCollapsedCards] = useState({});
+    const toggleCardCollapse = (dateStr) => {
+        setCollapsedCards(prev => ({ ...prev, [dateStr]: !prev[dateStr] }));
+    };
+
     // Upload mode
     const [uploadTab, setUploadTab] = useState('excel');
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -524,7 +530,7 @@ export default function RevenueManagement() {
                             <ChevronLeft size={18} />
                         </button>
                         <TrendingUp size={22} />
-                        매출 관리
+                        매출 요약
                     </h1>
                     {/* Year-only nav for annual views, month nav for monthly views */}
                     {(viewMode === 'revenueDetail' || viewMode === 'deliveryApp') ? (
@@ -600,7 +606,7 @@ export default function RevenueManagement() {
                         className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
                         onClick={() => setViewMode('revenueDetail')}
                     >
-                        💰 수입상세
+                        💰 매출요약
                     </button>
                     <button
                         className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
@@ -660,6 +666,13 @@ export default function RevenueManagement() {
                                     const weekday = getWeekday(dateStr);
                                     const dayNum = dateStr.split('-')[2];
 
+                                    // Split into cash and card items
+                                    const cashItems = items.filter(i => i.vendor_name?.includes('현금'));
+                                    const cardItems = items.filter(i => !i.vendor_name?.includes('현금'));
+                                    const cashTotal = cashItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const cardTotal = cardItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const isCardCollapsed = collapsedCards[dateStr] !== false; // default collapsed
+
                                     return [
                                         <tr key={`header-${dateStr}`} className="day-group-header">
                                             <td colSpan={4}>
@@ -670,16 +683,58 @@ export default function RevenueManagement() {
                                                 {items.length}건
                                             </td>
                                         </tr>,
-                                        ...items.map(item => {
+                                        /* ── Cash items (shown first, green tint) ── */
+                                        ...cashItems.map(item => {
                                             const catInfo = CATEGORY_LABELS[item.category] || { label: item.category, icon: '📦', badge: 'other' };
                                             return (
-                                                <tr key={item.id}>
+                                                <tr key={item.id} className="revenue-row cash-row">
                                                     <td className="td-date">{dayNum}</td>
                                                     <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
                                                         {getStoreName(item.item)}
                                                     </td>
                                                     <td className="td-vendor">
-                                                        {getDisplayName(item.vendor_name, item.item)}
+                                                        <span className="cash-label">💵 {getDisplayName(item.vendor_name, item.item)}</span>
+                                                    </td>
+                                                    <td className="td-category">
+                                                        <span className={`cat-badge cash`}>
+                                                            💵 현금
+                                                        </span>
+                                                    </td>
+                                                    <td className="td-amount cash-amount">{formatNumber(item.amount)}원</td>
+                                                    <td className="td-note">{item.note || '-'}</td>
+                                                    <td className="td-actions">
+                                                        <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
+                                                            <Edit3 size={14} />
+                                                        </button>
+                                                        <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }),
+                                        /* ── Card collapse toggle ── */
+                                        cardItems.length > 0 && (
+                                            <tr key={`card-toggle-${dateStr}`} className="card-toggle-row" onClick={() => toggleCardCollapse(dateStr)}>
+                                                <td colSpan={7} className="card-toggle-cell">
+                                                    <span className="card-toggle-icon">{isCardCollapsed ? '▶' : '▼'}</span>
+                                                    <span className="card-toggle-label">💳 카드매출</span>
+                                                    <span className="card-toggle-count">{cardItems.length}건</span>
+                                                    <span className="card-toggle-amount">{formatNumber(cardTotal)}원</span>
+                                                </td>
+                                            </tr>
+                                        ),
+                                        /* ── Card items (collapsible, blue tint) ── */
+                                        ...(!isCardCollapsed ? cardItems.map(item => {
+                                            const catInfo = CATEGORY_LABELS[item.category] || { label: item.category, icon: '📦', badge: 'other' };
+                                            return (
+                                                <tr key={item.id} className="revenue-row card-row">
+                                                    <td className="td-date">{dayNum}</td>
+                                                    <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
+                                                        {getStoreName(item.item)}
+                                                    </td>
+                                                    <td className="td-vendor">
+                                                        💳 {getDisplayName(item.vendor_name, item.item)}
                                                     </td>
                                                     <td className="td-category">
                                                         <span className={`cat-badge ${catInfo.badge}`}>
@@ -698,7 +753,7 @@ export default function RevenueManagement() {
                                                     </td>
                                                 </tr>
                                             );
-                                        })
+                                        }) : [])
                                     ];
                                 })}
                             </tbody>
@@ -837,12 +892,12 @@ export default function RevenueManagement() {
 
                 return (
                     <div className="revenue-content revenue-detail-mode">
-                        <h3 className="rd-section-title">💰 수입 상세 내역</h3>
+                        <h3 className="rd-section-title">💰 매출처별 요약 내역</h3>
                         <div className="rd-table-container">
                             <table className="rd-table">
                                 <thead>
                                     <tr>
-                                        <th className="rd-item-header">수입 항목</th>
+                                        <th className="rd-item-header">매출처</th>
                                         {MONTHS.map(m => <th key={m} className="rd-month-header">{m}월</th>)}
                                         <th className="rd-total-header">합계</th>
                                         <th className="rd-avg-header">월평균</th>

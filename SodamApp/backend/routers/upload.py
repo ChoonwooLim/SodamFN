@@ -263,8 +263,14 @@ async def upload_revenue_image(file: UploadFile = File(...)):
 @router.post("/upload/excel/revenue")
 async def upload_revenue_excel(file: UploadFile = File(...)):
     """
-    Processes an excel upload and bulk inserts REVENUE.
+    Smart revenue Excel upload.
+    Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약
     """
+    import traceback
+    from sqlmodel import select
+    from models import Vendor, DailyExpense, UploadHistory
+    from services.profit_loss_service import sync_all_expenses, sync_revenue_to_pl
+    
     try:
         content = await file.read()
         service = ExcelService("dummy_path")
@@ -273,27 +279,129 @@ async def upload_revenue_excel(file: UploadFile = File(...)):
         if result.get("status") == "error":
             return result
         
+        file_type = result.get("file_type")
+        
+        # Card summary is info-only, no DB insertion
+        if file_type == "card_summary":
+            return result
+        
         revenue_data = result.get("data", [])
+        if not revenue_data:
+            return {"status": "error", "message": "파싱된 매출 데이터가 없습니다."}
+        
+        # --- Create Upload History ---
+        with Session(engine) as session:
+            upload_history = UploadHistory(
+                filename=file.filename or "revenue_upload.xlsx",
+                upload_type="revenue",
+                record_count=0,
+                status="active"
+            )
+            session.add(upload_history)
+            session.commit()
+            session.refresh(upload_history)
+            upload_id = upload_history.id
+        
         inserted_count = 0
+        skipped_count = 0
+        vendor_created_count = 0
+        processed_months = set()
         
         with Session(engine) as session:
-            for item in revenue_data:
-                if item['amount'] > 0:
-                    rev = Revenue(
-                        date=item['date'],
-                        amount=item['amount'],
-                        channel=item['channel'],
-                        description=item['description']
-                    )
-                    session.add(rev)
-                    inserted_count += 1
-            session.commit()
+            # Build vendor lookup
+            vendors = session.exec(select(Vendor)).all()
+            vendor_by_name = {v.name: v for v in vendors}
             
+            for item in revenue_data:
+                if item['amount'] <= 0:
+                    continue
+                
+                vendor_name = item['vendor_name']
+                date_str = item['date']
+                amount = item['amount']
+                
+                try:
+                    date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                except Exception:
+                    continue
+                
+                # Find or create vendor
+                vendor = vendor_by_name.get(vendor_name)
+                if not vendor:
+                    # For card_detail: card company vendors should exist
+                    # For pos_daily: may need to create cash or generic card vendor
+                    payment_type = item.get('payment_type', 'other')
+                    vendor = Vendor(
+                        name=vendor_name,
+                        category='store',
+                        item=f'소담김밥 건대매장:{payment_type}',
+                        vendor_type='revenue',
+                        created_by_upload_id=upload_id,
+                    )
+                    session.add(vendor)
+                    session.flush()
+                    vendor_by_name[vendor_name] = vendor
+                    vendor_created_count += 1
+                
+                # Duplicate check: same date + vendor
+                existing = session.exec(
+                    select(DailyExpense).where(
+                        DailyExpense.date == date_obj,
+                        DailyExpense.vendor_id == vendor.id,
+                    )
+                ).first()
+                
+                if existing:
+                    skipped_count += 1
+                    continue
+                
+                expense = DailyExpense(
+                    date=date_obj,
+                    vendor_name=vendor.name,
+                    vendor_id=vendor.id,
+                    amount=amount,
+                    category='store',
+                    note=item.get('note', ''),
+                    upload_id=upload_id,
+                )
+                session.add(expense)
+                inserted_count += 1
+                processed_months.add((date_obj.year, date_obj.month))
+            
+            # Update upload history
+            upload_record = session.get(UploadHistory, upload_id)
+            if upload_record:
+                upload_record.record_count = inserted_count
+                session.add(upload_record)
+            
+            session.commit()
+        
+        # Sync P/L (expenses + revenue)
+        if processed_months:
+            try:
+                with Session(engine) as sync_session:
+                    for (year, month) in processed_months:
+                        sync_all_expenses(year, month, sync_session)
+                        sync_revenue_to_pl(year, month, sync_session)
+                    sync_session.commit()
+            except Exception as e:
+                print(f"Revenue Upload P/L Sync error: {e}")
+        
+        summary = result.get("summary", {})
         return {
-            "status": "success", 
+            "status": "success",
+            "file_type": file_type,
+            "file_type_label": result.get("file_type_label", ""),
             "message": f"{inserted_count}건의 매출 내역이 저장되었습니다.",
-            "count": inserted_count
+            "count": inserted_count,
+            "skipped": skipped_count,
+            "vendors_created": vendor_created_count,
+            "upload_id": upload_id,
+            "summary": summary,
         }
             
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Revenue Excel Upload Error: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
+
