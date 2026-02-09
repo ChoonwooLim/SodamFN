@@ -205,32 +205,60 @@ CHANNEL_TO_PL_FIELD = {
 
 def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     """
-    Aggregate DeliveryRevenue (monthly settlement summary) by channel
+    Aggregate DailyExpense (delivery category) by vendor keyword
     and update MonthlyProfitLoss delivery revenue fields.
+    Source of truth: DailyExpense table (same as grid view).
     """
-    # Channel map to P/L field
-    channel_field_map = {
+    import datetime as dt
+
+    start_date = dt.date(year, month, 1)
+    if month == 12:
+        end_date = dt.date(year + 1, 1, 1)
+    else:
+        end_date = dt.date(year, month + 1, 1)
+
+    # Vendor name keyword → P/L field mapping
+    keyword_field_map = {
         "쿠팡": "revenue_coupang",
+        "배달의민족": "revenue_baemin",
         "배민": "revenue_baemin",
         "요기요": "revenue_yogiyo",
         "땡겨요": "revenue_ddangyo",
     }
 
-    # Get all DeliveryRevenue for this month
-    # Note: DeliveryRevenue is already monthly aggregated
+    # Get all delivery DailyExpense for this month
     records = session.exec(
-        select(DeliveryRevenue)
-        .where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
+        select(DailyExpense)
+        .where(
+            DailyExpense.category == "delivery",
+            DailyExpense.date >= start_date,
+            DailyExpense.date < end_date,
+        )
     ).all()
 
-    # Aggregate by field
+    # Aggregate by P/L field
     delivery_totals = {}
     for r in records:
-        field = channel_field_map.get(r.channel)
+        field = None
+        for keyword, f in keyword_field_map.items():
+            if keyword in (r.vendor_name or ""):
+                field = f
+                break
         if field:
-            delivery_totals[field] = delivery_totals.get(field, 0) + r.settlement_amount
+            delivery_totals[field] = delivery_totals.get(field, 0) + (r.amount or 0)
 
-    # All delivery fields we manage
+    # Also sync revenue_store from store category
+    store_records = session.exec(
+        select(DailyExpense)
+        .where(
+            DailyExpense.category == "store",
+            DailyExpense.date >= start_date,
+            DailyExpense.date < end_date,
+        )
+    ).all()
+    store_total = sum(r.amount or 0 for r in store_records)
+
+    # All managed fields
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
 
     # Find or create P/L record
@@ -242,15 +270,16 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     if pl_record:
         for field in managed_fields:
             setattr(pl_record, field, delivery_totals.get(field, 0))
+        pl_record.revenue_store = store_total
         session.add(pl_record)
     else:
-        # Create new with defaults 0 then update
-        pl_record = MonthlyProfitLoss(year=year, month=month)
+        pl_record = MonthlyProfitLoss(year=year, month=month, revenue_store=store_total)
         for field, val in delivery_totals.items():
             setattr(pl_record, field, val)
         session.add(pl_record)
 
     session.commit()
+    delivery_totals["revenue_store"] = store_total
     return delivery_totals
 
 
