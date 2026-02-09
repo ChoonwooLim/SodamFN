@@ -198,15 +198,34 @@ class StaffDocument(SQLModel, table=True):
     
     staff: Optional[Staff] = Relationship(back_populates="documents")
 
+class WorkLocation(SQLModel, table=True):
+    """매장 위치 및 Geofence 설정"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = "소담김밥"
+    latitude: float = 0.0
+    longitude: float = 0.0
+    radius_meters: int = 100  # 허용 반경 (기본 100m)
+    is_active: bool = True
+
 class Attendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: datetime.date = Field(index=True)  # Added index for performance
+    date: datetime.date = Field(index=True)
     check_in: Optional[time] = None
     check_out: Optional[time] = None
     total_hours: float = 0.0
     status: str = "Normal" # Normal, Late, Absent
     
-    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)  # Added index
+    # GPS 검증 필드
+    check_in_lat: Optional[float] = None
+    check_in_lng: Optional[float] = None
+    check_out_lat: Optional[float] = None
+    check_out_lng: Optional[float] = None
+    check_in_verified: bool = False
+    check_out_verified: bool = False
+    check_in_distance: Optional[float] = None   # 매장과의 거리(m)
+    check_out_distance: Optional[float] = None
+    
+    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)
     staff: Optional[Staff] = Relationship(back_populates="attendances")
 
 class Payroll(SQLModel, table=True):

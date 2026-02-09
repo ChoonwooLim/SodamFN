@@ -5,26 +5,26 @@ import './ProfitLoss.css';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const REVENUE_FIELDS = [
-    { key: 'revenue_store', label: '매장매출' },
-    { key: 'revenue_coupang', label: '쿠팡 정산금' },
-    { key: 'revenue_baemin', label: '배민 정산금' },
-    { key: 'revenue_yogiyo', label: '요기요 정산금' },
-    { key: 'revenue_ddangyo', label: '땡겨요 정산금' },
+    { key: 'revenue_store', label: '매장매출', group: 'revenue-store' },
+    { key: 'revenue_coupang', label: '쿠팡 정산금', group: 'revenue-delivery' },
+    { key: 'revenue_baemin', label: '배민 정산금', group: 'revenue-delivery' },
+    { key: 'revenue_yogiyo', label: '요기요 정산금', group: 'revenue-delivery' },
+    { key: 'revenue_ddangyo', label: '땡겨요 정산금', group: 'revenue-delivery' },
 ];
 
 const EXPENSE_FIELDS = [
-    { key: 'expense_ingredient', label: '식자재' },
-    { key: 'expense_material', label: '재료비' },
-    { key: 'expense_rent', label: '임대료' },
-    { key: 'expense_rent_fee', label: '임대관리비' },
-    { key: 'expense_utility', label: '제세공과금' },
-    { key: 'expense_card_fee', label: '카드수수료' },
-    { key: 'expense_vat', label: '부가가치세' },
-    { key: 'expense_biz_tax', label: '사업소득세' },
-    { key: 'expense_income_tax', label: '근로소득세' },
-    { key: 'expense_other', label: '기타비용' },
-    { key: 'expense_labor', label: '인건비', auto: true },
-    { key: 'expense_retirement', label: '퇴직금적립', auto: true },
+    { key: 'expense_labor', label: '인건비', auto: true, group: 'expense-labor' },
+    { key: 'expense_retirement', label: '퇴직금적립', auto: true, group: 'expense-labor' },
+    { key: 'expense_ingredient', label: '식자재', group: 'expense-material' },
+    { key: 'expense_material', label: '재료비', group: 'expense-material' },
+    { key: 'expense_rent', label: '임대료', group: 'expense-rent' },
+    { key: 'expense_rent_fee', label: '임대관리비', group: 'expense-rent' },
+    { key: 'expense_utility', label: '제세공과금', group: 'expense-etc' },
+    { key: 'expense_card_fee', label: '카드수수료', group: 'expense-etc' },
+    { key: 'expense_vat', label: '부가가치세', group: 'expense-etc' },
+    { key: 'expense_biz_tax', label: '사업소득세', group: 'expense-etc' },
+    { key: 'expense_income_tax', label: '근로소득세', group: 'expense-etc' },
+    { key: 'expense_other', label: '기타비용', group: 'expense-etc' },
 ];
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -669,11 +669,11 @@ export default function ProfitLoss() {
             <div className="table-container">
                 <table className="pl-table">
                     <colgroup>
-                        <col style={{ width: '40px' }} />
-                        <col style={{ width: '160px' }} />
-                        {MONTHS.map(m => <col key={m} style={{ width: 'calc((100% - 200px) / 14)' }} />)}
-                        <col style={{ width: 'calc((100% - 200px) / 14)' }} />
-                        <col style={{ width: 'calc((100% - 200px) / 14)' }} />
+                        <col style={{ width: '52px' }} />
+                        <col style={{ width: '120px' }} />
+                        {MONTHS.map(m => <col key={m} style={{ width: 'calc((100% - 172px) / 14)' }} />)}
+                        <col style={{ width: 'calc((100% - 172px) / 14)' }} />
+                        <col style={{ width: 'calc((100% - 172px) / 14)' }} />
                     </colgroup>
                     <thead>
                         <tr>
@@ -685,75 +685,75 @@ export default function ProfitLoss() {
                     </thead>
                     <tbody>
                         {/* Revenue Section */}
-                        <tr className="section-header">
-                            <td rowSpan={REVENUE_FIELDS.length + 1}>수입</td>
-                            <td>{REVENUE_FIELDS[0].label}</td>
+                        <tr className={`section-header ${REVENUE_FIELDS[0].group}`}>
+                            <td className="pl-section-label" rowSpan={REVENUE_FIELDS.length + 1}>수입</td>
+                            <td className="pl-item-label">{REVENUE_FIELDS[0].label}</td>
                             {MONTHS.map(m => (
-                                <td key={m}>{renderCell(m, REVENUE_FIELDS[0].key, getMonthData(m)[REVENUE_FIELDS[0].key])}</td>
+                                <td key={m} className="pl-data">{renderCell(m, REVENUE_FIELDS[0].key, getMonthData(m)[REVENUE_FIELDS[0].key])}</td>
                             ))}
-                            <td className="total">{formatNumber(calcYearTotal(REVENUE_FIELDS[0].key))}</td>
-                            <td className="average">{formatNumber(calcYearAverage(REVENUE_FIELDS[0].key))}</td>
+                            <td className="pl-data total">{formatNumber(calcYearTotal(REVENUE_FIELDS[0].key))}</td>
+                            <td className="pl-data average">{formatNumber(calcYearAverage(REVENUE_FIELDS[0].key))}</td>
                         </tr>
                         {REVENUE_FIELDS.slice(1).map(field => (
-                            <tr key={field.key}>
-                                <td>{field.label}</td>
+                            <tr key={field.key} className={`revenue-row ${field.group}`}>
+                                <td className="pl-item-label">{field.label}</td>
                                 {MONTHS.map(m => (
-                                    <td key={m}>{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
                                 ))}
-                                <td className="total">{formatNumber(calcYearTotal(field.key))}</td>
-                                <td className="average">{formatNumber(calcYearAverage(field.key))}</td>
+                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
+                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
                             </tr>
                         ))}
                         <tr className="subtotal-row">
-                            <td>합계</td>
+                            <td className="pl-item-label">합계</td>
                             {MONTHS.map(m => (
-                                <td key={m} className="subtotal">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
+                                <td key={m} className="pl-data">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
                             ))}
-                            <td className="total">{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</td>
-                            <td className="average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / 6))}</td>
+                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</td>
+                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / 6))}</td>
                         </tr>
 
                         {/* Expense Section */}
-                        <tr className="section-header expense-section-header">
-                            <td rowSpan={EXPENSE_FIELDS.length + 1}>지출</td>
-                            <td>{EXPENSE_FIELDS[0].label}</td>
+                        <tr className={`section-header expense-section-header ${EXPENSE_FIELDS[0].group}`}>
+                            <td className="pl-section-label" rowSpan={EXPENSE_FIELDS.length + 1}>지출</td>
+                            <td className="pl-item-label">{EXPENSE_FIELDS[0].label}</td>
                             {MONTHS.map(m => (
-                                <td key={m}>{renderCell(m, EXPENSE_FIELDS[0].key, getMonthData(m)[EXPENSE_FIELDS[0].key])}</td>
+                                <td key={m} className="pl-data">{renderCell(m, EXPENSE_FIELDS[0].key, getMonthData(m)[EXPENSE_FIELDS[0].key])}</td>
                             ))}
-                            <td className="total">{formatNumber(calcYearTotal(EXPENSE_FIELDS[0].key))}</td>
-                            <td className="average">{formatNumber(calcYearAverage(EXPENSE_FIELDS[0].key))}</td>
+                            <td className="pl-data total">{formatNumber(calcYearTotal(EXPENSE_FIELDS[0].key))}</td>
+                            <td className="pl-data average">{formatNumber(calcYearAverage(EXPENSE_FIELDS[0].key))}</td>
                         </tr>
                         {EXPENSE_FIELDS.slice(1).map(field => (
-                            <tr key={field.key} className="expense-row">
-                                <td>{field.label}</td>
+                            <tr key={field.key} className={`expense-row ${field.group}`}>
+                                <td className="pl-item-label">{field.label}</td>
                                 {MONTHS.map(m => (
-                                    <td key={m}>{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
                                 ))}
-                                <td className="total">{formatNumber(calcYearTotal(field.key))}</td>
-                                <td className="average">{formatNumber(calcYearAverage(field.key))}</td>
+                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
+                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
                             </tr>
                         ))}
                         <tr className="subtotal-row">
-                            <td>합계</td>
+                            <td className="pl-item-label">합계</td>
                             {MONTHS.map(m => (
-                                <td key={m} className="subtotal">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
+                                <td key={m} className="pl-data">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
                             ))}
-                            <td className="total">{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</td>
-                            <td className="average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / 6))}</td>
+                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</td>
+                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / 6))}</td>
                         </tr>
 
                         {/* Profit Row */}
                         <tr className="profit-row">
-                            <td colSpan="2">영업이익</td>
+                            <td className="pl-section-label" colSpan="2">영업이익</td>
                             {MONTHS.map(m => (
-                                <td key={m} className={calcProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}>
+                                <td key={m} className={`pl-data ${calcProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
                                     {formatNumber(calcProfit(getMonthData(m)))}
                                 </td>
                             ))}
-                            <td className="total profit-positive">
+                            <td className="pl-data total profit-positive">
                                 {formatNumber(data.reduce((s, d) => s + calcProfit(d), 0))}
                             </td>
-                            <td className="average profit-positive">
+                            <td className="pl-data average profit-positive">
                                 {formatNumber(Math.round(data.reduce((s, d) => s + calcProfit(d), 0) / 6))}
                             </td>
                         </tr>

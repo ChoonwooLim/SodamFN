@@ -4,82 +4,160 @@ from services.profit_loss_service import sync_all_expenses
 from pydantic import BaseModel
 from datetime import date
 from typing import Optional, List
-from models import DailyExpense, Vendor
+from models import DailyExpense, Vendor, MonthlyProfitLoss, Staff
+from sqlmodel import Session, select, func
+from database import engine
 
 router = APIRouter()
 
+REVENUE_FIELDS = [
+    'revenue_store', 'revenue_coupang', 'revenue_baemin',
+    'revenue_yogiyo', 'revenue_ddangyo'
+]
+EXPENSE_FIELDS = [
+    'expense_labor', 'expense_retirement', 'expense_ingredient',
+    'expense_material', 'expense_rent', 'expense_rent_fee',
+    'expense_utility', 'expense_card_fee', 'expense_vat',
+    'expense_biz_tax', 'expense_income_tax', 'expense_other'
+]
+
+def _pl_totals(record):
+    """Calculate revenue, expense, profit from a MonthlyProfitLoss record."""
+    if not record:
+        return {"revenue": 0, "expense": 0, "profit": 0, "margin": 0}
+    rev = sum(getattr(record, f, 0) or 0 for f in REVENUE_FIELDS)
+    exp = sum(getattr(record, f, 0) or 0 for f in EXPENSE_FIELDS)
+    profit = rev - exp
+    margin = round((profit / rev * 100), 1) if rev > 0 else 0
+    return {"revenue": rev, "expense": exp, "profit": profit, "margin": margin}
+
 @router.get("/dashboard")
-def get_dashboard_data(year: int = 2025, month: int = 12):
+def get_dashboard_data(year: int = 2026, month: int = 1):
     try:
-        with DatabaseService() as service:
-            # Summary for selected month
-            data = service.get_monthly_summary(year=year, month=month)
-            
-            # Previous month calculation
-            if month == 1:
-                prev_year = year - 1
-                prev_month = 12
-            else:
-                prev_year = year
-                prev_month = month - 1
-                
-            prev_data = service.get_monthly_summary(year=prev_year, month=prev_month)
-            
-            growth = 0
-            if prev_data['revenue'] > 0:
-                growth = ((data['revenue'] - prev_data['revenue']) / prev_data['revenue']) * 100
-                
-            # 6-Month Trend Calculation
+        with Session(engine) as session:
+            # --- Current month P/L ---
+            record = session.exec(
+                select(MonthlyProfitLoss).where(
+                    MonthlyProfitLoss.year == year,
+                    MonthlyProfitLoss.month == month
+                )
+            ).first()
+            current = _pl_totals(record)
+
+            # --- Previous month for growth ---
+            prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
+            prev_record = session.exec(
+                select(MonthlyProfitLoss).where(
+                    MonthlyProfitLoss.year == prev_y,
+                    MonthlyProfitLoss.month == prev_m
+                )
+            ).first()
+            prev = _pl_totals(prev_record)
+            growth = round(((current["revenue"] - prev["revenue"]) / prev["revenue"] * 100), 1) if prev["revenue"] > 0 else 0
+
+            # --- 6-Month Trend ---
             monthly_trend = []
-            # Loop backwards 5 times + current = 6 months
-            curr_y, curr_m = year, month
-            
-            # Generate list of (year, month) tuples for last 6 months including current
+            cy, cm = year, month
             trend_months = []
             for _ in range(6):
-                trend_months.append((curr_y, curr_m))
-                if curr_m == 1:
-                    curr_y -= 1
-                    curr_m = 12
+                trend_months.append((cy, cm))
+                if cm == 1:
+                    cy -= 1; cm = 12
                 else:
-                    curr_m -= 1
-            
-            # Reverse to show chronological order
+                    cm -= 1
             trend_months.reverse()
-            
+
             for y, m in trend_months:
-                summary = service.get_monthly_summary(year=y, month=m)
-                monthly_trend.append({"month": f"{m}월", **summary})
+                rec = session.exec(
+                    select(MonthlyProfitLoss).where(
+                        MonthlyProfitLoss.year == y,
+                        MonthlyProfitLoss.month == m
+                    )
+                ).first()
+                t = _pl_totals(rec)
+                monthly_trend.append({"month": f"{m}월", **t})
+
+            # --- Staff count ---
+            staff_count = session.exec(
+                select(func.count(Staff.id)).where(Staff.status == "재직")
+            ).one() or 0
+            staff_names = session.exec(
+                select(Staff.name).where(Staff.status == "재직").limit(5)
+            ).all()
 
             return {
                 "status": "success",
                 "data": {
-                    "year": year, # Include year in response
+                    "year": year,
                     "month": f"{month}월",
-                    "revenue": data['revenue'], 
-                    "net_profit": data['profit'],
-                    "margin_rate": data['margin'],
-                    "revenue_growth": round(growth, 1),
-                    "monthly_trend": monthly_trend
+                    "revenue": current["revenue"],
+                    "expense": current["expense"],
+                    "net_profit": current["profit"],
+                    "margin_rate": current["margin"],
+                    "revenue_growth": growth,
+                    "monthly_trend": monthly_trend,
+                    "staff_count": staff_count,
+                    "staff_names": list(staff_names),
                 }
             }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/revenue")
-def get_revenue_breakdown(year: int = 2025, month: int = 12):
+def get_revenue_breakdown(year: int = 2026, month: int = 1):
+    """Return revenue breakdown from MonthlyProfitLoss for pie chart."""
     try:
-        with DatabaseService() as service:
-            data = service.get_revenue_breakdown(year=year, month=month)
+        with Session(engine) as session:
+            record = session.exec(
+                select(MonthlyProfitLoss).where(
+                    MonthlyProfitLoss.year == year,
+                    MonthlyProfitLoss.month == month
+                )
+            ).first()
+
+            LABELS = {
+                "revenue_store": "매장매출",
+                "revenue_coupang": "쿠팡 정산금",
+                "revenue_baemin": "배민 정산금",
+                "revenue_yogiyo": "요기요 정산금",
+                "revenue_ddangyo": "땡겨요 정산금",
+            }
+            data = []
+            for key, label in LABELS.items():
+                val = (getattr(record, key, 0) or 0) if record else 0
+                if val > 0:
+                    data.append({"name": label, "value": val})
             return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/cost")
-def get_cost_breakdown(year: int = 2025, month: int = 12):
+def get_cost_breakdown(year: int = 2026, month: int = 1):
+    """Return top 5 vendors by expense from DailyExpense table."""
     try:
-        with DatabaseService() as service:
-            data = service.get_top_expenses(year=year, month=month)
+        with Session(engine) as session:
+            import calendar
+            start_date = date(year, month, 1)
+            _, last_day = calendar.monthrange(year, month)
+            end_date = date(year, month, last_day)
+
+            stmt = (
+                select(
+                    Vendor.name,
+                    func.sum(DailyExpense.amount),
+                    Vendor.category,
+                )
+                .join(Vendor, DailyExpense.vendor_id == Vendor.id)
+                .where(
+                    DailyExpense.date >= start_date,
+                    DailyExpense.date <= end_date,
+                )
+                .group_by(Vendor.id)
+                .order_by(func.sum(DailyExpense.amount).desc())
+                .limit(5)
+            )
+            results = session.exec(stmt).all()
+            data = [{"vendor": r[0], "amount": r[1], "item": r[2] or "기타"} for r in results]
             return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

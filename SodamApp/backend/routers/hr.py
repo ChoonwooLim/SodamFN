@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body
 from services.database_service import DatabaseService
-from models import Staff, Attendance, StaffDocument
+from models import Staff, Attendance, StaffDocument, WorkLocation
+from services.geofence_service import verify_location
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
@@ -69,7 +70,9 @@ class StaffUpdate(BaseModel):
 
 class AttendanceAction(BaseModel):
     staff_id: int
-    action: str # "checkin" or "checkout"
+    action: str  # "checkin" or "checkout"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 # --- Endpoints ---
 
@@ -280,18 +283,41 @@ def log_attendance(payload: AttendanceAction):
         today = date.today()
         now_time = datetime.now().time()
         
+        # --- GPS Geofence 검증 ---
+        gps_result = None
+        if payload.latitude is not None and payload.longitude is not None:
+            gps_result = verify_location(payload.latitude, payload.longitude, service.session)
+            if not gps_result["verified"]:
+                return {
+                    "status": "error",
+                    "message": gps_result["message"],
+                    "gps": gps_result
+                }
+        
         # Check if record exists for today
         stmt = select(Attendance).where(Attendance.staff_id == payload.staff_id, Attendance.date == today)
         record = service.session.exec(stmt).first()
         
         if payload.action == "checkin":
-            if record: return {"status": "error", "message": "Already checked in today"}
-            new_record = Attendance(staff_id=payload.staff_id, date=today, check_in=now_time)
+            if record: return {"status": "error", "message": "이미 출근 기록이 있습니다."}
+            new_record = Attendance(
+                staff_id=payload.staff_id,
+                date=today,
+                check_in=now_time,
+                check_in_lat=payload.latitude,
+                check_in_lng=payload.longitude,
+                check_in_verified=gps_result["verified"] if gps_result else False,
+                check_in_distance=gps_result["distance"] if gps_result else None,
+            )
             service.session.add(new_record)
         
         elif payload.action == "checkout":
-            if not record: return {"status": "error", "message": "No check-in record found"}
+            if not record: return {"status": "error", "message": "출근 기록이 없습니다."}
             record.check_out = now_time
+            record.check_out_lat = payload.latitude
+            record.check_out_lng = payload.longitude
+            record.check_out_verified = gps_result["verified"] if gps_result else False
+            record.check_out_distance = gps_result["distance"] if gps_result else None
             # Calculate hours
             start_dt = datetime.combine(today, record.check_in)
             end_dt = datetime.combine(today, now_time)
@@ -300,7 +326,11 @@ def log_attendance(payload: AttendanceAction):
             service.session.add(record)
             
         service.session.commit()
-        return {"status": "success"}
+        return {
+            "status": "success",
+            "gps": gps_result,
+            "message": "출근이 기록되었습니다." if payload.action == "checkin" else f"퇴근이 기록되었습니다. (근무시간: {record.total_hours if payload.action == 'checkout' else 0}시간)"
+        }
     finally:
         service.close()
 
@@ -321,7 +351,11 @@ def get_attendance_status(staff_id: int):
                 "checked_in": record.check_in is not None,
                 "checked_out": record.check_out is not None,
                 "check_in_time": record.check_in,
-                "check_out_time": record.check_out
+                "check_out_time": record.check_out,
+                "check_in_verified": record.check_in_verified,
+                "check_out_verified": record.check_out_verified,
+                "check_in_distance": record.check_in_distance,
+                "check_out_distance": record.check_out_distance,
             }
         }
     finally:
@@ -384,3 +418,135 @@ def delete_staff(staff_id: int):
     finally:
         service.close()
 
+# --- 매장 위치 관리 (Geofence) ---
+
+class LocationUpdate(BaseModel):
+    name: Optional[str] = None
+    latitude: float
+    longitude: float
+    radius_meters: int = 100
+
+@router.get("/location")
+def get_work_location():
+    """현재 매장 위치 설정 조회"""
+    service = DatabaseService()
+    try:
+        stmt = select(WorkLocation).where(WorkLocation.is_active == True)
+        location = service.session.exec(stmt).first()
+        if not location:
+            return {"status": "success", "data": None, "message": "매장 위치가 설정되지 않았습니다."}
+        return {
+            "status": "success",
+            "data": {
+                "id": location.id,
+                "name": location.name,
+                "latitude": location.latitude,
+                "longitude": location.longitude,
+                "radius_meters": location.radius_meters,
+                "is_active": location.is_active,
+            }
+        }
+    finally:
+        service.close()
+
+@router.post("/location")
+def set_work_location(data: LocationUpdate):
+    """매장 위치 설정 (생성 또는 업데이트)"""
+    service = DatabaseService()
+    try:
+        stmt = select(WorkLocation).where(WorkLocation.is_active == True)
+        existing = service.session.exec(stmt).first()
+        
+        if existing:
+            existing.latitude = data.latitude
+            existing.longitude = data.longitude
+            existing.radius_meters = data.radius_meters
+            if data.name:
+                existing.name = data.name
+            service.session.add(existing)
+        else:
+            new_loc = WorkLocation(
+                name=data.name or "소담김밥",
+                latitude=data.latitude,
+                longitude=data.longitude,
+                radius_meters=data.radius_meters,
+            )
+            service.session.add(new_loc)
+        
+        service.session.commit()
+        return {"status": "success", "message": f"매장 위치가 설정되었습니다. (반경 {data.radius_meters}m)"}
+    finally:
+        service.close()
+
+# --- 월간 근무 요약 ---
+
+@router.get("/attendance/monthly-summary/{staff_id}/{month}")
+def get_monthly_attendance_summary(staff_id: int, month: str):
+    """
+    월간 출퇴근 요약 (근무일수, 총 근무시간, GPS 검증율, 예상 급여)
+    month = "YYYY-MM"
+    """
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        
+        from datetime import timedelta
+        target = datetime.strptime(f"{month}-01", "%Y-%m-%d")
+        year, m = target.year, target.month
+        
+        # Date range for the month
+        start_date = date(year, m, 1)
+        if m == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, m + 1, 1)
+        
+        stmt = (select(Attendance)
+                .where(Attendance.staff_id == staff_id,
+                       Attendance.date >= start_date,
+                       Attendance.date < end_date)
+                .order_by(Attendance.date))
+        records = service.session.exec(stmt).all()
+        
+        total_days = len([r for r in records if r.total_hours > 0])
+        total_hours = sum(r.total_hours for r in records)
+        verified_count = sum(1 for r in records if r.check_in_verified)
+        
+        # Daily breakdown
+        daily_data = []
+        for r in records:
+            daily_data.append({
+                "date": str(r.date),
+                "check_in": str(r.check_in)[:5] if r.check_in else None,
+                "check_out": str(r.check_out)[:5] if r.check_out else None,
+                "hours": r.total_hours,
+                "gps_verified": r.check_in_verified,
+                "distance": r.check_in_distance,
+            })
+        
+        # Estimated pay
+        estimated_pay = 0
+        if staff.contract_type == "정규직":
+            estimated_pay = staff.monthly_salary or 0
+        else:
+            estimated_pay = int(total_hours * staff.hourly_wage)
+        
+        return {
+            "status": "success",
+            "data": {
+                "staff_name": staff.name,
+                "month": month,
+                "total_work_days": total_days,
+                "total_hours": round(total_hours, 2),
+                "verified_count": verified_count,
+                "verified_ratio": round(verified_count / len(records) * 100, 1) if records else 0,
+                "estimated_base_pay": estimated_pay,
+                "hourly_wage": staff.hourly_wage,
+                "contract_type": staff.contract_type,
+                "daily_data": daily_data,
+            }
+        }
+    finally:
+        service.close()

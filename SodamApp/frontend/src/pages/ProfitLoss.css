@@ -107,128 +107,190 @@
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
+/* ===== P/L Summary Table — Accounting Standard ===== */
 .pl-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 12px;
     table-layout: fixed;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
 .pl-table th,
 .pl-table td {
-    padding: 8px 4px;
+    padding: 9px 12px;
     text-align: right;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #cbd5e1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Column widths are handled by colgroup in JSX */
-
+/* ── Header ── */
 .pl-table th {
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-    color: white;
+    background: #1e293b;
+    color: #f8fafc;
     font-weight: 600;
+    font-size: 12px;
     position: sticky;
     top: 0;
     z-index: 10;
-}
-
-.pl-table th:first-child,
-.pl-table th:nth-child(2) {
+    border-color: #334155;
     text-align: center;
+    letter-spacing: 0.02em;
 }
 
-.pl-table td:first-child,
-.pl-table td:nth-child(2) {
-    text-align: left;
-    font-weight: 500;
-    background: #f8fafc;
-}
-
-/* Revenue Section Styling - Soft Blue Pastel */
-.section-header td:first-child {
-    background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%);
-    color: #1e3a8a;
+/* ── Section Label (수입 / 지출 / 영업이익) ── */
+.pl-section-label {
+    text-align: center !important;
     font-weight: 700;
-    font-size: 14px;
-    text-align: center;
-    vertical-align: middle;
-    border-top: 2px solid #93c5fd;
+    font-size: 13px;
+    background: #f1f5f9;
+    color: #334155;
+    border-right: 2px solid #cbd5e1;
+    padding: 9px 4px !important;
+    overflow: visible;
+    text-overflow: clip;
 }
 
-.section-header td:nth-child(2) {
-    background: #eff6ff;
-    color: #3b82f6;
-    font-weight: 600;
-    border-top: 2px solid #bfdbfe;
-}
-
-/* Revenue rows - soft blue theme */
-.revenue-row td:nth-child(2) {
+/* ── Item Label (매장매출, 식자재, etc.) ── */
+.pl-item-label {
+    text-align: left !important;
+    font-weight: 500;
+    font-size: 12px;
+    padding-left: 16px !important;
     background: #f8fafc;
     color: #475569;
+    border-right: 2px solid #e2e8f0;
 }
 
-/* Expense Section Header - Soft Rose Pastel */
-.expense-section-header td:first-child {
-    background: linear-gradient(135deg, #fda4af 0%, #fb7185 100%) !important;
-    color: #881337;
-    font-weight: 700;
+/* ── Data Cells (numbers) — always right-aligned, normal weight ── */
+.pl-data {
+    text-align: right !important;
+    font-weight: 400;
+    font-size: 12px;
+    color: #334155;
+    background: #ffffff;
+}
+
+/* ── Revenue Section — Blue Theme ── */
+.section-header .pl-section-label {
+    background: #1d4ed8 !important;
+    color: white !important;
+    font-weight: 800;
     font-size: 14px;
-    text-align: center;
     vertical-align: middle;
-    border-top: 2px solid #fda4af;
+    border: 1px solid #1e40af;
+    letter-spacing: 0.1em;
 }
 
-.expense-section-header td:nth-child(2) {
-    background: #fff1f2 !important;
-    color: #e11d48;
+.section-header .pl-item-label {
+    background: #eff6ff !important;
+    color: #1d4ed8;
+    font-weight: 500;
+}
+
+/* ── Revenue Sub-Groups ── */
+/* 매장매출 — strong blue highlight */
+.revenue-store .pl-item-label {
+    background: #dbeafe !important;
+    color: #1e40af;
     font-weight: 600;
-    border-top: 2px solid #fecdd3;
+    border-left: 3px solid #3b82f6 !important;
 }
 
-/* Expense rows - soft rose theme */
-.expense-row td:nth-child(2) {
-    background: #fffbfc;
-    color: #64748b;
+/* 정산금 items */
+.revenue-delivery .pl-item-label {
+    background: #f0f7ff;
+    color: #475569;
+    border-left: 3px solid #93c5fd !important;
 }
 
-/* Subtotal rows - Soft Amber Pastel */
-.subtotal-row {
-    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-    border-top: 1px solid #fcd34d;
-    border-bottom: 1px solid #fcd34d;
-}
-
-.subtotal-row td {
-    font-weight: 600;
-    color: #92400e;
-    font-size: 13px;
-}
-
-.subtotal-row td:nth-child(2) {
-    background: #fffbeb !important;
-}
-
-/* Profit row - Soft Mint Pastel */
-.profit-row {
-    background: linear-gradient(135deg, #a7f3d0 0%, #6ee7b7 100%);
-    border-top: 2px solid #34d399;
-    border-bottom: 2px solid #34d399;
-}
-
-.profit-row td {
-    font-weight: 700;
+/* ── Expense Section — Rose Theme ── */
+.expense-section-header .pl-section-label {
+    background: #be123c !important;
+    color: white !important;
+    font-weight: 800;
     font-size: 14px;
-    color: #047857 !important;
+    vertical-align: middle;
+    border: 1px solid #9f1239;
+    letter-spacing: 0.1em;
 }
 
-.profit-row td:first-child,
-.profit-row td:nth-child(2) {
-    background: transparent !important;
+.expense-section-header .pl-item-label {
+    background: #fff1f2 !important;
+    color: #be123c;
+    font-weight: 500;
+}
+
+/* ── Expense Sub-Groups ── */
+/* 식자재 + 재료비 — warm orange */
+.expense-material .pl-item-label {
+    background: #fff7ed !important;
+    color: #c2410c;
+    border-left: 3px solid #fb923c !important;
+}
+
+/* 임대료 + 임대관리비 — purple */
+.expense-rent .pl-item-label {
+    background: #faf5ff !important;
+    color: #7e22ce;
+    border-left: 3px solid #a78bfa !important;
+}
+
+/* 인건비 + 퇴직금적립 — teal */
+.expense-labor .pl-item-label {
+    background: #f0fdfa !important;
+    color: #0f766e;
+    border-left: 3px solid #2dd4bf !important;
+}
+
+/* 제세공과금, 카드수수료, 부가가치세 등 — neutral slate */
+.expense-etc .pl-item-label {
+    background: #f8fafc;
+    color: #475569;
+    border-left: 3px solid #cbd5e1 !important;
+}
+
+/* ── Subtotal rows — Gold Accent ── */
+.subtotal-row {
+    border-top: 2px solid #d97706 !important;
+    border-bottom: 2px solid #d97706 !important;
+}
+
+.subtotal-row .pl-item-label {
+    background: #fef3c7 !important;
+    font-weight: 700;
+    color: #92400e;
+    text-align: center !important;
+}
+
+.subtotal-row .pl-data {
+    background: #fffbeb !important;
+    font-weight: 700;
+    color: #92400e;
+    border-color: #fcd34d;
+}
+
+/* ── Profit Row — Green Accent ── */
+.profit-row {
+    border-top: 3px double #059669 !important;
+    border-bottom: 3px double #059669 !important;
+}
+
+.profit-row .pl-section-label {
+    background: #d1fae5 !important;
     color: #047857 !important;
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.profit-row .pl-data {
+    background: #ecfdf5 !important;
+    font-weight: 700;
+    font-size: 13px;
+    border-color: #6ee7b7;
 }
 
 .profit-positive {
@@ -239,19 +301,39 @@
     color: #dc2626 !important;
 }
 
-/* Total column - Soft Green */
-.total {
+/* ── Total / Average Columns — subtle emphasis ── */
+.pl-data.total {
     background: #f0fdf4 !important;
     font-weight: 600;
-    color: #16a34a;
-    border-left: 1px solid #bbf7d0;
+    color: #15803d;
+    border-left: 2px solid #86efac !important;
 }
 
-/* Average column - Soft Yellow */
-.average {
+.pl-data.average {
     background: #fefce8 !important;
     font-weight: 600;
-    color: #ca8a04;
+    color: #a16207;
+    border-left: 1px solid #fde68a !important;
+}
+
+/* Subtotal total/average override */
+.subtotal-row .pl-data.total {
+    background: #fef3c7 !important;
+    color: #92400e;
+    font-weight: 700;
+}
+
+.subtotal-row .pl-data.average {
+    background: #fef3c7 !important;
+    color: #92400e;
+    font-weight: 700;
+}
+
+/* Profit total/average override */
+.profit-row .pl-data.total,
+.profit-row .pl-data.average {
+    background: #d1fae5 !important;
+    font-weight: 800;
 }
 
 .cell-value {

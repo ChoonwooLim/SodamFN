@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { ArrowUpRight, TrendingUp, Wallet, PieChart as PieIcon, BarChart3, AlertCircle, ShoppingBag, Users, Clock } from 'lucide-react';
 
 export default function Dashboard() {
-    const [data, setData] = useState([]);
+    const [dashData, setDashData] = useState(null);
     const [revenueData, setRevenueData] = useState([]);
     const [costData, setCostData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,29 +35,22 @@ export default function Dashboard() {
             setError(null);
             setLoading(true);
 
-            // Mock data fallback if API fails (for demonstration/development stability)
-            try {
-                const [summaryRes, revenueRes, costRes] = await Promise.all([
-                    api.get(`/dashboard?year=${year}&month=${month}`),
-                    api.get(`/analytics/revenue?year=${year}&month=${month}`),
-                    api.get(`/analytics/cost?year=${year}&month=${month}`)
-                ]);
+            const [summaryRes, revenueRes, costRes] = await Promise.all([
+                api.get(`/dashboard?year=${year}&month=${month}`),
+                api.get(`/analytics/revenue?year=${year}&month=${month}`),
+                api.get(`/analytics/cost?year=${year}&month=${month}`)
+            ]);
 
-                if (summaryRes.data.status === 'success') {
-                    // console.log("Dashboard Data:", summaryRes.data.data);
-                    setData(summaryRes.data.data.monthly_trend || []);
-                }
-                if (revenueRes.data.status === 'success') setRevenueData(revenueRes.data.data);
-                if (costRes.data.status === 'success') setCostData(costRes.data.data);
-            } catch (e) {
-                console.warn("Backend not ready, using mock data for UI check");
-                // Fallback Mock Data ... (omitted for brevity, existing logic kept if needed or just empty)
-                setData([]); setRevenueData([]); setCostData([]);
+            if (summaryRes.data.status === 'success') {
+                setDashData(summaryRes.data.data);
             }
-
-        } catch (error) {
-            console.error("Error fetching dashboard:", error);
-            setError("서버 연결에 실패했습니다.");
+            if (revenueRes.data.status === 'success') setRevenueData(revenueRes.data.data);
+            if (costRes.data.status === 'success') setCostData(costRes.data.data);
+        } catch (e) {
+            console.warn("Backend error:", e);
+            setDashData(null);
+            setRevenueData([]);
+            setCostData([]);
         } finally {
             setLoading(false);
         }
@@ -75,25 +68,14 @@ export default function Dashboard() {
         </div>
     );
 
-    const current = data.find(d => d.month === `${selectedMonth}월`) || data[data.length - 1] || {};
-    // const prevMonth = data[data.length - 2] || {};
-    // const revenueGrowth = prevMonth.revenue ? ((current.revenue - prevMonth.revenue) / prevMonth.revenue * 100).toFixed(1) : 0;
-    // backend now calculates growth based on selected month
-
-    // We need to fetch specific KPI data from response if structure allows,
-    // or rely on the trend array which has all months.
-    // Actually, the /dashboard endpoint returns exact KPI for that month in `data` root,
-    // but here we are setting `data` to `monthly_trend`.
-    // Let's rely on finding the specific month in the trend array for the chart visualization,
-    // For KPI cards, we should probably access the separate fields if we had them.
-    // But `current` extracted from `data` (trend) is fine for now as it contains revenue/profit.
-
-    // Growth? The backend calculation was returned in root `revenue_growth`.
-    // We lost it by setting data = monthly_trend.
-    // Let's refactor slightly to keep root data if possible, OR just re-calculate/ignore growth for now to be fast.
-    // Let's re-calculate simple growth here if possible or just hide it.
-
-    // Let's stick to the extracted 'current' logic for simplicity.
+    const revenue = dashData?.revenue || 0;
+    const expense = dashData?.expense || 0;
+    const profit = dashData?.net_profit || 0;
+    const marginRate = dashData?.margin_rate || 0;
+    const revenueGrowth = dashData?.revenue_growth || 0;
+    const monthlyTrend = dashData?.monthly_trend || [];
+    const staffCount = dashData?.staff_count || 0;
+    const staffNames = dashData?.staff_names || [];
 
     // Formatting date helper
     const formatDate = (date) => {
@@ -113,7 +95,11 @@ export default function Dashboard() {
         });
     };
 
-    const revenueGrowth = 0; // Placeholder or calculate
+    const formatKRW = (v) => {
+        if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
+        if (Math.abs(v) >= 10000) return `${Math.round(v / 10000).toLocaleString()}만`;
+        return v.toLocaleString();
+    };
 
     return (
         <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 pb-32 md:pb-10">
@@ -143,18 +129,9 @@ export default function Dashboard() {
                         onChange={(e) => setSelectedMonth(Number(e.target.value))}
                         className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                     >
-                        <option value="1">1월</option>
-                        <option value="2">2월</option>
-                        <option value="3">3월</option>
-                        <option value="4">4월</option>
-                        <option value="5">5월</option>
-                        <option value="6">6월</option>
-                        <option value="7">7월</option>
-                        <option value="8">8월</option>
-                        <option value="9">9월</option>
-                        <option value="10">10월</option>
-                        <option value="11">11월</option>
-                        <option value="12">12월</option>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => (
+                            <option key={m} value={m}>{m}월</option>
+                        ))}
                     </select>
                     <div className="bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -177,42 +154,47 @@ export default function Dashboard() {
                         </span>
                     </div>
                     <p className="text-slate-500 text-sm font-medium">이번 달 매출</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{(current.revenue || 0).toLocaleString()}원</h3>
+                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{revenue.toLocaleString()}원</h3>
                 </div>
 
                 {/* Profit Card */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
                     <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                        <div className={`p-3 rounded-xl ${profit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                             <ShoppingBag size={24} />
                         </div>
-                        <span className="text-sm font-bold text-slate-400">마진율 {current.margin}%</span>
+                        <span className="text-sm font-bold text-slate-400">마진율 {marginRate}%</span>
                     </div>
                     <p className="text-slate-500 text-sm font-medium">순이익</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{(current.profit || 0).toLocaleString()}원</h3>
+                    <h3 className={`text-2xl font-bold mt-1 ${profit >= 0 ? 'text-slate-900' : 'text-red-600'}`}>{profit.toLocaleString()}원</h3>
                 </div>
 
-                {/* Staff Card (Mock) */}
+                {/* Staff Card (Real Data) */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-violet-50 text-violet-600 rounded-xl">
                             <Users size={24} />
                         </div>
-                        <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-bold rounded-lg">4명 근무중</span>
+                        <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-bold rounded-lg">{staffCount}명 재직</span>
                     </div>
-                    <p className="text-slate-500 text-sm font-medium">현재 근무 인원</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">김철수 외 3명</h3>
+                    <p className="text-slate-500 text-sm font-medium">재직 직원</p>
+                    <h3 className="text-2xl font-bold text-slate-900 mt-1">
+                        {staffNames.length > 0 ? (
+                            staffNames.length === 1 ? staffNames[0] :
+                                `${staffNames[0]} 외 ${staffCount - 1}명`
+                        ) : '직원 없음'}
+                    </h3>
                 </div>
 
-                {/* Avg Processing Time (Mock) */}
+                {/* Total Expense Card */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
-                            <Clock size={24} />
+                            <BarChart3 size={24} />
                         </div>
                     </div>
-                    <p className="text-slate-500 text-sm font-medium">피크타임 예상</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">11:30 - 13:00</h3>
+                    <p className="text-slate-500 text-sm font-medium">이번 달 총 지출</p>
+                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{expense.toLocaleString()}원</h3>
                 </div>
             </div>
 
@@ -225,12 +207,11 @@ export default function Dashboard() {
                             <h3 className="font-bold text-lg text-slate-800">월별 수익 추이</h3>
                             <p className="text-sm text-slate-500">최근 6개월간의 순수익 변화</p>
                         </div>
-                        <button className="text-sm font-medium text-blue-600 hover:text-blue-700">전체 보기</button>
                     </div>
                     <div className="h-[350px]">
-                        {data && data.length > 0 ? (
+                        {monthlyTrend && monthlyTrend.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1} />
@@ -249,7 +230,7 @@ export default function Dashboard() {
                                         tick={{ fontSize: 12, fill: '#64748b' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(value) => `${value / 10000}만`}
+                                        tickFormatter={(value) => formatKRW(value)}
                                     />
                                     <Tooltip
                                         formatter={(value) => [`${value.toLocaleString()}원`, '이익']}
@@ -299,9 +280,13 @@ export default function Dashboard() {
                             <div className="h-full flex items-center justify-center text-slate-400">데이터가 없습니다</div>
                         )}
                         {/* Center Text */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <span className="text-sm font-bold text-slate-400">Channel</span>
-                        </div>
+                        {revenueData && revenueData.length > 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="text-sm font-bold text-slate-400">
+                                    {formatKRW(revenueData.reduce((s, e) => s + e.value, 0))}원
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-4 space-y-3">
@@ -318,7 +303,7 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Bottom Row: Recent Expenses / Top Costs */}
+            {/* Bottom Row: Top Costs + P/L Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
                     <div className="flex items-center gap-2 mb-6">
@@ -331,7 +316,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                     <div className="space-y-4">
-                        {costData.map((item, idx) => (
+                        {costData.length > 0 ? costData.map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center">
                                 <div className="flex items-center gap-4">
                                     <span className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold ${idx < 3 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
@@ -339,34 +324,50 @@ export default function Dashboard() {
                                     </span>
                                     <div>
                                         <p className="font-bold text-slate-800 text-sm">{item.vendor}</p>
-                                        <p className="text-xs text-slate-400">{item.item || '식자재'}</p>
+                                        <p className="text-xs text-slate-400">{item.item || '기타'}</p>
                                     </div>
                                 </div>
                                 <span className="font-bold text-slate-900">{item.amount.toLocaleString()}원</span>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="text-center text-slate-400 py-8">거래 내역이 없습니다</div>
+                        )}
                     </div>
                 </div>
 
-                {/* Placeholder for future module: Recent Alerts or Notices */}
+                {/* P/L Summary Card */}
                 <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm relative overflow-hidden">
                     <div className="relative z-10">
-                        <h3 className="font-bold text-lg mb-2">시스템 알림</h3>
-                        <p className="text-slate-400 text-sm mb-6">아직 읽지 않은 중요 알림이 없습니다.</p>
+                        <h3 className="font-bold text-lg mb-2">손익 현황</h3>
+                        <p className="text-slate-400 text-sm mb-6">{selectedYear}년 {selectedMonth}월 요약</p>
 
                         <div className="space-y-4">
                             <div className="flex gap-3 items-start p-3 bg-white/10 rounded-xl">
-                                <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
-                                <div>
-                                    <p className="text-sm font-bold">재고 부족 알림</p>
-                                    <p className="text-xs text-slate-400 mt-1">'김밥용 김' 재고가 안전재고 이하입니다.</p>
+                                <div className={`w-2 h-2 rounded-full mt-2 ${revenue > 0 ? 'bg-blue-500' : 'bg-slate-500'}`}></div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between">
+                                        <p className="text-sm font-bold">총 매출</p>
+                                        <p className="text-sm font-bold">{revenue.toLocaleString()}원</p>
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex gap-3 items-start p-3 bg-white/10 rounded-xl">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 mt-2"></div>
-                                <div>
-                                    <p className="text-sm font-bold">목표 매출 달성</p>
-                                    <p className="text-xs text-slate-400 mt-1">이번 달 목표 매출의 80%를 달성했습니다.</p>
+                                <div className={`w-2 h-2 rounded-full mt-2 ${expense > 0 ? 'bg-orange-500' : 'bg-slate-500'}`}></div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between">
+                                        <p className="text-sm font-bold">총 지출</p>
+                                        <p className="text-sm font-bold">{expense.toLocaleString()}원</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 items-start p-3 bg-white/10 rounded-xl border border-white/20">
+                                <div className={`w-2 h-2 rounded-full mt-2 ${profit >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                                <div className="flex-1">
+                                    <div className="flex justify-between">
+                                        <p className="text-sm font-bold">{profit >= 0 ? '영업이익' : '영업손실'}</p>
+                                        <p className={`text-sm font-bold ${profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>{profit.toLocaleString()}원</p>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-1">마진율 {marginRate}%</p>
                                 </div>
                             </div>
                         </div>
