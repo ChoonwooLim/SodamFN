@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func
-from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, Revenue
+from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, Revenue, DeliveryRevenue
 import datetime
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
@@ -205,27 +205,30 @@ CHANNEL_TO_PL_FIELD = {
 
 def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     """
-    Aggregate Revenue table entries (delivery app settlements) by channel
-    for a given month and update MonthlyProfitLoss delivery revenue fields.
+    Aggregate DeliveryRevenue (monthly settlement summary) by channel
+    and update MonthlyProfitLoss delivery revenue fields.
     """
-    start_date = datetime.date(year, month, 1)
-    if month == 12:
-        end_date = datetime.date(year + 1, 1, 1)
-    else:
-        end_date = datetime.date(year, month + 1, 1)
+    # Channel map to P/L field
+    channel_field_map = {
+        "쿠팡": "revenue_coupang",
+        "배민": "revenue_baemin",
+        "요기요": "revenue_yogiyo",
+        "땡겨요": "revenue_ddangyo",
+    }
 
-    # Get all Revenue entries for this month
-    revenues = session.exec(
-        select(Revenue)
-        .where(Revenue.date >= start_date, Revenue.date < end_date)
+    # Get all DeliveryRevenue for this month
+    # Note: DeliveryRevenue is already monthly aggregated
+    records = session.exec(
+        select(DeliveryRevenue)
+        .where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
     ).all()
 
-    # Aggregate by channel → P/L field
+    # Aggregate by field
     delivery_totals = {}
-    for rev in revenues:
-        pl_field = CHANNEL_TO_PL_FIELD.get(rev.channel)
-        if pl_field:
-            delivery_totals[pl_field] = delivery_totals.get(pl_field, 0) + (rev.amount or 0)
+    for r in records:
+        field = channel_field_map.get(r.channel)
+        if field:
+            delivery_totals[field] = delivery_totals.get(field, 0) + r.settlement_amount
 
     # All delivery fields we manage
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
@@ -241,7 +244,10 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
             setattr(pl_record, field, delivery_totals.get(field, 0))
         session.add(pl_record)
     else:
-        pl_record = MonthlyProfitLoss(year=year, month=month, **delivery_totals)
+        # Create new with defaults 0 then update
+        pl_record = MonthlyProfitLoss(year=year, month=month)
+        for field, val in delivery_totals.items():
+            setattr(pl_record, field, val)
         session.add(pl_record)
 
     session.commit()

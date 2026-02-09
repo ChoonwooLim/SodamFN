@@ -127,21 +127,18 @@ export default function RevenueManagement() {
         if (viewMode === 'revenueDetail') fetchPLData();
     }, [viewMode, fetchPLData]);
 
-    // ─── Delivery App Data Fetch (배달앱) ───
-    const fetchDeliveryAppData = useCallback(async (channel) => {
-        const ch = DELIVERY_CHANNELS.find(c => c.id === channel);
-        if (!ch) return;
+    const fetchDeliveryAppData = useCallback(async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/profitloss/delivery/${ch.apiKey}/${plYear}`);
-            setDeliveryAppData(prev => ({ ...prev, [channel]: res.data || [] }));
+            const res = await axios.get(`${API_URL}/api/revenue/delivery-summary?year=${plYear}`);
+            setDeliveryAppData(res.data || {});
         } catch (err) {
             console.error('Delivery fetch error:', err);
         }
     }, [plYear]);
 
     useEffect(() => {
-        if (viewMode === 'deliveryApp') fetchDeliveryAppData(deliveryChannel);
-    }, [viewMode, deliveryChannel, fetchDeliveryAppData]);
+        if (viewMode === 'deliveryApp') fetchDeliveryAppData();
+    }, [viewMode, fetchDeliveryAppData]);
 
     // ─── Month Navigation ───
     const prevMonth = () => {
@@ -366,12 +363,12 @@ export default function RevenueManagement() {
     const daysInMonth = new Date(year, month, 0).getDate();
     const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-    // Build vendor grid: vendorId -> { amounts: { day: amount }, ids: { day: expenseId }, channels: { day: channel } }
+    // Build vendor grid: vendorId -> { amounts: { day: amount }, ids: { day: expenseId }, channels: { day: channel }, notes: { day: note } }
     const vendorGrid = {};
     const filteredVendors = tab === 'all' ? vendors : vendors.filter(v => v.category === tab);
 
     filteredVendors.forEach(v => {
-        vendorGrid[v.id] = { amounts: {}, ids: {}, channels: {} };
+        vendorGrid[v.id] = { amounts: {}, ids: {}, channels: {}, notes: {} };
     });
 
     // Populate from data
@@ -381,11 +378,19 @@ export default function RevenueManagement() {
         if (vendorGrid[item.vendor_id]) {
             vendorGrid[item.vendor_id].amounts[day] = (vendorGrid[item.vendor_id].amounts[day] || 0) + item.amount;
             vendorGrid[item.vendor_id].ids[day] = item.id;
+            if (item.note) vendorGrid[item.vendor_id].notes[day] = item.note;
             if (item._channel) {
                 vendorGrid[item.vendor_id].channels[day] = item._channel;
             }
         }
     });
+
+    // Helper: parse 매출 amount from note (format: "매출:X / 수수료:Y / 주문:Z건")
+    const parseSalesFromNote = (note) => {
+        if (!note) return null;
+        const m = note.match(/매출[:\s]*([\d,]+)/);
+        return m ? parseInt(m[1].replace(/,/g, '')) : null;
+    };
 
     // Vendor totals
     const vendorTotals = {};
@@ -486,8 +491,20 @@ export default function RevenueManagement() {
         const groupVendors = groupedVendorsGrid[catId] || [];
         if (groupVendors.length === 0) return null;
 
+        const isDelivery = catId === 'delivery';
         const calcGroupDayTotal = (d) => groupVendors.reduce((sum, v) => sum + (vendorGrid[v.id]?.amounts[d] || 0), 0);
         const calcGroupTotal = () => groupVendors.reduce((sum, v) => sum + (vendorTotals[v.id] || 0), 0);
+
+        // For delivery: calculate 매출 totals from notes
+        const calcDeliverySalesTotal = (vendorId) => {
+            const notes = vendorGrid[vendorId]?.notes || {};
+            return Object.values(notes).reduce((sum, note) => sum + (parseSalesFromNote(note) || 0), 0);
+        };
+        const calcGroupDaySalesTotal = (d) => groupVendors.reduce((sum, v) => {
+            const note = vendorGrid[v.id]?.notes[d];
+            return sum + (parseSalesFromNote(note) || 0);
+        }, 0);
+        const calcGroupSalesTotal = () => groupVendors.reduce((sum, v) => sum + calcDeliverySalesTotal(v.id), 0);
 
         return (
             <>
@@ -497,18 +514,40 @@ export default function RevenueManagement() {
                     </td>
                 </tr>
                 {groupVendors.map(v => (
-                    <tr key={v.id}>
-                        <td className="grid-vendor-cell">{getDisplayName(v.name, v.item)}</td>
-                        {days.map(d => (
-                            <td key={d} className="grid-amount-cell">
-                                {renderGridCell(v.id, d)}
+                    <React.Fragment key={v.id}>
+                        {/* 정산금 row */}
+                        <tr>
+                            <td className="grid-vendor-cell" rowSpan={isDelivery ? 2 : 1}>
+                                {getDisplayName(v.name, v.item)}
                             </td>
-                        ))}
-                        <td className="grid-row-total">{formatNumber(vendorTotals[v.id])}</td>
-                    </tr>
+                            {days.map(d => (
+                                <td key={d} className="grid-amount-cell">
+                                    {renderGridCell(v.id, d)}
+                                </td>
+                            ))}
+                            <td className="grid-row-total">{formatNumber(vendorTotals[v.id])}</td>
+                        </tr>
+                        {/* 매출액 row (delivery only) */}
+                        {isDelivery && (
+                            <tr className="grid-sales-row">
+                                {days.map(d => {
+                                    const sales = parseSalesFromNote(vendorGrid[v.id]?.notes[d]);
+                                    return (
+                                        <td key={d} className="grid-amount-cell grid-sales-cell">
+                                            <span className="grid-cell-sales">{sales ? formatNumber(sales) : '-'}</span>
+                                        </td>
+                                    );
+                                })}
+                                <td className="grid-row-total grid-sales-cell">
+                                    <span className="grid-cell-sales">{formatNumber(calcDeliverySalesTotal(v.id))}</span>
+                                </td>
+                            </tr>
+                        )}
+                    </React.Fragment>
                 ))}
+                {/* 정산금 소계 */}
                 <tr className="grid-subtotal-row">
-                    <td className="grid-subtotal-label">↳ {label} 소계</td>
+                    <td className="grid-subtotal-label">↳ {isDelivery ? '정산금 소계' : `${label} 소계`}</td>
                     {days.map(d => (
                         <td key={d} className="grid-subtotal-cell">
                             {calcGroupDayTotal(d) > 0 ? formatNumber(calcGroupDayTotal(d)) : '-'}
@@ -516,6 +555,21 @@ export default function RevenueManagement() {
                     ))}
                     <td className="grid-subtotal-total">{formatNumber(calcGroupTotal())}</td>
                 </tr>
+                {/* 매출 소계 (delivery only) */}
+                {isDelivery && (
+                    <tr className="grid-subtotal-row grid-sales-subtotal">
+                        <td className="grid-subtotal-label">↳ 매출 소계</td>
+                        {days.map(d => {
+                            const t = calcGroupDaySalesTotal(d);
+                            return (
+                                <td key={d} className="grid-subtotal-cell grid-sales-cell">
+                                    {t > 0 ? formatNumber(t) : '-'}
+                                </td>
+                            );
+                        })}
+                        <td className="grid-subtotal-total grid-sales-cell">{formatNumber(calcGroupSalesTotal())}</td>
+                    </tr>
+                )}
             </>
         );
     };
@@ -940,128 +994,189 @@ export default function RevenueManagement() {
                 );
             })()}
 
-            {/* ═══════════════════════════════════════════ */}
-            {/* DELIVERY APP VIEW — 배달앱 정산금 (Day × 12-month grid) */}
-            {/* ═══════════════════════════════════════════ */}
             {viewMode === 'deliveryApp' && (() => {
-                const ch = DELIVERY_CHANNELS.find(c => c.id === deliveryChannel);
-                const revenueItems = deliveryAppData[deliveryChannel] || [];
+                const monthly = deliveryAppData?.monthly || [];
+                const channelTotals = deliveryAppData?.channel_totals || {};
+                const CHANNEL_ICONS = { '쿠팡': '🟡', '배민': '🔵', '요기요': '🔴', '땡겨요': '🟢' };
+                const CHANNEL_ORDER = ['쿠팡', '배민', '요기요', '땡겨요'];
+                const sortedChannels = CHANNEL_ORDER.filter(c => channelTotals[c]);
 
-                // Build grid: month -> { day -> { amount, id } }
-                const monthGrid = {};
-                MONTHS.forEach(m => { monthGrid[m] = {}; });
-                revenueItems.forEach(item => {
-                    const d = new Date(item.date);
-                    const m = d.getMonth() + 1, day = d.getDate();
-                    if (monthGrid[m]) monthGrid[m][day] = { amount: item.amount, id: item.id };
-                });
-
-                const monthlyTotals = {};
-                MONTHS.forEach(m => { monthlyTotals[m] = Object.values(monthGrid[m]).reduce((s, d) => s + (d.amount || 0), 0); });
-                const deliveryGrandTotal = Object.values(monthlyTotals).reduce((s, t) => s + t, 0);
-
-                const handleDeliverySave = async () => {
-                    if (!editingCell || editingCell.type !== 'deliveryApp') return;
-                    const { channel: chId, month: m, day, id } = editingCell;
-                    const amount = parseInt(editValue) || 0;
-                    const date = `${plYear}-${m.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-                    const apiChannel = DELIVERY_CHANNELS.find(c => c.id === chId)?.apiKey;
-                    try {
-                        if (id && amount > 0) {
-                            await axios.put(`${API_URL}/api/profitloss/delivery/${id}`, { date, channel: apiChannel, amount });
-                        } else if (!id && amount > 0) {
-                            await axios.post(`${API_URL}/api/profitloss/delivery`, { date, channel: apiChannel, amount });
-                        } else if (id && amount === 0) {
-                            await axios.delete(`${API_URL}/api/profitloss/delivery/${id}`);
-                        }
-                        fetchDeliveryAppData(chId);
-                    } catch (err) { console.error('Delivery save:', err); }
-                    setEditingCell(null);
-                };
-
-                const renderDelCell = (m, day) => {
-                    const cellData = monthGrid[m]?.[day];
-                    const amount = cellData?.amount || 0;
-                    const itemId = cellData?.id;
-                    const isEditing = editingCell?.type === 'deliveryApp' && editingCell?.channel === deliveryChannel && editingCell?.month === m && editingCell?.day === day;
-                    if (isEditing) {
-                        return (
-                            <input type="number" value={editValue}
-                                onChange={e => setEditValue(e.target.value)}
-                                onBlur={handleDeliverySave}
-                                onKeyDown={e => { if (e.key === 'Enter') handleDeliverySave(); if (e.key === 'Escape') setEditingCell(null); }}
-                                autoFocus className="del-edit-input" />
-                        );
-                    }
-                    return (
-                        <span className={`del-cell-value ${amount > 0 ? 'has-value' : ''}`}
-                            onClick={() => { setEditingCell({ type: 'deliveryApp', channel: deliveryChannel, month: m, day, id: itemId }); setEditValue(amount?.toString() || '0'); }}>
-                            {amount > 0 ? formatNumber(amount) : '-'}
-                        </span>
-                    );
-                };
+                // Grand totals
+                const grandSales = Object.values(channelTotals).reduce((s, c) => s + c.total_sales, 0);
+                const grandFees = Object.values(channelTotals).reduce((s, c) => s + c.total_fees, 0);
+                const grandSettle = Object.values(channelTotals).reduce((s, c) => s + c.settlement_amount, 0);
+                const grandOrders = Object.values(channelTotals).reduce((s, c) => s + c.order_count, 0);
+                const grandFeeRate = grandSales > 0 ? (grandFees / grandSales * 100).toFixed(1) : 0;
 
                 return (
                     <div className="revenue-content delivery-app-mode">
-                        {/* Channel Tabs */}
-                        <div className="delivery-channel-tabs">
-                            {DELIVERY_CHANNELS.map(c => (
-                                <button key={c.id}
-                                    className={`delivery-channel-btn ${deliveryChannel === c.id ? 'active' : ''}`}
-                                    onClick={() => setDeliveryChannel(c.id)}>
-                                    {c.icon} {c.label}
-                                </button>
-                            ))}
-                        </div>
+                        <h3 className="del-section-title">🛵 배달앱 정산 분석 — {plYear}년</h3>
 
-                        <h3 className="del-section-title">🛵 {ch?.label} 정산금 입금내역_{plYear}년</h3>
-
-                        {/* Monthly Summary Bar */}
-                        <div className="del-summary-bar">
+                        {/* Grand Total Summary */}
+                        <div className="del-summary-bar" style={{ marginBottom: 16 }}>
                             <div className="del-stat highlight">
-                                <span className="del-stat-label">총 정산금</span>
-                                <span className="del-stat-value">{formatNumber(deliveryGrandTotal)}원</span>
+                                <span className="del-stat-label">총 주문매출</span>
+                                <span className="del-stat-value">{formatNumber(grandSales)}원</span>
                             </div>
-                            {MONTHS.map(m => (
-                                <div key={m} className="del-stat">
-                                    <span className="del-stat-label">{m}월</span>
-                                    <span className="del-stat-value">{formatNumber(monthlyTotals[m])}원</span>
-                                </div>
-                            ))}
+                            <div className="del-stat" style={{ background: 'rgba(239,68,68,0.15)' }}>
+                                <span className="del-stat-label">총 수수료</span>
+                                <span className="del-stat-value" style={{ color: '#ef4444' }}>-{formatNumber(grandFees)}원</span>
+                            </div>
+                            <div className="del-stat" style={{ background: 'rgba(34,197,94,0.15)' }}>
+                                <span className="del-stat-label">💰 실 정산금</span>
+                                <span className="del-stat-value" style={{ color: '#22c55e', fontWeight: 700 }}>{formatNumber(grandSettle)}원</span>
+                            </div>
+                            <div className="del-stat">
+                                <span className="del-stat-label">총 주문수</span>
+                                <span className="del-stat-value">{grandOrders.toLocaleString()}건</span>
+                            </div>
+                            <div className="del-stat">
+                                <span className="del-stat-label">평균 수수료율</span>
+                                <span className="del-stat-value">{grandFeeRate}%</span>
+                            </div>
                         </div>
 
-                        {/* Day × 12-Month Grid */}
-                        <div className="del-grid-container">
-                            <table className="del-grid-table">
+                        {/* Channel Summary Cards */}
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)`, gap: 10, marginBottom: 20 }}>
+                            {sortedChannels.map(ch => {
+                                const ct = channelTotals[ch];
+                                return (
+                                    <div key={ch} className="revenue-summary-card" style={{ padding: '14px 16px' }}>
+                                        <div className="card-label">{CHANNEL_ICONS[ch]} {ch}</div>
+                                        <div className="card-value" style={{ fontSize: 18 }}>{formatNumber(ct.settlement_amount)}원</div>
+                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                                            매출 {formatNumber(ct.total_sales)}원 · 수수료 {ct.fee_rate}%
+                                        </div>
+                                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                                            {ct.order_count.toLocaleString()}건
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Monthly Breakdown Table */}
+                        <div className="del-grid-container" style={{ marginBottom: 20 }}>
+                            <table className="del-grid-table" style={{ fontSize: 12 }}>
                                 <thead>
                                     <tr>
-                                        <th className="del-day-header"></th>
-                                        {MONTHS.map(m => <th key={m} className="del-month-header">{m}월</th>)}
+                                        <th style={{ minWidth: 60, textAlign: 'center' }}>월</th>
+                                        {sortedChannels.map(ch => (
+                                            <th key={ch} colSpan={3} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                {CHANNEL_ICONS[ch]} {ch}
+                                            </th>
+                                        ))}
+                                        <th colSpan={2} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>합계</th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        {sortedChannels.map(ch => (
+                                            <React.Fragment key={ch}>
+                                                <th style={{ fontSize: 10, color: '#94a3b8', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>정산액</th>
+                                                <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료</th>
+                                                <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
+                                            </React.Fragment>
+                                        ))}
+                                        <th style={{ fontSize: 10, color: '#94a3b8', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>정산액</th>
+                                        <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                                        <tr key={day}>
-                                            <td className="del-day-label">{day}</td>
-                                            {MONTHS.map(m => {
-                                                const daysInM = new Date(plYear, m, 0).getDate();
-                                                if (day > daysInM) return <td key={m} className="del-invalid">-</td>;
-                                                return <td key={m} className="del-amount-cell">{renderDelCell(m, day)}</td>;
+                                    {monthly.map(m => (
+                                        <tr key={`${m.year}-${m.month}`}>
+                                            <td style={{ textAlign: 'center', fontWeight: 600 }}>{m.month}월</td>
+                                            {sortedChannels.map(ch => {
+                                                const chData = m.channels[ch];
+                                                if (!chData) return (
+                                                    <React.Fragment key={ch}>
+                                                        <td style={{ color: '#475569', textAlign: 'right', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>-</td>
+                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
+                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
+                                                    </React.Fragment>
+                                                );
+                                                return (
+                                                    <React.Fragment key={ch}>
+                                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 500, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                            {formatNumber(chData.settlement_amount)}
+                                                        </td>
+                                                        <td style={{ textAlign: 'right', color: '#ef4444', fontSize: 11 }}>
+                                                            -{formatNumber(chData.total_fees)}
+                                                        </td>
+                                                        <td style={{ textAlign: 'right', color: '#94a3b8', fontSize: 11 }}>
+                                                            {chData.fee_rate}%
+                                                        </td>
+                                                    </React.Fragment>
+                                                );
                                             })}
+                                            <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                                {formatNumber(m.total_settlement)}
+                                            </td>
+                                            <td style={{ textAlign: 'right', color: '#94a3b8' }}>
+                                                {m.overall_fee_rate}%
+                                            </td>
                                         </tr>
                                     ))}
+                                    {/* Totals Row */}
                                     <tr className="del-totals-row">
-                                        <td className="del-day-label"><strong>합 계</strong></td>
-                                        {MONTHS.map(m => (
-                                            <td key={m} className="del-month-total"><strong>{formatNumber(monthlyTotals[m])}</strong></td>
-                                        ))}
+                                        <td style={{ textAlign: 'center' }}><strong>합계</strong></td>
+                                        {sortedChannels.map(ch => {
+                                            const ct = channelTotals[ch];
+                                            return (
+                                                <React.Fragment key={ch}>
+                                                    <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                        {formatNumber(ct.settlement_amount)}
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', color: '#ef4444' }}>
+                                                        -{formatNumber(ct.total_fees)}
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', color: '#94a3b8' }}>
+                                                        {ct.fee_rate}%
+                                                    </td>
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                            {formatNumber(grandSettle)}
+                                        </td>
+                                        <td style={{ textAlign: 'right', color: '#94a3b8' }}>
+                                            {grandFeeRate}%
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <div className="grid-instructions">
-                            <p>💡 셀을 클릭하면 정산금을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+                        {/* Channel Fee Breakdown Cards */}
+                        <h3 className="del-section-title" style={{ marginTop: 8 }}>📊 채널별 수수료 상세</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 2)}, 1fr)`, gap: 12 }}>
+                            {sortedChannels.map(ch => {
+                                const ct = channelTotals[ch];
+                                // Collect fee breakdowns from latest month
+                                const latestMonth = monthly.find(m => m.channels[ch]);
+                                const feeBreakdown = latestMonth?.channels[ch]?.fee_breakdown || {};
+                                return (
+                                    <div key={ch} className="revenue-summary-card" style={{ padding: '14px 16px' }}>
+                                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
+                                        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
+                                            총매출 대비 수수료율: <span style={{ color: '#ef4444', fontWeight: 600 }}>{ct.fee_rate}%</span>
+                                        </div>
+                                        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
+                                            총 수수료: <span style={{ color: '#ef4444' }}>{formatNumber(ct.total_fees)}원</span> / 총매출: {formatNumber(ct.total_sales)}원
+                                        </div>
+                                        {Object.keys(feeBreakdown).length > 0 && (
+                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
+                                                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>최근 수수료 내역:</div>
+                                                {Object.entries(feeBreakdown).filter(([, v]) => v > 0).map(([k, v]) => (
+                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', padding: '2px 0' }}>
+                                                        <span>{k}</span>
+                                                        <span style={{ color: '#ef4444' }}>{formatNumber(v)}원</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 );

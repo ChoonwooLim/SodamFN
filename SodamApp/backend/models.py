@@ -279,6 +279,19 @@ class MonthlyProfitLoss(SQLModel, table=True):
     expense_personal: int = 0     # 개인생활비
 
 
+class DeliveryRevenue(SQLModel, table=True):
+    """배달앱 월별 정산 요약"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    channel: str = Field(index=True)          # 쿠팡/배민/요기요/땡겨요
+    year: int = Field(index=True)
+    month: int = Field(index=True)
+    total_sales: int = 0                       # 총 주문금액
+    total_fees: int = 0                        # 총 수수료 (차감금액)
+    settlement_amount: int = 0                 # 정산금액 (실제 입금액)
+    order_count: int = 0                       # 주문 건수
+    fee_breakdown: Optional[str] = None        # 수수료 세부내역 (JSON)
+
+
 class DailyExpense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     date: datetime.date = Field(index=True)

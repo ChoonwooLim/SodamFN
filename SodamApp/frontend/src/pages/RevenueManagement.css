@@ -951,6 +951,40 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* ── Delivery Sales Row (매출 sub-row) ── */
+.grid-sales-row {
+    background: #fffbeb;
+}
+
+.grid-sales-cell {
+    color: #92400e !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+}
+
+.grid-cell-sales {
+    font-variant-numeric: tabular-nums;
+}
+
+.grid-sales-subtotal {
+    background: #fef3c7;
+}
+
+.grid-sales-subtotal .grid-subtotal-label {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.grid-sales-subtotal .grid-subtotal-cell {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.grid-sales-subtotal .grid-subtotal-total {
+    background: #fde68a;
+    color: #78350f;
+}
+
 /* ── Grand Total ── */
 .grid-grand-total-row {
     background: #f1f5f9;

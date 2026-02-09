@@ -7,7 +7,7 @@ from typing import Optional, List
 from datetime import date, datetime
 from sqlmodel import Session, select, func, col
 from database import engine
-from models import DailyExpense, Vendor, Revenue
+from models import DailyExpense, Vendor, Revenue, DeliveryRevenue
 from services.profit_loss_service import sync_revenue_to_pl
 
 # Channel name (in Revenue table) → keyword to match delivery vendor names
@@ -199,37 +199,6 @@ def get_revenue_summary(year: int, month: int):
                 by_vendor_map[vname] = {"name": vname, "category": cat, "total": 0}
             by_vendor_map[vname]["total"] += amount
 
-        # ── Also include Revenue table entries (배달앱 data) ──
-        delivery_vendors = [v for v in revenue_vendors if v.category == "delivery"]
-        channel_to_vendor = {}
-        for ch_key, keyword in CHANNEL_KEYWORDS.items():
-            for v in delivery_vendors:
-                if keyword in v.name:
-                    channel_to_vendor[ch_key] = v
-                    break
-
-        revenue_entries = session.exec(
-            select(Revenue)
-            .where(Revenue.date >= start_date, Revenue.date < end_date)
-        ).all()
-
-        for rev in revenue_entries:
-            v = channel_to_vendor.get(rev.channel)
-            if v:
-                amount = rev.amount or 0
-                total += amount
-                by_category["delivery"] = by_category.get("delivery", 0) + amount
-
-                day_str = str(rev.date)
-                if day_str not in by_day_map:
-                    by_day_map[day_str] = {"date": day_str, "total": 0, "store": 0, "delivery": 0}
-                by_day_map[day_str]["total"] += amount
-                by_day_map[day_str]["delivery"] += amount
-
-                if v.name not in by_vendor_map:
-                    by_vendor_map[v.name] = {"name": v.name, "category": "delivery", "total": 0}
-                by_vendor_map[v.name]["total"] += amount
-
         by_day = sorted(by_day_map.values(), key=lambda x: x["date"])
         by_vendor = sorted(by_vendor_map.values(), key=lambda x: x["total"], reverse=True)
 
@@ -334,3 +303,86 @@ def delete_daily_revenue(expense_id: int):
         sync_revenue_to_pl(expense_year, expense_month, session)
 
         return {"status": "success", "message": "매출 내역이 삭제되었습니다."}
+
+
+# ─── GET delivery revenue summary ───
+
+@router.get("/delivery-summary")
+def get_delivery_summary(year: int = 0):
+    """
+    Returns delivery app revenue summary.
+    If year=0, returns all records. Otherwise filters by year.
+    Groups by year-month and provides per-channel data + monthly totals.
+    """
+    import json as json_lib
+
+    with Session(engine) as session:
+        query = select(DeliveryRevenue)
+        if year > 0:
+            query = query.where(DeliveryRevenue.year == year)
+        query = query.order_by(DeliveryRevenue.year.desc(), DeliveryRevenue.month.desc())
+
+        records = session.exec(query).all()
+
+        # Group by year-month
+        monthly = {}
+        for r in records:
+            key = f"{r.year}-{r.month:02d}"
+            if key not in monthly:
+                monthly[key] = {
+                    "year": r.year,
+                    "month": r.month,
+                    "channels": {},
+                    "total_sales": 0,
+                    "total_fees": 0,
+                    "total_settlement": 0,
+                    "total_orders": 0,
+                }
+            m = monthly[key]
+            fee_bd = {}
+            try:
+                if r.fee_breakdown:
+                    fee_bd = json_lib.loads(r.fee_breakdown)
+            except:
+                pass
+
+            m["channels"][r.channel] = {
+                "total_sales": r.total_sales,
+                "total_fees": r.total_fees,
+                "settlement_amount": r.settlement_amount,
+                "order_count": r.order_count,
+                "fee_rate": round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0,
+                "fee_breakdown": fee_bd,
+            }
+            m["total_sales"] += r.total_sales
+            m["total_fees"] += r.total_fees
+            m["total_settlement"] += r.settlement_amount
+            m["total_orders"] += r.order_count
+
+        # Convert to list & compute overall fee rate
+        result = []
+        for key in sorted(monthly.keys(), reverse=True):
+            m = monthly[key]
+            m["overall_fee_rate"] = round(m["total_fees"] / m["total_sales"] * 100, 1) if m["total_sales"] > 0 else 0
+            result.append(m)
+
+        # Channel summary totals across all months
+        channel_totals = {}
+        for r in records:
+            if r.channel not in channel_totals:
+                channel_totals[r.channel] = {"total_sales": 0, "total_fees": 0, "settlement_amount": 0, "order_count": 0}
+            ct = channel_totals[r.channel]
+            ct["total_sales"] += r.total_sales
+            ct["total_fees"] += r.total_fees
+            ct["settlement_amount"] += r.settlement_amount
+            ct["order_count"] += r.order_count
+
+        for ch, ct in channel_totals.items():
+            ct["fee_rate"] = round(ct["total_fees"] / ct["total_sales"] * 100, 1) if ct["total_sales"] > 0 else 0
+
+        return {
+            "monthly": result,
+            "channel_totals": channel_totals,
+            "record_count": len(records),
+        }
+
