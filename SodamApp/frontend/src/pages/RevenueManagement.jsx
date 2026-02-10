@@ -63,7 +63,7 @@ export default function RevenueManagement() {
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState('add');
     const [editingId, setEditingId] = useState(null);
-    const [form, setForm] = useState({ vendor_id: '', date: '', amount: '', note: '' });
+    const [form, setForm] = useState({ vendor_id: '', date: '', amount: '', note: '', payment_method: 'Card' });
 
     // Grid inline edit
     const [editingCell, setEditingCell] = useState(null);
@@ -151,7 +151,7 @@ export default function RevenueManagement() {
     };
 
     // ─── Filter by Tab ───
-    const filteredData = tab === 'all' ? data : data.filter(d => d.category === tab);
+    const filteredData = tab === 'all' ? data : data.filter(d => d.ui_category === tab);
 
     // ─── Group by Date ───
     const groupedByDate = {};
@@ -180,7 +180,7 @@ export default function RevenueManagement() {
     // ─── Add / Edit Modal ───
     const openAddModal = () => {
         const today = `${year}-${String(month).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
-        setForm({ vendor_id: vendors.length > 0 ? vendors[0].id : '', date: today, amount: '', note: '' });
+        setForm({ vendor_id: vendors.length > 0 ? vendors[0].id : '', date: today, amount: '', note: '', payment_method: 'Card' });
         setModalMode('add');
         setEditingId(null);
         setShowModal(true);
@@ -193,6 +193,7 @@ export default function RevenueManagement() {
             date: record.date,
             amount: String(record.amount),
             note: record.note || '',
+            payment_method: record.payment_method || 'Card',
             _isDeliveryApp: isDeliveryApp,
             _channel: record._channel || null,
         });
@@ -213,6 +214,7 @@ export default function RevenueManagement() {
                     date: form.date,
                     amount: Number(form.amount),
                     note: form.note || null,
+                    payment_method: form.payment_method || 'Card',
                 });
             } else {
                 // Check if editing a Revenue table entry (delivery app)
@@ -231,6 +233,7 @@ export default function RevenueManagement() {
                         date: form.date,
                         amount: Number(form.amount),
                         note: form.note || null,
+                        payment_method: form.payment_method || 'Card',
                     });
                 }
             }
@@ -607,16 +610,20 @@ export default function RevenueManagement() {
             {(viewMode === 'list' || viewMode === 'grid' || viewMode === 'upload') && (
                 <div className="revenue-summary-row" style={{ marginTop: 20 }}>
                     <div className="revenue-summary-card">
-                        <div className="card-label">🏪 매장매출</div>
-                        <div className="card-value">{formatNumber(storeTotal)}원</div>
+                        <div className="card-label">💵 현금매출</div>
+                        <div className="card-value">{formatNumber(summary.by_category?.cash || 0)}원</div>
+                    </div>
+                    <div className="revenue-summary-card">
+                        <div className="card-label">💳 카드매출</div>
+                        <div className="card-value">{formatNumber(summary.by_category?.card || 0)}원</div>
                     </div>
                     <div className="revenue-summary-card">
                         <div className="card-label">🛵 배달앱매출</div>
-                        <div className="card-value">{formatNumber(deliveryTotal)}원</div>
+                        <div className="card-value">{formatNumber(summary.by_category?.delivery || 0)}원</div>
                     </div>
                     <div className="revenue-summary-card total">
                         <div className="card-label">💰 총 매출</div>
-                        <div className="card-value">{formatNumber(grandTotal)}원</div>
+                        <div className="card-value">{formatNumber(summary.total || 0)}원</div>
                     </div>
                 </div>
             )}
@@ -628,8 +635,9 @@ export default function RevenueManagement() {
                     <div style={{ display: 'flex', gap: 4 }}>
                         {[
                             { id: 'all', label: '📊 전체' },
-                            { id: 'store', label: '🏪 매장매출' },
-                            { id: 'delivery', label: '🛵 배달앱매출' },
+                            { id: 'cash', label: '💵 현금' },
+                            { id: 'card', label: '💳 카드' },
+                            { id: 'delivery', label: '🛵 배달앱' },
                         ].map(t => (
                             <button
                                 key={t.id}
@@ -720,11 +728,12 @@ export default function RevenueManagement() {
                                     const weekday = getWeekday(dateStr);
                                     const dayNum = dateStr.split('-')[2];
 
-                                    // Split into cash and card items
-                                    const cashItems = items.filter(i => i.vendor_name?.includes('현금'));
-                                    const cardItems = items.filter(i => !i.vendor_name?.includes('현금'));
-                                    const cashTotal = cashItems.reduce((s, i) => s + (i.amount || 0), 0);
-                                    const cardTotal = cardItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    // Split into cash and other items (Card/Delivery)
+                                    const cashItems = items.filter(i => i.ui_category === 'cash');
+                                    const cardItems = items.filter(i => i.ui_category !== 'cash');
+
+                                    const cashItemsTotal = cashItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const cardItemsTotal = cardItems.reduce((s, i) => s + (i.amount || 0), 0);
                                     const isCardCollapsed = collapsedCards[dateStr] !== false; // default collapsed
 
                                     return [
@@ -738,49 +747,50 @@ export default function RevenueManagement() {
                                             </td>
                                         </tr>,
                                         /* ── Cash items (shown first, green tint) ── */
-                                        ...cashItems.map(item => {
-                                            const catInfo = CATEGORY_LABELS[item.category] || { label: item.category, icon: '📦', badge: 'other' };
-                                            return (
-                                                <tr key={item.id} className="revenue-row cash-row">
-                                                    <td className="td-date">{dayNum}</td>
-                                                    <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
-                                                        {getStoreName(item.item)}
-                                                    </td>
-                                                    <td className="td-vendor">
-                                                        <span className="cash-label">💵 {getDisplayName(item.vendor_name, item.item)}</span>
-                                                    </td>
-                                                    <td className="td-category">
-                                                        <span className={`cat-badge cash`}>
-                                                            💵 현금
-                                                        </span>
-                                                    </td>
-                                                    <td className="td-amount cash-amount">{formatNumber(item.amount)}원</td>
-                                                    <td className="td-note">{item.note || '-'}</td>
-                                                    <td className="td-actions">
-                                                        <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
-                                                            <Edit3 size={14} />
-                                                        </button>
-                                                        <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }),
-                                        /* ── Card collapse toggle ── */
+                                        ...cashItems.map(item => (
+                                            <tr key={item.id} className="revenue-row cash-row">
+                                                <td className="td-date">{dayNum}</td>
+                                                <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
+                                                    {getStoreName(item.item)}
+                                                </td>
+                                                <td className="td-vendor">
+                                                    <span className="cash-label">💵 {getDisplayName(item.vendor_name, item.item)}</span>
+                                                </td>
+                                                <td className="td-category">
+                                                    <span className={`cat-badge cash`}>
+                                                        💵 현금
+                                                    </span>
+                                                </td>
+                                                <td className="td-amount cash-amount">{formatNumber(item.amount)}원</td>
+                                                <td className="td-note">{item.note || '-'}</td>
+                                                <td className="td-actions">
+                                                    <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
+                                                        <Edit3 size={14} />
+                                                    </button>
+                                                    <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        )),
+                                        /* ── Card/Delivery collapse toggle ── */
                                         cardItems.length > 0 && (
                                             <tr key={`card-toggle-${dateStr}`} className="card-toggle-row" onClick={() => toggleCardCollapse(dateStr)}>
                                                 <td colSpan={7} className="card-toggle-cell">
                                                     <span className="card-toggle-icon">{isCardCollapsed ? '▶' : '▼'}</span>
-                                                    <span className="card-toggle-label">💳 카드매출</span>
+                                                    <span className="card-toggle-label">💳 카드/배달 매출</span>
                                                     <span className="card-toggle-count">{cardItems.length}건</span>
-                                                    <span className="card-toggle-amount">{formatNumber(cardTotal)}원</span>
+                                                    <span className="card-toggle-amount">{formatNumber(cardItemsTotal)}원</span>
                                                 </td>
                                             </tr>
                                         ),
-                                        /* ── Card items (collapsible, blue tint) ── */
+                                        /* ── Card/Delivery items (collapsible, blue tint) ── */
                                         ...(!isCardCollapsed ? cardItems.map(item => {
-                                            const catInfo = CATEGORY_LABELS[item.category] || { label: item.category, icon: '📦', badge: 'other' };
+                                            const isDelivery = item.ui_category === 'delivery';
+                                            const badgeLabel = isDelivery ? '배달앱' : '카드';
+                                            const badgeIcon = isDelivery ? '🛵' : '💳';
+                                            const badgeClass = isDelivery ? 'delivery' : 'store';
+
                                             return (
                                                 <tr key={item.id} className="revenue-row card-row">
                                                     <td className="td-date">{dayNum}</td>
@@ -788,11 +798,12 @@ export default function RevenueManagement() {
                                                         {getStoreName(item.item)}
                                                     </td>
                                                     <td className="td-vendor">
-                                                        💳 {getDisplayName(item.vendor_name, item.item)}
+                                                        {isDelivery ? '🛵 ' : '💳 '}
+                                                        {getDisplayName(item.vendor_name, item.item)}
                                                     </td>
                                                     <td className="td-category">
-                                                        <span className={`cat-badge ${catInfo.badge}`}>
-                                                            {catInfo.icon} {catInfo.label}
+                                                        <span className={`cat-badge ${badgeClass}`}>
+                                                            {badgeIcon} {badgeLabel}
                                                         </span>
                                                     </td>
                                                     <td className="td-amount">{formatNumber(item.amount)}원</td>
@@ -1315,6 +1326,43 @@ export default function RevenueManagement() {
                                 )}
                             </select>
                         </div>
+
+                        {/* Payment Method - Only for store vendors */}
+                        {(() => {
+                            const selectedVendor = vendors.find(v => v.id === Number(form.vendor_id));
+                            if (selectedVendor && selectedVendor.category === 'store') {
+                                return (
+                                    <div className="form-group">
+                                        <label className="form-label">결제수단</label>
+                                        <div className="payment-method-toggle" style={{ display: 'flex', gap: 16, marginTop: 4 }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 14 }}>
+                                                <input
+                                                    type="radio"
+                                                    name="paymentMethod"
+                                                    value="Card"
+                                                    checked={form.payment_method === 'Card'}
+                                                    onChange={e => setForm({ ...form, payment_method: e.target.value })}
+                                                    style={{ marginRight: 6 }}
+                                                />
+                                                💳 카드
+                                            </label>
+                                            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 14 }}>
+                                                <input
+                                                    type="radio"
+                                                    name="paymentMethod"
+                                                    value="Cash"
+                                                    checked={form.payment_method === 'Cash'}
+                                                    onChange={e => setForm({ ...form, payment_method: e.target.value })}
+                                                    style={{ marginRight: 6 }}
+                                                />
+                                                💵 현금
+                                            </label>
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
 
                         <div className="form-group">
                             <label className="form-label">금액 (원)</label>

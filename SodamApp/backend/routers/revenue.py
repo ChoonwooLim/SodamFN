@@ -30,6 +30,7 @@ class RevenueCreate(BaseModel):
     date: str  # YYYY-MM-DD
     amount: int
     note: Optional[str] = None
+    payment_method: str = "Card"  # Card, Cash
 
 
 class RevenueUpdate(BaseModel):
@@ -37,6 +38,7 @@ class RevenueUpdate(BaseModel):
     note: Optional[str] = None
     date: Optional[str] = None
     vendor_id: Optional[int] = None
+    payment_method: Optional[str] = None
 
 
 # ─── GET daily revenue list ───
@@ -78,6 +80,12 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
         result = []
         for e in expenses:
             v = vendor_map.get(e.vendor_id)
+            # Determine effective category for UI (cash/card/delivery)
+            # Default to v.category (store/delivery). If store, check payment_method
+            ui_category = v.category if v else e.category
+            if ui_category == 'store':
+                ui_category = e.payment_method.lower() if e.payment_method else 'card'
+            
             result.append({
                 "id": e.id,
                 "date": str(e.date),
@@ -86,6 +94,8 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
                 "amount": e.amount,
                 "note": e.note,
                 "category": v.category if v else e.category,
+                "payment_method": e.payment_method or "Card",
+                "ui_category": ui_category, # cash, card, delivery
                 "item": v.item if v else None,
             })
 
@@ -126,6 +136,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
                     "amount": rev.amount or 0,
                     "note": rev.description or "배달앱 정산",
                     "category": "delivery",
+                    "ui_category": "delivery",
                     "item": v.item,
                     "source": "delivery_app",  # flag for frontend
                     "_channel": rev.channel,  # channel key for edit API
@@ -140,6 +151,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
 def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
     """
     Returns aggregated revenue by category and by day.
+    Categories: cash, card, delivery
     """
     start_date = date(year, month, 1)
     if month == 12:
@@ -175,7 +187,7 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
         ).all()
 
         total = 0
-        by_category = {}
+        by_category = {"cash": 0, "card": 0, "delivery": 0}
         by_day_map = {}
         by_vendor_map = {}
 
@@ -183,23 +195,64 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
             v = vendor_map.get(e.vendor_id)
             cat = v.category if v else (e.category or "기타")
             amount = e.amount or 0
-            total += amount
+            
+            # Refine category based on payment_method for 'store' type
+            ui_cat = cat
+            if cat == 'store':
+                pm = (e.payment_method or "Card").lower()
+                ui_cat = 'cash' if pm == 'cash' else 'card'
+            
+            # Delivery vendors in DailyExpense are also 'delivery'
+            if cat == 'delivery':
+                ui_cat = 'delivery'
 
-            by_category[cat] = by_category.get(cat, 0) + amount
+            total += amount
+            by_category[ui_cat] = by_category.get(ui_cat, 0) + amount
 
             day_str = str(e.date)
             if day_str not in by_day_map:
-                by_day_map[day_str] = {"date": day_str, "total": 0, "store": 0, "delivery": 0}
+                by_day_map[day_str] = {"date": day_str, "total": 0, "cash": 0, "card": 0, "delivery": 0}
+            
             by_day_map[day_str]["total"] += amount
-            if cat == "store":
-                by_day_map[day_str]["store"] += amount
-            elif cat == "delivery":
+            
+            if ui_cat == 'cash':
+                by_day_map[day_str]["cash"] += amount
+            elif ui_cat == 'card':
+                by_day_map[day_str]["card"] += amount
+            elif ui_cat == 'delivery':
                 by_day_map[day_str]["delivery"] += amount
 
             vname = e.vendor_name
             if vname not in by_vendor_map:
-                by_vendor_map[vname] = {"name": vname, "category": cat, "total": 0}
+                by_vendor_map[vname] = {"name": vname, "category": ui_cat, "total": 0}
             by_vendor_map[vname]["total"] += amount
+
+        # Also add Revenue table (Delivery App) data if not already covered
+        # (Assuming Revenue table data is separate from DailyExpense)
+        revenue_entries = session.exec(
+            select(Revenue)
+            .where(Revenue.date >= start_date, Revenue.date < end_date)
+        ).all()
+        
+        for rev in revenue_entries:
+            amount = rev.amount or 0
+            total += amount
+            by_category['delivery'] = by_category.get('delivery', 0) + amount
+            
+            day_str = str(rev.date)
+            if day_str not in by_day_map:
+                 by_day_map[day_str] = {"date": day_str, "total": 0, "cash": 0, "card": 0, "delivery": 0}
+            
+            by_day_map[day_str]["total"] += amount
+            by_day_map[day_str]["delivery"] += amount
+            
+            # Map channel to vendor name for by_vendor?
+            # CHANNEL_KEYWORDS map is available but simple mapping here:
+            vname = CHANNEL_KEYWORDS.get(rev.channel, rev.channel)
+            if vname not in by_vendor_map:
+                by_vendor_map[vname] = {"name": vname, "category": "delivery", "total": 0}
+            by_vendor_map[vname]["total"] += amount
+
 
         by_day = sorted(by_day_map.values(), key=lambda x: x["date"])
         by_vendor = sorted(by_vendor_map.values(), key=lambda x: x["total"], reverse=True)
@@ -234,7 +287,8 @@ def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_
             vendor_id=vendor.id,
             amount=payload.amount,
             category=vendor.category,
-            note=payload.note
+            note=payload.note,
+            payment_method=payload.payment_method or "Card"
         )
         session.add(expense)
         session.commit()
@@ -264,6 +318,8 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUs
             expense.amount = payload.amount
         if payload.note is not None:
             expense.note = payload.note
+        if payload.payment_method is not None:
+            expense.payment_method = payload.payment_method
         if payload.date is not None:
             try:
                 expense.date = datetime.strptime(payload.date, "%Y-%m-%d").date()
@@ -276,7 +332,7 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUs
             expense.vendor_id = vendor.id
             expense.vendor_name = vendor.name
             expense.category = vendor.category
-
+        
         session.add(expense)
         session.commit()
 

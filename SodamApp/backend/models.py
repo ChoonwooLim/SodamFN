@@ -319,6 +319,7 @@ class DailyExpense(SQLModel, table=True):
     vendor_name: str              # 거래처명
     amount: int                   # 금액
     category: Optional[str] = None  # 비용 카테고리 (재료비, 기타 등)
+    payment_method: str = Field(default="Card") # Card, Cash
     note: Optional[str] = None    # 비고
     
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
