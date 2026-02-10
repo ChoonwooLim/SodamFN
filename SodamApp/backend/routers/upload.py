@@ -356,6 +356,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                     skipped_count += 1
                     continue
                 
+                payment_type = item.get('payment_type', 'card')
+                payment_method = 'Cash' if payment_type == 'cash' else 'Card'
                 expense = DailyExpense(
                     date=date_obj,
                     vendor_name=vendor.name,
@@ -364,6 +366,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                     category='store',
                     note=item.get('note', ''),
                     upload_id=upload_id,
+                    payment_method=payment_method,
                 )
                 session.add(expense)
                 inserted_count += 1

@@ -225,6 +225,23 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
         if field:
             delivery_totals[field] = delivery_totals.get(field, 0) + (r.amount or 0)
 
+    # Fallback: if no delivery DailyExpense found, read from DeliveryRevenue table
+    if not delivery_totals:
+        dr_channel_map = {
+            "쿠팡": "revenue_coupang",
+            "배민": "revenue_baemin",
+            "요기요": "revenue_yogiyo",
+            "땡겨요": "revenue_ddangyo",
+        }
+        dr_records = session.exec(
+            select(DeliveryRevenue)
+            .where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
+        ).all()
+        for dr in dr_records:
+            field = dr_channel_map.get(dr.channel)
+            if field:
+                delivery_totals[field] = delivery_totals.get(field, 0) + (dr.settlement_amount or 0)
+
     # Also sync revenue_store from store category
     store_records = session.exec(
         select(DailyExpense)
