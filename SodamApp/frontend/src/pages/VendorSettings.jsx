@@ -43,6 +43,7 @@ export default function VendorSettings() {
     const [collapsedCategories, setCollapsedCategories] = useState(new Set());
     // Sorting State
     const [sortBy, setSortBy] = useState('name'); // 'name', 'recent', 'frequency', 'amount'
+    const [showActiveOnly, setShowActiveOnly] = useState(true); // 해당월 거래처만 보기
     // Monthly Stats State
     const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -174,9 +175,13 @@ export default function VendorSettings() {
     };
     const getCategories = () => activeTab === 'expense' ? EXPENSE_CATEGORIES : REVENUE_CATEGORIES;
     const getVendorsByCategory = (category) => {
-        const filtered = vendors.filter(v =>
+        let filtered = vendors.filter(v =>
             v.vendor_type === activeTab && v.category === category
         );
+        // 해당월 거래내역이 있는 업체만 필터링
+        if (showActiveOnly) {
+            filtered = filtered.filter(v => (v.transaction_count || 0) > 0);
+        }
         // Apply Sorting
         return filtered.sort((a, b) => {
             if (sortBy === 'name') {
@@ -517,12 +522,20 @@ export default function VendorSettings() {
                             <div className="controls-right">
                                 <div className="month-control">
                                     <span className="control-label">기간: </span>
+                                    <button
+                                        onClick={() => setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}
+                                        style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', fontSize: '14px', color: '#374151' }}
+                                    >◀</button>
                                     <input
                                         type="month"
                                         value={`${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`}
                                         onChange={handleMonthChange}
                                         className="month-input"
                                     />
+                                    <button
+                                        onClick={() => setSelectedDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}
+                                        style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', padding: '4px 8px', fontSize: '14px', color: '#374151' }}
+                                    >▶</button>
                                 </div>
                                 <div className="sorting-control">
                                     <span className="control-label">정렬: </span>
@@ -533,6 +546,15 @@ export default function VendorSettings() {
                                         <option value="amount">거래 총액순 (높은금액)</option>
                                     </select>
                                 </div>
+                                <label className="active-filter-toggle" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '13px', color: '#d1d5db' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showActiveOnly}
+                                        onChange={(e) => setShowActiveOnly(e.target.checked)}
+                                        style={{ accentColor: '#3b82f6' }}
+                                    />
+                                    해당월 거래처만
+                                </label>
                             </div>
                         </div>
                         <div className="vendor-add-section">

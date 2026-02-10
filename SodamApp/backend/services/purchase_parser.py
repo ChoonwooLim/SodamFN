@@ -416,6 +416,71 @@ def parse_hyundai(filepath: str) -> List[Dict]:
     return records
 
 
+def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
+    """Generic bank transfer parser (국민은행, 수협은행 등).
+    Reuses the same column format as 신한은행: 거래일자, 출금(원), 내용."""
+    try:
+        df = pd.read_excel(filepath, header=None, engine='xlrd')
+    except Exception:
+        df = pd.read_excel(filepath, header=None, engine='openpyxl')
+
+    # Find header row (contains '거래일자')
+    header_idx = 0
+    for i in range(min(10, len(df))):
+        row_vals = [str(v) for v in df.iloc[i].values]
+        if any('거래일자' in v for v in row_vals):
+            header_idx = i
+            break
+
+    df.columns = df.iloc[header_idx].values
+    df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+    # Try to find amount and vendor columns flexibly
+    amount_col = None
+    vendor_col = None
+    for col in df.columns:
+        col_str = str(col)
+        if '출금' in col_str:
+            amount_col = col
+        elif col_str in ('내용', '적요', '거래내용', '비고'):
+            vendor_col = col
+
+    if amount_col is None:
+        # Fallback: try column index patterns
+        amount_col = df.columns[2] if len(df.columns) > 2 else None
+    if vendor_col is None:
+        vendor_col = df.columns[1] if len(df.columns) > 1 else None
+
+    records = []
+    for _, row in df.iterrows():
+        use_date = _normalize_date(row.get('거래일자'))
+        if not use_date:
+            continue
+
+        amount = _clean_amount(row.get(amount_col, 0)) if amount_col else 0
+        if amount == 0:
+            continue
+
+        vendor_name = str(row.get(vendor_col, '')).strip() if vendor_col else ''
+        if not vendor_name or vendor_name == 'nan':
+            continue
+
+        category = classify_category(vendor_name, '')
+
+        records.append({
+            'date': use_date,
+            'vendor_name': vendor_name,
+            'amount': amount,
+            'category': category,
+            'card_company': bank_name,
+            'approval_no': '',
+            'business_type': '은행이체',
+            'is_cancelled': False,
+        })
+
+    return records
+
+
 # ═══════════════════════════════════════════════════════════════
 # Main Entry Point
 # ═══════════════════════════════════════════════════════════════
@@ -427,6 +492,10 @@ def detect_card_company(filepath: str, filename: str) -> str:
         return 'lotte'
     elif '삼성' in fn or 'samsung' in fn:
         return 'samsung'
+    elif '국민은행' in fn or 'kb은행' in fn:
+        return 'kookmin_bank'
+    elif '수협' in fn or 'suhyup' in fn:
+        return 'suhyup_bank'
     elif '신한은행' in fn or '송금' in fn:
         return 'shinhan_bank'
     elif '신한카드' in fn or '신한' in fn:
@@ -454,6 +523,8 @@ def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
         'samsung': parse_samsung,
         'shinhan_card': parse_shinhan_card,
         'shinhan_bank': parse_shinhan_bank,
+        'kookmin_bank': lambda fp: _parse_generic_bank(fp, '국민은행'),
+        'suhyup_bank': lambda fp: _parse_generic_bank(fp, '수협은행'),
         'hyundai': parse_hyundai,
     }
 

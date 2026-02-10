@@ -12,6 +12,8 @@ const CARD_COLORS = {
     '삼성카드': { bg: '#dbeafe', text: '#2563eb', border: '#93c5fd' },
     '신한카드': { bg: '#d1fae5', text: '#059669', border: '#6ee7b7' },
     '신한은행': { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' },
+    '국민은행': { bg: '#fef3c7', text: '#b45309', border: '#fcd34d' },
+    '수협은행': { bg: '#cffafe', text: '#0e7490', border: '#67e8f9' },
     '현대카드': { bg: '#f3f4f6', text: '#1f2937', border: '#d1d5db' },
     '기타': { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
 };
