@@ -368,14 +368,23 @@ export default function RevenueManagement() {
 
     // Build vendor grid: vendorId -> { amounts: { day: amount }, ids: { day: expenseId }, channels: { day: channel }, notes: { day: note } }
     const vendorGrid = {};
-    const filteredVendors = tab === 'all' ? vendors : vendors.filter(v => v.category === tab);
+
+    // Populate from data first to know which vendors have matching data
+    const dataForGrid = tab === 'all' ? data
+        : (tab === 'cash' || tab === 'card') ? data.filter(d => d.ui_category === tab)
+            : data.filter(d => d.ui_category === tab || d.category === tab);
+
+    // For cash/card tabs, only show vendors that actually have matching data
+    const relevantVendorIds = (tab === 'cash' || tab === 'card')
+        ? new Set(dataForGrid.map(d => d.vendor_id))
+        : null;
+    const filteredVendors = tab === 'all' ? vendors
+        : (tab === 'cash' || tab === 'card') ? vendors.filter(v => v.category === 'store' && relevantVendorIds.has(v.id))
+            : vendors.filter(v => v.category === tab);
 
     filteredVendors.forEach(v => {
         vendorGrid[v.id] = { amounts: {}, ids: {}, channels: {}, notes: {} };
     });
-
-    // Populate from data
-    const dataForGrid = tab === 'all' ? data : data.filter(d => d.category === tab);
     dataForGrid.forEach(item => {
         const day = new Date(item.date).getDate();
         if (vendorGrid[item.vendor_id]) {
@@ -662,7 +671,7 @@ export default function RevenueManagement() {
                         className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
                         onClick={() => setViewMode('grid')}
                     >
-                        📅 월별전체
+                        📅 월별 상세 내역
                     </button>
                     <button
                         className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
