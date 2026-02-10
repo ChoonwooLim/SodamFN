@@ -559,7 +559,7 @@ export default function RevenueManagement() {
                 ))}
                 {/* 정산금 소계 */}
                 <tr className="grid-subtotal-row">
-                    <td className="grid-subtotal-label">↳ {isDelivery ? '정산금 소계' : `${label} 소계`}</td>
+                    <td className="grid-subtotal-label">↳ {isDelivery ? '정산금 소계' : tab === 'cash' ? '현금매출 소계' : tab === 'card' ? '카드매출 소계' : `${label} 소계`}</td>
                     {days.map(d => (
                         <td key={d} className="grid-subtotal-cell">
                             {calcGroupDayTotal(d) > 0 ? formatNumber(calcGroupDayTotal(d)) : '-'}
