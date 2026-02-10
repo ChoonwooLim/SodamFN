@@ -156,9 +156,17 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
                 by_card["기타"]["amount"] += e.amount
                 by_card["기타"]["count"] += 1
         
-        # Top vendors
+        # Top vendors (개인가계부, 세금과공과, 임차료 제외 - 사업용 매입만)
+        EXCLUDED_CATEGORIES = {'개인가계부', '개인생활비', '세금과공과', '제세공과금', '부가가치세', '사업소득세', '근로소득세', '임차료', '임대료', '임대관리비', '인건비', '퇴직금적립'}
+        # Build vendor_id -> category map for vendor-level filtering
+        vendor_cat_map = {v.id: v.category for v in vendors}
         by_vendor = {}
         for e in expenses:
+            # Check both expense category and vendor category
+            exp_cat = e.category or ''
+            vnd_cat = vendor_cat_map.get(e.vendor_id, '') or ''
+            if exp_cat in EXCLUDED_CATEGORIES or vnd_cat in EXCLUDED_CATEGORIES:
+                continue
             vn = e.vendor_name
             by_vendor.setdefault(vn, {"amount": 0, "count": 0})
             by_vendor[vn]["amount"] += e.amount
