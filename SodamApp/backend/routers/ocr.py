@@ -1,10 +1,12 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from services.ocr_service import OCRService
+from routers.auth import get_admin_user
+from models import User
 
 router = APIRouter()
 
 @router.post("/ocr/upload")
-async def upload_receipt(file: UploadFile = File(...)):
+async def upload_receipt(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     try:
         content = await file.read()
         service = OCRService()

@@ -15,7 +15,15 @@ import config
 import os
 
 # Configuration - Load from environment variables for security
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "sodam_fn_dev_only_change_in_production")
+_DEFAULT_SECRET = "sodam_fn_dev_only_change_in_production"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", _DEFAULT_SECRET)
+if SECRET_KEY == _DEFAULT_SECRET:
+    import warnings
+    warnings.warn(
+        "⚠️  JWT_SECRET_KEY 환경변수가 설정되지 않아 기본값을 사용합니다. "
+        "운영 환경에서는 반드시 안전한 키를 설정하세요!",
+        stacklevel=2,
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
 
@@ -161,8 +169,8 @@ async def signup(user_data: UserCreate):
         raise
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        traceback.print_exc()  # Log internally for debugging
+        raise HTTPException(status_code=500, detail="서버 내부 오류가 발생했습니다. 관리자에게 문의하세요.")
     finally:
         service.close()
 

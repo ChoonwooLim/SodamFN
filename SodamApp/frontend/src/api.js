@@ -6,7 +6,7 @@ const api = axios.create({
     baseURL: `${API_BASE}/api`,
 });
 
-// Add a request interceptor
+// Request interceptor: attach JWT token
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
@@ -16,6 +16,28 @@ api.interceptors.request.use(
         return config;
     },
     (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// Response interceptor: handle 401 (expired / invalid token)
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            // Token expired or invalid — clear session and redirect to login
+            localStorage.removeItem('token');
+            localStorage.removeItem('user_role');
+            localStorage.removeItem('user_name');
+            localStorage.removeItem('user_grade');
+            localStorage.removeItem('profile_image');
+            localStorage.removeItem('staff_id');
+
+            // Only redirect if not already on login page
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+        }
         return Promise.reject(error);
     }
 );

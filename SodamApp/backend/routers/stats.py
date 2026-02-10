@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from routers.auth import get_admin_user
+from models import User
 from services.database_service import DatabaseService
 from services.profit_loss_service import sync_all_expenses
 from pydantic import BaseModel
@@ -32,7 +34,7 @@ def _pl_totals(record):
     return {"revenue": rev, "expense": exp, "profit": profit, "margin": margin}
 
 @router.get("/dashboard")
-def get_dashboard_data(year: int = 2026, month: int = 1):
+def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user)):
     try:
         with Session(engine) as session:
             # --- Current month P/L ---
@@ -104,7 +106,7 @@ def get_dashboard_data(year: int = 2026, month: int = 1):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/revenue")
-def get_revenue_breakdown(year: int = 2026, month: int = 1):
+def get_revenue_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user)):
     """Return revenue breakdown from MonthlyProfitLoss for pie chart."""
     try:
         with Session(engine) as session:
@@ -132,7 +134,7 @@ def get_revenue_breakdown(year: int = 2026, month: int = 1):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/cost")
-def get_cost_breakdown(year: int = 2026, month: int = 1):
+def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user)):
     """Return top 5 vendors by expense from DailyExpense table."""
     try:
         with Session(engine) as session:
@@ -163,7 +165,7 @@ def get_cost_breakdown(year: int = 2026, month: int = 1):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/vendors")
-def get_vendors_list(year: Optional[int] = None, month: Optional[int] = None):
+def get_vendors_list(year: Optional[int] = None, month: Optional[int] = None, _admin: User = Depends(get_admin_user)):
     try:
         with DatabaseService() as service:
             data = service.get_vendors(year=year, month=month)
@@ -179,7 +181,7 @@ class VendorUpdate(BaseModel):
     order_index: int = 0
 
 @router.post("/vendors")
-def update_vendor(payload: VendorUpdate):
+def update_vendor(payload: VendorUpdate, _admin: User = Depends(get_admin_user)):
     try:
         with DatabaseService() as service:
             success = service.update_vendor_full(
@@ -197,7 +199,7 @@ def update_vendor(payload: VendorUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/vendors/{vendor_name}")
-def delete_vendor(vendor_name: str):
+def delete_vendor(vendor_name: str, _admin: User = Depends(get_admin_user)):
     try:
         with DatabaseService() as service:
             success = service.delete_vendor(vendor_name)
@@ -209,7 +211,7 @@ def delete_vendor(vendor_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/vendors/id/{vendor_id}")
-def delete_vendor_by_id(vendor_id: int):
+def delete_vendor_by_id(vendor_id: int, _admin: User = Depends(get_admin_user)):
     try:
         from sqlmodel import Session, select
         from database import engine
@@ -241,7 +243,7 @@ class VendorPatch(BaseModel):
     order_index: int = None
 
 @router.patch("/vendors/{vendor_id}")
-def patch_vendor(vendor_id: int, payload: VendorPatch):
+def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(get_admin_user)):
     """Update vendor by ID - supports name change"""
     try:
         print(f"[PATCH VENDOR] ID: {vendor_id}, Payload: {payload}")
@@ -300,7 +302,7 @@ class VendorMergeRequest(BaseModel):
     source_ids: List[int]
 
 @router.post("/vendors/{target_id}/merge")
-def merge_vendors(target_id: int, payload: VendorMergeRequest):
+def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = Depends(get_admin_user)):
     """Merge multiple vendors into one target vendor.
     
     All DailyExpense records from source vendors will be updated
@@ -358,7 +360,7 @@ def merge_vendors(target_id: int, payload: VendorMergeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/backup/excel")
-def download_backup():
+def download_backup(_admin: User = Depends(get_admin_user)):
     try:
         service = DatabaseService()
         filename = f"sodam_backup_{date.today()}.xlsx"
@@ -374,7 +376,7 @@ class UncategorizedMergeRequest(BaseModel):
     category: str = "other"
 
 @router.post("/vendors/merge-uncategorized")
-def merge_uncategorized_vendors(payload: UncategorizedMergeRequest):
+def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User = Depends(get_admin_user)):
     """
     Merge uncategorized vendors (by name) into a target vendor.
     1. Find or create target vendor.

@@ -1,7 +1,9 @@
 """
 Revenue Management API — DailyExpense-based CRUD for revenue vendors.
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from routers.auth import get_admin_user
+from models import User as AuthUser
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, datetime
@@ -40,7 +42,7 @@ class RevenueUpdate(BaseModel):
 # ─── GET daily revenue list ───
 
 @router.get("/daily")
-def get_daily_revenue(year: int, month: int):
+def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
     """
     Returns all DailyExpense records for revenue vendors in the given month.
     Each record is enriched with vendor name/category/item.
@@ -135,7 +137,7 @@ def get_daily_revenue(year: int, month: int):
 # ─── GET summary stats ───
 
 @router.get("/summary")
-def get_revenue_summary(year: int, month: int):
+def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
     """
     Returns aggregated revenue by category and by day.
     """
@@ -214,7 +216,7 @@ def get_revenue_summary(year: int, month: int):
 # ─── POST create revenue entry ───
 
 @router.post("/daily")
-def create_daily_revenue(payload: RevenueCreate):
+def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_admin_user)):
     """Create a single revenue DailyExpense record."""
     with Session(engine) as session:
         vendor = session.get(Vendor, payload.vendor_id)
@@ -251,7 +253,7 @@ def create_daily_revenue(payload: RevenueCreate):
 # ─── PUT update revenue entry ───
 
 @router.put("/daily/{expense_id}")
-def update_daily_revenue(expense_id: int, payload: RevenueUpdate):
+def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUser = Depends(get_admin_user)):
     """Update a revenue DailyExpense record."""
     with Session(engine) as session:
         expense = session.get(DailyExpense, expense_id)
@@ -287,7 +289,7 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate):
 # ─── DELETE revenue entry ───
 
 @router.delete("/daily/{expense_id}")
-def delete_daily_revenue(expense_id: int):
+def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_user)):
     """Delete a revenue DailyExpense record."""
     with Session(engine) as session:
         expense = session.get(DailyExpense, expense_id)
@@ -308,7 +310,7 @@ def delete_daily_revenue(expense_id: int):
 # ─── GET delivery revenue summary ───
 
 @router.get("/delivery-summary")
-def get_delivery_summary(year: int = 0):
+def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user)):
     """
     Returns delivery app revenue summary.
     If year=0, returns all records. Otherwise filters by year.

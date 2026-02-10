@@ -2,6 +2,8 @@
 Product CRUD API endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
+from routers.auth import get_admin_user
+from models import User as AuthUser
 from sqlmodel import Session, select
 from database import get_session
 from models import Product, Vendor
@@ -32,7 +34,7 @@ class ProductUpdate(BaseModel):
 
 # Get all products for a vendor
 @router.get("")
-def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get_session)):
+def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     try:
         if vendor_id:
             stmt = select(Product).where(Product.vendor_id == vendor_id)
@@ -60,7 +62,7 @@ def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get
 
 # Create a new product
 @router.post("")
-def create_product(data: ProductCreate, session: Session = Depends(get_session)):
+def create_product(data: ProductCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     try:
         # Verify vendor exists
         vendor = session.get(Vendor, data.vendor_id)
@@ -105,7 +107,7 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session))
 
 # Update a product
 @router.put("/{product_id}")
-def update_product(product_id: int, data: ProductUpdate, session: Session = Depends(get_session)):
+def update_product(product_id: int, data: ProductUpdate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     try:
         product = session.get(Product, product_id)
         if not product:
@@ -137,7 +139,7 @@ def update_product(product_id: int, data: ProductUpdate, session: Session = Depe
 
 # Delete a product
 @router.delete("/{product_id}")
-def delete_product(product_id: int, session: Session = Depends(get_session)):
+def delete_product(product_id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     try:
         product = session.get(Product, product_id)
         if not product:

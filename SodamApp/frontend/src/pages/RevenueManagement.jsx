@@ -116,7 +116,7 @@ export default function RevenueManagement() {
     // ─── PL Annual Data Fetch (수입상세) ───
     const fetchPLData = useCallback(async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/profitloss/monthly?year=${plYear}`);
+            const res = await api.get(`/profitloss/monthly`, { params: { year: plYear } });
             setPlData(res.data || []);
         } catch (err) {
             console.error('PL fetch error:', err);
@@ -129,7 +129,7 @@ export default function RevenueManagement() {
 
     const fetchDeliveryAppData = useCallback(async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/revenue/delivery-summary?year=${plYear}`);
+            const res = await api.get(`/revenue/delivery-summary?year=${plYear}`);
             setDeliveryAppData(res.data || {});
         } catch (err) {
             console.error('Delivery fetch error:', err);
@@ -219,7 +219,7 @@ export default function RevenueManagement() {
                 const isDeliveryApp = typeof editingId === 'string' && editingId.startsWith('rev_');
                 if (isDeliveryApp) {
                     const realId = editingId.replace('rev_', '');
-                    await axios.put(`${API_URL}/api/profitloss/delivery/${realId}`, {
+                    await api.put(`/profitloss/delivery/${realId}`, {
                         date: form.date,
                         amount: Number(form.amount),
                         description: form.note || null,
@@ -249,7 +249,7 @@ export default function RevenueManagement() {
             const isDeliveryApp = typeof id === 'string' && id.startsWith('rev_');
             if (isDeliveryApp) {
                 const realId = id.replace('rev_', '');
-                await axios.delete(`${API_URL}/api/profitloss/delivery/${realId}`);
+                await api.delete(`/profitloss/delivery/${realId}`);
             } else {
                 await api.delete(`/revenue/daily/${id}`);
             }
@@ -435,11 +435,11 @@ export default function RevenueManagement() {
                 const realId = id.replace('rev_', '');
                 const channel = vendorGrid[vendorId]?.channels[day] || 'Coupang';
                 if (amount > 0) {
-                    await axios.put(`${API_URL}/api/profitloss/delivery/${realId}`, {
+                    await api.put(`/profitloss/delivery/${realId}`, {
                         amount, date: dateStr, channel, description: null
                     });
                 } else {
-                    await axios.delete(`${API_URL}/api/profitloss/delivery/${realId}`);
+                    await api.delete(`/profitloss/delivery/${realId}`);
                 }
             } else if (id && amount > 0) {
                 await api.put(`/revenue/daily/${id}`, { amount, date: dateStr, vendor_id: vendorId });

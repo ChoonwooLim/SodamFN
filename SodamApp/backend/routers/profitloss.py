@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from routers.auth import get_admin_user
+from models import User as AuthUser
 from sqlmodel import Session, select
 from database import get_session
 from models import MonthlyProfitLoss, DailyExpense, Revenue, Vendor
@@ -81,7 +83,7 @@ class DeliveryRevenueCreate(BaseModel):
 # --- Monthly P/L Endpoints ---
 
 @router.post("/sync-labor/{year}/{month}")
-def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(get_session)):
+def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """
     Manually sync labor costs from Payroll table to MonthlyProfitLoss.
     Useful for backfilling existing payroll data.
@@ -94,7 +96,7 @@ def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(g
     }
 
 @router.post("/sync-expenses/{year}/{month}")
-def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get_session)):
+def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """
     Sync all expenses from DailyExpense by vendor category to MonthlyProfitLoss.
     Aggregates expenses based on vendor.category mapping to P/L fields.
@@ -107,7 +109,7 @@ def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get
     }
 
 @router.get("/monthly")
-def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depends(get_session)):
+def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Get all monthly P/L records, optionally filtered by year"""
     query = select(MonthlyProfitLoss)
     if year:
@@ -134,7 +136,7 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
     return output
 
 @router.get("/monthly/{year}/{month}")
-def get_monthly_profitloss_single(year: int, month: int, session: Session = Depends(get_session)):
+def get_monthly_profitloss_single(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Get a specific month's P/L record"""
     result = session.exec(
         select(MonthlyProfitLoss)
@@ -145,7 +147,7 @@ def get_monthly_profitloss_single(year: int, month: int, session: Session = Depe
     return result
 
 @router.post("/monthly")
-def create_monthly_profitloss(data: MonthlyPLCreate, session: Session = Depends(get_session)):
+def create_monthly_profitloss(data: MonthlyPLCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Create or update a monthly P/L record"""
     existing = session.exec(
         select(MonthlyProfitLoss)
@@ -167,7 +169,7 @@ def create_monthly_profitloss(data: MonthlyPLCreate, session: Session = Depends(
         return new_record
 
 @router.put("/monthly/{id}")
-def update_monthly_profitloss(id: int, data: MonthlyPLUpdate, session: Session = Depends(get_session)):
+def update_monthly_profitloss(id: int, data: MonthlyPLUpdate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Update a monthly P/L record"""
     record = session.get(MonthlyProfitLoss, id)
     if not record:
@@ -183,7 +185,7 @@ def update_monthly_profitloss(id: int, data: MonthlyPLUpdate, session: Session =
     return record
 
 @router.delete("/monthly/{id}")
-def delete_monthly_profitloss(id: int, session: Session = Depends(get_session)):
+def delete_monthly_profitloss(id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Delete a monthly P/L record"""
     record = session.get(MonthlyProfitLoss, id)
     if not record:
@@ -195,7 +197,7 @@ def delete_monthly_profitloss(id: int, session: Session = Depends(get_session)):
 # --- Daily Expense Endpoints ---
 
 @router.get("/expenses/{year}/{month}")
-def get_daily_expenses(year: int, month: int, session: Session = Depends(get_session)):
+def get_daily_expenses(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Get daily expenses for a specific month (revenue vendors excluded)"""
     from models import Vendor
     
@@ -233,7 +235,7 @@ def get_daily_expenses(year: int, month: int, session: Session = Depends(get_ses
     return output
 
 @router.post("/expenses")
-def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(get_session)):
+def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Create a new daily expense entry"""
     # Auto-link to Vendor by vendor_name
     if data.vendor_name:
@@ -264,7 +266,7 @@ def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(ge
     return new_expense
 
 @router.put("/expenses/{id}")
-def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = Depends(get_session)):
+def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Update a daily expense entry"""
     record = session.get(DailyExpense, id)
     if not record:
@@ -298,7 +300,7 @@ def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = D
     return record
 
 @router.delete("/expenses/{id}")
-def delete_daily_expense(id: int, session: Session = Depends(get_session)):
+def delete_daily_expense(id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Delete a daily expense entry"""
     record = session.get(DailyExpense, id)
     if not record:
@@ -310,7 +312,7 @@ def delete_daily_expense(id: int, session: Session = Depends(get_session)):
 # --- Delivery App Revenue Endpoints (쿠팡/배민/요기요/땡겨요) ---
 
 @router.get("/delivery/{channel}/{year}")
-def get_delivery_revenue(channel: str, year: int, session: Session = Depends(get_session)):
+def get_delivery_revenue(channel: str, year: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Get delivery app revenue for a specific channel and year"""
     start_date = datetime.date(year, 1, 1)
     end_date = datetime.date(year + 1, 1, 1)
@@ -324,7 +326,7 @@ def get_delivery_revenue(channel: str, year: int, session: Session = Depends(get
     return results
 
 @router.get("/delivery/{channel}/{year}/{month}")
-def get_delivery_revenue_monthly(channel: str, year: int, month: int, session: Session = Depends(get_session)):
+def get_delivery_revenue_monthly(channel: str, year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Get delivery app revenue for a specific channel, year and month"""
     start_date = datetime.date(year, month, 1)
     if month == 12:
@@ -341,7 +343,7 @@ def get_delivery_revenue_monthly(channel: str, year: int, month: int, session: S
     return results
 
 @router.post("/delivery")
-def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depends(get_session)):
+def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Create a new delivery revenue entry"""
     new_revenue = Revenue(**data.model_dump())
     session.add(new_revenue)
@@ -354,7 +356,7 @@ def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depe
     return new_revenue
 
 @router.put("/delivery/{id}")
-def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Session = Depends(get_session)):
+def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Update a delivery revenue entry"""
     record = session.get(Revenue, id)
     if not record:
@@ -373,7 +375,7 @@ def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Sessi
     return record
 
 @router.delete("/delivery/{id}")
-def delete_delivery_revenue(id: int, session: Session = Depends(get_session)):
+def delete_delivery_revenue(id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
     """Delete a delivery revenue entry"""
     record = session.get(Revenue, id)
     if not record:

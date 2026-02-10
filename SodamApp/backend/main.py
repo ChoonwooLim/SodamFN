@@ -1,30 +1,47 @@
 import sys
 import os
-from fastapi import FastAPI
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings, finance, profitloss, products, revenue
+from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings, finance, profitloss, products, revenue, purchase
 from init_db import init_db
 
 from fastapi.staticfiles import StaticFiles
 
 from fastapi.middleware.gzip import GZipMiddleware
 
-app = FastAPI(title="Sodam Profit API")
+logger = logging.getLogger("sodam")
+
+# --- Lifespan (replaces deprecated on_event) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    os.makedirs("uploads", exist_ok=True)
+    yield
+    # Shutdown (cleanup if needed)
+
+app = FastAPI(title="Sodam Profit API", lifespan=lifespan)
+
+# --- Global Exception Handler ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "서버 내부 오류가 발생했습니다. 관리자에게 문의하세요."}
+    )
 
 # Enable Gzip compression for responses > 1KB
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
-
 # Ensure uploads directory exists
-os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Allow CORS for local development and production
-import os
 FRONTEND_URL = os.getenv("FRONTEND_URL", "")
 
 cors_origins = [
@@ -70,6 +87,7 @@ app.include_router(settings.router)
 app.include_router(profitloss.router)
 app.include_router(products.router)
 app.include_router(revenue.router, prefix="/api/revenue")
+app.include_router(purchase.router)
 
 @app.get("/")
 def read_root():

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import api from '../api';
 import './ProfitLoss.css';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; // Keep for now if needed, but api client handles base URL
 
 const REVENUE_FIELDS = [
     { key: 'revenue_store', label: '매장매출', group: 'revenue-store' },
@@ -87,7 +87,7 @@ export default function ProfitLoss() {
     // Fetch global vendor list from API and merge with localStorage order
     const fetchGlobalVendors = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/vendors`);
+            const res = await api.get(`/vendors`);
             if (res.data.status === 'success') {
                 const apiVendors = res.data.data;
 
@@ -129,7 +129,7 @@ export default function ProfitLoss() {
 
     const fetchData = async () => {
         try {
-            const res = await axios.get(`${API_URL}/api/profitloss/monthly?year=${year}`);
+            const res = await api.get(`/profitloss/monthly?year=${year}`);
             setData(res.data);
         } catch (err) {
             console.error('Error fetching P/L data:', err);
@@ -140,7 +140,7 @@ export default function ProfitLoss() {
 
     const fetchMonthlyExpenses = async (month) => {
         try {
-            const res = await axios.get(`${API_URL}/api/profitloss/expenses/${year}/${month}`);
+            const res = await api.get(`/profitloss/expenses/${year}/${month}`);
             setMonthlyExpenses(prev => ({ ...prev, [month]: res.data }));
         } catch (err) {
             console.error('Error fetching monthly expenses:', err);
@@ -165,12 +165,12 @@ export default function ProfitLoss() {
         try {
             if (monthData.id) {
                 // Update existing
-                await axios.put(`${API_URL}/api/profitloss/monthly/${monthData.id}`, {
+                await api.put(`/profitloss/monthly/${monthData.id}`, {
                     [field]: parseInt(editValue) || 0
                 });
             } else {
                 // Create new
-                await axios.post(`${API_URL}/api/profitloss/monthly`, {
+                await api.post(`/profitloss/monthly`, {
                     year,
                     month,
                     [field]: parseInt(editValue) || 0
@@ -493,11 +493,11 @@ export default function ProfitLoss() {
 
             try {
                 if (id && amount > 0) {
-                    await axios.put(`${API_URL}/api/profitloss/expenses/${id}`, { date, vendor_name: vendor, amount });
+                    await api.put(`/profitloss/expenses/${id}`, { date, vendor_name: vendor, amount });
                 } else if (!id && amount > 0) {
-                    await axios.post(`${API_URL}/api/profitloss/expenses`, { date, vendor_name: vendor, amount });
+                    await api.post(`/profitloss/expenses`, { date, vendor_name: vendor, amount });
                 } else if (id && amount === 0) {
-                    await axios.delete(`${API_URL}/api/profitloss/expenses/${id}`);
+                    await api.delete(`/profitloss/expenses/${id}`);
                 }
                 fetchMonthlyExpenses(m);
             } catch (err) {

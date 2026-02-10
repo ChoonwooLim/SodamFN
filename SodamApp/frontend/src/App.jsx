@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy Load Pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -19,6 +20,7 @@ const StaffDashboard = React.lazy(() => import('./pages/StaffDashboard'));
 const CardSales = React.lazy(() => import('./pages/CardSales'));
 const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
+const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -75,38 +77,44 @@ const Layout = ({ children }) => {
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
+      <ErrorBoundary>
+        <Layout>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/signup" element={<SignupPage />} />
 
-            <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+              <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
 
-            {/* SPLIT INPUT ROUTES */}
-            <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
+              {/* SPLIT INPUT ROUTES */}
+              <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
-            {/* FINANCE */}
-            <Route path="/finance/card-sales" element={<ProtectedRoute adminOnly><CardSales /></ProtectedRoute>} />
-            <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
-            <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
+              {/* FINANCE */}
+              <Route path="/finance/card-sales" element={<ProtectedRoute adminOnly><CardSales /></ProtectedRoute>} />
+              <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
+              <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
+              <Route path="/purchase" element={<ProtectedRoute adminOnly><PurchaseManagement /></ProtectedRoute>} />
 
-            {/* BACKWARD COMPATIBILITY */}
-            <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
+              {/* BACKWARD COMPATIBILITY */}
+              <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
 
-            <Route path="/confirm" element={<ProtectedRoute adminOnly><ExpenseConfirm /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
-            <Route path="/vendor-settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
-            <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
-            <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
+              <Route path="/confirm" element={<ProtectedRoute adminOnly><ExpenseConfirm /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
+              <Route path="/vendor-settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
+              <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
+              <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
 
-            {/* STAFF ROUTES */}
-            <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
-            <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
-            <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />
-          </Routes>
-        </Suspense>
-      </Layout>
+              {/* STAFF ROUTES */}
+              <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
+              <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
+              <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />
+
+              {/* 404 catch-all */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

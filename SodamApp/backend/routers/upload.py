@@ -1,9 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from services.ocr_service import OCRService
 from services.excel_service import ExcelService
-from models import Expense, Revenue, Session, create_engine, SQLModel
+from models import Expense, Revenue, Session, create_engine, SQLModel, User
 from database import engine 
 from sqlmodel import Session
+from routers.auth import get_admin_user
 import datetime
 
 router = APIRouter()
@@ -11,7 +12,7 @@ router = APIRouter()
 # --- EXPENSE ENDPOINTS ---
 
 @router.post("/upload/image/expense")
-async def upload_expense_image(file: UploadFile = File(...)):
+async def upload_expense_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     """
     Processes an image upload for receipt OCR (Expense).
     """
@@ -24,7 +25,7 @@ async def upload_expense_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/expense")
-async def upload_expense_excel(file: UploadFile = File(...)):
+async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     """
     Processes an excel upload and bulk inserts to DailyExpense.
     Also auto-creates/links vendors and syncs P/L.
@@ -144,7 +145,7 @@ async def upload_expense_excel(file: UploadFile = File(...)):
 # --- HISTORY & ROLLBACK ENDPOINTS ---
 
 @router.get("/uploads/history")
-def get_upload_history(type: str = None):
+def get_upload_history(type: str = None, _admin: User = Depends(get_admin_user)):
     from models import UploadHistory
     from sqlmodel import select, desc
     
@@ -156,7 +157,7 @@ def get_upload_history(type: str = None):
         return results
 
 @router.delete("/uploads/{upload_id}")
-def rollback_upload(upload_id: int):
+def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
     """
     Rollback an upload by ID.
     Deletes all expenses created by this upload.
@@ -237,7 +238,7 @@ def rollback_upload(upload_id: int):
 # --- REVENUE ENDPOINTS ---
 
 @router.post("/upload/image/revenue")
-async def upload_revenue_image(file: UploadFile = File(...)):
+async def upload_revenue_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     """
     Processes an image upload for REVENUE (Mock).
     Maybe extracting daily sales report photo?
@@ -261,7 +262,7 @@ async def upload_revenue_image(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/revenue")
-async def upload_revenue_excel(file: UploadFile = File(...)):
+async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     """
     Smart revenue Excel upload.
     Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약

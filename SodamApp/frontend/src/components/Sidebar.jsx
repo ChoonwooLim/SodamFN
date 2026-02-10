@@ -26,7 +26,7 @@ export default function Sidebar() {
         ? [
             { icon: LayoutDashboard, label: '대시보드', path: '/' },
             { icon: BarChart3, label: '매출 관리', path: '/revenue' },
-            { icon: ShoppingBag, label: '매입 입력', path: '/input/expense' },
+            { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
             { icon: Receipt, label: '지출 내역', path: '/confirm' },
