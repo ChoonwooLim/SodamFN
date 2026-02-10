@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../api';
 import './PurchaseManagement.css';
 
@@ -17,13 +17,71 @@ const CARD_COLORS = {
 };
 
 const EXPENSE_CATEGORIES = [
-    { id: '재료비', label: '재료비', icon: '🥬', color: '#10b981' },
-    { id: '제세공과금', label: '제세공과금', icon: '🏛️', color: '#6366f1' },
-    { id: '임대관리비', label: '임대관리비', icon: '🏠', color: '#8b5cf6' },
-    { id: '개인생활비', label: '개인생활비', icon: '👤', color: '#f59e0b' },
+    { id: '원재료비', label: '원재료비', icon: '🥬', color: '#10b981' },
+    { id: '소모품비', label: '소모품비', icon: '📦', color: '#059669' },
+    { id: '수도광열비', label: '수도광열비', icon: '💡', color: '#8b5cf6' },
+    { id: '임차료', label: '임차료', icon: '🏠', color: '#7c3aed' },
+    { id: '수선비', label: '수선비', icon: '🔧', color: '#6366f1' },
+    { id: '감가상각비', label: '감가상각비', icon: '⚙️', color: '#0ea5e9' },
+    { id: '세금과공과', label: '세금과공과', icon: '🏛️', color: '#14b8a6' },
+    { id: '보험료', label: '보험료', icon: '🛡️', color: '#f97316' },
+    { id: '인건비', label: '인건비', icon: '👷', color: '#0d9488' },
     { id: '카드수수료', label: '카드수수료', icon: '💳', color: '#ef4444' },
-    { id: '기타비용', label: '기타비용', icon: '📦', color: '#64748b' },
+    { id: '기타경비', label: '기타경비', icon: '📋', color: '#64748b' },
+    { id: '개인가계부', label: '개인가계부', icon: '👤', color: '#f59e0b' },
 ];
+
+// 카테고리 선택 도우미 데이터 (한국 개인사업자 회계기준)
+const CATEGORY_HELP_DATA = {
+    '원재료비': {
+        desc: '식자재를 포함한 원재료 구입비',
+        items: ['식재료 (야채, 육류, 수산물)', '반가공식품 (얕념류, 튜브식품)', '양념/소스/조미료'],
+    },
+    '소모품비': {
+        desc: '단기 소모성 물품 구입비',
+        items: ['포장재 · 비닐봉투 · 박스', '일회용품 (젖가락, 냅킨)', '세제 · 유리세정제 · 라텍스 장갑'],
+    },
+    '수도광열비': {
+        desc: '전기 · 가스 · 수도 요금',
+        items: ['전기요금 (한전)', '도시가스/LPG요금', '상하수도 요금'],
+    },
+    '임차료': {
+        desc: '가게 임대료 + 관리비 통합',
+        items: ['월세 (임대료)', '공용관리비', '주차장 임대료'],
+    },
+    '수선비': {
+        desc: '시설 · 장비 수리비',
+        items: ['주방장비 수리', '냉건/냉동고 수리', '인테리어 보수'],
+    },
+    '감가상각비': {
+        desc: '대형 장비 · 시설 구입액의 기간 안분',
+        items: ['업소용 기계장치', '인테리어 공사비', 'POS 단말기 · 카드단말기 구입'],
+    },
+    '세금과공과': {
+        desc: '볕인세 · 소득세 · 등 세금 통합',
+        items: ['부가가치세 (세금계산서)', '종합소득세 (사업소득세)', '주민세 · 지방세'],
+    },
+    '보험료': {
+        desc: '각종 보험료',
+        items: ['화재보험 · 배상책임보험', '상가임대인 보험', '영업배상책임보험'],
+    },
+    '인건비': {
+        desc: '직원 급여 및 4대보험 사업주 부담분',
+        items: ['직원 급여 · 상여금', '4대보험 (국민연금/건강보험/고용보험/산재보험)', '퇴직금 · 퇴직연금'],
+    },
+    '카드수수료': {
+        desc: 'PG · VAN 카드 결제 수수료',
+        items: ['신용카드 수수료', 'PG수수료 (배달앱)', 'VAN 및 단말기 이용료'],
+    },
+    '기타경비': {
+        desc: '위 카테고리에 해당하지 않는 기타 경비',
+        items: ['이용료 · 수수료 · 배달비', '통신비 (인터넷/전화)', '광고선전비 · 교육비'],
+    },
+    '개인가계부': {
+        desc: '사업외 개인적 지출 (손익계산서 미포함)',
+        items: ['생활비 · 카드값', '전자제품 · 마트 장보기', '자녀 교육비 · 의료비'],
+    },
+};
 
 function formatNumber(n) {
     if (n == null) return '0';
@@ -53,11 +111,13 @@ function getCardCompany(note) {
 export default function PurchaseManagement() {
     const navigate = useNavigate();
     const now = new Date();
-    const [year, setYear] = useState(now.getFullYear());
-    const [month, setMonth] = useState(now.getMonth() + 1);
+    // 이전 달을 기본으로 표시 (월말이 지나야 정확한 데이터가 완성되므로)
+    const defaultDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const [year, setYear] = useState(defaultDate.getFullYear());
+    const [month, setMonth] = useState(defaultDate.getMonth() + 1);
     const [viewMode, setViewMode] = useState('dashboard'); // dashboard | list | household | upload
     const [data, setData] = useState([]);
-    const [summary, setSummary] = useState({ total: 0, count: 0, by_category: {}, by_card_company: {}, top_vendors: [] });
+    const [summary, setSummary] = useState({ total: 0, count: 0, by_category: {}, by_card_company: {}, by_bank_transfer: {}, top_vendors: [] });
     const [loading, setLoading] = useState(false);
 
     // Filters
@@ -68,7 +128,10 @@ export default function PurchaseManagement() {
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState('add');
     const [editingId, setEditingId] = useState(null);
-    const [form, setForm] = useState({ vendor_name: '', date: '', amount: '', category: '기타비용', note: '' });
+    const [form, setForm] = useState({ vendor_name: '', date: '', amount: '', category: '기타경비', note: '' });
+
+    // Category Helper
+    const [showCategoryHelper, setShowCategoryHelper] = useState(false);
 
     // Upload
     const [uploadLoading, setUploadLoading] = useState(false);
@@ -89,13 +152,25 @@ export default function PurchaseManagement() {
             ]);
             setData(dailyRes.data.records || []);
             setSelectedIds(new Set());
-            setSummary(summaryRes.data || { total: 0, count: 0, by_category: {}, by_card_company: {}, top_vendors: [] });
+            setSummary(summaryRes.data || { total: 0, count: 0, by_category: {}, by_card_company: {}, by_bank_transfer: {}, top_vendors: [] });
         } catch (err) {
             console.error('Purchase fetch error:', err);
         } finally {
             setLoading(false);
         }
     }, [year, month]);
+
+    // ─── Collapse State ───
+    const [collapsedDates, setCollapsedDates] = useState(new Set());
+
+    const toggleDateCollapse = (dateStr) => {
+        setCollapsedDates(prev => {
+            const next = new Set(prev);
+            if (next.has(dateStr)) next.delete(dateStr);
+            else next.add(dateStr);
+            return next;
+        });
+    };
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -110,12 +185,12 @@ export default function PurchaseManagement() {
     };
 
     // ─── Filtered & grouped data ───
-    // 'household' view only shows '개인생활비'
-    // 'list' view shows everything EXCEPT '개인생활비'
+    // 'household' view only shows '개인가계부'
+    // 'list' view shows everything EXCEPT '개인가계부'
     const isHouseholdMode = viewMode === 'household';
 
     const filteredData = data.filter(d => {
-        const isPersonal = d.category === '개인생활비';
+        const isPersonal = d.category === '개인가계부';
 
         // Mode filter
         if (isHouseholdMode && !isPersonal) return false;
@@ -134,14 +209,14 @@ export default function PurchaseManagement() {
     const sortedDates = Object.keys(groupedByDate).sort((a, b) => b.localeCompare(a));
 
     // Separate sums
-    const personalTotal = (summary.by_category?.['개인생활비']?.amount || 0);
+    const personalTotal = (summary.by_category?.['개인가계부']?.amount || 0);
     const businessTotal = (summary.total || 0) - personalTotal;
 
     // ─── CRUD ───
     const openAddModal = () => {
         const today = `${year}-${String(month).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
         // Default category based on view mode
-        const defaultCat = isHouseholdMode ? '개인생활비' : '기타비용';
+        const defaultCat = isHouseholdMode ? '개인가계부' : '기타경비';
         setForm({ vendor_name: '', date: today, amount: '', category: defaultCat, note: '' });
         setModalMode('add');
         setEditingId(null);
@@ -205,8 +280,8 @@ export default function PurchaseManagement() {
 
     // Quick Toggle: Business <-> Personal
     const toggleCategory = async (record) => {
-        const isPersonal = record.category === '개인생활비';
-        const newCategory = isPersonal ? '기타비용' : '개인생활비';
+        const isPersonal = record.category === '개인가계부';
+        const newCategory = isPersonal ? '기타경비' : '개인가계부';
         const actionName = isPersonal ? '사업비용으로' : '개인비용으로';
 
         if (!window.confirm(`'${record.vendor_name}' ${formatNumber(record.amount)}원을 ${actionName} 변경하시겠습니까?\n(동일 업체명 항목도 함께 변경됩니다)`)) return;
@@ -323,6 +398,7 @@ export default function PurchaseManagement() {
     const totalCount = summary.count || 0;
     const categoryData = summary.by_category || {};
     const cardData = summary.by_card_company || {};
+    const bankData = summary.by_bank_transfer || {};
     const topVendors = summary.top_vendors || [];
 
     return (
@@ -350,10 +426,10 @@ export default function PurchaseManagement() {
                 <div className="purchase-summary-card total">
                     <div className="card-label">💰 사업용 총 매입</div>
                     <div className="card-value">{formatNumber(businessTotal)}원</div>
-                    <div className="card-sub">개인생활비 제외</div>
+                    <div className="card-sub">개인가계부 제외</div>
                 </div>
                 <div className="purchase-summary-card personal" onClick={() => setViewMode('household')}>
-                    <div className="card-label">👤 개인생활비 (가계부)</div>
+                    <div className="card-label">👤 개인가계부</div>
                     <div className="card-value">{formatNumber(personalTotal)}원</div>
                     <div className="card-sub">별도 관리됨</div>
                 </div>
@@ -417,20 +493,44 @@ export default function PurchaseManagement() {
                         </div>
                     </div>
 
-                    {/* Card Company Breakdown */}
-                    <div className="dashboard-section">
-                        <h3>💳 카드사별 매입 현황</h3>
-                        <div className="card-company-grid">
-                            {Object.entries(cardData).sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
-                                const colors = CARD_COLORS[card] || CARD_COLORS['기타'];
-                                return (
-                                    <div className="card-company-item" key={card} style={{ background: colors.bg, borderColor: colors.border }}>
-                                        <div className="cc-name" style={{ color: colors.text }}>{card || '기타'}</div>
-                                        <div className="cc-amount">{formatNumber(info.amount)}원</div>
-                                        <div className="cc-count">{info.count}건</div>
-                                    </div>
-                                );
-                            })}
+                    {/* Card + Bank side by side */}
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                        {/* Card Company Breakdown */}
+                        <div className="dashboard-section" style={{ flex: 1, minWidth: 0 }}>
+                            <h3>💳 카드사별 매입 현황</h3>
+                            <div className="card-company-grid">
+                                {Object.entries(cardData).filter(([k]) => k !== '기타').sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
+                                    const colors = CARD_COLORS[card] || CARD_COLORS['기타'];
+                                    return (
+                                        <div className="card-company-item" key={card} style={{ background: colors.bg, borderColor: colors.border }}>
+                                            <div className="cc-name" style={{ color: colors.text }}>{card}</div>
+                                            <div className="cc-amount">{formatNumber(info.amount)}원</div>
+                                            <div className="cc-count">{info.count}건</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Bank Transfer Breakdown */}
+                        <div className="dashboard-section" style={{ flex: 1, minWidth: 0 }}>
+                            <h3>🏦 계좌이체 현황</h3>
+                            <div className="card-company-grid">
+                                {Object.keys(bankData).length > 0 ? (
+                                    Object.entries(bankData).sort((a, b) => b[1].amount - a[1].amount).map(([bank, info]) => {
+                                        const colors = CARD_COLORS[bank] || { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' };
+                                        return (
+                                            <div className="card-company-item" key={bank} style={{ background: colors.bg, borderColor: colors.border }}>
+                                                <div className="cc-name" style={{ color: colors.text }}>{bank}</div>
+                                                <div className="cc-amount">{formatNumber(info.amount)}원</div>
+                                                <div className="cc-count">{info.count}건</div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div style={{ color: '#9ca3af', padding: '20px', textAlign: 'center' }}>계좌이체 내역 없음</div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -475,7 +575,7 @@ export default function PurchaseManagement() {
                                     onChange={e => setFilterCategory(e.target.value)}
                                 >
                                     <option value="all">전체 카테고리</option>
-                                    {EXPENSE_CATEGORIES.filter(c => c.id !== '개인생활비').map(c => (
+                                    {EXPENSE_CATEGORIES.filter(c => c.id !== '개인가계부').map(c => (
                                         <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
                                     ))}
                                 </select>
@@ -483,7 +583,7 @@ export default function PurchaseManagement() {
 
                             {isHouseholdMode && (
                                 <div className="household-badge">
-                                    📒 가계부 모드 (개인생활비만 표시)
+                                    📒 가계부 모드 (개인가계부만 표시)
                                 </div>
                             )}
                         </div>
@@ -526,60 +626,65 @@ export default function PurchaseManagement() {
                                                     ? <CheckSquare size={16} className="checked" />
                                                     : <Square size={16} />}
                                             </button>
-                                            <span className="day-date">📅 {month}/{dayNum} ({weekday})</span>
+                                            <span className="day-date" onClick={() => toggleDateCollapse(dateStr)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                {collapsedDates.has(dateStr) ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                                📅 {month}/{dayNum} ({weekday})
+                                            </span>
                                             <span className="day-count">{items.length}건</span>
                                             <span className="day-total">{formatNumber(dayTotal)}원</span>
                                         </div>
-                                        <div className="day-items">
-                                            {items.map(item => {
-                                                const cardCompany = getCardCompany(item.note);
-                                                const cardColor = getCardColor(item.note);
-                                                const catInfo = EXPENSE_CATEGORIES.find(c => c.id === item.category) || EXPENSE_CATEGORIES[5];
+                                        {!collapsedDates.has(dateStr) && (
+                                            <div className="day-items">
+                                                {items.map(item => {
+                                                    const cardCompany = getCardCompany(item.note);
+                                                    const cardColor = getCardColor(item.note);
+                                                    const catInfo = EXPENSE_CATEGORIES.find(c => c.id === item.category) || EXPENSE_CATEGORIES[5];
 
-                                                return (
-                                                    <div className={`purchase-item ${selectedIds.has(item.id) ? 'selected' : ''}`} key={item.id}>
-                                                        <label className="item-checkbox" onClick={e => e.stopPropagation()}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedIds.has(item.id)}
-                                                                onChange={() => toggleSelect(item.id)}
-                                                            />
-                                                        </label>
-                                                        <div className="item-left">
-                                                            <div className="item-vendor">{item.vendor_name}</div>
-                                                            <div className="item-meta">
-                                                                {cardCompany && (
-                                                                    <span className="card-badge" style={{ background: cardColor.bg, color: cardColor.text, borderColor: cardColor.border }}>
-                                                                        {cardCompany}
+                                                    return (
+                                                        <div className={`purchase-item ${selectedIds.has(item.id) ? 'selected' : ''}`} key={item.id}>
+                                                            <label className="item-checkbox" onClick={e => e.stopPropagation()}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedIds.has(item.id)}
+                                                                    onChange={() => toggleSelect(item.id)}
+                                                                />
+                                                            </label>
+                                                            <div className="item-left">
+                                                                <div className="item-vendor">{item.vendor_name}</div>
+                                                                <div className="item-meta">
+                                                                    {cardCompany && (
+                                                                        <span className="card-badge" style={{ background: cardColor.bg, color: cardColor.text, borderColor: cardColor.border }}>
+                                                                            {cardCompany}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="cat-badge" style={{ color: catInfo.color }}>
+                                                                        {catInfo.icon} {catInfo.label}
                                                                     </span>
-                                                                )}
-                                                                <span className="cat-badge" style={{ color: catInfo.color }}>
-                                                                    {catInfo.icon} {catInfo.label}
-                                                                </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="item-right">
+                                                                <div className="item-amount">{formatNumber(item.amount)}원</div>
+                                                                <div className="item-actions">
+                                                                    <button
+                                                                        className="action-btn toggle-type"
+                                                                        onClick={() => toggleCategory(item)}
+                                                                        title={isHouseholdMode ? "사업비용으로 변경" : "개인비용으로 변경"}
+                                                                    >
+                                                                        <ArrowRightLeft size={14} />
+                                                                    </button>
+                                                                    <button className="action-btn" onClick={() => openEditModal(item)} title="수정">
+                                                                        <Edit3 size={14} />
+                                                                    </button>
+                                                                    <button className="action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="item-right">
-                                                            <div className="item-amount">{formatNumber(item.amount)}원</div>
-                                                            <div className="item-actions">
-                                                                <button
-                                                                    className="action-btn toggle-type"
-                                                                    onClick={() => toggleCategory(item)}
-                                                                    title={isHouseholdMode ? "사업비용으로 변경" : "개인비용으로 변경"}
-                                                                >
-                                                                    <ArrowRightLeft size={14} />
-                                                                </button>
-                                                                <button className="action-btn" onClick={() => openEditModal(item)} title="수정">
-                                                                    <Edit3 size={14} />
-                                                                </button>
-                                                                <button className="action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -607,7 +712,7 @@ export default function PurchaseManagement() {
                                     ))}
                                 </select>
                                 {!isHouseholdMode && (
-                                    <button className="batch-btn personal" onClick={() => handleBatchCategory('개인생활비')}>
+                                    <button className="batch-btn personal" onClick={() => handleBatchCategory('개인가계부')}>
                                         👤 개인비용 전환
                                     </button>
                                 )}
@@ -744,7 +849,17 @@ export default function PurchaseManagement() {
                                 />
                             </div>
                             <div className="form-group">
-                                <label>카테고리</label>
+                                <label>
+                                    카테고리
+                                    <button
+                                        type="button"
+                                        className="category-helper-btn"
+                                        onClick={() => setShowCategoryHelper(true)}
+                                        title="카테고리 선택 도우미"
+                                    >
+                                        ❓ 선택도우미
+                                    </button>
+                                </label>
                                 <div className="category-chips">
                                     {EXPENSE_CATEGORIES.map(c => (
                                         <button
@@ -774,6 +889,51 @@ export default function PurchaseManagement() {
                             <button className="btn-save" onClick={handleSubmit}>
                                 {modalMode === 'add' ? '추가' : '저장'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* 카테고리 선택 도우미 모달 */}
+            {showCategoryHelper && (
+                <div className="modal-overlay" onClick={() => setShowCategoryHelper(false)} style={{ zIndex: 1100 }}>
+                    <div className="modal-content category-helper-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, maxHeight: '80vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3>❓ 카테고리 선택 도우미</h3>
+                            <button className="modal-close" onClick={() => setShowCategoryHelper(false)}>×</button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '12px 16px' }}>
+                            <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
+                                한국 개인사업자 회계기준에 맞춤 카테고리입니다. 카테고리를 클릭하면 선택됩니다.
+                            </p>
+                            {EXPENSE_CATEGORIES.map(cat => {
+                                const help = CATEGORY_HELP_DATA[cat.id];
+                                if (!help) return null;
+                                return (
+                                    <div
+                                        key={cat.id}
+                                        className="category-helper-item"
+                                        onClick={() => { setForm(f => ({ ...f, category: cat.id })); setShowCategoryHelper(false); }}
+                                        style={{
+                                            padding: '10px 14px', marginBottom: 8, borderRadius: 10,
+                                            background: form.category === cat.id ? `${cat.color}18` : '#1e293b',
+                                            border: `1px solid ${form.category === cat.id ? cat.color : '#334155'}`,
+                                            cursor: 'pointer', transition: 'all 0.15s',
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                                            {cat.icon} {cat.label}
+                                            <span style={{ fontWeight: 400, fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{help.desc}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                            {help.items.map((item, i) => (
+                                                <span key={i} style={{ fontSize: 11, color: '#64748b', background: '#0f172a', padding: '2px 8px', borderRadius: 6 }}>
+                                                    {item}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

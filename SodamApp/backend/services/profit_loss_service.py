@@ -3,20 +3,34 @@ from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, Revenue, De
 import datetime
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
-# Note: 인건비는 Payroll 데이터에서 동기화됨 (sync_labor_cost)
+# Note: 인건비(expense_labor)는 Payroll/수동입력에서 관리 → sync_labor_cost 전용
+#       sync_all_expenses에서 건드리지 않음
 # Note: 퇴직금적립은 인건비의 10%로 자동계산됨 (sync_labor_cost)
+# Note: 개인가계부는 P/L에 미포함 (사업외 비용)
 CATEGORY_TO_PL_FIELD = {
-    "식자재": "expense_ingredient",
-    "재료비": "expense_material",
-    "임대료": "expense_rent",
-    "임대관리비": "expense_rent_fee",
-    "제세공과금": "expense_utility",
+    # ── 신규 카테고리 (2026 재편) ──
+    "원재료비": "expense_ingredient",
+    "소모품비": "expense_material",
+    "수도광열비": "expense_utility",
+    "임차료": "expense_rent",
+    "수선비": "expense_repair",
+    "감가상각비": "expense_depreciation",
+    "세금과공과": "expense_tax",
+    "보험료": "expense_insurance",
+    # "인건비"는 sync_all_expenses에서 제외 — expense_labor는 급여대장/수동입력으로만 관리
     "카드수수료": "expense_card_fee",
-    "부가가치세": "expense_vat",
-    "사업소득세": "expense_biz_tax",
-    "근로소득세": "expense_income_tax",
-    "other": "expense_other",
+    "기타경비": "expense_other",
+    # ── 레거시 호환 (기존 DailyExpense 레코드) ──
+    "식자재": "expense_ingredient",
+    "재료비": "expense_ingredient",
+    "제세공과금": "expense_utility",
+    "임대료": "expense_rent",
+    "임대관리비": "expense_rent",
+    "부가가치세": "expense_tax",
+    "사업소득세": "expense_tax",
+    "근로소득세": "expense_tax",
     "기타비용": "expense_other",
+    "other": "expense_other",
 }
 
 def sync_all_expenses(year: int, month: int, session: Session):
@@ -104,15 +118,14 @@ def sync_all_expenses(year: int, month: int, session: Session):
         
         # Get all fields that SHOULD be updated by this function
         managed_fields = set(CATEGORY_TO_PL_FIELD.values())
+        # expense_labor, expense_retirement은 별도 관리 (sync_labor_cost / 수동입력)
+        excluded_fields = {'expense_labor', 'expense_retirement'}
+        managed_fields -= excluded_fields
         
         for field in managed_fields:
             if field in category_totals:
                 setattr(pl_record, field, category_totals[field])
             else:
-                # If no expenses for this category found, set to 0?
-                # Yes, otherwise stale data persists.
-                # Be careful not to overwrite if logic is split. Use caution.
-                # Assuming this function owns these fields.
                 setattr(pl_record, field, 0)
 
         session.add(pl_record)

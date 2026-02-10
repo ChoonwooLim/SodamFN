@@ -6,38 +6,46 @@ Auto-detects card company and format (HTML-as-xls vs real Excel).
 import os
 import re
 import pandas as pd
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import List, Dict, Optional
 
-# ─── Category classification rules ───
+# ─── Category classification rules (2026 재편) ───
+# 주의: dict 순서가 우선순위! 세금과공과가 원재료비보다 먼저 와야
+# "국세_소담김밥"이 "국세"로 매칭됨 (김밥보다 먼저)
 CATEGORY_RULES = {
-    "개인생활비": [
+    "개인가계부": [
         "병원", "의원", "치과", "약국", "의료", "안과", "한의원",
         "이비인후과", "신경과", "호텔", "숙박", "여행",
         "주렁주렁", "놀이", "레저",
         "식당", "요식", "음식점", "카페", "커피", "베이커리", "빵", "제과",
         "스타벅스", "투썸", "맥도날드", "버거", "피자", "치킨", "분식", "김가네",
     ],
-    "재료비": [
+    "세금과공과": [
+        "국세", "지방세", "세금", "부가세", "종합소득세", "부가가치세",
+    ],
+    "원재료비": [
         "한식", "식품", "농가공산품", "할인점", "슈퍼마켓", "마트", "푸드",
         "식자재", "농산물", "수산물", "축산물", "반찬", "김밥", "쿠팡",
         "다인푸드", "트레이더스", "이마트", "코스트코",
     ],
-    "재료비_포장": [
+    "소모품비": [
         "봉투", "팩", "포장", "쇼핑/유통", "가락팩", "가락봉투",
         "신진상사", "라디스펜사",
     ],
-    "제세공과금": [
+    "수도광열비": [
         "가스", "전기", "수도", "도시가스", "한전", "가정용연료", "예스코",
-        "국세", "지방세", "세금",
     ],
-    "임대관리비": [
-        "관리비", "관리단", "임대",
+    "임차료": [
+        "관리비", "관리단", "임대", "스타시티",
+    ],
+    "인건비": [
+        "산재보험", "고용보험", "국민연금", "건강보험", "국민건강", "4대보험",
+        "급여", "상여", "퇴직금",
     ],
     "카드수수료": [
         "카드수수료", "카드사",
     ],
-    "기타비용": [],  # Fallback
+    "기타경비": [],  # Fallback
 }
 
 
@@ -47,8 +55,8 @@ def classify_category(vendor_name: str, business_type: str = "") -> str:
     for category, keywords in CATEGORY_RULES.items():
         for kw in keywords:
             if kw.lower() in combined:
-                return category.replace("_포장", "")  # 재료비_포장 → 재료비
-    return "기타비용"
+                return category
+    return "기타경비"
 
 
 def _is_html_file(filepath: str) -> bool:
@@ -238,7 +246,12 @@ def parse_shinhan_card(filepath: str) -> List[Dict]:
 
 
 def parse_shinhan_bank(filepath: str) -> List[Dict]:
-    """Parse 신한은행 송금내역 (real xls format)."""
+    """Parse 신한은행 송금내역 (real xls format).
+    
+    Excludes:
+    - 카드대금 결제 (삼성카드, 현대카드, 롯데카드 등 — 카드 명세서로 별도 업로드)
+    - 직원 급여 이체 (Staff 테이블 기반 동적 감지)
+    """
     df = pd.read_excel(filepath, header=None, engine='xlrd')
 
     # Find header row (contains '거래일자')
@@ -252,7 +265,39 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
     df.columns = df.iloc[header_idx].values
     df = df.iloc[header_idx + 1:].reset_index(drop=True)
 
+    # ── 카드대금 제외 키워드 ──
+    CARD_PAYMENT_KEYWORDS = [
+        '삼성카드', '현대카드', '롯데카드', '신한카드', '비씨카드',
+        '하나카드', '국민카드', 'KB카드', '우리카드', '카드대금',
+    ]
+
+    # ── 직원 이름 (Staff DB에서 가져옴) ──
+    staff_names = set()
+    try:
+        from database import engine as db_engine
+        from sqlmodel import Session as DBSession, text
+        with DBSession(db_engine) as session:
+            result = session.exec(text("SELECT name FROM staff"))
+            staff_names = {r[0].strip() for r in result if r[0]}
+    except Exception:
+        pass
+    # 외국인 직원 (DB name과 은행 표기가 다를 수 있음)
+    FOREIGN_STAFF = {
+        'PHAM THI THUY LINH', 'DAO KIM HONG NGOC', 'JINJINSHUN',
+    }
+    staff_names.update(FOREIGN_STAFF)
+
+    # ── 개인 이름 → 상호명 매핑 ──
+    VENDOR_ALIASES = {
+        '최희상': '홍성상회',
+        '김영민': '찬들농산',
+        '유용운': '창미포장',
+    }
+
     records = []
+    excluded_cards = 0
+    excluded_salary = 0
+
     for _, row in df.iterrows():
         use_date = _normalize_date(row.get('거래일자'))
         if not use_date:
@@ -267,25 +312,52 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
         if not vendor_name or vendor_name == 'nan':
             continue
 
-        # Exclude credit card payments to avoid double counting
-        # (Since we upload card statements separately)
-        if '카드' in vendor_name or '삼성' in vendor_name or '현대' in vendor_name or '롯데' in vendor_name:
-             # Check if it looks like a card payment (e.g. "삼성카드", "현대카드", "롯데카드")
-             # But be careful not to exclude "삼성전자" or "롯데마트" if they appear in bank text (though usually bank text is just vendor name)
-             # Shinhan Bank export usually says "신한카드", "삼성카드(주)", "롯데카드(주)" etc.
-             if any(c in vendor_name for c in ['카드', '카드(주)', '카드대금']):
-                 continue
+        # ① 카드대금 결제 제외 (카드 명세서로 이미 업로드)
+        if any(kw in vendor_name for kw in CARD_PAYMENT_KEYWORDS):
+            excluded_cards += 1
+            continue
+
+        # ② 직원 급여 이체 제외 (직원관리 모듈에서 관리)
+        if vendor_name in staff_names:
+            excluded_salary += 1
+            continue
+
+        # ③ 개인 이름 → 상호명 변환
+        if vendor_name in VENDOR_ALIASES:
+            vendor_name = VENDOR_ALIASES[vendor_name]
+
+        category = classify_category(vendor_name, '')
+
+        # ④ 임차료 월초 날짜 조정 (발생주의)
+        # 임대료/관리비가 월초(1~5일)에 결제된 경우 → 전월 말일로 이동
+        # (휴일로 인해 이체일이 밀린 경우 대응)
+        if category == '임차료' and use_date:
+            # use_date may be a date object or string
+            if isinstance(use_date, str):
+                d = datetime.strptime(use_date, '%Y-%m-%d').date()
+            else:
+                d = use_date
+            if d.day <= 5:  # 월초 1~5일
+                # 전월 말일로 이동
+                first_of_month = d.replace(day=1)
+                last_of_prev = first_of_month - timedelta(days=1)
+                original_date = str(use_date)
+                use_date = str(last_of_prev)
+                print(f"  [날짜조정] {vendor_name}: {original_date} → {use_date} (임차료 발생주의)")
 
         records.append({
             'date': use_date,
             'vendor_name': vendor_name,
             'amount': amount,
-            'category': classify_category(vendor_name, ''),
+            'category': category,
             'card_company': '신한은행',
             'approval_no': '',
             'business_type': '은행이체',
             'is_cancelled': False,
         })
+
+    if excluded_cards or excluded_salary:
+        print(f"  [신한은행] 카드대금 {excluded_cards}건, 직원급여 {excluded_salary}건 제외")
 
     return records
 

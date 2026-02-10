@@ -136,14 +136,25 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
             by_day[d]["count"] += 1
         
         # By card company (parse from note field: "카드사:XXX")
+        # Separate bank transfers from card purchases
+        BANK_KEYWORDS = ['은행']  # 신한은행, 국민은행, etc.
         by_card = {}
+        by_bank = {}
         for e in expenses:
-            card = "기타"
+            card = None
             if e.note and "카드사:" in e.note:
                 card = e.note.split("카드사:")[1].split(",")[0].strip()
-            by_card.setdefault(card, {"amount": 0, "count": 0})
-            by_card[card]["amount"] += e.amount
-            by_card[card]["count"] += 1
+            
+            if card:
+                is_bank = any(kw in card for kw in BANK_KEYWORDS)
+                target = by_bank if is_bank else by_card
+                target.setdefault(card, {"amount": 0, "count": 0})
+                target[card]["amount"] += e.amount
+                target[card]["count"] += 1
+            else:
+                by_card.setdefault("기타", {"amount": 0, "count": 0})
+                by_card["기타"]["amount"] += e.amount
+                by_card["기타"]["count"] += 1
         
         # Top vendors
         by_vendor = {}
@@ -161,6 +172,7 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
             "by_category": by_category,
             "by_day": by_day,
             "by_card_company": by_card,
+            "by_bank_transfer": by_bank,
             "top_vendors": [{"name": k, **v} for k, v in top_vendors],
         }
 

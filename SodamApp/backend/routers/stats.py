@@ -18,9 +18,11 @@ REVENUE_FIELDS = [
 ]
 EXPENSE_FIELDS = [
     'expense_labor', 'expense_retirement', 'expense_ingredient',
-    'expense_material', 'expense_rent', 'expense_rent_fee',
-    'expense_utility', 'expense_card_fee', 'expense_vat',
-    'expense_biz_tax', 'expense_income_tax', 'expense_other'
+    'expense_material', 'expense_rent', 'expense_utility',
+    'expense_repair', 'expense_depreciation', 'expense_tax',
+    'expense_insurance', 'expense_card_fee', 'expense_other',
+    # LEGACY (하위호환 - 기존 데이터에 값이 남아있을 수 있음)
+    'expense_rent_fee', 'expense_vat', 'expense_biz_tax', 'expense_income_tax',
 ]
 
 def _pl_totals(record):

@@ -911,3 +911,39 @@
         padding: 20px;
     }
 }
+
+/* ── Category Helper ── */
+.purchase-page .category-helper-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all 0.15s;
+    vertical-align: middle;
+}
+
+.purchase-page .category-helper-btn:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+    transform: translateY(-1px);
+}
+
+.purchase-page .category-helper-item:hover {
+    background: #f8fafc !important;
+    border-color: #22c55e !important;
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
+}
+
+.purchase-page .category-helper-modal .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}

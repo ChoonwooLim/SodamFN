@@ -15,16 +15,16 @@ const REVENUE_FIELDS = [
 const EXPENSE_FIELDS = [
     { key: 'expense_labor', label: '인건비', auto: true, group: 'expense-labor' },
     { key: 'expense_retirement', label: '퇴직금적립', auto: true, group: 'expense-labor' },
-    { key: 'expense_ingredient', label: '식자재', group: 'expense-material' },
-    { key: 'expense_material', label: '재료비', group: 'expense-material' },
-    { key: 'expense_rent', label: '임대료', group: 'expense-rent' },
-    { key: 'expense_rent_fee', label: '임대관리비', group: 'expense-rent' },
-    { key: 'expense_utility', label: '제세공과금', group: 'expense-etc' },
+    { key: 'expense_ingredient', label: '원재료비', group: 'expense-material' },
+    { key: 'expense_material', label: '소모품비', group: 'expense-material' },
+    { key: 'expense_utility', label: '수도광열비', group: 'expense-utility' },
+    { key: 'expense_rent', label: '임차료', group: 'expense-rent' },
+    { key: 'expense_repair', label: '수선비', group: 'expense-facility' },
+    { key: 'expense_depreciation', label: '감가상각비', group: 'expense-facility' },
+    { key: 'expense_tax', label: '세금과공과', group: 'expense-tax' },
+    { key: 'expense_insurance', label: '보험료', group: 'expense-tax' },
     { key: 'expense_card_fee', label: '카드수수료', group: 'expense-etc' },
-    { key: 'expense_vat', label: '부가가치세', group: 'expense-etc' },
-    { key: 'expense_biz_tax', label: '사업소득세', group: 'expense-etc' },
-    { key: 'expense_income_tax', label: '근로소득세', group: 'expense-etc' },
-    { key: 'expense_other', label: '기타비용', group: 'expense-etc' },
+    { key: 'expense_other', label: '기타경비', group: 'expense-etc' },
 ];
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -32,16 +32,17 @@ const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 // 매입처 카테고리 정의 (VendorSettings.jsx와 동기화)
 // Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
 const EXPENSE_CATEGORIES = [
-    { id: '식자재', label: '식자재', icon: '🥬' },
-    { id: '재료비', label: '재료비', icon: '📦' },
-    { id: '임대료', label: '임대료(월세)', icon: '🏠' },
-    { id: '임대관리비', label: '임대관리비', icon: '🏢' },
-    { id: '제세공과금', label: '제세공과금', icon: '💡' },
+    { id: '원재료비', label: '원재료비', icon: '🥬' },
+    { id: '소모품비', label: '소모품비', icon: '📦' },
+    { id: '수도광열비', label: '수도광열비', icon: '💡' },
+    { id: '임차료', label: '임차료', icon: '🏠' },
+    { id: '수선비', label: '수선비', icon: '🔧' },
+    { id: '감가상각비', label: '감가상각비', icon: '⚙️' },
+    { id: '세금과공과', label: '세금과공과', icon: '🏛️' },
+    { id: '보험료', label: '보험료', icon: '🛡️' },
+    { id: '인건비', label: '인건비', icon: '👷' },
     { id: '카드수수료', label: '카드수수료', icon: '💳' },
-    { id: '부가가치세', label: '부가가치세', icon: '📋' },
-    { id: '사업소득세', label: '사업소득세', icon: '📋' },
-    { id: '근로소득세', label: '근로소득세', icon: '📋' },
-    { id: 'other', label: '기타비용', icon: '📋' },
+    { id: '기타경비', label: '기타경비', icon: '📋' },
 ];
 
 // Main tabs (always visible) — 수입상세/배달앱은 매출관리로 이동
@@ -67,7 +68,7 @@ export default function ProfitLoss() {
     const [loading, setLoading] = useState(true);
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
-    const [year, setYear] = useState(2025);
+    const [year, setYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('summary');
 
     // Dropdown group state
@@ -366,21 +367,32 @@ export default function ProfitLoss() {
     const getPlFieldByCategory = (category) => {
         if (!category) return 'other';
         const map = {
-            '식자재': 'expense_ingredient',
-            '재료비': 'expense_material',
-            '임대료': 'expense_rent',
-            '임대료(월세)': 'expense_rent',
-            '임대관리비': 'expense_rent_fee',
-            '제세공과금': 'expense_utility',
-            '부가가치세': 'expense_vat',
-            '사업소득세': 'expense_biz_tax',
-            '근로소득세': 'expense_income_tax',
+            // 신규 카테고리
+            '원재료비': 'expense_ingredient',
+            '소모품비': 'expense_material',
+            '수도광열비': 'expense_utility',
+            '임차료': 'expense_rent',
+            '수선비': 'expense_repair',
+            '감가상각비': 'expense_depreciation',
+            '세금과공과': 'expense_tax',
+            '보험료': 'expense_insurance',
             '카드수수료': 'expense_card_fee',
+            '기타경비': 'expense_other',
             '퇴직금적립': 'expense_retirement',
             '인건비': 'expense_labor',
-            '기타비용': 'other'
+            // 레거시 호환
+            '식자재': 'expense_ingredient',
+            '재료비': 'expense_ingredient',
+            '임대료': 'expense_rent',
+            '임대료(월세)': 'expense_rent',
+            '임대관리비': 'expense_rent',
+            '제세공과금': 'expense_utility',
+            '부가가치세': 'expense_tax',
+            '사업소득세': 'expense_tax',
+            '근로소득세': 'expense_tax',
+            '기타비용': 'expense_other',
         };
-        return map[category] || 'other';
+        return map[category] || 'expense_other';
     };
 
     // Render monthly expense detail (7~12월 비용) - Excel-like grid

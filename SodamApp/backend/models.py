@@ -284,20 +284,25 @@ class MonthlyProfitLoss(SQLModel, table=True):
     revenue_yogiyo: int = 0       # 요기요 정산금
     revenue_ddangyo: int = 0      # 땡겨요 정산금
     
-    # 지출 (Expenses)
-    expense_labor: int = 0        # 인건비
-    expense_rent: int = 0         # 임대료 (월세)
-    expense_rent_fee: int = 0     # 임대관리비
-    expense_utility: int = 0      # 제세공과금
-    expense_vat: int = 0          # 부가가치세
-    expense_biz_tax: int = 0      # 사업소득세
-    expense_income_tax: int = 0   # 근로소득세
+    # 지출 (Expenses) - 2026 카테고리 재편
+    expense_labor: int = 0        # 인건비 (Payroll 자동)
+    expense_ingredient: int = 0   # 원재료비 (식자재·반가공식품)
+    expense_material: int = 0     # 소모품비 (포장재·일회용품·주방비품)
+    expense_utility: int = 0      # 수도광열비 (전기·가스·수도)
+    expense_rent: int = 0         # 임차료 (월세+관리비 통합)
+    expense_repair: int = 0       # 수선비 (시설·장비 수리)
+    expense_depreciation: int = 0 # 감가상각비 (기계·인테리어 구입)
+    expense_tax: int = 0          # 세금과공과 (부가세·소득세·지방세)
+    expense_insurance: int = 0    # 보험료 (4대보험·화재보험)
     expense_card_fee: int = 0     # 카드수수료
-    expense_ingredient: int = 0   # 식자재
-    expense_material: int = 0     # 재료비
-    expense_retirement: int = 0   # 퇴직금적립
-    expense_other: int = 0        # 기타비용
-    expense_personal: int = 0     # 개인생활비
+    expense_retirement: int = 0   # 퇴직금적립 (인건비 10% 자동)
+    expense_other: int = 0        # 기타경비
+    expense_personal: int = 0     # 개인가계부 (P/L 미포함)
+    # [LEGACY] 기존 필드 유지 (하위호환)
+    expense_rent_fee: int = 0     # [LEGACY] 임대관리비 → 임차료에 통합
+    expense_vat: int = 0          # [LEGACY] 부가가치세 → 세금과공과에 통합
+    expense_biz_tax: int = 0      # [LEGACY] 사업소득세 → 세금과공과에 통합
+    expense_income_tax: int = 0   # [LEGACY] 근로소득세 → 세금과공과에 통합
 
 
 class DeliveryRevenue(SQLModel, table=True):
