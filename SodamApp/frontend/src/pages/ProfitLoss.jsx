@@ -802,28 +802,7 @@ export default function ProfitLoss() {
                     </button>
                 ))}
 
-                {/* Monthly Expenses Dropdown */}
-                <div className="tab-dropdown">
-                    <button
-                        className={`tab-button dropdown-trigger ${activeTab.startsWith('month_') ? 'active' : ''}`}
-                        onClick={() => setOpenDropdown(openDropdown === 'monthly' ? null : 'monthly')}
-                    >
-                        📅 월별비용 ▾
-                    </button>
-                    {openDropdown === 'monthly' && (
-                        <div className="dropdown-menu month-dropdown">
-                            {MONTH_TABS.map(tab => (
-                                <button
-                                    key={tab.id}
-                                    className={`dropdown-item ${activeTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => { setActiveTab(tab.id); setOpenDropdown(null); }}
-                                >
-                                    {tab.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+
             </div>
 
             {/* Tab Content */}
