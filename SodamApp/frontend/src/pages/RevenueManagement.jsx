@@ -728,13 +728,64 @@ export default function RevenueManagement() {
                                     const weekday = getWeekday(dateStr);
                                     const dayNum = dateStr.split('-')[2];
 
-                                    // Split into cash and other items (Card/Delivery)
+                                    // Split into 3 groups: cash, card, delivery
                                     const cashItems = items.filter(i => i.ui_category === 'cash');
-                                    const cardItems = items.filter(i => i.ui_category !== 'cash');
+                                    const cardOnlyItems = items.filter(i => i.ui_category === 'card');
+                                    const deliveryItems = items.filter(i => i.ui_category === 'delivery');
 
                                     const cashItemsTotal = cashItems.reduce((s, i) => s + (i.amount || 0), 0);
-                                    const cardItemsTotal = cardItems.reduce((s, i) => s + (i.amount || 0), 0);
-                                    const isCardCollapsed = collapsedCards[dateStr] !== false; // default collapsed
+                                    const cardOnlyTotal = cardOnlyItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const deliveryTotal = deliveryItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    const isCardCollapsed = collapsedCards[`card-${dateStr}`] !== false; // default collapsed
+                                    const isDeliveryCollapsed = collapsedCards[`delivery-${dateStr}`] !== false; // default collapsed
+
+                                    const renderItemRow = (item, icon, badgeLabel, badgeClass, rowClass, showStore = true) => (
+                                        <tr key={item.id} className={`revenue-row ${rowClass}`}>
+                                            <td className="td-date">{dayNum}</td>
+                                            {showStore ? (
+                                                <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
+                                                    {getStoreName(item.item)}
+                                                </td>
+                                            ) : (
+                                                <td className="td-vendor"></td>
+                                            )}
+                                            <td className="td-vendor" style={rowClass === 'card-row' ? { paddingLeft: '5em' } : undefined}>
+                                                {icon} {getDisplayName(item.vendor_name, item.item)}
+                                            </td>
+                                            <td className="td-category">
+                                                <span className={`cat-badge ${badgeClass}`}>
+                                                    {icon} {badgeLabel}
+                                                </span>
+                                            </td>
+                                            <td className={`td-amount ${rowClass === 'cash-row' ? 'cash-amount' : ''}`}>{formatNumber(item.amount)}원</td>
+                                            <td className="td-note">{item.note || '-'}</td>
+                                            <td className="td-actions">
+                                                <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
+                                                    <Edit3 size={14} />
+                                                </button>
+                                                <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+
+                                    /* Toggle row rendered in same column layout as data rows */
+                                    const renderToggleRow = (key, icon, label, count, total, isCollapsed, toggleKey, toggleClass = '') => (
+                                        <tr key={key} className={`revenue-row toggle-summary-row ${toggleClass}`} onClick={() => toggleCardCollapse(toggleKey)} style={{ cursor: 'pointer' }}>
+                                            <td className="td-date"></td>
+                                            <td className="td-vendor" style={{ textAlign: 'right', paddingRight: 4, fontSize: 11, color: '#6366f1' }}>{isCollapsed ? '▶' : '▼'}</td>
+                                            <td className="td-vendor">
+                                                <span style={{ fontWeight: 600 }}>{icon} {label}</span>
+                                            </td>
+                                            <td className="td-category">
+                                                <span className="toggle-count-badge">{count}건</span>
+                                            </td>
+                                            <td className="td-amount" style={{ fontWeight: 600, color: '#3b82f6' }}>{formatNumber(total)}원</td>
+                                            <td className="td-note"></td>
+                                            <td className="td-actions"></td>
+                                        </tr>
+                                    );
 
                                     return [
                                         <tr key={`header-${dateStr}`} className="day-group-header">
@@ -747,78 +798,27 @@ export default function RevenueManagement() {
                                             </td>
                                         </tr>,
                                         /* ── Cash items (shown first, green tint) ── */
-                                        ...cashItems.map(item => (
-                                            <tr key={item.id} className="revenue-row cash-row">
-                                                <td className="td-date">{dayNum}</td>
-                                                <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
-                                                    {getStoreName(item.item)}
-                                                </td>
-                                                <td className="td-vendor">
-                                                    <span className="cash-label">💵 {getDisplayName(item.vendor_name, item.item)}</span>
-                                                </td>
-                                                <td className="td-category">
-                                                    <span className={`cat-badge cash`}>
-                                                        💵 현금
-                                                    </span>
-                                                </td>
-                                                <td className="td-amount cash-amount">{formatNumber(item.amount)}원</td>
-                                                <td className="td-note">{item.note || '-'}</td>
-                                                <td className="td-actions">
-                                                    <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
-                                                        <Edit3 size={14} />
-                                                    </button>
-                                                    <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
-                                                        <Trash2 size={14} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        )),
-                                        /* ── Card/Delivery collapse toggle ── */
-                                        cardItems.length > 0 && (
-                                            <tr key={`card-toggle-${dateStr}`} className="card-toggle-row" onClick={() => toggleCardCollapse(dateStr)}>
-                                                <td colSpan={7} className="card-toggle-cell">
-                                                    <span className="card-toggle-icon">{isCardCollapsed ? '▶' : '▼'}</span>
-                                                    <span className="card-toggle-label">💳 카드/배달 매출</span>
-                                                    <span className="card-toggle-count">{cardItems.length}건</span>
-                                                    <span className="card-toggle-amount">{formatNumber(cardItemsTotal)}원</span>
-                                                </td>
-                                            </tr>
+                                        ...cashItems.map(item => renderItemRow(item, '💵', '현금', 'cash', 'cash-row', true)),
+                                        /* ── Card items collapse toggle ── */
+                                        cardOnlyItems.length > 0 && renderToggleRow(
+                                            `card-toggle-${dateStr}`, '💳', '카드매출',
+                                            cardOnlyItems.length, cardOnlyTotal,
+                                            isCardCollapsed, `card-${dateStr}`
                                         ),
-                                        /* ── Card/Delivery items (collapsible, blue tint) ── */
-                                        ...(!isCardCollapsed ? cardItems.map(item => {
-                                            const isDelivery = item.ui_category === 'delivery';
-                                            const badgeLabel = isDelivery ? '배달앱' : '카드';
-                                            const badgeIcon = isDelivery ? '🛵' : '💳';
-                                            const badgeClass = isDelivery ? 'delivery' : 'store';
-
-                                            return (
-                                                <tr key={item.id} className="revenue-row card-row">
-                                                    <td className="td-date">{dayNum}</td>
-                                                    <td className="td-vendor" style={{ fontSize: 12, color: '#94a3b8' }}>
-                                                        {getStoreName(item.item)}
-                                                    </td>
-                                                    <td className="td-vendor">
-                                                        {isDelivery ? '🛵 ' : '💳 '}
-                                                        {getDisplayName(item.vendor_name, item.item)}
-                                                    </td>
-                                                    <td className="td-category">
-                                                        <span className={`cat-badge ${badgeClass}`}>
-                                                            {badgeIcon} {badgeLabel}
-                                                        </span>
-                                                    </td>
-                                                    <td className="td-amount">{formatNumber(item.amount)}원</td>
-                                                    <td className="td-note">{item.note || '-'}</td>
-                                                    <td className="td-actions">
-                                                        <button className="rev-action-btn" onClick={() => openEditModal(item)} title="수정">
-                                                            <Edit3 size={14} />
-                                                        </button>
-                                                        <button className="rev-action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }) : [])
+                                        /* ── Card items (collapsible, blue tint) ── */
+                                        ...(!isCardCollapsed ? cardOnlyItems.map(item =>
+                                            renderItemRow(item, '💳', '카드', 'store', 'card-row', false)
+                                        ) : []),
+                                        /* ── Delivery items collapse toggle ── */
+                                        deliveryItems.length > 0 && renderToggleRow(
+                                            `delivery-toggle-${dateStr}`, '🛵', '배달매출',
+                                            deliveryItems.length, deliveryTotal,
+                                            isDeliveryCollapsed, `delivery-${dateStr}`, 'delivery-toggle-row'
+                                        ),
+                                        /* ── Delivery items (collapsible) ── */
+                                        ...(!isDeliveryCollapsed ? deliveryItems.map(item =>
+                                            renderItemRow(item, '🛵', '배달', 'delivery', 'card-row', false)
+                                        ) : [])
                                     ];
                                 })}
                             </tbody>
