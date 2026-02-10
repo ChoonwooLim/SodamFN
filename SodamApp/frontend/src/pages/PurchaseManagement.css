@@ -455,12 +455,12 @@
     flex-direction: column;
 }
 
-.day-group {
+.purchase-page .day-group {
     background: white;
     border-bottom: 1px solid #f1f5f9;
 }
 
-.day-group-header {
+.purchase-page .day-group-header {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -470,31 +470,31 @@
     border-bottom: 1px solid #e2e8f0;
 }
 
-.day-date {
+.purchase-page .day-date {
     font-size: 14px;
     font-weight: 700;
     color: #334155;
     flex: 1;
 }
 
-.day-count {
+.purchase-page .day-count {
     font-size: 12px;
     color: #94a3b8;
     font-weight: 500;
 }
 
-.day-total {
+.purchase-page .day-total {
     font-size: 14px;
     font-weight: 800;
     color: #15803d;
 }
 
-.day-items {
+.purchase-page .day-items {
     display: flex;
     flex-direction: column;
 }
 
-.purchase-item {
+.purchase-page .purchase-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -503,30 +503,30 @@
     transition: background 0.1s;
 }
 
-.purchase-item:hover {
+.purchase-page .purchase-item:hover {
     background: #f0fdf4;
     /* Green tint on hover */
 }
 
-.item-left {
+.purchase-page .item-left {
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.item-vendor {
+.purchase-page .item-vendor {
     font-size: 14px;
     font-weight: 600;
     color: #1e293b;
 }
 
-.item-meta {
+.purchase-page .item-meta {
     display: flex;
     gap: 8px;
     align-items: center;
 }
 
-.card-badge {
+.purchase-page .card-badge {
     font-size: 11px;
     padding: 2px 8px;
     border-radius: 4px;
@@ -534,13 +534,13 @@
     font-weight: 600;
 }
 
-.item-right {
+.purchase-page .item-right {
     display: flex;
     align-items: center;
     gap: 16px;
 }
 
-.item-amount {
+.purchase-page .item-amount {
     font-size: 15px;
     font-weight: 700;
     color: #1e293b;
@@ -548,18 +548,18 @@
     text-align: right;
 }
 
-.item-actions {
+.purchase-page .item-actions {
     display: flex;
     gap: 6px;
     opacity: 0.4;
     transition: opacity 0.2s;
 }
 
-.purchase-item:hover .item-actions {
+.purchase-page .purchase-item:hover .item-actions {
     opacity: 1;
 }
 
-.action-btn {
+.purchase-page .action-btn {
     background: white;
     border: 1px solid #e2e8f0;
     color: #94a3b8;
@@ -573,13 +573,13 @@
     transition: all .15s;
 }
 
-.action-btn:hover {
+.purchase-page .action-btn:hover {
     border-color: #22c55e;
     color: #22c55e;
     background: #f0fdf4;
 }
 
-.action-btn.delete:hover {
+.purchase-page .action-btn.delete:hover {
     border-color: #ef4444;
     color: #ef4444;
     background: #fef2f2;
@@ -665,77 +665,77 @@
 }
 
 /* ── Modal (Light Theme) ── */
-.modal-overlay {
+.purchase-page .modal-overlay {
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
 }
 
-.modal-content {
+.purchase-page .modal-content {
     background: white;
     border: 1px solid #e2e8f0;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
-.modal-header {
+.purchase-page .modal-header {
     border-bottom: 1px solid #f1f5f9;
 }
 
-.modal-header h3 {
+.purchase-page .modal-header h3 {
     color: #1e293b;
 }
 
-.form-group label {
+.purchase-page .form-group label {
     color: #64748b;
 }
 
-.form-group input,
-.form-group select {
+.purchase-page .form-group input,
+.purchase-page .form-group select {
     background: white;
     border: 2px solid #e2e8f0;
     color: #1e293b;
 }
 
-.form-group input:focus {
+.purchase-page .form-group input:focus {
     border-color: #22c55e;
 }
 
-.category-chip {
+.purchase-page .category-chip {
     background: white;
     border: 1px solid #e2e8f0;
     color: #64748b;
 }
 
-.category-chip.active {
+.purchase-page .category-chip.active {
     color: white !important;
     /* Force white text on active chip */
     border-color: transparent;
 }
 
-.category-chip:hover:not(.active) {
+.purchase-page .category-chip:hover:not(.active) {
     background: #f1f5f9;
     color: #334155;
 }
 
-.modal-footer {
+.purchase-page .modal-footer {
     border-top: 1px solid #f1f5f9;
 }
 
-.btn-cancel {
+.purchase-page .btn-cancel {
     background: #f1f5f9;
     border: none;
     color: #64748b;
 }
 
-.btn-cancel:hover {
+.purchase-page .btn-cancel:hover {
     background: #e2e8f0;
 }
 
-.btn-save {
+.purchase-page .btn-save {
     background: linear-gradient(135deg, #22c55e, #16a34a);
     box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
 }
 
-.btn-save:hover {
+.purchase-page .btn-save:hover {
     box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
 }
 
