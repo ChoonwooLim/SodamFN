@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
 import api from '../api';
 import './PurchaseManagement.css';
 
@@ -76,6 +76,9 @@ export default function PurchaseManagement() {
     const [uploadResult, setUploadResult] = useState(null);
     const fileInputRef = useRef(null);
 
+    // Batch selection
+    const [selectedIds, setSelectedIds] = useState(new Set());
+
     // ─── Fetch ───
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -85,6 +88,7 @@ export default function PurchaseManagement() {
                 api.get('/purchase/summary', { params: { year, month } }),
             ]);
             setData(dailyRes.data.records || []);
+            setSelectedIds(new Set());
             setSummary(summaryRes.data || { total: 0, count: 0, by_category: {}, by_card_company: {}, top_vendors: [] });
         } catch (err) {
             console.error('Purchase fetch error:', err);
@@ -205,16 +209,80 @@ export default function PurchaseManagement() {
         const newCategory = isPersonal ? '기타비용' : '개인생활비';
         const actionName = isPersonal ? '사업비용으로' : '개인비용으로';
 
-        if (!window.confirm(`'${record.vendor_name}' ${formatNumber(record.amount)}원을 ${actionName} 변경하시겠습니까?`)) return;
+        if (!window.confirm(`'${record.vendor_name}' ${formatNumber(record.amount)}원을 ${actionName} 변경하시겠습니까?\n(동일 업체명 항목도 함께 변경됩니다)`)) return;
 
         try {
-            await api.put(`/purchase/${record.id}`, {
+            const res = await api.put(`/purchase/${record.id}`, {
                 category: newCategory
             });
+            const extra = res.data?.same_vendor_updated || 0;
+            if (extra > 0) {
+                alert(`✅ 변경 완료! 동일 업체 ${extra}건도 함께 변경되었습니다.`);
+            }
             fetchData();
         } catch (err) {
             console.error(err);
             alert('변경 실패');
+        }
+    };
+
+    // ─── Batch Actions ───
+    const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectDay = (items) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            const allSelected = items.every(i => next.has(i.id));
+            items.forEach(i => allSelected ? next.delete(i.id) : next.add(i.id));
+            return next;
+        });
+    };
+
+    const handleBatchCategory = async (newCategory) => {
+        if (selectedIds.size === 0) return;
+        const catInfo = EXPENSE_CATEGORIES.find(c => c.id === newCategory);
+        const label = catInfo ? `${catInfo.icon} ${catInfo.label}` : newCategory;
+        if (!window.confirm(`선택한 ${selectedIds.size}건을 ${label}(으)로 일괄 변경하시겠습니까?\n(동일 업체명 항목도 함께 변경됩니다)`)) return;
+
+        try {
+            const results = await Promise.all(
+                [...selectedIds].map(id =>
+                    api.put(`/purchase/${id}`, { category: newCategory })
+                )
+            );
+            const totalExtra = results.reduce((sum, r) => sum + (r.data?.same_vendor_updated || 0), 0);
+            setSelectedIds(new Set());
+            if (totalExtra > 0) {
+                alert(`✅ ${selectedIds.size}건 변경 완료! 동일 업체 ${totalExtra}건도 함께 변경되었습니다.`);
+            }
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert('일괄 변경 중 오류가 발생했습니다.');
+        }
+    };
+
+    const handleBatchDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!window.confirm(`선택한 ${selectedIds.size}건을 삭제하시겠습니까?`)) return;
+
+        try {
+            const promises = [...selectedIds].map(id =>
+                api.delete(`/purchase/${id}`)
+            );
+            await Promise.all(promises);
+            setSelectedIds(new Set());
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert('일괄 삭제 중 오류가 발생했습니다.');
         }
     };
 
@@ -449,6 +517,15 @@ export default function PurchaseManagement() {
                                 return (
                                     <div className="day-group" key={dateStr}>
                                         <div className="day-group-header">
+                                            <button
+                                                className="day-select-btn"
+                                                onClick={() => toggleSelectDay(items)}
+                                                title="이 날짜 전체 선택/해제"
+                                            >
+                                                {items.every(i => selectedIds.has(i.id))
+                                                    ? <CheckSquare size={16} className="checked" />
+                                                    : <Square size={16} />}
+                                            </button>
                                             <span className="day-date">📅 {month}/{dayNum} ({weekday})</span>
                                             <span className="day-count">{items.length}건</span>
                                             <span className="day-total">{formatNumber(dayTotal)}원</span>
@@ -460,7 +537,14 @@ export default function PurchaseManagement() {
                                                 const catInfo = EXPENSE_CATEGORIES.find(c => c.id === item.category) || EXPENSE_CATEGORIES[5];
 
                                                 return (
-                                                    <div className="purchase-item" key={item.id}>
+                                                    <div className={`purchase-item ${selectedIds.has(item.id) ? 'selected' : ''}`} key={item.id}>
+                                                        <label className="item-checkbox" onClick={e => e.stopPropagation()}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedIds.has(item.id)}
+                                                                onChange={() => toggleSelect(item.id)}
+                                                            />
+                                                        </label>
                                                         <div className="item-left">
                                                             <div className="item-vendor">{item.vendor_name}</div>
                                                             <div className="item-meta">
@@ -499,6 +583,46 @@ export default function PurchaseManagement() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    )}
+
+                    {/* ── Batch Action Bar ── */}
+                    {selectedIds.size > 0 && (
+                        <div className="batch-action-bar">
+                            <span className="batch-count">✅ {selectedIds.size}건 선택</span>
+                            <div className="batch-actions">
+                                <select
+                                    className="batch-category-select"
+                                    defaultValue=""
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            handleBatchCategory(e.target.value);
+                                            e.target.value = '';
+                                        }
+                                    }}
+                                >
+                                    <option value="" disabled>📂 카테고리 변경</option>
+                                    {EXPENSE_CATEGORIES.map(c => (
+                                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                                    ))}
+                                </select>
+                                {!isHouseholdMode && (
+                                    <button className="batch-btn personal" onClick={() => handleBatchCategory('개인생활비')}>
+                                        👤 개인비용 전환
+                                    </button>
+                                )}
+                                {isHouseholdMode && (
+                                    <button className="batch-btn business" onClick={() => handleBatchCategory('기타비용')}>
+                                        💼 사업비용 전환
+                                    </button>
+                                )}
+                                <button className="batch-btn delete" onClick={handleBatchDelete}>
+                                    🗑️ 삭제
+                                </button>
+                                <button className="batch-btn cancel" onClick={() => setSelectedIds(new Set())}>
+                                    ✕ 선택해제
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -563,6 +687,7 @@ export default function PurchaseManagement() {
                                                 <span className="ur-count">✅ {r.count}건 저장</span>
                                                 {r.skipped > 0 && <span className="ur-skipped">⏭️ {r.skipped}건 중복</span>}
                                                 {r.vendors_created > 0 && <span className="ur-vendors">🏪 {r.vendors_created}개 거래처 생성</span>}
+                                                {r.auto_classified > 0 && <span className="ur-auto">🤖 {r.auto_classified}건 자동분류</span>}
                                             </div>
                                         ) : (
                                             <div className="ur-error">❌ {r.message}</div>

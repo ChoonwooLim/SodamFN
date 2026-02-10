@@ -335,3 +335,17 @@ class UploadHistory(SQLModel, table=True):
     record_count: int = 0
     status: str = Field(default="active")  # 'active', 'rolled_back'
 
+
+# --- AI Auto-Learning Rules ---
+
+class VendorRule(SQLModel, table=True):
+    """사용자 행동으로부터 학습된 매입 분류 규칙"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    original_name: str = Field(index=True)  # 카드 명세서 원본 가맹점명
+    mapped_vendor_name: Optional[str] = None  # 사용자가 매핑한 거래처명 (병합 시)
+    category: Optional[str] = None  # 학습된 카테고리
+    confidence: int = Field(default=1)  # 규칙 적용/확인 횟수
+    source: str = Field(default="manual")  # 학습 출처: category_change, vendor_merge, toggle_personal, vendor_patch
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+

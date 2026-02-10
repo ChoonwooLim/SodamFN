@@ -280,6 +280,17 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
                     select(DailyExpense).where(DailyExpense.vendor_id == vendor_id)
                 ).all()
                 
+                # AI 학습: 이 벤더의 모든 거래처명에 대해 카테고리 규칙 학습
+                from services.smart_classifier import learn_rule
+                vendor_names = set(e.vendor_name for e in expenses)
+                for vname in vendor_names:
+                    learn_rule(
+                        original_name=vname,
+                        category=payload.category,
+                        source="vendor_patch",
+                        session=sync_session,
+                    )
+                
                 affected_months = set((e.date.year, e.date.month) for e in expenses)
                 
                 print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor category change")
@@ -342,7 +353,17 @@ def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = De
                     session.add(expense)
                     merged_count += 1
                 
-                # 4. Delete source vendor
+                # 4. AI 학습: 소스 거래처명 → 타겟 거래처명 매핑 학습
+                from services.smart_classifier import learn_rule
+                learn_rule(
+                    original_name=source.name,
+                    mapped_vendor_name=target.name,
+                    category=target.category,
+                    source="vendor_merge",
+                    session=session,
+                )
+                
+                # 5. Delete source vendor
                 deleted_vendors.append(source.name)
                 session.delete(source)
             
@@ -423,6 +444,16 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
                 # Skip if source is same as target
                 if src_name == payload.target_name:
                     continue
+                
+                # AI 학습: 소스 이름 → 타겟 이름 매핑
+                from services.smart_classifier import learn_rule
+                learn_rule(
+                    original_name=src_name,
+                    mapped_vendor_name=target_vendor.name,
+                    category=payload.category,
+                    source="vendor_merge",
+                    session=session,
+                )
                     
                 expenses = session.exec(
                     select(DailyExpense).where(DailyExpense.vendor_name == src_name)

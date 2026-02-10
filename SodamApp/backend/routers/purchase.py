@@ -197,6 +197,10 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         if not records:
             return {"status": "error", "message": "파싱된 매입 데이터가 없습니다. 파일 형식을 확인해주세요."}
         
+        # ─── AI 자동 분류 적용 ───
+        from services.smart_classifier import apply_rules
+        auto_classified_count = apply_rules(records)
+        
         card_company = records[0].get('card_company', '알수없음')
         
         # Create Upload History
@@ -300,11 +304,12 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         
         return {
             "status": "success",
-            "message": f"{card_company} {inserted_count}건 저장 완료 (중복 {skipped_count}건 제외, 신규 거래처 {vendor_created_count}개)",
+            "message": f"{card_company} {inserted_count}건 저장 완료 (중복 {skipped_count}건 제외, 신규 거래처 {vendor_created_count}개, 🤖자동분류 {auto_classified_count}건)",
             "card_company": card_company,
             "count": inserted_count,
             "skipped": skipped_count,
             "vendors_created": vendor_created_count,
+            "auto_classified": auto_classified_count,
             "upload_id": upload_id,
             "total_parsed": len(records),
         }
@@ -369,6 +374,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
 def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Depends(get_admin_user)):
     """Update a purchase entry."""
     from services.profit_loss_service import sync_all_expenses
+    from services.smart_classifier import learn_rule
     
     with Session(engine) as session:
         expense = session.get(DailyExpense, expense_id)
@@ -376,6 +382,8 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
             raise HTTPException(status_code=404, detail="매입 내역을 찾을 수 없습니다.")
         
         old_year, old_month = expense.date.year, expense.date.month
+        old_category = expense.category
+        original_vendor_name = expense.vendor_name
         
         if payload.amount is not None:
             expense.amount = payload.amount
@@ -397,17 +405,51 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
         session.add(expense)
         session.commit()
         
-        # Sync P/L for affected months
+        # ─── 카테고리 변경 시: 동일 업체 전체 자동 변경 + AI 학습 ───
+        same_vendor_updated = 0
+        affected_months = set()
+        affected_months.add((old_year, old_month))
+        affected_months.add((expense.date.year, expense.date.month))
+        
+        if payload.category is not None and payload.category != old_category:
+            source = "toggle_personal" if payload.category == "개인생활비" or old_category == "개인생활비" else "category_change"
+            learn_rule(
+                original_name=original_vendor_name,
+                category=payload.category,
+                source=source,
+                session=session,
+            )
+            
+            # 동일 업체명의 다른 매입 내역도 모두 같은 카테고리로 변경
+            same_vendor_expenses = session.exec(
+                select(DailyExpense).where(
+                    DailyExpense.vendor_name == original_vendor_name,
+                    DailyExpense.id != expense_id,
+                    DailyExpense.category != payload.category,
+                )
+            ).all()
+            
+            for sv_exp in same_vendor_expenses:
+                affected_months.add((sv_exp.date.year, sv_exp.date.month))
+                sv_exp.category = payload.category
+                session.add(sv_exp)
+                same_vendor_updated += 1
+            
+            session.commit()
+        
+        # Sync P/L for all affected months
         try:
-            sync_all_expenses(old_year, old_month, session)
-            new_year, new_month = expense.date.year, expense.date.month
-            if (new_year, new_month) != (old_year, old_month):
-                sync_all_expenses(new_year, new_month, session)
+            for y, m in affected_months:
+                sync_all_expenses(y, m, session)
             session.commit()
         except Exception:
             pass
         
-        return {"status": "success", "id": expense.id}
+        return {
+            "status": "success",
+            "id": expense.id,
+            "same_vendor_updated": same_vendor_updated,
+        }
 
 
 # ─── DELETE purchase ───
@@ -434,3 +476,24 @@ def delete_purchase(expense_id: int, _admin: User = Depends(get_admin_user)):
             pass
         
         return {"status": "success", "message": "삭제되었습니다."}
+
+
+# ─── Rules API (AI 학습 규칙 관리) ───
+
+@router.get("/api/purchase/rules")
+def get_classification_rules(_admin: User = Depends(get_admin_user)):
+    """학습된 자동 분류 규칙 목록 조회"""
+    from services.smart_classifier import get_rules
+    rules = get_rules()
+    return {"status": "success", "rules": rules, "count": len(rules)}
+
+
+@router.delete("/api/purchase/rules/{rule_id}")
+def delete_classification_rule(rule_id: int, _admin: User = Depends(get_admin_user)):
+    """학습된 규칙 삭제"""
+    from services.smart_classifier import delete_rule
+    success = delete_rule(rule_id)
+    if success:
+        return {"status": "success"}
+    raise HTTPException(status_code=404, detail="규칙을 찾을 수 없습니다.")
+
