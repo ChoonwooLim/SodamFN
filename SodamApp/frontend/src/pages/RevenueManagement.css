@@ -1554,3 +1554,245 @@
 .del-grid-table tbody tr:nth-child(even):hover {
     background: #f1f5f9;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — max-width: 768px
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* ── Page Container ── */
+    .revenue-page {
+        overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    .revenue-header {
+        padding: 16px 16px 14px;
+    }
+
+    .revenue-header-top {
+        margin-bottom: 0;
+    }
+
+    .revenue-header h1 {
+        font-size: 17px;
+        gap: 8px;
+    }
+
+    .revenue-month-nav {
+        gap: 8px;
+    }
+
+    .revenue-month-label {
+        font-size: 14px;
+        min-width: 90px;
+    }
+
+    /* ── Summary Cards: 3 → 2 columns ── */
+    .revenue-summary-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 0 12px;
+    }
+
+    .revenue-summary-card {
+        padding: 12px 14px;
+        border-radius: 12px;
+    }
+
+    .revenue-summary-card .card-value {
+        font-size: 16px;
+    }
+
+    .revenue-summary-card .card-label {
+        font-size: 11px;
+    }
+
+    /* ── Tab Bar ── */
+    .revenue-tab-bar {
+        padding: 12px 12px 0;
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .revenue-tab-bar>div[style*="display: flex"] {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .revenue-tab-bar>div[style*="display: flex"]::-webkit-scrollbar {
+        display: none;
+    }
+
+    .revenue-tab {
+        padding: 8px 12px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .view-mode-toggle {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        width: 100%;
+    }
+
+    .view-mode-toggle::-webkit-scrollbar {
+        display: none;
+    }
+
+    .view-mode-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    /* ── Content Area ── */
+    .revenue-content {
+        margin: 0 8px 80px;
+        border-radius: 12px;
+    }
+
+    /* ── Toolbar ── */
+    .revenue-toolbar {
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .revenue-add-btn {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+
+    /* ── List View: table → card layout ── */
+    .revenue-table {
+        display: block;
+    }
+
+    .revenue-table thead {
+        display: none;
+    }
+
+    .revenue-table tbody {
+        display: block;
+    }
+
+    .revenue-table tbody tr {
+        display: block;
+        padding: 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .revenue-table tbody tr.day-group-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 12px;
+    }
+
+    .revenue-table tbody tr.day-group-header td {
+        padding: 0;
+        border: none;
+        background: transparent;
+    }
+
+    .revenue-table tbody tr.day-group-header td[colspan] {
+        flex: 1;
+    }
+
+    .revenue-table tbody tr.revenue-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        padding: 10px 12px;
+        gap: 4px;
+    }
+
+    .revenue-table tbody tr.toggle-summary-row {
+        display: flex;
+        align-items: center;
+        padding: 8px 12px;
+    }
+
+    .revenue-table .td-date {
+        width: auto;
+        min-width: auto;
+        font-size: 12px;
+        margin-right: 8px;
+    }
+
+    .revenue-table .td-vendor {
+        font-size: 13px;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .revenue-table .td-category {
+        width: auto;
+    }
+
+    .revenue-table .td-amount {
+        min-width: auto;
+        font-size: 14px;
+    }
+
+    .revenue-table .td-note {
+        display: none;
+    }
+
+    .revenue-table .td-actions {
+        width: auto;
+    }
+
+    .revenue-table .td-actions .rev-action-btn {
+        padding: 4px;
+    }
+
+    /* ── Desktop-only notice (for grid views) ── */
+    .desktop-only-notice {
+        text-align: center;
+        padding: 48px 24px;
+        color: #64748b;
+    }
+
+    .desktop-only-notice .notice-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+
+    .desktop-only-notice h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #475569;
+        margin: 0 0 8px;
+    }
+
+    .desktop-only-notice p {
+        font-size: 13px;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    /* ── Modal ── */
+    .revenue-modal {
+        width: auto;
+        margin: 16px;
+        padding: 20px;
+    }
+
+    /* ── Loading ── */
+    .revenue-loading {
+        padding: 32px;
+    }
+
+    /* ── Empty State ── */
+    .revenue-empty {
+        padding: 32px 16px;
+    }
+}

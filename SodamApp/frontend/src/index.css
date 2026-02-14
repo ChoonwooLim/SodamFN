@@ -33,6 +33,17 @@
     }
 }
 
+/* Mobile: prevent horizontal scroll globally */
+@media (max-width: 768px) {
+
+    html,
+    body,
+    #root {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+}
+
 @layer utilities {
     .pb-safe {
         padding-bottom: env(safe-area-inset-bottom);
@@ -50,4 +61,25 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+}
+
+/* PWA Standalone Mode Styles */
+@media all and (display-mode: standalone) {
+    body {
+        /* Account for status bar in standalone mode */
+        padding-top: env(safe-area-inset-top, 0px);
+    }
+}
+
+/* Bottom nav clearance for mobile */
+@media (max-width: 767px) {
+    .pb-32 {
+        padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+/* Smooth touch scrolling */
+* {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
 }

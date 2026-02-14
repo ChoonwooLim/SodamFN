@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, TrendingUp, Camera, Fil
 import axios from 'axios';
 import api from '../api';
 import UploadHistoryList from '../components/UploadHistoryList';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import './RevenueManagement.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -49,6 +50,7 @@ function getWeekday(dateStr) {
 
 export default function RevenueManagement() {
     const navigate = useNavigate();
+    const isMobile = useIsMobile();
     const now = new Date();
     const [year, setYear] = useState(now.getFullYear());
     const [month, setMonth] = useState(now.getMonth() + 1);
@@ -839,7 +841,15 @@ export default function RevenueManagement() {
             {/* ═══════════════════════════════════════════ */}
             {/* GRID VIEW — Monthly Full View */}
             {/* ═══════════════════════════════════════════ */}
-            {viewMode === 'grid' && (
+            {viewMode === 'grid' && isMobile ? (
+                <div className="revenue-content">
+                    <div className="desktop-only-notice">
+                        <div className="notice-icon">🖥️</div>
+                        <h3>월별 상세 내역은 PC에서 확인해주세요</h3>
+                        <p>31일 × 거래처 그리드는 넓은 화면에서 최적화되어 있습니다.<br />📋 리스트 탭에서 데이터를 확인하실 수 있습니다.</p>
+                    </div>
+                </div>
+            ) : viewMode === 'grid' && (
                 <div className="revenue-content grid-mode">
                     <div className="grid-header-bar">
                         <div className="grid-stats">
@@ -924,7 +934,15 @@ export default function RevenueManagement() {
             {/* ═══════════════════════════════════════════ */}
             {/* REVENUE DETAIL VIEW — 수입상세 (Annual 12-month matrix) */}
             {/* ═══════════════════════════════════════════ */}
-            {viewMode === 'revenueDetail' && (() => {
+            {viewMode === 'revenueDetail' && isMobile ? (
+                <div className="revenue-content">
+                    <div className="desktop-only-notice">
+                        <div className="notice-icon">🖥️</div>
+                        <h3>매출요약은 PC에서 확인해주세요</h3>
+                        <p>12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
+                    </div>
+                </div>
+            ) : viewMode === 'revenueDetail' && (() => {
                 const getPlMonth = (m) => plData.find(d => d.month === m) || {};
                 const calcPlTotal = (field) => plData.reduce((s, d) => s + (d[field] || 0), 0);
                 const calcPlAvg = (field) => { const t = calcPlTotal(field); const months = plData.filter(d => PL_REVENUE_FIELDS.some(f => d[f.key] > 0)).length || 1; return Math.round(t / months); };
@@ -1014,7 +1032,15 @@ export default function RevenueManagement() {
                 );
             })()}
 
-            {viewMode === 'deliveryApp' && (() => {
+            {viewMode === 'deliveryApp' && isMobile ? (
+                <div className="revenue-content">
+                    <div className="desktop-only-notice">
+                        <div className="notice-icon">🖥️</div>
+                        <h3>배달앱 상세 내역은 PC에서 확인해주세요</h3>
+                        <p>배달앱 비교 분석 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
+                    </div>
+                </div>
+            ) : viewMode === 'deliveryApp' && (() => {
                 const monthly = deliveryAppData?.monthly || [];
                 const channelTotals = deliveryAppData?.channel_totals || {};
                 const CHANNEL_ICONS = { '쿠팡': '🟡', '배민': '🔵', '요기요': '🔴', '땡겨요': '🟢' };

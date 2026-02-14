@@ -897,21 +897,6 @@
     background: rgba(255, 255, 255, 0.2);
 }
 
-@media (max-width: 768px) {
-    .purchase-summary-row {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .purchase-content,
-    .purchase-dashboard {
-        margin: 0 16px 20px;
-    }
-
-    .purchase-header {
-        padding: 20px;
-    }
-}
-
 /* ── Category Helper ── */
 .purchase-page .category-helper-btn {
     display: inline-flex;
@@ -946,4 +931,313 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — max-width: 768px
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+
+    /* ── Page Container ── */
+    .purchase-page {
+        overflow-x: hidden;
+    }
+
+    /* ── Header ── */
+    .purchase-header {
+        padding: 16px 16px 14px;
+    }
+
+    .purchase-header-top {
+        margin-bottom: 0;
+    }
+
+    .purchase-header h1 {
+        font-size: 17px;
+        gap: 8px;
+    }
+
+    .purchase-month-nav {
+        gap: 8px;
+    }
+
+    .purchase-month-label {
+        font-size: 14px;
+        min-width: 90px;
+    }
+
+    /* ── Summary Cards: 4 → 2 columns ── */
+    .purchase-summary-row {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        padding: 0 12px;
+        margin-top: -4px;
+    }
+
+    .purchase-summary-card {
+        padding: 12px 14px;
+        border-radius: 12px;
+    }
+
+    .purchase-summary-card .card-value {
+        font-size: 16px;
+    }
+
+    .purchase-summary-card .card-label {
+        font-size: 11px;
+    }
+
+    .purchase-summary-card .card-sub {
+        font-size: 10px;
+    }
+
+    /* ── Tab Bar ── */
+    .purchase-tab-bar {
+        padding: 12px 12px 0;
+        justify-content: center;
+        margin-bottom: 12px;
+    }
+
+    .purchase-page .view-mode-toggle {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        width: 100%;
+    }
+
+    .purchase-page .view-mode-toggle::-webkit-scrollbar {
+        display: none;
+    }
+
+    .purchase-page .view-mode-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    /* ── Content / Dashboard Area ── */
+    .purchase-content,
+    .purchase-dashboard {
+        margin: 0 8px 80px;
+        border-radius: 12px;
+    }
+
+    /* ── Dashboard View ── */
+    .dashboard-section {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .dashboard-section h3 {
+        font-size: 14px;
+        margin: 0 0 14px;
+    }
+
+    /* Card/Bank side-by-side → stacked */
+    .purchase-dashboard>div[style*="display: flex"] {
+        flex-direction: column !important;
+    }
+
+    .card-company-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .card-company-item {
+        padding: 12px;
+    }
+
+    .cc-name {
+        font-size: 12px;
+    }
+
+    .cc-amount {
+        font-size: 14px;
+    }
+
+    /* Top Vendors */
+    .top-vendor-item {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .tv-name {
+        font-size: 13px;
+    }
+
+    .tv-amount {
+        font-size: 13px;
+    }
+
+    /* ── Toolbar: horizontal → vertical ── */
+    .purchase-toolbar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        align-items: stretch;
+    }
+
+    .toolbar-left {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .purchase-page .search-box {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .purchase-page .search-box input {
+        width: 100%;
+    }
+
+    .purchase-page .category-filter {
+        flex: 1;
+        min-width: 0;
+        font-size: 12px;
+        padding: 8px 8px;
+    }
+
+    .toolbar-right {
+        justify-content: space-between;
+    }
+
+    .purchase-add-btn {
+        font-size: 12px;
+        padding: 8px 12px;
+    }
+
+    /* ── Day Group Headers ── */
+    .purchase-page .day-group-header {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .purchase-page .day-date {
+        font-size: 13px;
+    }
+
+    .purchase-page .day-total {
+        font-size: 13px;
+    }
+
+    /* ── Purchase Items: remove fixed width ── */
+    .purchase-page .purchase-item {
+        padding: 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .purchase-page .item-left {
+        width: auto;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .purchase-page .item-vendor {
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .purchase-page .item-meta {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .purchase-page .card-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+    }
+
+    .purchase-page .cat-badge {
+        font-size: 11px;
+    }
+
+    .purchase-page .item-right {
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .purchase-page .item-amount {
+        font-size: 14px;
+        min-width: auto;
+    }
+
+    .purchase-page .item-actions {
+        opacity: 1;
+        gap: 4px;
+    }
+
+    .purchase-page .action-btn {
+        width: 28px;
+        height: 28px;
+    }
+
+    /* ── Upload View ── */
+    .purchase-upload {
+        padding: 12px;
+    }
+
+    .upload-section {
+        padding: 16px;
+        border-radius: 12px;
+    }
+
+    .upload-dropzone {
+        padding: 32px 16px;
+    }
+
+    .supported-cards {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    /* ── Batch Action Bar ── */
+    .purchase-page .batch-action-bar {
+        padding: 10px 12px;
+        flex-direction: column;
+        gap: 8px;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .purchase-page .batch-actions {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .purchase-page .batch-btn {
+        padding: 6px 10px;
+        font-size: 11px;
+    }
+
+    .purchase-page .batch-category-select {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+
+    /* ── Modal ── */
+    .purchase-page .modal-content {
+        margin: 16px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .purchase-page .category-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .purchase-page .category-chip {
+        font-size: 11px;
+        padding: 4px 10px;
+    }
+
+    /* ── Household Badge ── */
+    .household-badge {
+        font-size: 11px;
+    }
 }

@@ -243,15 +243,28 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
                 delivery_totals[field] = delivery_totals.get(field, 0) + (dr.settlement_amount or 0)
 
     # Also sync revenue_store from store category
-    store_records = session.exec(
-        select(DailyExpense)
-        .where(
-            DailyExpense.category == "store",
-            DailyExpense.date >= start_date,
-            DailyExpense.date < end_date,
+    # FIX: Use vendor_id to identify store revenue, not just category label
+    # This ensures we catch all records from store vendors even if category is missing/mismatched on the record
+    store_vendors = session.exec(
+        select(Vendor).where(
+            Vendor.vendor_type == "revenue", 
+            Vendor.category == "store"
         )
     ).all()
-    store_total = sum(r.amount or 0 for r in store_records)
+    store_vendor_ids = [v.id for v in store_vendors]
+
+    if store_vendor_ids:
+        store_records = session.exec(
+            select(DailyExpense)
+            .where(
+                DailyExpense.vendor_id.in_(store_vendor_ids),
+                DailyExpense.date >= start_date,
+                DailyExpense.date < end_date,
+            )
+        ).all()
+        store_total = sum(r.amount or 0 for r in store_records)
+    else:
+        store_total = 0
 
     # All managed fields
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}

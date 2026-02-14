@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../api';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import './ProfitLoss.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; // Keep for now if needed, but api client handles base URL
@@ -64,6 +65,7 @@ function formatNumber(num) {
 }
 
 export default function ProfitLoss() {
+    const isMobile = useIsMobile();
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingCell, setEditingCell] = useState(null);
@@ -807,10 +809,23 @@ export default function ProfitLoss() {
 
             {/* Tab Content */}
             <div className="tab-content">
-                {activeTab === 'summary' && renderSummaryTable()}
-                {activeTab === 'expenses' && renderExpenseDetail()}
-                {activeTab === 'analysis' && renderAnalysis()}
-                {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
+                {isMobile ? (
+                    <div className="desktop-only-notice" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
+                        <div style={{ fontSize: 48, marginBottom: 16 }}>🖥️</div>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#475569', margin: '0 0 8px' }}>손익계산서는 PC에서 확인해주세요</h3>
+                        <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+                            12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.<br />
+                            📊 대시보드에서 간단한 손익 현황을 확인하실 수 있습니다.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        {activeTab === 'summary' && renderSummaryTable()}
+                        {activeTab === 'expenses' && renderExpenseDetail()}
+                        {activeTab === 'analysis' && renderAnalysis()}
+                        {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
+                    </>
+                )}
             </div>
         </div>
     );

@@ -654,12 +654,23 @@ class ExcelService:
                 date_str = str(date_val)[:10]
             
             total = int(row.iloc[6]) if pd.notna(row.iloc[6]) and row.iloc[6] != 0 else 0
-            cash = int(row.iloc[14]) if pd.notna(row.iloc[14]) and row.iloc[14] != 0 else 0
-            card = int(row.iloc[15]) if pd.notna(row.iloc[15]) and row.iloc[15] != 0 else 0
+            cash_net = int(row.iloc[14]) if pd.notna(row.iloc[14]) and row.iloc[14] != 0 else 0
+            card_net = int(row.iloc[15]) if pd.notna(row.iloc[15]) and row.iloc[15] != 0 else 0
             
             if total == 0:
                 continue
             
+            # FIX: User wants Gross Sales (inc. VAT).
+            # iloc[6] is Total Gross. iloc[14/15] are Net.
+            # We calculate ratio to scale Net -> Gross.
+            net_sum = cash_net + card_net
+            vat_ratio = (total / net_sum) if net_sum > 0 else 1.0
+            
+            # If ratio is close to 1.1, apply it. If it's 1.0, data is already Gross.
+            # Just apply generally to align with Total Gross.
+            cash = int(cash_net * vat_ratio)
+            card = int(card_net * vat_ratio)
+
             if date_range[0] is None:
                 date_range[0] = date_str
             date_range[1] = date_str
@@ -682,7 +693,7 @@ class ExcelService:
                     'payment_type': 'card',
                 })
             
-            total_amount += total
+            total_amount += (cash + card)
         
         return {
             "status": "success",
