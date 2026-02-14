@@ -54,16 +54,11 @@
 /* ── Category Tabs ── */
 .recipe-tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     padding: 14px 24px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     background: white;
     border-bottom: 1px solid #eee;
-}
-
-.recipe-tabs::-webkit-scrollbar {
-    display: none;
 }
 
 .recipe-tab {
@@ -562,7 +557,9 @@
     .recipe-page {
         overflow-x: hidden;
         overflow-y: auto;
-        padding-bottom: 80px;
+        height: auto;
+        min-height: 100vh;
+        padding-bottom: 100px;
         -webkit-overflow-scrolling: touch;
     }
 
@@ -581,6 +578,9 @@
     .recipe-tabs {
         padding: 10px 12px;
         gap: 5px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
     }
 
     .recipe-tab {
@@ -588,33 +588,76 @@
         font-size: 12px;
     }
 
+    /* ── Mobile Grid: compact list ── */
     .recipe-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-        padding: 12px 12px 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 14px 120px;
     }
 
-    .recipe-card-info {
-        padding: 8px 10px;
+    /* ── Mobile Card: horizontal compact ── */
+    .recipe-card {
+        flex-direction: row;
+        align-items: center;
+        border-radius: 12px;
+        overflow: hidden;
+        min-height: 0;
     }
 
-    .recipe-card-title {
-        font-size: 12px;
+    .recipe-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     }
 
-    .recipe-card-badge {
-        font-size: 9px;
-        padding: 2px 5px;
+    .recipe-card-placeholder {
+        aspect-ratio: unset;
+        width: 72px;
+        height: 72px;
+        min-width: 72px;
+        flex-shrink: 0;
+        border-bottom: none;
+        border-right: 1px solid #f0ebe3;
+        border-radius: 0;
+        gap: 2px;
     }
 
     .recipe-card-placeholder .placeholder-emoji {
-        font-size: 40px;
+        font-size: 28px;
     }
 
     .recipe-card-placeholder .placeholder-name {
-        font-size: 12px;
+        display: none;
     }
 
+    .recipe-card-image {
+        aspect-ratio: unset;
+        width: 72px;
+        height: 72px;
+        min-width: 72px;
+        flex-shrink: 0;
+        object-fit: cover;
+    }
+
+    .recipe-card-info {
+        flex: 1;
+        padding: 12px 14px;
+        border-top: none;
+        min-width: 0;
+    }
+
+    .recipe-card-title {
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .recipe-card-badge {
+        font-size: 10px;
+        padding: 3px 8px;
+        border-radius: 10px;
+    }
+
+    /* ── Mobile Lightbox ── */
     .recipe-lightbox {
         padding: 16px;
     }
