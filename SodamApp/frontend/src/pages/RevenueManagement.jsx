@@ -618,7 +618,7 @@ export default function RevenueManagement() {
             </div>
 
             {/* ── Summary Cards (monthly views only) ── */}
-            {(viewMode === 'list' || viewMode === 'grid' || viewMode === 'upload') && (
+            {(viewMode === 'dashboard' || viewMode === 'list' || viewMode === 'grid' || viewMode === 'upload') && (
                 <div className="revenue-summary-row" style={{ marginTop: 20 }}>
                     <div className="revenue-summary-card">
                         <div className="card-label">💵 현금매출</div>
@@ -664,6 +664,12 @@ export default function RevenueManagement() {
                 {!(viewMode === 'list' || viewMode === 'grid') && <div />}
                 <div className="view-mode-toggle">
                     <button
+                        className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
+                        onClick={() => setViewMode('dashboard')}
+                    >
+                        📊 대시보드
+                    </button>
+                    <button
                         className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
                         onClick={() => setViewMode('list')}
                     >
@@ -695,6 +701,105 @@ export default function RevenueManagement() {
                     </button>
                 </div>
             </div>
+
+            {/* ═══════════════════════════════════════════ */}
+            {/* DASHBOARD VIEW */}
+            {/* ═══════════════════════════════════════════ */}
+            {viewMode === 'dashboard' && (() => {
+                const totalAmt = summary.total || 0;
+                const cashAmt = summary.by_category?.cash || 0;
+                const cardAmt = summary.by_category?.card || 0;
+                const deliveryAmt = summary.by_category?.delivery || 0;
+                const byDay = summary.by_day || [];
+                const byVendor = (summary.by_vendor || []).slice(0, 10);
+                const maxDayTotal = Math.max(...byDay.map(d => d.total || 0), 1);
+
+                const CHANNELS = [
+                    { key: 'cash', label: '현금매출', icon: '💵', color: '#10b981', amount: cashAmt },
+                    { key: 'card', label: '카드매출', icon: '💳', color: '#3b82f6', amount: cardAmt },
+                    { key: 'delivery', label: '배달앱매출', icon: '🛵', color: '#f59e0b', amount: deliveryAmt },
+                ];
+
+                return (
+                    <div className="revenue-dashboard">
+                        {/* Channel Breakdown */}
+                        <div className="rev-dash-section">
+                            <h3>📊 채널별 매출 비중</h3>
+                            <div className="rev-channel-bars">
+                                {CHANNELS.map(ch => {
+                                    const pct = totalAmt > 0 ? (ch.amount / totalAmt * 100) : 0;
+                                    return (
+                                        <div className="rev-channel-bar-item" key={ch.key}>
+                                            <div className="bar-label">
+                                                <span>{ch.icon} {ch.label}</span>
+                                                <span className="bar-amount">{formatNumber(ch.amount)}원 ({pct.toFixed(1)}%)</span>
+                                            </div>
+                                            <div className="bar-track">
+                                                <div className="bar-fill" style={{ width: `${pct}%`, background: ch.color }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Daily Revenue Chart */}
+                        <div className="rev-dash-section">
+                            <h3>📈 일별 매출 추이</h3>
+                            {byDay.length > 0 ? (
+                                <div className="rev-daily-chart">
+                                    {byDay.map(d => {
+                                        const dayNum = d.date.split('-')[2];
+                                        const pct = (d.total / maxDayTotal) * 100;
+                                        return (
+                                            <div className="rev-daily-bar" key={d.date}>
+                                                <div className="daily-bar-stack">
+                                                    {d.delivery > 0 && (
+                                                        <div className="daily-bar-seg delivery" style={{ height: `${(d.delivery / maxDayTotal) * 100}%` }} title={`배달 ${formatNumber(d.delivery)}`} />
+                                                    )}
+                                                    {d.card > 0 && (
+                                                        <div className="daily-bar-seg card" style={{ height: `${(d.card / maxDayTotal) * 100}%` }} title={`카드 ${formatNumber(d.card)}`} />
+                                                    )}
+                                                    {d.cash > 0 && (
+                                                        <div className="daily-bar-seg cash" style={{ height: `${(d.cash / maxDayTotal) * 100}%` }} title={`현금 ${formatNumber(d.cash)}`} />
+                                                    )}
+                                                </div>
+                                                <span className="daily-bar-label">{dayNum}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>데이터가 없습니다</div>
+                            )}
+                            <div className="rev-daily-legend">
+                                <span><span className="legend-dot" style={{ background: '#10b981' }} />현금</span>
+                                <span><span className="legend-dot" style={{ background: '#3b82f6' }} />카드</span>
+                                <span><span className="legend-dot" style={{ background: '#f59e0b' }} />배달앱</span>
+                            </div>
+                        </div>
+
+                        {/* Top Vendors */}
+                        <div className="rev-dash-section">
+                            <h3>🏆 TOP {byVendor.length} 거래처</h3>
+                            <div className="rev-top-vendors">
+                                {byVendor.length > 0 ? byVendor.map((v, i) => (
+                                    <div className="rev-vendor-item" key={v.name}>
+                                        <span className={`tv-rank ${i < 3 ? 'top3' : ''}`}>{i + 1}</span>
+                                        <span className="tv-name">{v.name}</span>
+                                        <span className={`tv-cat-badge ${v.category}`}>
+                                            {v.category === 'cash' ? '💵' : v.category === 'card' ? '💳' : '🛵'}
+                                        </span>
+                                        <span className="tv-amount">{formatNumber(v.total)}원</span>
+                                    </div>
+                                )) : (
+                                    <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>거래처 데이터가 없습니다</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ═══════════════════════════════════════════ */}
             {/* LIST VIEW */}

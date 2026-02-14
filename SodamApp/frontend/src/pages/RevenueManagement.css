@@ -1556,6 +1556,207 @@
 }
 
 /* ═══════════════════════════════════════════════════════════
+   REVENUE DASHBOARD
+   ═══════════════════════════════════════════════════════════ */
+.revenue-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 0 24px 80px;
+}
+
+.rev-dash-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
+}
+
+.rev-dash-section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 20px;
+}
+
+/* ── Channel Bars ── */
+.rev-channel-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.rev-channel-bar-item .bar-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.rev-channel-bar-item .bar-amount {
+    font-weight: 700;
+    color: #1e293b;
+    font-variant-numeric: tabular-nums;
+}
+
+.rev-channel-bar-item .bar-track {
+    height: 10px;
+    border-radius: 5px;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.rev-channel-bar-item .bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    min-width: 2px;
+}
+
+/* ── Daily Revenue Chart ── */
+.rev-daily-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 200px;
+    padding: 8px 0;
+}
+
+.rev-daily-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    min-width: 0;
+}
+
+.daily-bar-stack {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 1px;
+    border-radius: 3px 3px 0 0;
+    overflow: hidden;
+}
+
+.daily-bar-seg {
+    width: 100%;
+    border-radius: 2px;
+    transition: height 0.4s ease;
+    min-height: 1px;
+}
+
+.daily-bar-seg.cash {
+    background: #10b981;
+}
+
+.daily-bar-seg.card {
+    background: #3b82f6;
+}
+
+.daily-bar-seg.delivery {
+    background: #f59e0b;
+}
+
+.daily-bar-label {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+.rev-daily-legend {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.rev-daily-legend .legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* ── Top Vendors ── */
+.rev-top-vendors {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.rev-vendor-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f8fafc;
+    transition: background 0.2s, transform 0.15s;
+}
+
+.rev-vendor-item:hover {
+    background: #f1f5f9;
+    transform: translateX(2px);
+}
+
+.rev-vendor-item .tv-rank {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.rev-vendor-item .tv-rank.top3 {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: white;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
+}
+
+.rev-vendor-item .tv-name {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rev-vendor-item .tv-cat-badge {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.rev-vendor-item .tv-amount {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
    MOBILE RESPONSIVE — max-width: 768px
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
