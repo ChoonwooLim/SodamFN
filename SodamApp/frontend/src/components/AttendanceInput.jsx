@@ -216,25 +216,23 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
                 {/* Header */}
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-indigo-600" />
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b flex justify-between items-start bg-slate-50 gap-2">
+                    <div className="min-w-0">
+                        <h2 className="text-base sm:text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Calendar className="w-5 h-5 text-indigo-600 flex-shrink-0" />
                             근무 기록 입력 및 급여 산출
                         </h2>
-                        <div className="flex items-center gap-4 mt-1">
-                            <p className="text-sm text-slate-500">
-                                <span className="font-semibold text-indigo-700">{staffName}</span> 님의 {month} 근무 내역
-                            </p>
-                            <div className="flex gap-2 text-[10px] font-bold uppercase tracking-wider">
-                                <span className="flex items-center gap-1 text-slate-400"><span className="w-2 h-2 rounded-full bg-slate-200"></span> 정상</span>
-                                <span className="flex items-center gap-1 text-red-500"><span className="w-2 h-2 rounded-full bg-red-400"></span> 결근(주휴X)</span>
-                                <span className="flex items-center gap-1 text-blue-500"><span className="w-2 h-2 rounded-full bg-blue-400"></span> 개인휴무</span>
-                                <span className="flex items-center gap-1 text-amber-600"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> 임시공휴일</span>
-                            </div>
+                        <p className="text-sm text-slate-500 mt-1">
+                            <span className="font-semibold text-indigo-700">{staffName}</span> 님의 {month} 근무 내역
+                        </p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[10px] font-bold uppercase tracking-wider">
+                            <span className="flex items-center gap-1 text-slate-400 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-slate-200"></span> 정상</span>
+                            <span className="flex items-center gap-1 text-red-500 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-red-400"></span> 결근(주휴X)</span>
+                            <span className="flex items-center gap-1 text-blue-500 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-blue-400"></span> 개인휴무</span>
+                            <span className="flex items-center gap-1 text-amber-600 whitespace-nowrap"><span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> 임시공휴일</span>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors flex-shrink-0">
                         <X className="w-6 h-6 text-slate-400" />
                     </button>
                 </div>
@@ -308,20 +306,20 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                 </div>
 
                 {/* Footer */}
-                <div className="p-6 border-t bg-white flex justify-end gap-3">
+                <div className="p-4 sm:p-6 border-t bg-white flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
                     <button
                         onClick={handleSave}
                         disabled={saving || calculating}
-                        className="flex items-center gap-2 px-6 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-all disabled:opacity-50 whitespace-nowrap text-sm"
                     >
-                        {saving ? '저장 중...' : <><Save className="w-5 h-5" /> 기록 저장</>}
+                        {saving ? '저장 중...' : <><Save className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" /> 기록 저장</>}
                     </button>
                     <button
                         onClick={handleCalculate}
                         disabled={saving || calculating}
-                        className="flex items-center gap-2 px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-8 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 whitespace-nowrap text-sm"
                     >
-                        {calculating ? '산출 중...' : <><Calculator className="w-5 h-5" /> 급여 산출 및 명세서 생성</>}
+                        {calculating ? '산출 중...' : <><Calculator className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" /> 급여 산출 및 명세서 생성</>}
                     </button>
                 </div>
             </div>

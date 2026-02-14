@@ -52,10 +52,11 @@ export default function RevenueManagement() {
     const navigate = useNavigate();
     const isMobile = useIsMobile();
     const now = new Date();
-    const [year, setYear] = useState(now.getFullYear());
-    const [month, setMonth] = useState(now.getMonth() + 1);
+    const defaultMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const [year, setYear] = useState(defaultMonth.getFullYear());
+    const [month, setMonth] = useState(defaultMonth.getMonth() + 1);
     const [tab, setTab] = useState('all'); // all | store | delivery
-    const [viewMode, setViewMode] = useState('list'); // list | grid | revenueDetail | deliveryApp | upload
+    const [viewMode, setViewMode] = useState('dashboard'); // dashboard | list | grid | revenueDetail | deliveryApp | upload
     const [data, setData] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [summary, setSummary] = useState({ total: 0, by_category: {} });

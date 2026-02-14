@@ -1323,3 +1323,295 @@
     color: #854d0e !important;
     font-weight: 800 !important;
 }
+
+/* ═══════════════════════════════════════════ */
+/* P&L DASHBOARD STYLES                       */
+/* ═══════════════════════════════════════════ */
+
+.pl-dashboard {
+    padding: 8px 0;
+}
+
+/* Metric Cards */
+.pl-dash-cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.pl-dash-card {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
+}
+
+.pl-dash-card.revenue {
+    border-left: 4px solid #3b82f6;
+}
+
+.pl-dash-card.expense {
+    border-left: 4px solid #ef4444;
+}
+
+.pl-dash-card.profit {
+    border-left: 4px solid #10b981;
+}
+
+.pl-dash-card.margin {
+    border-left: 4px solid #f59e0b;
+}
+
+.pl-dash-card-icon {
+    font-size: 28px;
+    flex-shrink: 0;
+}
+
+.pl-dash-card-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.pl-dash-card-label {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pl-dash-card-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pl-dash-card-value.positive {
+    color: #10b981;
+}
+
+.pl-dash-card-value.negative {
+    color: #ef4444;
+}
+
+/* Dashboard Section */
+.pl-dash-section {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
+}
+
+.pl-dash-section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 16px 0;
+}
+
+/* Annual Summary */
+.pl-annual-summary {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.pl-annual-item {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.pl-annual-item.highlight {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    border: 1px solid #a7f3d0;
+}
+
+.pl-annual-item .label {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.pl-annual-item .value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.pl-annual-item .value.expense {
+    color: #ef4444;
+}
+
+.pl-annual-item .value.positive {
+    color: #10b981;
+}
+
+.pl-annual-item .value.negative {
+    color: #ef4444;
+}
+
+/* Monthly Chart */
+.pl-monthly-chart {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 160px;
+    padding: 0 4px;
+}
+
+.pl-month-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.pl-month-bars {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    min-height: 100px;
+}
+
+.pl-bar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    transition: height 0.3s ease;
+}
+
+.pl-bar.revenue {
+    background: #3b82f6;
+}
+
+.pl-bar.expense {
+    background: #ef4444;
+    opacity: 0.7;
+}
+
+.pl-month-label {
+    font-size: 10px;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.pl-month-profit {
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.pl-month-profit.positive {
+    color: #10b981;
+}
+
+.pl-month-profit.negative {
+    color: #ef4444;
+}
+
+.pl-chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.pl-chart-legend .legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+/* Expense Breakdown */
+.pl-expense-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pl-expense-bar-item .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.pl-expense-bar-item .bar-amount {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.pl-expense-bar-item .bar-track {
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.pl-expense-bar-item .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Desktop: wider cards */
+@media (min-width: 768px) {
+    .pl-dash-cards {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .pl-annual-summary {
+        grid-template-columns: repeat(4, 1fr);
+    }
+
+    .pl-dashboard {
+        max-width: 900px;
+    }
+
+    .pl-dash-card-value {
+        font-size: 18px;
+    }
+}
+
+/* Mobile adjustments */
+@media (max-width: 767px) {
+    .pl-dash-card {
+        padding: 12px;
+    }
+
+    .pl-dash-card-icon {
+        font-size: 24px;
+    }
+
+    .pl-dash-card-value {
+        font-size: 14px;
+    }
+
+    .pl-monthly-chart {
+        height: 130px;
+    }
+}

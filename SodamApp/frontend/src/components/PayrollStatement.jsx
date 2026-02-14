@@ -279,26 +279,26 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 no-print">
+            <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-2 no-print">
                 <div
-                    className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col h-[98vh] my-auto"
-                    style={{ width: 'min(98vh * 210/297, 98vw)' }}
+                    className="bg-white sm:rounded-xl shadow-2xl overflow-hidden flex flex-col w-full h-full sm:h-[98vh] sm:my-auto"
+                    style={{ maxWidth: 'min(98vh * 210/297, 98vw)' }}
                 >
                     {/* Header */}
-                    <div className="p-3 border-b flex justify-between items-center bg-white">
+                    <div className="px-3 py-2 border-b flex justify-between items-center bg-white flex-shrink-0">
                         <h3 className="font-bold text-slate-800 text-sm">급여명세서 미리보기</h3>
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-2 sm:gap-4 items-center">
                             <button
                                 onClick={handlePrint}
-                                className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-bold shadow-md active:scale-95"
+                                className="flex items-center gap-1.5 px-3 sm:px-6 py-1.5 sm:py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs sm:text-sm font-bold shadow-md active:scale-95 whitespace-nowrap"
                             >
-                                <Printer size={18} /> 인쇄하기
+                                <Printer size={16} /> 인쇄하기
                             </button>
                             <button
                                 onClick={onClose}
                                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
                             >
-                                <X size={24} />
+                                <X size={22} />
                             </button>
                         </div>
                     </div>
@@ -306,7 +306,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                     {/* Preview Content Container - Scaled */}
                     <div
                         ref={containerRef}
-                        className="flex-1 bg-slate-100 flex items-center justify-center overflow-hidden"
+                        className="flex-1 bg-slate-100 flex items-start sm:items-center justify-center overflow-hidden p-1 sm:p-0"
                     >
                         <PayrollPaper staff={staff} payroll={payroll} scale={scale} isPrint={false} />
                     </div>

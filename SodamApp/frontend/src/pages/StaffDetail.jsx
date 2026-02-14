@@ -949,12 +949,12 @@ export default function StaffDetail() {
                 </div>
                 {/* 5. Payroll History (Full Width) */}
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
-                    <div className="flex items-center justify-between mb-6 border-b pb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 border-b pb-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><CreditCard size={24} /></div>
-                            <h2 className="text-lg font-bold text-slate-800">월별 급여 지급 내역</h2>
+                            <h2 className="text-lg font-bold text-slate-800 whitespace-nowrap">월별 급여 지급 내역</h2>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <input
                                 type="month"
                                 value={currentBudgetMonth}
@@ -963,16 +963,16 @@ export default function StaffDetail() {
                             />
                             <button
                                 onClick={() => setIsAttendanceModalOpen(true)}
-                                className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm transition-all"
+                                className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm transition-all whitespace-nowrap"
                             >
-                                <Calendar size={18} /> 출퇴근/정산
+                                <Calendar size={14} /> 출퇴근/정산
                             </button>
                             <button
                                 onClick={handleSendAttendanceRequest}
-                                className="flex items-center gap-2 bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-emerald-600 shadow-sm transition-all"
+                                className="flex items-center gap-1 bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-600 shadow-sm transition-all whitespace-nowrap"
                                 title="직원에게 근무시간 입력 요청 카톡 발송"
                             >
-                                <MessageSquare size={18} /> 시급입력 요청
+                                <MessageSquare size={14} /> 시급입력 요청
                             </button>
                         </div>
                     </div>
@@ -980,48 +980,98 @@ export default function StaffDetail() {
                     {payrolls.length === 0 ? (
                         <div className="text-center py-10 text-slate-400 text-sm italic">급여 지급 내역이 없습니다.</div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-slate-50 text-slate-600 text-sm">
-                                        <th className="p-4 font-bold border-b border-slate-100">귀속월</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-right">기본급</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-right text-red-500">공제액</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-right text-blue-600">실수령액</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-center">상태</th>
-                                        <th className="p-4 font-bold border-b border-slate-100 text-center">관리</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {payrolls.map((pay) => (
-                                        <tr key={pay.id} className="hover:bg-slate-50 border-b border-slate-50 transition-colors">
-                                            <td className="p-4 text-sm font-bold text-slate-800">{pay.month}</td>
-                                            <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.base_pay || 0).toLocaleString()}</td>
-                                            <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.bonus || 0).toLocaleString()}</td>
-                                            <td className="p-4 text-sm text-right text-red-400 font-mono">-{(pay.deductions || 0).toLocaleString()}</td>
-                                            <td className="p-4 text-sm text-right text-indigo-600 font-bold font-mono">{(pay.total_pay || 0).toLocaleString()}</td>
-                                            <td className="p-4 text-center">
-                                                {pay.transfer_status === '완료' ? (
-                                                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">이체완료</span>
-                                                ) : (
-                                                    <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold">이체대기</span>
-                                                )}
-                                            </td>
-                                            <td className="p-4">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button onClick={() => setSelectedPayroll(pay)} className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors" title="명세서 출력"><Printer size={16} /></button>
-                                                    <button onClick={() => handleSendPayrollStatement(pay)} className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors" title="명세서 카톡전송"><MessageSquare size={16} /></button>
-                                                    {pay.transfer_status !== '완료' && (
-                                                        <button onClick={() => handleExecuteTransfer(pay.id)} className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm">이체</button>
-                                                    )}
-                                                </div>
-                                            </td>
+                        <>
+                            {/* Desktop Table */}
+                            <div className="hidden sm:block overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50 text-slate-600 text-sm">
+                                            <th className="p-4 font-bold border-b border-slate-100">귀속월</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-right">기본급</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-right">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-right text-red-500">공제액</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-right text-blue-600">실수령액</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-center">상태</th>
+                                            <th className="p-4 font-bold border-b border-slate-100 text-center">관리</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {payrolls.map((pay) => (
+                                            <tr key={pay.id} className="hover:bg-slate-50 border-b border-slate-50 transition-colors">
+                                                <td className="p-4 text-sm font-bold text-slate-800">{pay.month}</td>
+                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.base_pay || 0).toLocaleString()}</td>
+                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.bonus || 0).toLocaleString()}</td>
+                                                <td className="p-4 text-sm text-right text-red-400 font-mono">-{(pay.deductions || 0).toLocaleString()}</td>
+                                                <td className="p-4 text-sm text-right text-indigo-600 font-bold font-mono">{(pay.total_pay || 0).toLocaleString()}</td>
+                                                <td className="p-4 text-center">
+                                                    {pay.transfer_status === '완료' ? (
+                                                        <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">이체완료</span>
+                                                    ) : (
+                                                        <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold">이체대기</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button onClick={() => setSelectedPayroll(pay)} className="p-2 hover:bg-indigo-50 text-indigo-600 rounded-lg transition-colors" title="명세서 출력"><Printer size={16} /></button>
+                                                        <button onClick={() => handleSendPayrollStatement(pay)} className="p-2 hover:bg-emerald-50 text-emerald-600 rounded-lg transition-colors" title="명세서 카톡전송"><MessageSquare size={16} /></button>
+                                                        {pay.transfer_status !== '완료' && (
+                                                            <button onClick={() => handleExecuteTransfer(pay.id)} className="px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm">이체</button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile Card List */}
+                            <div className="sm:hidden space-y-3">
+                                {payrolls.map((pay) => (
+                                    <div key={pay.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="font-bold text-slate-800 text-sm">{pay.month}</span>
+                                            {pay.transfer_status === '완료' ? (
+                                                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">이체완료</span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold">이체대기</span>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                                            <div className="flex justify-between bg-white rounded-lg px-3 py-2">
+                                                <span className="text-slate-500">기본급</span>
+                                                <span className="font-bold font-mono text-slate-700">{(pay.base_pay || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between bg-white rounded-lg px-3 py-2">
+                                                <span className="text-slate-500">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</span>
+                                                <span className="font-bold font-mono text-slate-700">{(pay.bonus || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between bg-white rounded-lg px-3 py-2">
+                                                <span className="text-red-400">공제액</span>
+                                                <span className="font-bold font-mono text-red-400">-{(pay.deductions || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between bg-white rounded-lg px-3 py-2">
+                                                <span className="text-indigo-500">실수령</span>
+                                                <span className="font-bold font-mono text-indigo-600">{(pay.total_pay || 0).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
+                                            <button onClick={() => setSelectedPayroll(pay)} className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-indigo-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-indigo-50">
+                                                <Printer size={14} /> 명세서
+                                            </button>
+                                            <button onClick={() => handleSendPayrollStatement(pay)} className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-emerald-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-emerald-50">
+                                                <MessageSquare size={14} /> 카톡전송
+                                            </button>
+                                            {pay.transfer_status !== '완료' && (
+                                                <button onClick={() => handleExecuteTransfer(pay.id)} className="flex-1 p-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm">
+                                                    이체
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </div>
 

@@ -48,6 +48,7 @@ const EXPENSE_CATEGORIES = [
 
 // Main tabs (always visible) — 수입상세/배달앱은 매출관리로 이동
 const MAIN_TABS = [
+    { id: 'dashboard', label: '🏠 대시보드' },
     { id: 'summary', label: '📊 손익계산서' },
     { id: 'expenses', label: '💰 세부지출' },
     { id: 'analysis', label: '📈 월별분석' },
@@ -71,7 +72,7 @@ export default function ProfitLoss() {
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
     const [year, setYear] = useState(new Date().getFullYear());
-    const [activeTab, setActiveTab] = useState('summary');
+    const [activeTab, setActiveTab] = useState('dashboard');
 
     // Dropdown group state
     const [openDropdown, setOpenDropdown] = useState(null); // 'monthly'
@@ -241,6 +242,192 @@ export default function ProfitLoss() {
     };
 
     if (loading) return <div className="loading">로딩 중...</div>;
+
+    // ═══════════════════════════════════════════
+    // DASHBOARD VIEW
+    // ═══════════════════════════════════════════
+    const renderDashboard = () => {
+        // Current month and previous month data
+        const currentMonth = new Date().getMonth(); // 0-indexed (0=Jan)
+        const prevMonthIdx = currentMonth === 0 ? 11 : currentMonth - 1;
+        const curData = data.find(d => d.month === (currentMonth + 1)) || {};
+        const prevData = data.find(d => d.month === (prevMonthIdx + 1)) || {};
+
+        // Calculate monthly summaries
+        const monthSummaries = MONTHS.map(m => {
+            const md = data.find(d => d.month === m) || {};
+            const revenue = calcTotalRevenue(md);
+            const expense = calcTotalExpense(md);
+            const profit = revenue - expense;
+            return { month: m, revenue, expense, profit };
+        });
+
+        // Year totals
+        const yearRevenue = monthSummaries.reduce((s, m) => s + m.revenue, 0);
+        const yearExpense = monthSummaries.reduce((s, m) => s + m.expense, 0);
+        const yearProfit = yearRevenue - yearExpense;
+        const yearMargin = yearRevenue > 0 ? ((yearProfit / yearRevenue) * 100).toFixed(1) : '0.0';
+
+        // Previous month summary
+        const prevRevenue = calcTotalRevenue(prevData);
+        const prevExpense = calcTotalExpense(prevData);
+        const prevProfit = prevRevenue - prevExpense;
+        const prevMargin = prevRevenue > 0 ? ((prevProfit / prevRevenue) * 100).toFixed(1) : '0.0';
+
+        // Expense breakdown by category
+        const expenseBreakdown = EXPENSE_FIELDS.map(f => {
+            const total = data.reduce((sum, d) => sum + (d[f.key] || 0), 0);
+            return { key: f.key, label: f.label, total };
+        }).filter(e => e.total > 0).sort((a, b) => b.total - a.total);
+        const maxExpense = expenseBreakdown.length > 0 ? expenseBreakdown[0].total : 1;
+
+        // Monthly trend — max for chart scale
+        const maxMonthValue = Math.max(...monthSummaries.map(m => Math.max(m.revenue, m.expense)), 1);
+
+        // Months with data
+        const activeMonths = monthSummaries.filter(m => m.revenue > 0 || m.expense > 0);
+
+        const EXPENSE_COLORS = {
+            'expense_labor': '#ef4444',
+            'expense_retirement': '#f97316',
+            'expense_ingredient': '#22c55e',
+            'expense_material': '#10b981',
+            'expense_utility': '#3b82f6',
+            'expense_rent': '#8b5cf6',
+            'expense_repair': '#ec4899',
+            'expense_depreciation': '#6366f1',
+            'expense_tax': '#14b8a6',
+            'expense_insurance': '#f59e0b',
+            'expense_card_fee': '#06b6d4',
+            'expense_other': '#94a3b8',
+        };
+
+        return (
+            <div className="pl-dashboard">
+                {/* Key Metric Cards */}
+                <div className="pl-dash-cards">
+                    <div className="pl-dash-card revenue">
+                        <div className="pl-dash-card-icon">💰</div>
+                        <div className="pl-dash-card-content">
+                            <span className="pl-dash-card-label">전월 매출</span>
+                            <span className="pl-dash-card-value">{formatNumber(prevRevenue)}원</span>
+                        </div>
+                    </div>
+                    <div className="pl-dash-card expense">
+                        <div className="pl-dash-card-icon">📤</div>
+                        <div className="pl-dash-card-content">
+                            <span className="pl-dash-card-label">전월 지출</span>
+                            <span className="pl-dash-card-value">{formatNumber(prevExpense)}원</span>
+                        </div>
+                    </div>
+                    <div className="pl-dash-card profit">
+                        <div className="pl-dash-card-icon">{prevProfit >= 0 ? '📈' : '📉'}</div>
+                        <div className="pl-dash-card-content">
+                            <span className="pl-dash-card-label">전월 순이익</span>
+                            <span className={`pl-dash-card-value ${prevProfit >= 0 ? 'positive' : 'negative'}`}>
+                                {formatNumber(prevProfit)}원
+                            </span>
+                        </div>
+                    </div>
+                    <div className="pl-dash-card margin">
+                        <div className="pl-dash-card-icon">🎯</div>
+                        <div className="pl-dash-card-content">
+                            <span className="pl-dash-card-label">전월 마진율</span>
+                            <span className={`pl-dash-card-value ${Number(prevMargin) >= 0 ? 'positive' : 'negative'}`}>
+                                {prevMargin}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Annual Summary */}
+                <div className="pl-dash-section">
+                    <h3>📅 {year}년 연간 요약</h3>
+                    <div className="pl-annual-summary">
+                        <div className="pl-annual-item">
+                            <span className="label">총 매출</span>
+                            <span className="value">{formatNumber(yearRevenue)}원</span>
+                        </div>
+                        <div className="pl-annual-item">
+                            <span className="label">총 지출</span>
+                            <span className="value expense">{formatNumber(yearExpense)}원</span>
+                        </div>
+                        <div className="pl-annual-item highlight">
+                            <span className="label">총 순이익</span>
+                            <span className={`value ${yearProfit >= 0 ? 'positive' : 'negative'}`}>{formatNumber(yearProfit)}원</span>
+                        </div>
+                        <div className="pl-annual-item">
+                            <span className="label">연간 마진율</span>
+                            <span className={`value ${Number(yearMargin) >= 0 ? 'positive' : 'negative'}`}>{yearMargin}%</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Monthly Trend */}
+                <div className="pl-dash-section">
+                    <h3>📊 월별 매출/지출 추이</h3>
+                    {activeMonths.length > 0 ? (
+                        <div className="pl-monthly-chart">
+                            {monthSummaries.map(m => (
+                                <div className="pl-month-col" key={m.month}>
+                                    <div className="pl-month-bars">
+                                        <div
+                                            className="pl-bar revenue"
+                                            style={{ height: `${(m.revenue / maxMonthValue) * 100}%` }}
+                                            title={`매출 ${formatNumber(m.revenue)}`}
+                                        />
+                                        <div
+                                            className="pl-bar expense"
+                                            style={{ height: `${(m.expense / maxMonthValue) * 100}%` }}
+                                            title={`지출 ${formatNumber(m.expense)}`}
+                                        />
+                                    </div>
+                                    <span className="pl-month-label">{m.month}월</span>
+                                    {m.profit !== 0 && (
+                                        <span className={`pl-month-profit ${m.profit >= 0 ? 'positive' : 'negative'}`}>
+                                            {m.profit >= 0 ? '+' : ''}{(m.profit / 10000).toFixed(0)}만
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>데이터가 없습니다</div>
+                    )}
+                    <div className="pl-chart-legend">
+                        <span><span className="legend-dot" style={{ background: '#3b82f6' }} />매출</span>
+                        <span><span className="legend-dot" style={{ background: '#ef4444' }} />지출</span>
+                    </div>
+                </div>
+
+                {/* Expense Breakdown */}
+                <div className="pl-dash-section">
+                    <h3>💸 지출 항목별 비중 (연간)</h3>
+                    <div className="pl-expense-breakdown">
+                        {expenseBreakdown.map(e => {
+                            const pct = yearExpense > 0 ? ((e.total / yearExpense) * 100).toFixed(1) : '0.0';
+                            const cat = EXPENSE_CATEGORIES.find(c => e.label === c.label);
+                            const color = EXPENSE_COLORS[e.key] || '#94a3b8';
+                            return (
+                                <div className="pl-expense-bar-item" key={e.key}>
+                                    <div className="bar-label">
+                                        <span>{cat?.icon || '📋'} {e.label}</span>
+                                        <span className="bar-amount">{formatNumber(e.total)}원 ({pct}%)</span>
+                                    </div>
+                                    <div className="bar-track">
+                                        <div className="bar-fill" style={{ width: `${(e.total / maxExpense) * 100}%`, background: color }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {expenseBreakdown.length === 0 && (
+                            <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>지출 데이터가 없습니다</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     // Render expense detail table
     const renderExpenseDetail = () => (
@@ -809,13 +996,13 @@ export default function ProfitLoss() {
 
             {/* Tab Content */}
             <div className="tab-content">
-                {isMobile ? (
+                {activeTab === 'dashboard' && renderDashboard()}
+                {isMobile && activeTab !== 'dashboard' ? (
                     <div className="desktop-only-notice" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748b' }}>
                         <div style={{ fontSize: 48, marginBottom: 16 }}>🖥️</div>
-                        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#475569', margin: '0 0 8px' }}>손익계산서는 PC에서 확인해주세요</h3>
+                        <h3 style={{ fontSize: 16, fontWeight: 700, color: '#475569', margin: '0 0 8px' }}>이 뷰는 PC에서 확인해주세요</h3>
                         <p style={{ fontSize: 13, lineHeight: 1.6, margin: 0 }}>
-                            12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.<br />
-                            📊 대시보드에서 간단한 손익 현황을 확인하실 수 있습니다.
+                            12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.
                         </p>
                     </div>
                 ) : (
