@@ -555,11 +555,7 @@
 @media (max-width: 768px) {
 
     .recipe-page {
-        overflow-x: hidden;
-        overflow-y: scroll;
-        height: 100vh;
         padding-bottom: 100px;
-        -webkit-overflow-scrolling: touch;
     }
 
     .recipe-header {

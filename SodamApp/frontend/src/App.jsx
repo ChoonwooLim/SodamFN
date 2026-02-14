@@ -56,12 +56,12 @@ const Layout = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 md:flex">
       {/* Render Sidebar for Admin (Reactive) */}
       {isAdmin && <Sidebar />}
 
       {/* Main Content Area */}
-      <div className={`flex-1 relative min-h-screen ${isAdmin ? 'md:ml-64' : ''}`}>
+      <div className={`flex-1 relative md:min-h-screen ${isAdmin ? 'md:ml-64' : ''}`}>
         {children}
 
         {/* Mobile Bottom Navigation - Only visible on small screens for Admin */}
