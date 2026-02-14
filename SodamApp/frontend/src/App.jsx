@@ -21,6 +21,7 @@ const CardSales = React.lazy(() => import('./pages/CardSales'));
 const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
+const RecipeBook = React.lazy(() => import('./pages/RecipeBook'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
               <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
               <Route path="/purchase" element={<ProtectedRoute adminOnly><PurchaseManagement /></ProtectedRoute>} />
+              <Route path="/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}
               <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />

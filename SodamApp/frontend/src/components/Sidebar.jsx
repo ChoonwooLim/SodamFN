@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -31,6 +31,7 @@ export default function Sidebar() {
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
 
             { icon: Users, label: '직원 관리', path: '/staff' },
+            { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: Settings, label: '설정', path: '/settings' },
         ]
