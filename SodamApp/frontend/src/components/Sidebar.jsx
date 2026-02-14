@@ -1,8 +1,15 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    // Close drawer on route change
+    useEffect(() => {
+        setMobileOpen(false);
+    }, [location.pathname]);
 
     // Get user info from localStorage
     const token = localStorage.getItem('token');
@@ -38,7 +45,7 @@ export default function Sidebar() {
         : [
             { icon: LayoutDashboard, label: '대시보드', path: '/staff-dashboard' },
             { icon: FileSignature, label: '내 전자계약', path: '/contracts/my' },
-            { icon: Settings, label: '설정', path: '/settings' }, // Assuming settings page is shared or safe
+            { icon: Settings, label: '설정', path: '/settings' },
         ];
 
     const handleLogout = () => {
@@ -46,8 +53,8 @@ export default function Sidebar() {
         window.location.href = '/login';
     };
 
-    return (
-        <aside className="hidden md:flex flex-col w-64 bg-slate-900 min-h-screen text-white fixed left-0 top-0 z-50">
+    const sidebarContent = (
+        <>
             <div className="p-6 border-b border-slate-800/50">
                 <div className="flex items-center gap-3 mb-4">
                     {user.profile_image ? (
@@ -74,7 +81,7 @@ export default function Sidebar() {
                 </h1>
             </div>
 
-            <nav className="flex-1 px-4 space-y-2 mt-4">
+            <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
@@ -103,6 +110,57 @@ export default function Sidebar() {
                     <span className="font-medium text-sm">로그아웃</span>
                 </button>
             </div>
-        </aside>
+        </>
+    );
+
+    return (
+        <>
+            {/* Desktop Sidebar — always visible */}
+            <aside className="hidden md:flex flex-col w-64 bg-slate-900 min-h-screen text-white fixed left-0 top-0 z-50">
+                {sidebarContent}
+            </aside>
+
+            {/* Mobile Hamburger Button */}
+            <button
+                onClick={() => setMobileOpen(true)}
+                className="md:hidden fixed top-3 left-3 z-[60] w-10 h-10 rounded-xl bg-slate-900/90 backdrop-blur-sm text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                aria-label="메뉴 열기"
+            >
+                <Menu size={20} />
+            </button>
+
+            {/* Mobile Drawer Overlay */}
+            {mobileOpen && (
+                <div
+                    className="md:hidden fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm"
+                    onClick={() => setMobileOpen(false)}
+                    style={{ animation: 'fadeIn 0.2s ease' }}
+                />
+            )}
+
+            {/* Mobile Drawer */}
+            <aside
+                className={`md:hidden fixed top-0 left-0 z-[80] w-72 h-full bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'
+                    }`}
+            >
+                {/* Close Button */}
+                <button
+                    onClick={() => setMobileOpen(false)}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                    aria-label="메뉴 닫기"
+                >
+                    <X size={16} />
+                </button>
+
+                {sidebarContent}
+            </aside>
+
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `}</style>
+        </>
     );
 }

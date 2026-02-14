@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Camera, Settings, BarChart3, ShoppingBag } from 'lucide-react';
+import { Home, Camera, BookOpen, BarChart3, ShoppingBag } from 'lucide-react';
 
 export default function BottomNav() {
     const location = useLocation();
@@ -10,7 +10,7 @@ export default function BottomNav() {
         { icon: BarChart3, path: '/revenue', label: '매출' },
         null, // Center camera button placeholder
         { icon: ShoppingBag, path: '/purchase', label: '매입' },
-        { icon: Settings, path: '/settings', label: '설정' },
+        { icon: BookOpen, path: '/recipes', label: '레시피' },
     ];
 
     return (
@@ -22,8 +22,8 @@ export default function BottomNav() {
                         return (
                             <Link key="camera" to="/camera" className="relative -top-5 mx-1">
                                 <div className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white border-4 border-white transition-all active:scale-95 ${isActive('/camera')
-                                        ? 'bg-gradient-to-tr from-indigo-600 to-blue-500 shadow-blue-500/40'
-                                        : 'bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/30'
+                                    ? 'bg-gradient-to-tr from-indigo-600 to-blue-500 shadow-blue-500/40'
+                                    : 'bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/30'
                                     }`}>
                                     <Camera size={24} />
                                 </div>
@@ -39,8 +39,8 @@ export default function BottomNav() {
                             key={item.path}
                             to={item.path}
                             className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all duration-200 min-w-[52px] ${active
-                                    ? 'text-blue-600'
-                                    : 'text-slate-400 hover:text-slate-600'
+                                ? 'text-blue-600'
+                                : 'text-slate-400 hover:text-slate-600'
                                 }`}
                         >
                             <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
