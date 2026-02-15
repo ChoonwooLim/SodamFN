@@ -104,9 +104,11 @@ export default function Sidebar() {
             <div className="p-4 border-t border-slate-800">
                 {user.role === 'admin' && (
                     <a
-                        href={`${window.location.protocol}//${window.location.hostname}:5174`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href="#"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            window.open(`${window.location.protocol}//${window.location.hostname}:5174/?_t=${Date.now()}`, '_blank');
+                        }}
                         className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-all"
                     >
                         <Smartphone size={20} />
