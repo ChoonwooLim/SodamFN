@@ -208,6 +208,15 @@ def create_staff_account(
         service.session.add(new_user)
         service.session.commit()
         return {"status": "success", "message": "Account created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        detail = str(e)
+        if "UNIQUE" in detail.upper() or "unique" in detail:
+            raise HTTPException(status_code=400, detail="이미 존재하는 아이디이거나, 해당 직원에게 이미 계정이 있습니다.")
+        raise HTTPException(status_code=500, detail="계정 생성 중 오류가 발생했습니다.")
     finally:
         service.close()
 
