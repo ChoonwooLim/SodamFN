@@ -315,7 +315,9 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
         record = service.session.exec(stmt).first()
         
         if payload.action == "checkin":
-            if record: return {"status": "error", "message": "이미 출근 기록이 있습니다."}
+            if record:
+                print(f"[ATTENDANCE] Duplicate check-in blocked for staff_id={payload.staff_id} on {today}, existing record id={record.id}")
+                return {"status": "error", "message": "이미 출근 기록이 있습니다."}
             new_record = Attendance(
                 staff_id=payload.staff_id,
                 date=today,
@@ -341,7 +343,17 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
             record.total_hours = round(duration, 2)
             service.session.add(record)
             
-        service.session.commit()
+        try:
+            service.session.commit()
+        except Exception as e:
+            import traceback
+            print(f"[ATTENDANCE ERROR] {type(e).__name__}: {str(e)}")
+            traceback.print_exc()
+            service.session.rollback()
+            error_msg = str(e)
+            if "IntegrityError" in type(e).__name__ or "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+                return {"status": "error", "message": "이미 출근 기록이 있습니다. (중복 데이터)"}
+            raise HTTPException(status_code=500, detail=f"출퇴근 기록 중 오류: {error_msg}")
         return {
             "status": "success",
             "gps": gps_result,
@@ -497,7 +509,7 @@ def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin
 # --- 월간 근무 요약 ---
 
 @router.get("/attendance/monthly-summary/{staff_id}/{month}")
-def get_monthly_attendance_summary(staff_id: int, month: str, _admin: AuthUser = Depends(get_admin_user)):
+def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = Depends(get_current_user_dep)):
     """
     월간 출퇴근 요약 (근무일수, 총 근무시간, GPS 검증율, 예상 급여)
     month = "YYYY-MM"

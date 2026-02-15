@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -102,6 +102,18 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
+                {user.role === 'admin' && (
+                    <a
+                        href={`${window.location.protocol}//${window.location.hostname}:5174`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-all"
+                    >
+                        <Smartphone size={20} />
+                        <span className="font-medium text-sm">직원용 앱</span>
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">PWA</span>
+                    </a>
+                )}
                 <button
                     onClick={handleLogout}
                     className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-white transition-colors"
