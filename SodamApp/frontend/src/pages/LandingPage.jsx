@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
     MapPin, Phone, Clock, Star, Users, Car, CreditCard,
     ChevronDown, UtensilsCrossed, LogIn, Truck, Accessibility,
-    ArrowRight, Sparkles, ShoppingBag
+    ArrowRight, Sparkles, ShoppingBag, LayoutDashboard
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -68,6 +68,7 @@ const fadeUp = {
 
 export default function LandingPage() {
     const [scrollY, setScrollY] = useState(0);
+    const isLoggedIn = !!localStorage.getItem('token');
 
     useEffect(() => {
         const onScroll = () => setScrollY(window.scrollY);
@@ -100,6 +101,10 @@ export default function LandingPage() {
                         건대입구역 4번 출구 · 스타시티 영존 A동 B2
                     </motion.div>
 
+                    <motion.div className="hero-logo" variants={fadeUp}>
+                        <img src="/sodam-logo-white.png" alt="소담김밥 로고" className="hero-logo-img" />
+                    </motion.div>
+
                     <motion.h1 className="hero-title" variants={fadeUp}>
                         <span className="hero-title-accent">소담</span>김밥
                     </motion.h1>
@@ -114,10 +119,17 @@ export default function LandingPage() {
                             <Phone size={18} />
                             전화 주문
                         </a>
-                        <Link to="/login" className="hero-btn-secondary">
-                            <LogIn size={18} />
-                            관리자 로그인
-                        </Link>
+                        {isLoggedIn ? (
+                            <Link to="/dashboard" className="hero-btn-secondary">
+                                <LayoutDashboard size={18} />
+                                대시보드
+                            </Link>
+                        ) : (
+                            <Link to="/login" className="hero-btn-secondary">
+                                <LogIn size={18} />
+                                관리자 로그인
+                            </Link>
+                        )}
                     </motion.div>
                 </motion.div>
 
@@ -353,7 +365,10 @@ export default function LandingPage() {
             {/* ═══════ FOOTER ═══════ */}
             <footer className="landing-footer">
                 <div className="footer-content">
-                    <div className="footer-brand">소담김밥</div>
+                    <div className="footer-brand">
+                        <img src="/sodam-logo.png" alt="소담김밥" className="footer-logo" />
+                        <span>소담김밥</span>
+                    </div>
                     <div className="footer-address">
                         서울 광진구 능동로 110 스타시티 영존 A동 지하 2층<br />
                         Tel. 0507-1384-6570
@@ -362,10 +377,17 @@ export default function LandingPage() {
                     <div className="footer-copyright">
                         © {new Date().getFullYear()} 소담김밥. All rights reserved.
                     </div>
-                    <Link to="/login" className="footer-login-link">
-                        <LogIn size={14} />
-                        관리자 로그인
-                    </Link>
+                    {isLoggedIn ? (
+                        <Link to="/dashboard" className="footer-login-link">
+                            <LayoutDashboard size={14} />
+                            대시보드로 돌아가기
+                        </Link>
+                    ) : (
+                        <Link to="/login" className="footer-login-link">
+                            <LogIn size={14} />
+                            관리자 로그인
+                        </Link>
+                    )}
                 </div>
             </footer>
         </div>

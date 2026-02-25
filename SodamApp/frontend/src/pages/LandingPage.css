@@ -32,7 +32,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--sodam-warm-900) 0%, var(--sodam-warm-700) 50%, var(--sodam-warm-600) 100%);
+    background: var(--sodam-warm-900);
     overflow: hidden;
 }
 
@@ -40,8 +40,20 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse at 30% 50%, rgba(212, 118, 58, 0.15) 0%, transparent 70%),
-        radial-gradient(ellipse at 70% 30%, rgba(201, 168, 76, 0.1) 0%, transparent 60%);
+    background: url('/hero-bg.jpg') center/cover no-repeat;
+    opacity: 0.35;
+    filter: blur(1px);
+}
+
+.landing-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,
+            rgba(42, 26, 14, 0.6) 0%,
+            rgba(42, 26, 14, 0.3) 40%,
+            rgba(42, 26, 14, 0.5) 70%,
+            rgba(42, 26, 14, 0.8) 100%);
     pointer-events: none;
 }
 
@@ -61,6 +73,30 @@
     text-align: center;
     padding: 2rem;
     max-width: 700px;
+}
+
+.hero-logo {
+    margin-bottom: 1.5rem;
+}
+
+.hero-logo-img {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    filter: drop-shadow(0 4px 20px rgba(255, 255, 255, 0.2));
+    animation: logoGlow 3s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+
+    0%,
+    100% {
+        filter: drop-shadow(0 4px 20px rgba(255, 255, 255, 0.2));
+    }
+
+    50% {
+        filter: drop-shadow(0 4px 30px rgba(255, 255, 255, 0.35));
+    }
 }
 
 .hero-badge {
@@ -523,10 +559,20 @@
 }
 
 .footer-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
     font-size: 1.25rem;
     font-weight: 800;
     color: var(--sodam-gold);
     margin-bottom: 0.75rem;
+}
+
+.footer-logo {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
 }
 
 .footer-address {

@@ -36,8 +36,8 @@ api.interceptors.response.use(
             localStorage.removeItem('staff_id');
 
             // Only redirect if not already on login page
-            if (window.location.pathname !== '/') {
-                window.location.href = '/';
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
             }
         }
         return Promise.reject(error);
