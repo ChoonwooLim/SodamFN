@@ -31,7 +31,7 @@ export default function Sidebar() {
 
     const menuItems = user.role === 'admin'
         ? [
-            { icon: LayoutDashboard, label: '대시보드', path: '/' },
+            { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
             { icon: BarChart3, label: '매출 관리', path: '/revenue' },
             { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },

@@ -36,7 +36,7 @@ export default function CameraPage() {
                 } else {
                     // For Excel, show success and go to Dashboard or Expense List
                     alert(`${response.data.count}건의 내역이 성공적으로 저장되었습니다.`);
-                    navigate('/');
+                    navigate('/dashboard');
                 }
             } else {
                 alert('처리 실패: ' + response.data.message);

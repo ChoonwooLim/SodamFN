@@ -22,6 +22,7 @@ const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
 const RecipeBook = React.lazy(() => import('./pages/RecipeBook'));
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -34,7 +35,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('user_role');
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) return <Navigate to="/" replace />;
 
   if (adminOnly && role !== 'admin') {
     return <Navigate to="/staff-dashboard" replace />;
@@ -49,7 +50,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const role = localStorage.getItem('user_role');
   const isAdmin = role === 'admin';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/';
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
@@ -85,7 +86,8 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
 
-              <Route path="/" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
 
               {/* SPLIT INPUT ROUTES */}
               <Route path="/input/expense" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />

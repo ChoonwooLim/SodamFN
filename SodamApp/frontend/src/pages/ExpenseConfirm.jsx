@@ -27,7 +27,7 @@ export default function ExpenseConfirm() {
             if (response.data.status === 'success') {
                 // Need a success toast or clearer feedback
                 alert('저장되었습니다.');
-                navigate('/');
+                navigate('/dashboard');
             } else {
                 alert('Error: ' + response.data.message);
             }

@@ -6,7 +6,7 @@ export default function BottomNav() {
     const isActive = (path) => location.pathname === path;
 
     const navItems = [
-        { icon: Home, path: '/', label: '홈' },
+        { icon: Home, path: '/dashboard', label: '홈' },
         { icon: BarChart3, path: '/revenue', label: '매출' },
         null, // Center camera button placeholder
         { icon: ShoppingBag, path: '/purchase', label: '매입' },

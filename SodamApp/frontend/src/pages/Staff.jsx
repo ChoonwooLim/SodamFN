@@ -104,7 +104,7 @@ export default function StaffPage() {
             <div className="max-w-5xl mx-auto">
                 <header className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/')} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
+                        <button onClick={() => navigate('/dashboard')} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
                             <ChevronLeft size={20} />
                         </button>
                         <h1 className="text-xl font-bold text-slate-900">직원 관리</h1>

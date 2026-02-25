@@ -48,7 +48,7 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                 if (response.data.status === 'success') {
                     if (isRevenue) {
                         alert("이미지가 성공적으로 분석되었습니다. (Mock)");
-                        navigate('/');
+                        navigate('/dashboard');
                     } else {
                         navigate('/confirm', { state: { ...response.data.data } });
                     }
@@ -101,7 +101,7 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                 message += `\n\n실패한 파일:\n${errorFiles.join('\n')}`;
             }
             alert(message);
-            navigate('/');
+            navigate('/dashboard');
 
         } catch (error) {
             console.error("Upload error:", error);
