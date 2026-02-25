@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// 개발: .env에 VITE_API_URL=http://localhost:8000 설정
+// 배포: 빈 문자열 → 동일 origin으로 API 요청
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const api = axios.create({
     baseURL: `${API_BASE}/api`,
