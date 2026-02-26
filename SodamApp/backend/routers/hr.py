@@ -290,6 +290,50 @@ def upload_staff_document(
     finally:
         service.close()
 
+@router.delete("/staff/{staff_id}/document/{doc_id}")
+def delete_staff_document(
+    staff_id: int,
+    doc_id: int,
+    _admin: AuthUser = Depends(get_admin_user)
+):
+    service = DatabaseService()
+    try:
+        doc = service.session.get(StaffDocument, doc_id)
+        if not doc or doc.staff_id != staff_id:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Delete physical file
+        try:
+            if os.path.exists(doc.file_path):
+                os.remove(doc.file_path)
+        except Exception:
+            pass
+
+        doc_type = doc.doc_type
+        service.session.delete(doc)
+
+        # Check if there are remaining documents of the same type
+        remaining = service.session.exec(
+            select(StaffDocument).where(
+                StaffDocument.staff_id == staff_id,
+                StaffDocument.doc_type == doc_type
+            )
+        ).first()
+
+        # If no remaining docs of this type, uncheck the staff flag
+        if not remaining:
+            staff = service.session.get(Staff, staff_id)
+            if staff:
+                attr_name = f"doc_{doc_type}"
+                if hasattr(staff, attr_name):
+                    setattr(staff, attr_name, False)
+                    service.session.add(staff)
+
+        service.session.commit()
+        return {"status": "success", "message": "Document deleted"}
+    finally:
+        service.close()
+
 from routers.auth import get_current_user as get_current_user_dep
 
 @router.post("/attendance")

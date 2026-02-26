@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SodamFN - 소규모 외식업 경영을 손안에서 완성하다</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: "Pretendard", sans-serif;
+            background-color: #f1f5f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .infographic-wrapper {
+            width: 1200px;
+            height: 675px;
+            /* 16:9 Aspect Ratio */
+            background-color: #fafbf9;
+            /* Slightly warm off-white */
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 50px;
+            box-sizing: border-box;
+        }
+
+        /* Background noise/pattern for depth */
+        .infographic-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            w: 100%;
+            h: 100%;
+            background-image:
+                radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 0% 100%, rgba(59, 130, 246, 0.05) 0%, transparent 40%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .content-layer {
+            position: relative;
+            z-index: 10;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Phone Mockup Styling */
+        .phone-frame {
+            width: 250px;
+            height: 480px;
+            background: #1e293b;
+            border-radius: 40px;
+            padding: 10px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .phone-notch {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 24px;
+            background: #1e293b;
+            border-bottom-left-radius: 12px;
+            border-bottom-right-radius: 12px;
+            z-index: 20;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #f0fdfa 0%, #ffffff 50%, #eff6ff 100%);
+            border-radius: 32px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .phone-blur-circle-1 {
+            position: absolute;
+            top: 10%;
+            left: -20%;
+            width: 150px;
+            height: 150px;
+            background: rgba(16, 185, 129, 0.2);
+            border-radius: 50%;
+            filter: blur(30px);
+        }
+
+        .phone-blur-circle-2 {
+            position: absolute;
+            bottom: 10%;
+            right: -20%;
+            width: 150px;
+            height: 150px;
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 50%;
+            filter: blur(30px);
+        }
+
+        .icon-floating {
+            position: absolute;
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #f1f5f9;
+        }
+
+        /* Custom Table Styling */
+        .comparison-table th {
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        .comparison-table td {
+            padding: 12px 12px;
+            font-size: 13px;
+            line-height: 1.4;
+            vertical-align: middle;
+        }
+    </style>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+
+    <div class="infographic-wrapper">
+        <div class="content-layer">
+
+            <!-- HEADER -->
+            <header class="text-center mb-10 mt-2">
+                <h1 class="text-4xl font-extrabold text-slate-800 tracking-tight">
+                    Sodam<span class="text-brand-700">FN</span>: 소규모 외식업 경영을 손안에서 완성하다
+                </h1>
+            </header>
+
+            <!-- MAIN CONTENT (3 Columns) -->
+            <div class="flex flex-1 items-center justify-between gap-6 relative">
+
+                <!-- LEFT COLUMN: 3 Core Features -->
+                <div class="flex-1 max-w-[340px] flex flex-col gap-6">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2 whitespace-nowrap">3대 핵심 자동화 기능</h2>
+
+                    <!-- Feature 1 -->
+                    <div class="flex items-start gap-4">
+                        <div
+                            class="bg-indigo-50 p-3 rounded-2xl text-indigo-500 shrink-0 shadow-sm border border-indigo-100">
+                            <i data-lucide="brain-circuit" class="w-8 h-8"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-800 mb-1">AI 스마트 매입 분류</h3>
+                            <p class="text-sm text-slate-600 leading-snug">매입 명세서 업로드 시 AI가 지출 카테고리를 학습하여 <strong
+                                    class="text-indigo-600 font-bold">30초 만에 자동 분류</strong>합니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="flex items-start gap-4">
+                        <div
+                            class="bg-amber-50 p-3 rounded-2xl text-amber-500 shrink-0 shadow-sm border border-amber-100">
+                            <i data-lucide="calculator" class="w-8 h-8"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-800 mb-1">2026 세법 기준 자동 급여 산출</h3>
+                            <p class="text-sm text-slate-600 leading-snug">주휴수당, 4대 보험, 소득세를 최신 법령에 맞춰 <strong
+                                    class="text-amber-600 font-bold">원클릭으로 정밀 계산</strong>합니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="flex items-start gap-4">
+                        <div class="bg-blue-50 p-3 rounded-2xl text-blue-500 shrink-0 shadow-sm border border-blue-100">
+                            <i data-lucide="map-pin" class="w-8 h-8"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-800 mb-1">GPS 근태 및 전자계약</h3>
+                            <p class="text-sm text-slate-600 leading-snug">매장 반경 내에서만 가능한 GPS 출퇴근과 카카오톡 전자서명으로 <strong
+                                    class="text-blue-600 font-bold">종이 없는 관리</strong>를 실현합니다.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CENTER COLUMN: Phone Mockup -->
+                <div class="relative flex-shrink-0 flex items-center justify-center w-[300px]">
+                    <!-- Floating Icon: Receipt -->
+                    <div class="icon-floating top-24 -left-8 text-indigo-500">
+                        <i data-lucide="receipt" class="w-8 h-8"></i>
+                    </div>
+                    <!-- Floating Icon: Timer/Hourglass -->
+                    <div class="icon-floating bottom-32 -right-8 text-amber-500">
+                        <i data-lucide="hourglass" class="w-8 h-8"></i>
+                    </div>
+
+                    <div class="phone-frame">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <div class="phone-blur-circle-1"></div>
+                            <div class="phone-blur-circle-2"></div>
+                            <div class="z-10 flex flex-col items-center">
+                                <h2 class="text-3xl font-black text-slate-800 tracking-tighter shadow-sm">
+                                    Sodam<span class="text-brand-500">FN</span>
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: Innovation & Comparison -->
+                <div class="flex-1 max-w-[400px] flex flex-col gap-6">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">SodamFN이 만드는 경영 혁신</h2>
+
+                    <!-- Innovation Stats -->
+                    <div class="flex gap-4 items-center">
+                        <!-- 90% Stat -->
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <div class="text-orange-500 font-black text-5xl mb-1 flex items-start drop-shadow-sm">
+                                90<span class="text-3xl mt-1">%</span>
+                            </div>
+                            <h3 class="font-extrabold text-slate-800 text-sm mb-1">관리 시간 90% 절감</h3>
+                            <p class="text-xs text-slate-500 text-center leading-tight">수기 장부와 엑셀 입력에<br />낭비되던 시간을 자동
+                                집계로<br />대폭 단축합니다.</p>
+                        </div>
+                        <!-- Chart Stat -->
+                        <div class="flex-1 flex flex-col items-center justify-center">
+                            <div
+                                class="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 mb-2 shadow-sm border border-brand-100">
+                                <i data-lucide="trending-up" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="font-extrabold text-slate-800 text-sm mb-1">실시간 손익 시각화</h3>
+                            <p class="text-xs text-slate-500 text-center leading-tight">12개월 손익 트렌드와<br />이익률을 대시보드
+                                차트로<br />즉시 파악합니다.</p>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Table -->
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-3">
+                        <div class="bg-slate-100 px-4 py-2 border-b border-slate-200">
+                            <h3 class="text-xs font-bold text-slate-700">효율성 비교 (기존 vs SodamFN 도입 후)</h3>
+                        </div>
+                        <table class="w-full text-left comparison-table border-collapse">
+                            <thead class="bg-gray-50 text-gray-500">
+                                <tr>
+                                    <th class="border-b border-gray-200 font-semibold text-center w-1/4">비교 항목</th>
+                                    <th
+                                        class="border-b border-gray-200 border-l border-r font-semibold text-center w-[30%] bg-slate-50/50">
+                                        기존 방식 <span class="text-[10px] font-normal block">(수기/엑셀)</span></th>
+                                    <th
+                                        class="border-b border-brand-200 font-semibold text-center w-[45%] bg-brand-50 text-brand-800">
+                                        SodamFN 도입 후</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <!-- Row 1: Purchase -->
+                                <tr>
+                                    <td class="font-semibold text-slate-700 text-center bg-gray-50/50">매입 분류</td>
+                                    <td class="text-slate-500 text-center border-l border-r bg-slate-50/10"><span
+                                            class="block">500건 기준</span><span class="font-medium text-slate-700">약
+                                            3시간</span></td>
+                                    <td class="text-center bg-brand-50/30">
+                                        <div class="flex flex-col items-center">
+                                            <div class="flex items-center gap-1 font-bold text-brand-700">
+                                                <i data-lucide="zap" class="w-3 h-3 fill-brand-500"></i> 30초 자동 분류
+                                            </div>
+                                            <span class="text-[11px] text-brand-600 mt-0.5">+ 검토 10분</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Row 2: Payroll -->
+                                <tr>
+                                    <td class="font-semibold text-slate-700 text-center bg-gray-50/50">급여 산출</td>
+                                    <td class="text-slate-500 text-center border-l border-r bg-slate-50/10"><span
+                                            class="block">계산 오류 및</span><span
+                                            class="font-medium text-slate-700 text-[12px]">분쟁 리스크</span></td>
+                                    <td class="text-center bg-brand-50/30">
+                                        <div class="flex flex-col items-center">
+                                            <div class="flex items-center gap-1 font-bold text-brand-700">
+                                                <i data-lucide="scale" class="w-3 h-3"></i> 2026 세법 기준
+                                            </div>
+                                            <span class="text-[11px] text-brand-600 mt-0.5">정밀 원클릭 산출</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- Row 3: HR -->
+                                <tr>
+                                    <td class="font-semibold text-slate-700 text-center bg-gray-50/50">인사 관리</td>
+                                    <td class="text-slate-500 text-center border-l border-r bg-slate-50/10"><span
+                                            class="block">종이 계약서 및</span><span class="font-medium text-slate-700">수기
+                                            출석부</span></td>
+                                    <td class="text-center bg-brand-50/30">
+                                        <div class="flex flex-col items-center">
+                                            <div class="flex items-center gap-1 font-bold text-brand-700">
+                                                <i data-lucide="smartphone" class="w-3 h-3"></i> 카카오톡 전자계약
+                                            </div>
+                                            <span class="text-[11px] text-brand-600 mt-0.5">및 GPS 전용 앱</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
+</body>
+
+</html>

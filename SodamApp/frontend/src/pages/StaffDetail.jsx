@@ -202,9 +202,7 @@ export default function StaffDetail() {
         uploadData.append('file', file);
 
         try {
-            await api.post(`/hr/staff/${id}/document`, uploadData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            await api.post(`/hr/staff/${id}/document`, uploadData);
             // Refresh data to show new file
             fetchStaffDetail();
             setMsg("파일이 업로드되었습니다.");
@@ -212,6 +210,21 @@ export default function StaffDetail() {
         } catch (error) {
             console.error("Upload failed", error);
             alert("파일 업로드 실패");
+        } finally {
+            e.target.value = null; // Reset file input so the same file can be uploaded again
+        }
+    };
+
+    const handleDeleteDocument = async (docId, docType) => {
+        if (!window.confirm('이 서류를 삭제하시겠습니까?')) return;
+        try {
+            await api.delete(`/hr/staff/${id}/document/${docId}`);
+            fetchStaffDetail();
+            setMsg('서류가 삭제되었습니다.');
+            setTimeout(() => setMsg(''), 3000);
+        } catch (error) {
+            console.error('Delete failed', error);
+            alert('서류 삭제 실패');
         }
     };
 
@@ -887,6 +900,15 @@ export default function StaffDetail() {
                                                 <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
                                                     <Eye size={14} />
                                                 </a>
+                                            )}
+                                            {uploadedDoc && (
+                                                <button
+                                                    onClick={() => handleDeleteDocument(uploadedDoc.id, doc.key)}
+                                                    className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100"
+                                                    title="서류 삭제"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             )}
                                         </div>
                                     </div>
