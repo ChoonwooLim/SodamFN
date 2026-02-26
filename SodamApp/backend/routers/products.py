@@ -1,7 +1,7 @@
 """
 Product CRUD API endpoints
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from routers.auth import get_admin_user
 from models import User as AuthUser
 from sqlmodel import Session, select
@@ -9,6 +9,9 @@ from database import get_session
 from models import Product, Vendor
 from pydantic import BaseModel
 from typing import Optional, List
+import os
+import shutil
+from datetime import datetime
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -155,6 +158,40 @@ def delete_product(product_id: int, session: Session = Depends(get_session), _ad
         session.commit()
         
         return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Upload product image
+@router.post("/upload-image")
+async def upload_product_image(
+    file: UploadFile = File(...),
+    _admin: AuthUser = Depends(get_admin_user)
+):
+    try:
+        # Validate file type
+        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP만 가능)")
+
+        # Create directory
+        base_dir = "uploads/product_images"
+        os.makedirs(base_dir, exist_ok=True)
+
+        # Generate unique filename
+        timestamp = int(datetime.now().timestamp() * 1000)
+        ext = os.path.splitext(file.filename or "image.jpg")[1]
+        filename = f"product_{timestamp}{ext}"
+        file_path = os.path.join(base_dir, filename)
+
+        # Save file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Return the URL path (served by FastAPI StaticFiles mount)
+        url_path = f"/uploads/product_images/{filename}"
+        return {"status": "success", "url": url_path}
     except HTTPException:
         raise
     except Exception as e:

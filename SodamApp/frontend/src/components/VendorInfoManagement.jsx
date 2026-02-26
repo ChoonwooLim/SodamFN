@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText, ImagePlus } from 'lucide-react';
 import api from '../api';
 import './VendorInfoManagement.css';
 
@@ -26,6 +26,9 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
+    const [imageUploading, setImageUploading] = useState(false);
+    const addImageInputRef = useRef(null);
+    const editImageInputRef = useRef(null);
 
     const [newProduct, setNewProduct] = useState({
         name: '',
@@ -144,6 +147,30 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
 
     const formatPrice = (price) => {
         return new Intl.NumberFormat('ko-KR').format(price);
+    };
+
+    const handleImageUpload = async (file, target) => {
+        if (!file) return;
+        setImageUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await api.post('/products/upload-image', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            if (response.data.status === 'success') {
+                const url = response.data.url;
+                if (target === 'new') {
+                    setNewProduct(prev => ({ ...prev, image_url: url }));
+                } else {
+                    setEditProduct(prev => ({ ...prev, image_url: url }));
+                }
+            }
+        } catch (error) {
+            alert('이미지 업로드 실패: ' + (error.response?.data?.detail || error.message));
+        } finally {
+            setImageUploading(false);
+        }
     };
 
     return (
@@ -330,13 +357,36 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                             />
                                         </div>
                                         <div className="form-field">
-                                            <label>이미지 URL</label>
-                                            <input
-                                                type="url"
-                                                placeholder="https://..."
-                                                value={newProduct.image_url}
-                                                onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
-                                            />
+                                            <label>이미지</label>
+                                            <div className="image-upload-group">
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://..."
+                                                    value={newProduct.image_url}
+                                                    onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                                                />
+                                                <input
+                                                    type="file"
+                                                    ref={addImageInputRef}
+                                                    accept="image/jpeg,image/png,image/gif,image/webp"
+                                                    style={{ display: 'none' }}
+                                                    onChange={(e) => handleImageUpload(e.target.files[0], 'new')}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="image-upload-btn"
+                                                    onClick={() => addImageInputRef.current?.click()}
+                                                    disabled={imageUploading}
+                                                    title="이미지 업로드"
+                                                >
+                                                    <ImagePlus size={16} />
+                                                </button>
+                                            </div>
+                                            {newProduct.image_url && (
+                                                <div className="image-preview-small">
+                                                    <img src={newProduct.image_url} alt="미리보기" onError={(e) => { e.target.style.display = 'none'; }} />
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="form-field full-width">
                                             <label>비고</label>
@@ -403,12 +453,30 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                                             onChange={(e) => setEditProduct({ ...editProduct, manufacturer: e.target.value })}
                                                             placeholder="제조사"
                                                         />
-                                                        <input
-                                                            type="url"
-                                                            value={editProduct.image_url}
-                                                            onChange={(e) => setEditProduct({ ...editProduct, image_url: e.target.value })}
-                                                            placeholder="이미지 URL"
-                                                        />
+                                                        <div className="image-upload-group">
+                                                            <input
+                                                                type="url"
+                                                                value={editProduct.image_url}
+                                                                onChange={(e) => setEditProduct({ ...editProduct, image_url: e.target.value })}
+                                                                placeholder="이미지 URL"
+                                                            />
+                                                            <input
+                                                                type="file"
+                                                                ref={editImageInputRef}
+                                                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                                                style={{ display: 'none' }}
+                                                                onChange={(e) => handleImageUpload(e.target.files[0], 'edit')}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="image-upload-btn"
+                                                                onClick={() => editImageInputRef.current?.click()}
+                                                                disabled={imageUploading}
+                                                                title="이미지 업로드"
+                                                            >
+                                                                <ImagePlus size={16} />
+                                                            </button>
+                                                        </div>
                                                         <input
                                                             type="text"
                                                             value={editProduct.note}
