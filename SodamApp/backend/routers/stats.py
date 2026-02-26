@@ -243,6 +243,9 @@ class VendorPatch(BaseModel):
     category: str = None
     vendor_type: str = None
     order_index: int = None
+    phone: str = None
+    address: str = None
+    business_reg_number: str = None
 
 @router.patch("/vendors/{vendor_id}")
 def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(get_admin_user)):
@@ -269,6 +272,12 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
                 vendor.vendor_type = payload.vendor_type
             if payload.order_index is not None:
                 vendor.order_index = payload.order_index
+            if payload.phone is not None:
+                vendor.phone = payload.phone
+            if payload.address is not None:
+                vendor.address = payload.address
+            if payload.business_reg_number is not None:
+                vendor.business_reg_number = payload.business_reg_number
             
             session.add(vendor)
             session.commit()

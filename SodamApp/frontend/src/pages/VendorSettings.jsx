@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Package, GitMerge } from 'lucide-react';
+import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Building2, Package, GitMerge } from 'lucide-react';
 import api from '../api';
 import './VendorSettings.css';
-import ProductManagement from '../components/ProductManagement';
+import VendorInfoManagement from '../components/VendorInfoManagement';
 // 매입처 카테고리 정의 (백엔드 CATEGORY_TO_PL_FIELD와 동기화)
 // Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
 const EXPENSE_CATEGORIES = [
@@ -853,10 +853,10 @@ export default function VendorSettings() {
                                             <button
                                                 onClick={() => setSelectedVendor(vendor)}
                                                 className="product-summary-btn"
-                                                title="클릭하여 제품 관리"
+                                                title="클릭하여 정보관리"
                                             >
-                                                <Package size={14} />
-                                                <span>제품 관리</span>
+                                                <Building2 size={14} />
+                                                <span>정보관리</span>
                                             </button>
                                         ) : (
                                             <input
@@ -1354,12 +1354,13 @@ export default function VendorSettings() {
                     )}
                 </div>
             </div>
-            {/* Product Management Modal */}
+            {/* Vendor Info Management Modal */}
             {
                 selectedVendor && (
-                    <ProductManagement
+                    <VendorInfoManagement
                         vendor={selectedVendor}
                         onClose={() => setSelectedVendor(null)}
+                        onVendorUpdate={fetchVendors}
                     />
                 )
             }

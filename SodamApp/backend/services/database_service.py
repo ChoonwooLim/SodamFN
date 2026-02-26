@@ -108,6 +108,9 @@ class DatabaseService:
             "category": row[0].category,
             "vendor_type": getattr(row[0], 'vendor_type', 'expense'),
             "order_index": getattr(row[0], 'order_index', 0),
+            "phone": getattr(row[0], 'phone', None),
+            "address": getattr(row[0], 'address', None),
+            "business_reg_number": getattr(row[0], 'business_reg_number', None),
             # Add stats to response
             "last_transaction_date": row[1],
             "transaction_count": row[2] or 0,

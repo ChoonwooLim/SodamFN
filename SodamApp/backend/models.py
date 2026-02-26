@@ -13,6 +13,9 @@ class Vendor(SQLModel, table=True):
     order_index: int = Field(default=0)  # 표시 순서
     contact_info: Optional[str] = None
     item: Optional[str] = None  # 취급 품목
+    phone: Optional[str] = None  # 전화번호
+    address: Optional[str] = None  # 주소
+    business_reg_number: Optional[str] = None  # 사업자등록번호
     
     created_by_upload_id: Optional[int] = Field(default=None) # No FK constraint for simplicity or nullable FK
     
@@ -30,6 +33,7 @@ class Product(SQLModel, table=True):
     tax_type: str = Field(default="taxable")  # taxable(과세), tax_free(면세), zero_rated(영세)
     manufacturer: Optional[str] = None  # 제조사
     note: Optional[str] = None  # 비고
+    image_url: Optional[str] = None  # 제품 이미지 URL
     
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
     vendor: Optional[Vendor] = Relationship(back_populates="products")

@@ -22,6 +22,7 @@ class ProductCreate(BaseModel):
     tax_type: str = "taxable"  # taxable, tax_free, zero_rated
     manufacturer: Optional[str] = None
     note: Optional[str] = None
+    image_url: Optional[str] = None
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -31,6 +32,7 @@ class ProductUpdate(BaseModel):
     tax_type: Optional[str] = None
     manufacturer: Optional[str] = None
     note: Optional[str] = None
+    image_url: Optional[str] = None
 
 # Get all products for a vendor
 @router.get("")
@@ -54,6 +56,7 @@ def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get
                 "tax_type": p.tax_type,
                 "manufacturer": p.manufacturer,
                 "note": p.note,
+                "image_url": p.image_url,
                 "vendor_id": p.vendor_id
             } for p in products]
         }
@@ -93,7 +96,8 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session),
             unit_price=data.unit_price,
             tax_type=data.tax_type,
             manufacturer=data.manufacturer,
-            note=data.note
+            note=data.note,
+            image_url=data.image_url
         )
         session.add(product)
         session.commit()
@@ -127,6 +131,8 @@ def update_product(product_id: int, data: ProductUpdate, session: Session = Depe
             product.manufacturer = data.manufacturer
         if data.note is not None:
             product.note = data.note
+        if data.image_url is not None:
+            product.image_url = data.image_url
         
         session.add(product)
         session.commit()
