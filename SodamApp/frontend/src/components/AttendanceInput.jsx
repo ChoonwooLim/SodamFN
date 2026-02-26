@@ -70,7 +70,6 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                     body: JSON.stringify({ date: dateStr, description: '임시공휴일' })
                 });
                 setCompanyHolidays(prev => [...prev, dateStr]);
-                setCompanyHolidays(prev => [...prev, dateStr]);
                 // Also set local status to Holiday and reset hours to 0
                 setDailyData(prev => ({
                     ...prev,
@@ -175,13 +174,14 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             if (result.status === 'success') {
                 alert('급여 산출이 완료되었습니다.');
 
-                // Close modal first
-                onClose();
-
+                // Notify parent with calculated data BEFORE closing modal
+                // so the parent state is updated properly
                 if (onCalculateSuccess) {
                     onCalculateSuccess(result.data);
-                    onCalculateSuccess(result.data);
                 }
+
+                // Close modal after parent has received the data
+                onClose();
             } else {
                 alert(result.message || '산출 중 오류가 발생했습니다.');
             }
