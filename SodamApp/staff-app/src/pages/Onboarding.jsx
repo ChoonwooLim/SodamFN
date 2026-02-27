@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MapPin, Shield, Bell, ChevronRight, Check, Smartphone, FileText, Eye } from 'lucide-react';
 
 const STEPS = ['welcome', 'terms', 'permissions', 'ready'];

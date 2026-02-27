@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import BottomTab from './components/BottomTab';
-import LocationPermission from './components/LocationPermission';
+import Onboarding from './pages/Onboarding';
 
 const Login = lazy(() => import('./pages/Login'));
 const Home = lazy(() => import('./pages/Home'));
@@ -33,28 +33,40 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
+  const [onboarded, setOnboarded] = useState(
+    () => localStorage.getItem('onboarding_completed') === 'true'
+  );
+
   return (
     <BrowserRouter>
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-          <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
-          <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
-          <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSign /></ProtectedRoute>} />
-          <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
-          <Route path="/payslip" element={<ProtectedRoute><Payslip /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/purchase-request" element={<ProtectedRoute><PurchaseRequest /></ProtectedRoute>} />
-          <Route path="/emergency" element={<ProtectedRoute><EmergencyContacts /></ProtectedRoute>} />
-          <Route path="/suggestions" element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
-          <Route path="/staff-chat" element={<ProtectedRoute><StaffChat /></ProtectedRoute>} />
+          {/* Install guide is always accessible */}
           <Route path="/install" element={<InstallGuide />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+
+          {/* If not onboarded, show onboarding on all routes except /install */}
+          {!onboarded ? (
+            <Route path="*" element={<Onboarding onComplete={() => setOnboarded(true)} />} />
+          ) : (
+            <>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
+              <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+              <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSign /></ProtectedRoute>} />
+              <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
+              <Route path="/payslip" element={<ProtectedRoute><Payslip /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/purchase-request" element={<ProtectedRoute><PurchaseRequest /></ProtectedRoute>} />
+              <Route path="/emergency" element={<ProtectedRoute><EmergencyContacts /></ProtectedRoute>} />
+              <Route path="/suggestions" element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
+              <Route path="/staff-chat" element={<ProtectedRoute><StaffChat /></ProtectedRoute>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
         </Routes>
       </Suspense>
-      <ConditionalBottomTab />
-      <ConditionalLocationPermission />
+      {onboarded && <ConditionalBottomTab />}
     </BrowserRouter>
   );
 }
@@ -63,11 +75,4 @@ function ConditionalBottomTab() {
   const loc = window.location.pathname;
   if (loc === '/install' || loc === '/login') return null;
   return <BottomTab />;
-}
-
-function ConditionalLocationPermission() {
-  const token = localStorage.getItem('token');
-  const loc = window.location.pathname;
-  if (!token || loc === '/install' || loc === '/login') return null;
-  return <LocationPermission />;
 }
