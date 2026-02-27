@@ -77,6 +77,12 @@ export default function EmergencyContacts() {
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>{c.name}</div>
                                             <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>{c.phone}</div>
+                                            {(c.store_id || c.note) && (
+                                                <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '3px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {c.store_id && <span>🏪 {c.store_id}</span>}
+                                                    {c.note && <span>📝 {c.note}</span>}
+                                                </div>
+                                            )}
                                         </div>
                                         <div style={{
                                             padding: '8px 14px', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 700,

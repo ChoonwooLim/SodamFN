@@ -9,7 +9,7 @@ export default function EmergencyContactsAdmin() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editId, setEditId] = useState(null);
-    const [form, setForm] = useState({ name: '', phone: '', category: '배달앱', display_order: 0 });
+    const [form, setForm] = useState({ name: '', phone: '', category: '배달앱', store_id: '', note: '', display_order: 0 });
 
     const fetchContacts = async () => {
         setLoading(true);
@@ -22,7 +22,7 @@ export default function EmergencyContactsAdmin() {
 
     useEffect(() => { fetchContacts(); }, []);
 
-    const resetForm = () => { setForm({ name: '', phone: '', category: '배달앱', display_order: 0 }); setEditId(null); setShowForm(false); };
+    const resetForm = () => { setForm({ name: '', phone: '', category: '배달앱', store_id: '', note: '', display_order: 0 }); setEditId(null); setShowForm(false); };
 
     const handleSave = async () => {
         if (!form.name || !form.phone) return alert('이름과 전화번호를 입력해주세요.');
@@ -40,7 +40,7 @@ export default function EmergencyContactsAdmin() {
     };
 
     const handleEdit = (c) => {
-        setForm({ name: c.name, phone: c.phone, category: c.category, display_order: c.display_order });
+        setForm({ name: c.name, phone: c.phone, category: c.category, store_id: c.store_id || '', note: c.note || '', display_order: c.display_order });
         setEditId(c.id);
         setShowForm(true);
     };
@@ -101,6 +101,18 @@ export default function EmergencyContactsAdmin() {
                                 </select>
                             </div>
                             <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">매장 아이디</label>
+                                <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    placeholder="예: sodam_gangnam"
+                                    value={form.store_id} onChange={(e) => setForm({ ...form, store_id: e.target.value })} />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">비고</label>
+                                <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    placeholder="메모"
+                                    value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+                            </div>
+                            <div>
                                 <label className="text-xs font-bold text-slate-500 mb-1 block">정렬순서</label>
                                 <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                     value={form.display_order} onChange={(e) => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} />
@@ -131,6 +143,8 @@ export default function EmergencyContactsAdmin() {
                                         </span>
                                     </div>
                                     <span className="text-sm text-slate-500">{c.phone}</span>
+                                    {c.store_id && <span className="text-xs text-slate-400 ml-2">ID: {c.store_id}</span>}
+                                    {c.note && <span className="text-xs text-slate-400 ml-2">| {c.note}</span>}
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={() => handleEdit(c)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={16} /></button>

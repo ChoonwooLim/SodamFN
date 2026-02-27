@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings, finance, profitloss, products, revenue, purchase, purchase_requests, emergency_contacts
+from routers import stats, ocr, expense, hr, upload, payroll, auth, contract, settings, finance, profitloss, products, revenue, purchase, purchase_requests, emergency_contacts, announcements
 from init_db import init_db
 
 from fastapi.staticfiles import StaticFiles
@@ -90,6 +90,7 @@ app.include_router(revenue.router, prefix="/api/revenue")
 app.include_router(purchase.router)
 app.include_router(purchase_requests.router, prefix="/api")
 app.include_router(emergency_contacts.router, prefix="/api")
+app.include_router(announcements.router, prefix="/api")
 
 @app.get("/")
 def read_root():

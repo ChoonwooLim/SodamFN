@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import {
-    Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone,
+    Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone, Megaphone,
     Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer
 } from 'lucide-react';
 
@@ -14,6 +14,8 @@ export default function Home() {
     const [monthlySummary, setMonthlySummary] = useState(null);
     const [pendingContracts, setPendingContracts] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [announcements, setAnnouncements] = useState([]);
+    const [expandedAnn, setExpandedAnn] = useState(null);
 
     // GPS
     const [gpsLoading, setGpsLoading] = useState(false);
@@ -51,6 +53,12 @@ export default function Home() {
                 }
             } catch (e) { console.error(e); }
             finally { setLoading(false); }
+
+            // Fetch announcements (separate try to not block main data)
+            try {
+                const annRes = await api.get('/announcements');
+                if (annRes.data.status === 'success') setAnnouncements(annRes.data.data);
+            } catch { /* ignore */ }
         };
         init();
     }, [navigate]);
@@ -141,27 +149,27 @@ export default function Home() {
             )}
 
             {/* Attendance Button */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '32px 0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0 16px' }}>
                 <button
                     className={`attendance-btn ${allDone ? 'done' : canCheckin ? 'checkin' : 'checkout'}`}
                     onClick={() => handleAttendance(canCheckin ? 'checkin' : 'checkout')}
                     disabled={allDone || gpsLoading}
                 >
                     {gpsLoading ? (
-                        <Loader2 size={32} style={{ animation: 'spin 0.8s linear infinite' }} />
+                        <Loader2 size={24} style={{ animation: 'spin 0.8s linear infinite' }} />
                     ) : allDone ? (
                         <>
-                            <ShieldCheck size={32} />
+                            <ShieldCheck size={24} />
                             <span>근무 완료</span>
                         </>
                     ) : canCheckin ? (
                         <>
-                            <Coffee size={32} />
+                            <Coffee size={24} />
                             <span>출근하기</span>
                         </>
                     ) : (
                         <>
-                            <LogOutIcon size={32} />
+                            <LogOutIcon size={24} />
                             <span>퇴근하기</span>
                         </>
                     )}
@@ -183,6 +191,33 @@ export default function Home() {
                     )}
                 </div>
             </div>
+
+            {/* Announcements */}
+            {announcements.length > 0 && (
+                <div className="card mb-4" style={{ padding: '14px 16px', border: '1px solid #fde68a', background: '#fffbeb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <Megaphone size={14} color="#d97706" />
+                        <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#92400e' }}>공지사항</span>
+                    </div>
+                    {announcements.slice(0, 3).map((a) => (
+                        <div key={a.id}
+                            style={{ padding: '8px 0', borderBottom: '1px solid rgba(251,191,36,0.2)', cursor: a.content ? 'pointer' : 'default' }}
+                            onClick={() => a.content && setExpandedAnn(expandedAnn === a.id ? null : a.id)}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {a.pinned && <span style={{ fontSize: '0.6rem', background: '#f59e0b', color: 'white', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>고정</span>}
+                                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#78350f' }}>{a.title}</span>
+                                <span style={{ fontSize: '0.65rem', color: '#b45309', marginLeft: 'auto', flexShrink: 0 }}>
+                                    {a.created_at ? new Date(a.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }) : ''}
+                                </span>
+                            </div>
+                            {expandedAnn === a.id && a.content && (
+                                <p style={{ fontSize: '0.75rem', color: '#92400e', marginTop: '6px', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{a.content}</p>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Monthly Summary Card */}
             <div className="card card-gradient-dark mb-4">

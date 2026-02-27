@@ -376,4 +376,15 @@ class EmergencyContact(SQLModel, table=True):
     name: str  # 업체/서비스명 (예: 쿠팡이츠 AS센터)
     phone: str  # 전화번호
     category: str = ""  # 분류 (배달앱, 장비AS, 기타)
+    store_id: str = ""  # 매장 아이디
+    note: str = ""  # 비고
     display_order: int = Field(default=0)
+
+
+class Announcement(SQLModel, table=True):
+    """회사 공지사항"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str
+    content: str = ""
+    pinned: bool = Field(default=False)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

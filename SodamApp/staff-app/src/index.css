@@ -254,20 +254,20 @@ h3 {
   border-radius: var(--radius-md);
 }
 
-/* ===== Big Attendance Button ===== */
+/* ===== Attendance Button (Compact) ===== */
 .attendance-btn {
-  width: 160px;
-  height: 160px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   border: none;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   font-family: inherit;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all var(--transition-spring);
   position: relative;
@@ -277,15 +277,30 @@ h3 {
 .attendance-btn::before {
   content: '';
   position: absolute;
-  inset: -8px;
+  inset: -6px;
   border-radius: 50%;
   opacity: 0;
   transition: opacity var(--transition-normal);
   z-index: -1;
 }
 
+.attendance-btn::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  animation: spin-slow 12s linear infinite;
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .attendance-btn:active {
-  transform: scale(0.92);
+  transform: scale(0.9);
 }
 
 .attendance-btn:disabled {
@@ -294,14 +309,18 @@ h3 {
   transform: none;
 }
 
+.attendance-btn:disabled::after {
+  animation: none;
+}
+
 .attendance-btn.checkin {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
   color: white;
-  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.35);
+  box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);
 }
 
 .attendance-btn.checkin::before {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(99, 102, 241, 0.12);
 }
 
 .attendance-btn.checkin:not(:disabled):hover::before {
@@ -311,11 +330,11 @@ h3 {
 .attendance-btn.checkout {
   background: linear-gradient(135deg, #f97316, #ea580c);
   color: white;
-  box-shadow: 0 8px 32px rgba(249, 115, 22, 0.35);
+  box-shadow: 0 6px 24px rgba(249, 115, 22, 0.4);
 }
 
 .attendance-btn.checkout::before {
-  background: rgba(249, 115, 22, 0.15);
+  background: rgba(249, 115, 22, 0.12);
 }
 
 .attendance-btn.checkout:not(:disabled):hover::before {
@@ -326,6 +345,10 @@ h3 {
   background: linear-gradient(135deg, #d1d5db, #9ca3af);
   color: white;
   box-shadow: none;
+}
+
+.attendance-btn.done::after {
+  border-color: transparent;
 }
 
 /* ===== Status Badges ===== */

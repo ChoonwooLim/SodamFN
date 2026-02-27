@@ -17,7 +17,7 @@ def get_contacts(_user: AuthUser = Depends(get_current_user)):
         return {
             "status": "success",
             "data": [
-                {"id": c.id, "name": c.name, "phone": c.phone, "category": c.category, "display_order": c.display_order}
+                {"id": c.id, "name": c.name, "phone": c.phone, "category": c.category, "store_id": c.store_id, "note": c.note, "display_order": c.display_order}
                 for c in contacts
             ]
         }
@@ -30,16 +30,18 @@ def create_contact(
     name: str = Body(..., embed=True),
     phone: str = Body(..., embed=True),
     category: str = Body("", embed=True),
+    store_id: str = Body("", embed=True),
+    note: str = Body("", embed=True),
     display_order: int = Body(0, embed=True),
     _admin: AuthUser = Depends(get_admin_user)
 ):
     service = DatabaseService()
     try:
-        contact = EmergencyContact(name=name, phone=phone, category=category, display_order=display_order)
+        contact = EmergencyContact(name=name, phone=phone, category=category, store_id=store_id, note=note, display_order=display_order)
         service.session.add(contact)
         service.session.commit()
         service.session.refresh(contact)
-        return {"status": "success", "data": {"id": contact.id, "name": contact.name, "phone": contact.phone, "category": contact.category}}
+        return {"status": "success", "data": {"id": contact.id, "name": contact.name, "phone": contact.phone, "category": contact.category, "store_id": contact.store_id, "note": contact.note}}
     finally:
         service.close()
 
@@ -50,6 +52,8 @@ def update_contact(
     name: str = Body(None, embed=True),
     phone: str = Body(None, embed=True),
     category: str = Body(None, embed=True),
+    store_id: str = Body(None, embed=True),
+    note: str = Body(None, embed=True),
     display_order: int = Body(None, embed=True),
     _admin: AuthUser = Depends(get_admin_user)
 ):
@@ -61,6 +65,8 @@ def update_contact(
         if name is not None: contact.name = name
         if phone is not None: contact.phone = phone
         if category is not None: contact.category = category
+        if store_id is not None: contact.store_id = store_id
+        if note is not None: contact.note = note
         if display_order is not None: contact.display_order = display_order
         service.session.add(contact)
         service.session.commit()
