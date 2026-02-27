@@ -29,6 +29,30 @@ services:
           type: web
           name: sodam-backend
           property: url
+      - key: VITE_STAFF_APP_URL
+        fromService:
+          type: web
+          name: sodam-staff
+          property: url
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # Staff App (PWA) - Static Site
+  - type: web
+    name: sodam-staff
+    runtime: static
+    region: singapore
+    rootDir: SodamApp/staff-app
+    buildCommand: "npm install && npm run build"
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: sodam-backend
+          property: url
     routes:
       - type: rewrite
         source: /*

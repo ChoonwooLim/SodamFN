@@ -30,7 +30,7 @@ export default function Documents() {
             formData.append('doc_type', docKey);
 
             const staffId = localStorage.getItem('staff_id');
-            await api.post(`/hr/staff/${staffId}/documents`, formData, {
+            await api.post(`/hr/staff/${staffId}/document`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
 

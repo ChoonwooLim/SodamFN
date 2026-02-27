@@ -27,6 +27,7 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
     const [editingId, setEditingId] = useState(null);
     const [showAddForm, setShowAddForm] = useState(false);
     const [imageUploading, setImageUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
     const addImageInputRef = useRef(null);
     const editImageInputRef = useRef(null);
 
@@ -500,7 +501,7 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                                 <>
                                                     <div className="product-card-main">
                                                         {product.image_url && (
-                                                            <div className="product-image">
+                                                            <div className="product-image" onClick={() => setPreviewImage({ url: product.image_url, name: product.name })} style={{ cursor: 'pointer' }}>
                                                                 <img src={product.image_url} alt={product.name} onError={(e) => { e.target.style.display = 'none'; }} />
                                                             </div>
                                                         )}
@@ -538,6 +539,18 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                     )}
                 </div>
             </div>
+            {/* Image Preview Lightbox */}
+            {previewImage && (
+                <div className="image-lightbox-overlay" onClick={() => setPreviewImage(null)}>
+                    <div className="image-lightbox-content" onClick={(e) => e.stopPropagation()}>
+                        <button className="image-lightbox-close" onClick={() => setPreviewImage(null)}>
+                            <X size={24} />
+                        </button>
+                        <img src={previewImage.url} alt={previewImage.name} />
+                        <p className="image-lightbox-caption">{previewImage.name}</p>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

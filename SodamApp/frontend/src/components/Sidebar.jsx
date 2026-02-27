@@ -103,18 +103,14 @@ export default function Sidebar() {
 
             <div className="p-4 border-t border-slate-800">
                 {user.role === 'admin' && (
-                    <a
-                        href="#"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            window.open(`${window.location.protocol}//${window.location.hostname}:5174/?_t=${Date.now()}`, '_blank');
-                        }}
-                        className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 transition-all"
+                    <Link
+                        to="/staff-app-preview"
+                        className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/staff-app-preview' ? 'bg-emerald-500/20 text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
                     >
                         <Smartphone size={20} />
                         <span className="font-medium text-sm">직원용 앱</span>
                         <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">PWA</span>
-                    </a>
+                    </Link>
                 )}
                 <Link
                     to="/"

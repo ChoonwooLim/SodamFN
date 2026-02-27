@@ -23,6 +23,7 @@ const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
 const RecipeBook = React.lazy(() => import('./pages/RecipeBook'));
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const StaffAppPreview = React.lazy(() => import('./pages/StaffAppPreview'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -109,6 +110,7 @@ export default function App() {
               <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
 
               {/* STAFF ROUTES */}
+              <Route path="/staff-app-preview" element={<ProtectedRoute adminOnly><StaffAppPreview /></ProtectedRoute>} />
               <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
               <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
               <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />

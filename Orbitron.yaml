@@ -1,0 +1,69 @@
+# Orbitron Deployment Configuration
+# SodamFN Enterprise Management Platform
+# 3 Services: Backend (FastAPI), Admin Frontend (React), Staff App (React PWA)
+
+project:
+  name: sodam-fn
+  region: ap-northeast-2  # Seoul
+
+services:
+  # ─────────────────────────────────────────────
+  # Backend API (FastAPI + PostgreSQL)
+  # ─────────────────────────────────────────────
+  - name: sodam-backend
+    type: web
+    runtime: python
+    rootDir: SodamApp/backend
+    build:
+      command: "pip install -r requirements.txt"
+    start:
+      command: "gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT"
+    env:
+      - key: DATABASE_URL
+        from: database.sodam-db.connectionString
+      - key: SECRET_KEY
+        generate: true
+    healthCheck:
+      path: /api/health
+      interval: 30
+
+  # ─────────────────────────────────────────────
+  # Admin Frontend (Vite + React)
+  # ─────────────────────────────────────────────
+  - name: sodam-frontend
+    type: static
+    rootDir: SodamApp/frontend
+    build:
+      command: "npm install && npm run build"
+    publish: ./dist
+    env:
+      - key: VITE_API_URL
+        from: service.sodam-backend.url
+      - key: VITE_STAFF_APP_URL
+        from: service.sodam-staff.url
+    routes:
+      - source: "/*"
+        rewrite: /index.html
+
+  # ─────────────────────────────────────────────
+  # Staff App - PWA (Vite + React)
+  # ─────────────────────────────────────────────
+  - name: sodam-staff
+    type: static
+    rootDir: SodamApp/staff-app
+    build:
+      command: "npm install && npm run build"
+    publish: ./dist
+    env:
+      - key: VITE_API_URL
+        from: service.sodam-backend.url
+    routes:
+      - source: "/*"
+        rewrite: /index.html
+    pwa: true
+
+databases:
+  - name: sodam-db
+    engine: postgres
+    region: ap-northeast-2
+    plan: starter
