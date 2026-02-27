@@ -128,7 +128,7 @@ export default function DeployManagement() {
     const info = APP_INFO[activeApp];
 
     return (
-        <div className="p-6 max-w-5xl mx-auto" style={{ fontFamily: "'Pretendard', 'Inter', -apple-system, sans-serif" }}>
+        <div className="p-6 max-w-5xl mx-auto rounded-2xl" style={{ fontFamily: "'Pretendard', 'Inter', -apple-system, sans-serif", background: '#0f172a', minHeight: 'calc(100vh - 48px)' }}>
             {/* Toast */}
             {toast && (
                 <div
