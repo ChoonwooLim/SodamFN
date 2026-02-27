@@ -8,7 +8,7 @@ const REQUIRED_DOCS = [
     { key: 'contract', label: '근로계약서', desc: '관리자가 전자계약으로 발송합니다', selfUpload: false },
     { key: 'id_copy', label: '신분증 사본', desc: '주민등록증 또는 외국인등록증', selfUpload: true },
     { key: 'health_cert', label: '보건증', desc: '식품위생 관련 보건증', selfUpload: true },
-    { key: 'bank_account', label: '통장 사본', desc: '급여 입금용 통장 앞면', selfUpload: true },
+    { key: 'bank_copy', label: '통장 사본', desc: '급여 입금용 통장 앞면', selfUpload: true },
     { key: 'photo', label: '취업승인서', desc: '외국인 취업승인서', selfUpload: true },
 ];
 

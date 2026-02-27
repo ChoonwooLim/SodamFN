@@ -255,7 +255,7 @@ def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_use
                     "doc_type": doc.doc_type,
                     "original_filename": doc.original_filename,
                     "file_path": doc.file_path,
-                    "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                    "uploaded_at": doc.upload_date.isoformat() if doc.upload_date else None,
                 }
                 for doc in documents
             ]
