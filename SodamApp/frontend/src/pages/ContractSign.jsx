@@ -184,6 +184,9 @@ export default function ContractSignPage() {
         if (!text) return null;
         let content = text.replace(/^표\s*준\s*근\s*로\s*계\s*약\s*서\s*\n*/, '');
 
+        // Remove the awkward hardcoded newline in the introductory sentence
+        content = content.replace(/다음과 같이\s*\n+\s*근로계약을 체결한다/g, '다음과 같이 근로계약을 체결한다');
+
         // Extract the signature block (starts near the bottom with a year or (사업주))
         const signMatch = content.match(/(\d{4}년\s*\d*월\s*\d*일\s*\n)?\(사업주\)/);
         let bodyText = content;
