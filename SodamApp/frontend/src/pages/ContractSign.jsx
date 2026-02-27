@@ -217,7 +217,7 @@ export default function ContractSignPage() {
                     return <div key={idx} className={`font-bold text-slate-900 mt-3 mb-1 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>{line}</div>;
                 }
                 if (trimmed.startsWith('-')) {
-                    return <div key={idx} className={`pl-4 text-slate-700 leading-relaxed mb-0.5 ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
+                    return <div key={idx} className={`pl-[5pt] text-slate-700 leading-relaxed mb-0.5 ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
                 }
                 return <div key={idx} className={`text-slate-800 leading-[1.6] min-h-[1.2em] ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
             });
