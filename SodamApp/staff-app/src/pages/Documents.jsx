@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import api, { API_BASE } from '../api';
 import {
     FileText, Camera, Upload, CheckCircle, Clock, ImageIcon, AlertCircle
@@ -9,7 +9,7 @@ const REQUIRED_DOCS = [
     { key: 'id_copy', label: '신분증 사본', desc: '주민등록증 또는 외국인등록증', selfUpload: true },
     { key: 'health_cert', label: '보건증', desc: '식품위생 관련 보건증', selfUpload: true },
     { key: 'bank_account', label: '통장 사본', desc: '급여 입금용 통장 앞면', selfUpload: true },
-    { key: 'photo', label: '증명사진', desc: '최근 6개월 이내', selfUpload: true },
+    { key: 'photo', label: '취업승인서', desc: '외국인 취업승인서', selfUpload: true },
 ];
 
 export default function Documents() {
@@ -18,6 +18,28 @@ export default function Documents() {
     const [message, setMessage] = useState('');
     const fileRef = useRef(null);
     const [activeDoc, setActiveDoc] = useState(null);
+
+    // Fetch existing documents on mount
+    useEffect(() => {
+        const staffId = localStorage.getItem('staff_id');
+        if (!staffId) return;
+        api.get(`/hr/staff/${staffId}/documents`)
+            .then(res => {
+                if (res.data.status === 'success' && res.data.data) {
+                    const existing = {};
+                    res.data.data.forEach(doc => {
+                        existing[doc.doc_type] = {
+                            name: doc.original_filename,
+                            time: doc.uploaded_at
+                                ? new Date(doc.uploaded_at).toLocaleString('ko-KR')
+                                : '제출 완료',
+                        };
+                    });
+                    setUploads(existing);
+                }
+            })
+            .catch(() => { });
+    }, []);
 
     const handleUpload = async (docKey, file) => {
         if (!file) return;

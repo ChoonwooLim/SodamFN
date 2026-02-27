@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body, Depends
-from routers.auth import get_admin_user
+from routers.auth import get_admin_user, get_current_user
 from models import User as AuthUser
 from services.database_service import DatabaseService
 from models import Staff, Attendance, StaffDocument, WorkLocation
@@ -240,13 +240,36 @@ def update_staff_account_grade(
     finally:
         service.close()
 
+@router.get("/staff/{staff_id}/documents")
+def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_user)):
+    service = DatabaseService()
+    try:
+        documents = service.session.exec(
+            select(StaffDocument).where(StaffDocument.staff_id == staff_id)
+        ).all()
+        return {
+            "status": "success",
+            "data": [
+                {
+                    "id": doc.id,
+                    "doc_type": doc.doc_type,
+                    "original_filename": doc.original_filename,
+                    "file_path": doc.file_path,
+                    "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+                }
+                for doc in documents
+            ]
+        }
+    finally:
+        service.close()
+
 @router.post("/staff/{staff_id}/document")
 
 def upload_staff_document(
     staff_id: int, 
     doc_type: str = Form(...), 
     file: UploadFile = File(...),
-    _admin: AuthUser = Depends(get_admin_user)
+    _user: AuthUser = Depends(get_current_user)
 ):
     service = DatabaseService()
     try:
