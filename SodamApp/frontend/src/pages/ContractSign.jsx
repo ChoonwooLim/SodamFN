@@ -207,7 +207,7 @@ export default function ContractSignPage() {
                     const employerName = introMatch[1].trim() || '____________';
                     const employeeName = introMatch[2].trim() || '____________';
                     return (
-                        <div key={idx} className={`text-slate-900 leading-[1.8] min-h-[1.2em] mb-4 mt-2 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>
+                        <div key={idx} className={`text-slate-900 leading-[1.8] min-h-[1.2em] mb-1 mt-1 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>
                             <strong className="font-extrabold">{employerName}</strong>(이하 "사업주"라 함)와 <strong className="font-extrabold">{employeeName}</strong>(이하 "근로자"라 함)은 다음과 같이 근로계약을 체결한다.
                         </div>
                     );
