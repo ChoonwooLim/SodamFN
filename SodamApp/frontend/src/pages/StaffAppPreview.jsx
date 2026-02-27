@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Smartphone, ExternalLink, RefreshCw, Monitor, Tablet } from 'lucide-react';
 import './StaffAppPreview.css';
 
-const STAFF_APP_URL = import.meta.env.VITE_STAFF_APP_URL || `${window.location.protocol}//${window.location.hostname}:5174`;
+const STAFF_APP_URL = import.meta.env.VITE_STAFF_APP_URL
+    || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? `${window.location.protocol}//${window.location.hostname}:5174`
+        : 'https://sodam-staff.pages.dev');
 
 const DEVICE_PRESETS = [
     { id: 'phone', label: '스마트폰', icon: Smartphone, width: 390, height: 844 },

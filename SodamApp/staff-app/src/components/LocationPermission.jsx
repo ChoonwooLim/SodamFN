@@ -74,19 +74,34 @@ export default function LocationPermission() {
                     </>
                 ) : status === 'denied' ? (
                     <>
-                        <div style={{ ...iconCircle, background: '#dc2626' }}>
+                        <div style={{ ...iconCircle, background: '#f59e0b' }}>
                             <AlertTriangle size={36} color="white" />
                         </div>
-                        <h2 style={title}>위치 권한이 거부되었습니다</h2>
+                        <h2 style={title}>위치 권한을 허용해주세요</h2>
                         <p style={desc}>
-                            출퇴근 기록을 위해 위치 권한이 필요합니다.<br />
-                            설정에서 위치 권한을 직접 허용해주세요.
+                            출퇴근 기록에 필요합니다.<br />
+                            아래 방법으로 허용 후 <strong>"다시 시도"</strong>를 눌러주세요.
                         </p>
+
                         <div style={stepsBox}>
-                            <p style={stepText}><Settings size={14} style={{ verticalAlign: 'middle' }} /> <strong>설정 → 앱 → Chrome → 권한 → 위치</strong></p>
-                            <p style={stepText}>또는 주소창 왼쪽 🔒 아이콘 클릭 → 위치 허용</p>
+                            <p style={{ ...stepText, fontWeight: 800, fontSize: '0.85rem', marginBottom: '8px', color: '#0f172a' }}>📱 Android (Chrome)</p>
+                            <p style={stepText}>❶ 주소창 왼쪽 <strong>🔒 자물쇠</strong> 아이콘 탭</p>
+                            <p style={stepText}>❷ <strong>"권한"</strong> 탭</p>
+                            <p style={stepText}>❸ <strong>"위치"</strong> → <strong>"허용"</strong> 선택</p>
+                            <p style={stepText}>❹ 아래 <strong>"다시 시도"</strong> 버튼 클릭!</p>
+                            <div style={{ borderTop: '1px dashed #fde68a', margin: '10px 0', paddingTop: '8px' }}>
+                                <p style={{ ...stepText, fontWeight: 800, fontSize: '0.85rem', color: '#0f172a' }}>📱 iPhone (Safari)</p>
+                                <p style={stepText}>설정 → Safari → 위치 → 허용</p>
+                            </div>
                         </div>
-                        <button onClick={handleSkip} style={btnSecondary}>닫기</button>
+
+                        <button
+                            onClick={() => { setStatus('prompt'); requestPermission(); }}
+                            style={{ ...btnPrimary, background: '#f59e0b' }}
+                        >
+                            🔄 다시 시도
+                        </button>
+                        <button onClick={handleSkip} style={btnSecondary}>나중에 하기</button>
                     </>
                 ) : (
                     <>
