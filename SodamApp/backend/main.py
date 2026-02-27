@@ -60,11 +60,18 @@ cors_origins = [
     "https://sodam-frontend.onrender.com",
     "https://sodamfn-frontend.onrender.com",
     "https://sodamfn.onrender.com",
+    # Cloudflare Pages production
+    "https://sodam-staff.pages.dev",
+    "https://sodamfn.twinverse.org",
 ]
 
 # Add custom frontend URL from environment if set
 if FRONTEND_URL:
     cors_origins.append(FRONTEND_URL)
+
+STAFF_APP_URL = os.getenv("STAFF_APP_URL", "")
+if STAFF_APP_URL:
+    cors_origins.append(STAFF_APP_URL)
 
 app.add_middleware(
     CORSMiddleware,

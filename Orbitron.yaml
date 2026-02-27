@@ -23,6 +23,10 @@ services:
         from: database.sodam-db.connectionString
       - key: SECRET_KEY
         generate: true
+      - key: FRONTEND_URL
+        from: service.sodam-frontend.url
+      - key: STAFF_APP_URL
+        from: service.sodam-staff.url
     healthCheck:
       path: /api/health
       interval: 30
