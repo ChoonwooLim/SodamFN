@@ -358,3 +358,13 @@ class VendorRule(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+
+class PurchaseRequest(SQLModel, table=True):
+    """직원 재료 구매 요청"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""
+    items_json: str = "[]"  # JSON: [{name, quantity, note}]
+    status: str = Field(default="pending")  # pending, completed, rejected
+    admin_note: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

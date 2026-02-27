@@ -10,6 +10,7 @@ const ContractSign = lazy(() => import('./pages/ContractSign'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Payslip = lazy(() => import('./pages/Payslip'));
 const Profile = lazy(() => import('./pages/Profile'));
+const PurchaseRequest = lazy(() => import('./pages/PurchaseRequest'));
 
 function PageLoader() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
           <Route path="/payslip" element={<ProtectedRoute><Payslip /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/purchase-request" element={<ProtectedRoute><PurchaseRequest /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

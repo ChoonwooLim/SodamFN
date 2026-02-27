@@ -198,12 +198,16 @@ def create_staff_account(
         if staff_account:
             raise HTTPException(status_code=400, detail="Staff already has an account")
             
+        # Get staff name for real_name
+        staff = service.session.get(Staff, staff_id)
+        
         new_user = User(
             username=username,
             hashed_password=get_password_hash(password),
             role="staff",
             grade=grade,
-            staff_id=staff_id
+            staff_id=staff_id,
+            real_name=staff.name if staff else None
         )
         service.session.add(new_user)
         service.session.commit()
