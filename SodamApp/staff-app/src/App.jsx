@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import BottomTab from './components/BottomTab';
+import LocationPermission from './components/LocationPermission';
 
 const Login = lazy(() => import('./pages/Login'));
 const Home = lazy(() => import('./pages/Home'));
@@ -53,6 +54,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <ConditionalBottomTab />
+      <ConditionalLocationPermission />
     </BrowserRouter>
   );
 }
@@ -61,4 +63,11 @@ function ConditionalBottomTab() {
   const loc = window.location.pathname;
   if (loc === '/install' || loc === '/login') return null;
   return <BottomTab />;
+}
+
+function ConditionalLocationPermission() {
+  const token = localStorage.getItem('token');
+  const loc = window.location.pathname;
+  if (!token || loc === '/install' || loc === '/login') return null;
+  return <LocationPermission />;
 }

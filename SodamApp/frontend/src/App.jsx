@@ -28,6 +28,7 @@ const PurchaseRequests = React.lazy(() => import('./pages/PurchaseRequests'));
 const EmergencyContactsAdmin = React.lazy(() => import('./pages/EmergencyContacts'));
 const AnnouncementsAdmin = React.lazy(() => import('./pages/Announcements'));
 const BoardManagement = React.lazy(() => import('./pages/BoardManagement'));
+const DeployManagement = React.lazy(() => import('./pages/DeployManagement'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -106,6 +107,7 @@ export default function App() {
               <Route path="/emergency-contacts" element={<ProtectedRoute adminOnly><EmergencyContactsAdmin /></ProtectedRoute>} />
               <Route path="/announcements" element={<ProtectedRoute adminOnly><AnnouncementsAdmin /></ProtectedRoute>} />
               <Route path="/board" element={<ProtectedRoute adminOnly><BoardManagement /></ProtectedRoute>} />
+              <Route path="/deploy" element={<ProtectedRoute adminOnly><DeployManagement /></ProtectedRoute>} />
               <Route path="/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}

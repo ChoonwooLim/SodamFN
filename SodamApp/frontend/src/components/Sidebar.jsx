@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -42,6 +42,7 @@ export default function Sidebar() {
             { icon: ClipboardList, label: '통합 게시판', path: '/board' },
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: Settings, label: '설정', path: '/settings' },
+            { icon: Rocket, label: '배포 관리', path: '/deploy' },
         ]
         : [
             { icon: LayoutDashboard, label: '대시보드', path: '/staff-dashboard' },
