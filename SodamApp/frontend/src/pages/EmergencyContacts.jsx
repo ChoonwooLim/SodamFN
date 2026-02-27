@@ -4,6 +4,17 @@ import { Phone, Plus, Trash2, Save, ChevronLeft, Edit2, X } from 'lucide-react';
 
 const CATEGORIES = ['배달앱', '장비AS', '기타'];
 
+const formatPhone = (phone) => {
+    if (!phone) return '';
+    const digits = phone.replace(/[^0-9]/g, '');
+    if (digits.startsWith('1') && digits.length === 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`; // 1600-9827
+    if (digits.startsWith('1') && digits.length === 8) return `${digits.slice(0, 4)}-${digits.slice(4)}`; // 1600-9827
+    if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`; // 010-1234-5678
+    if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`; // 02-123-4567
+    if (digits.length === 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`; // 02-123-4567
+    return phone; // already formatted or unknown
+};
+
 export default function EmergencyContactsAdmin() {
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -134,21 +145,23 @@ export default function EmergencyContactsAdmin() {
                 ) : (
                     <div className="space-y-3">
                         {contacts.map((c) => (
-                            <div key={c.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-4">
+                            <div key={c.id} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="font-bold text-slate-800">{c.name}</span>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${categoryColor[c.category] || categoryColor['기타']}`}>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="font-black text-lg text-slate-900">{c.name}</span>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${categoryColor[c.category] || categoryColor['기타']}`}>
                                             {c.category || '기타'}
                                         </span>
                                     </div>
-                                    <span className="text-sm text-slate-500">{c.phone}</span>
-                                    {c.store_id && <span className="text-xs text-slate-400 ml-2">ID: {c.store_id}</span>}
-                                    {c.note && <span className="text-xs text-slate-400 ml-2">| {c.note}</span>}
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <span className="text-base font-semibold text-slate-600 tracking-wide">📞 {formatPhone(c.phone)}</span>
+                                        {c.store_id && <span className="text-sm font-semibold text-indigo-500">매장ID: {c.store_id}</span>}
+                                    </div>
+                                    {c.note && <p className="text-sm text-slate-400 mt-1">📝 {c.note}</p>}
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handleEdit(c)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={16} /></button>
-                                    <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-400"><Trash2 size={16} /></button>
+                                    <button onClick={() => handleEdit(c)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={18} /></button>
+                                    <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-400"><Trash2 size={18} /></button>
                                 </div>
                             </div>
                         ))}

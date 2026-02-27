@@ -474,6 +474,74 @@ h3 {
   color: var(--text-secondary);
 }
 
+/* ===== Quick Access Buttons (구매 요청 / 비상연락처) ===== */
+.quick-access-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.quick-access-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-spring);
+  position: relative;
+  overflow: hidden;
+}
+
+.quick-access-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0) 60%);
+  pointer-events: none;
+}
+
+.quick-access-btn:active {
+  transform: scale(0.96);
+}
+
+.quick-access-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.quick-access-purchase {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.35);
+}
+
+.quick-access-emergency {
+  background: linear-gradient(135deg, #f43f5e 0%, #dc2626 100%);
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35);
+}
+
+.quick-access-suggestions {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.35);
+}
+
+.quick-access-chat {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+}
+
 /* ===== Summary Stats ===== */
 .stat-row {
   display: flex;

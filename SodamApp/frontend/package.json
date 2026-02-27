@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"VITE,FASTAPI\" -c \"blue,green\" \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev": "concurrently -n \"VITE,FASTAPI,STAFF\" -c \"blue,green,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:staff\"",
     "dev:frontend": "vite",
     "dev:backend": "cd ../backend && .\\.venv\\Scripts\\python.exe main.py",
+    "dev:staff": "cd ../staff-app && npx vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"

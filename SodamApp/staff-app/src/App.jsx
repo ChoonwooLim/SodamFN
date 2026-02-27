@@ -12,6 +12,8 @@ const Payslip = lazy(() => import('./pages/Payslip'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PurchaseRequest = lazy(() => import('./pages/PurchaseRequest'));
 const EmergencyContacts = lazy(() => import('./pages/EmergencyContacts'));
+const Suggestions = lazy(() => import('./pages/Suggestions'));
+const StaffChat = lazy(() => import('./pages/StaffChat'));
 
 function PageLoader() {
   return (
@@ -43,6 +45,8 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/purchase-request" element={<ProtectedRoute><PurchaseRequest /></ProtectedRoute>} />
           <Route path="/emergency" element={<ProtectedRoute><EmergencyContacts /></ProtectedRoute>} />
+          <Route path="/suggestions" element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
+          <Route path="/staff-chat" element={<ProtectedRoute><StaffChat /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

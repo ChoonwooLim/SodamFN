@@ -388,3 +388,24 @@ class Announcement(SQLModel, table=True):
     content: str = ""
     pinned: bool = Field(default=False)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class Suggestion(SQLModel, table=True):
+    """건의사항"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""
+    title: str
+    content: str = ""
+    status: str = Field(default="pending")  # pending, reviewed, resolved
+    admin_reply: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class StaffChatMessage(SQLModel, table=True):
+    """직원소통방 메시지"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""
+    message: str
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

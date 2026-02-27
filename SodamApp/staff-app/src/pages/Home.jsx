@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import {
     Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone, Megaphone,
-    Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer
+    Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer,
+    MessageSquarePlus, MessageCircle
 } from 'lucide-react';
 
 export default function Home() {
@@ -219,6 +220,38 @@ export default function Home() {
                 </div>
             )}
 
+            {/* Quick Access Buttons — 구매 요청 & 비상연락처 */}
+            <div className="quick-access-row">
+                <button className="quick-access-btn quick-access-purchase" onClick={() => navigate('/purchase-request')}>
+                    <div className="quick-access-icon">
+                        <ShoppingCart size={20} />
+                    </div>
+                    <span>구매 요청</span>
+                </button>
+                <button className="quick-access-btn quick-access-emergency" onClick={() => navigate('/emergency')}>
+                    <div className="quick-access-icon">
+                        <Phone size={20} />
+                    </div>
+                    <span>비상연락처</span>
+                </button>
+            </div>
+
+            {/* Quick Access Row 2 — 건의사항 & 직원소통방 */}
+            <div className="quick-access-row">
+                <button className="quick-access-btn quick-access-suggestions" onClick={() => navigate('/suggestions')}>
+                    <div className="quick-access-icon">
+                        <MessageSquarePlus size={20} />
+                    </div>
+                    <span>건의사항</span>
+                </button>
+                <button className="quick-access-btn quick-access-chat" onClick={() => navigate('/staff-chat')}>
+                    <div className="quick-access-icon">
+                        <MessageCircle size={20} />
+                    </div>
+                    <span>직원소통방</span>
+                </button>
+            </div>
+
             {/* Monthly Summary Card */}
             <div className="card card-gradient-dark mb-4">
                 <div className="section-header" style={{ marginBottom: '12px' }}>
@@ -260,18 +293,6 @@ export default function Home() {
                 </span>
             </div>
             <div className="action-grid">
-                <div className="action-card" onClick={() => navigate('/purchase-request')}>
-                    <div className="action-card-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
-                        <ShoppingCart size={24} />
-                    </div>
-                    <span className="action-card-label">구매 요청</span>
-                </div>
-                <div className="action-card" onClick={() => navigate('/emergency')}>
-                    <div className="action-card-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
-                        <Phone size={24} />
-                    </div>
-                    <span className="action-card-label">비상연락처</span>
-                </div>
                 <div className="action-card" onClick={() => navigate('/attendance')}>
                     <div className="action-card-icon" style={{ background: '#ffe4e6', color: '#e11d48' }}>
                         <Clock size={24} />
