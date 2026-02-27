@@ -225,18 +225,82 @@ export default function ContractSignPage() {
 
         const renderSignatures = (textSign) => {
             if (!textSign) return null;
-            // Use monospace to perfectly preserve space-based manual alignments
+
+            // Extract employer and employee sections
+            const splitIdx = textSign.indexOf('(근로자)');
+            const employerText = splitIdx > -1 ? textSign.substring(0, splitIdx) : textSign;
+            const employeeText = splitIdx > -1 ? textSign.substring(splitIdx) : "";
+
+            const ex = (text, regex) => {
+                const m = text.match(regex);
+                return m ? m[1].trim() : '';
+            };
+
+            // Parse values robustly
+            const date = ex(employerText, /(\d{4}년\s*\d*월\s*\d*일)/).replace(/\s+/g, ' ');
+            const eComp = ex(employerText, /사업체명\s*:\s*(.*?)(?=\s+전\s*화|\n|$)/);
+            const ePhone = ex(employerText, /전\s*화\s*:\s*(.*?)(?=\n|$)/);
+            const eAddr = ex(employerText, /주\s*소\s*:\s*(.*?)(?=\n|$)/);
+            const eName = ex(employerText, /대\s*표\s*자\s*:\s*(.*?)(?=\(서명\)|\n|$)/);
+
+            const wAddr = ex(employeeText, /주\s*소\s*:\s*(.*?)(?=\s*연\s*락\s*처|\n|$)/);
+            const wPhone = ex(employeeText, /연\s*락\s*처\s*:?\s*(.*?)(?=\n|$)/);
+            const wName = ex(employeeText, /명\s*:\s*(.*?)(?=\(서명\)|\n|$)/);
+
             return (
-                <div className={`mt-4 p-4 border-2 border-slate-200 rounded-xl bg-slate-50 relative ${isA4 ? 'font-mono text-[11px] leading-[1.8]' : 'font-mono text-[13px] leading-[2]'}`}>
-                    <div className="whitespace-pre text-slate-800 overflow-x-auto print:overflow-hidden print:whitespace-pre-wrap">
-                        {textSign}
+                <div className="mt-2 flex flex-col w-full text-slate-800">
+                    {/* Date outside the box */}
+                    <div className={`text-right font-bold mb-2 pr-2 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>
+                        {date || "2026년    월    일"}
                     </div>
-                    {/* Stamp Overlay */}
-                    {isSigned && contract?.signature_data && (
-                        <div className="absolute opacity-90" style={{ bottom: '12px', right: '35%' }}>
-                            <img src={contract.signature_data} alt="서명" className="w-16 h-16 object-contain mix-blend-multiply" />
+
+                    {/* Structured Signature Box */}
+                    <div className={`border-2 border-slate-300 rounded-lg p-5 flex flex-col gap-3 bg-white relative ${isA4 ? 'text-[12px]' : 'text-[13px]'} leading-relaxed`}>
+                        {/* Employer */}
+                        <div className="flex flex-col gap-1.5">
+                            <div className="font-bold text-slate-900 mb-1">(사업주)</div>
+                            <div className="flex items-center">
+                                <div className="w-16 text-slate-500">사업체명</div>
+                                <div className="font-semibold flex-1">{eComp}</div>
+                                <div className="w-12 text-slate-500">전화</div>
+                                <div className="w-32">{ePhone}</div>
+                            </div>
+                            <div className="flex items-start">
+                                <div className="w-16 text-slate-500">주소</div>
+                                <div className="flex-1">{eAddr}</div>
+                            </div>
+                            <div className="flex items-center">
+                                <div className="w-16 text-slate-500">대표자</div>
+                                <div className="font-semibold flex-1">{eName}</div>
+                                <div className="w-16 text-slate-500 text-right pr-4">(서명)</div>
+                            </div>
                         </div>
-                    )}
+
+                        <div className="h-px bg-slate-200 my-1"></div>
+
+                        {/* Employee */}
+                        <div className="flex flex-col gap-1.5 relative">
+                            <div className="font-bold text-slate-900 mb-1">(근로자)</div>
+                            <div className="flex items-start">
+                                <div className="w-16 text-slate-500">주소</div>
+                                <div className="flex-1 min-h-[1.2rem]">{wAddr}</div>
+                                <div className="w-12 text-slate-500">연락처</div>
+                                <div className="w-32 min-h-[1.2rem]">{wPhone}</div>
+                            </div>
+                            <div className="flex items-center mt-1">
+                                <div className="w-16 text-slate-500">성명</div>
+                                <div className="font-semibold flex-1 text-[14px]">{wName}</div>
+                                <div className="w-16 text-slate-500 text-right pr-4">(서명)</div>
+                            </div>
+
+                            {/* Stamp Overlay */}
+                            {isSigned && contract?.signature_data && (
+                                <div className="absolute opacity-90" style={{ bottom: '-8px', right: '0px' }}>
+                                    <img src={contract.signature_data} alt="서명" className="w-16 h-16 object-contain mix-blend-multiply" />
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             );
         };
