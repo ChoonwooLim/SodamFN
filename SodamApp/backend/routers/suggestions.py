@@ -39,7 +39,7 @@ def create_suggestion(
     service = DatabaseService()
     try:
         s = Suggestion(
-            staff_id=user.staff_id or 0,
+            staff_id=user.staff_id,
             staff_name=user.real_name or user.username,
             title=title,
             content=content

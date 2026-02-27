@@ -42,7 +42,7 @@ def send_message(
     service = DatabaseService()
     try:
         msg = StaffChatMessage(
-            staff_id=user.staff_id or 0,
+            staff_id=user.staff_id,
             staff_name=user.real_name or user.username,
             message=message
         )

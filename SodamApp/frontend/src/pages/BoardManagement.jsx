@@ -309,32 +309,64 @@ function EmergencyTab() {
 function ChatTab() {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [text, setText] = useState('');
+    const [sending, setSending] = useState(false);
 
     const fetch_ = async () => { try { const r = await api.get('/staff-chat?limit=100'); if (r.data.status === 'success') setMessages(r.data.data); } catch { } setLoading(false); };
     useEffect(() => { fetch_(); const i = setInterval(fetch_, 5000); return () => clearInterval(i); }, []);
+
+    const handleSend = async () => {
+        if (!text.trim() || sending) return;
+        setSending(true);
+        try { await api.post('/staff-chat', { message: text.trim() }); setText(''); fetch_(); } catch { alert('전송 실패'); }
+        finally { setSending(false); }
+    };
 
     const handleDelete = async (id) => { if (!window.confirm('메시지를 삭제하시겠습니까?')) return; try { await api.delete(`/staff-chat/${id}`); fetch_(); } catch { alert('삭제 실패'); } };
 
     const formatTime = (iso) => iso ? new Date(iso).toLocaleString('ko-KR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
-    return messages.length === 0 ? <EmptyState icon={MessageCircle} text="메시지가 없습니다." /> : (
-        <div className="space-y-2">
-            {messages.map(m => (
-                <div key={m.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
-                        {(m.staff_name || '?')[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold text-sm text-slate-800">{m.staff_name}</span>
-                            <span className="text-[10px] text-slate-400">{formatTime(m.created_at)}</span>
+    return (
+        <>
+            {/* Message Input */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-4 flex gap-3 items-center">
+                <input
+                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400"
+                    placeholder="메시지를 입력하세요..."
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                />
+                <button
+                    onClick={handleSend}
+                    disabled={!text.trim() || sending}
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                    {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} 전송
+                </button>
+            </div>
+
+            {/* Messages List */}
+            {messages.length === 0 ? <EmptyState icon={MessageCircle} text="메시지가 없습니다." /> : (
+                <div className="space-y-2">
+                    {messages.map(m => (
+                        <div key={m.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3">
+                            <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                                {(m.staff_name || '?')[0]}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="font-bold text-sm text-slate-800">{m.staff_name}</span>
+                                    <span className="text-[10px] text-slate-400">{formatTime(m.created_at)}</span>
+                                </div>
+                                <p className="text-sm text-slate-600 whitespace-pre-wrap">{m.message}</p>
+                            </div>
+                            <button onClick={() => handleDelete(m.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-400 flex-shrink-0"><Trash2 size={14} /></button>
                         </div>
-                        <p className="text-sm text-slate-600 whitespace-pre-wrap">{m.message}</p>
-                    </div>
-                    <button onClick={() => handleDelete(m.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-400 flex-shrink-0"><Trash2 size={14} /></button>
+                    ))}
                 </div>
-            ))}
-        </div>
+            )}
+        </>
     );
 }
 

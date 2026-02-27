@@ -112,6 +112,11 @@ export default function Home() {
 
     return (
         <div className="page animate-fade">
+            {/* Logo */}
+            <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                <img src="/sodam-logo-white.png" alt="소담김밥" style={{ height: '48px', filter: 'brightness(0) saturate(100%)', margin: '0 auto' }} />
+            </div>
+
             {/* Header */}
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
