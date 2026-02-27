@@ -248,7 +248,7 @@ export default function ContractSignPage() {
             const wName = ex(employeeText, /명\s*:\s*(.*?)(?=\(서명\)|\n|$)/);
 
             return (
-                <div className="mt-2 flex flex-col w-full text-slate-800">
+                <div className="mt-6 flex flex-col w-full text-slate-800">
                     {/* Date outside the box */}
                     <div className={`text-right font-bold mb-2 pr-2 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>
                         {date || "2026년    월    일"}
