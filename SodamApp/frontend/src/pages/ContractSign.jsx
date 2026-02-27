@@ -179,6 +179,60 @@ export default function ContractSignPage() {
         }
     };
 
+    // --- Contract Text Formatter ---
+    const formatContractText = (text, isA4 = false) => {
+        if (!text) return null;
+        let content = text.replace(/^표\s*준\s*근\s*로\s*계\s*약\s*서\s*\n*/, '');
+
+        // Extract the signature block (starts near the bottom with a year or (사업주))
+        const signMatch = content.match(/(\d{4}년\s*\d*월\s*\d*일\s*\n)?\(사업주\)/);
+        let bodyText = content;
+        let signText = "";
+
+        if (signMatch) {
+            bodyText = content.substring(0, signMatch.index);
+            signText = content.substring(signMatch.index);
+        }
+
+        const renderBody = (textBody) => {
+            return textBody.split('\n').map((line, idx) => {
+                const trimmed = line.trim();
+                if (/^\d+\.\s/.test(trimmed)) {
+                    return <div key={idx} className={`font-bold text-slate-900 mt-3 mb-1 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>{line}</div>;
+                }
+                if (trimmed.startsWith('-')) {
+                    return <div key={idx} className={`pl-4 text-slate-700 leading-relaxed mb-0.5 ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
+                }
+                return <div key={idx} className={`text-slate-800 leading-[1.6] min-h-[1.2em] ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
+            });
+        };
+
+        const renderSignatures = (textSign) => {
+            if (!textSign) return null;
+            // Use monospace to perfectly preserve space-based manual alignments
+            return (
+                <div className={`mt-4 p-4 border-2 border-slate-200 rounded-xl bg-slate-50 relative ${isA4 ? 'font-mono text-[11px] leading-[1.8]' : 'font-mono text-[13px] leading-[2]'}`}>
+                    <div className="whitespace-pre text-slate-800 overflow-x-auto print:overflow-hidden print:whitespace-pre-wrap">
+                        {textSign}
+                    </div>
+                    {/* Stamp Overlay */}
+                    {isSigned && contract?.signature_data && (
+                        <div className="absolute opacity-90" style={{ bottom: '12px', right: '35%' }}>
+                            <img src={contract.signature_data} alt="서명" className="w-16 h-16 object-contain mix-blend-multiply" />
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        return (
+            <div className="text-left w-full w-full">
+                {renderBody(bodyText)}
+                {renderSignatures(signText)}
+            </div>
+        );
+    };
+
     // --- A4 Viewer Scale (hooks must be before early returns) ---
     const containerRef = useRef(null);
     const [viewScale, setViewScale] = useState(0.5);
@@ -217,16 +271,9 @@ export default function ContractSignPage() {
                     표 준 근 로 계 약 서
                 </h1>
 
-                {/* Contract Body */}
-                <div className="text-[13px] leading-[2] whitespace-pre-wrap relative">
-                    {contract.content?.replace(/^표준근로계약서\s*\n*/, '')}
-
-                    {/* Stamp overlay - absolute position at bottom-right near (서명) */}
-                    {contract.signature_data && (
-                        <div className="absolute" style={{ bottom: '0px', right: '0px' }}>
-                            <img src={contract.signature_data} alt="서명" className="w-20 h-20 object-contain mix-blend-multiply" />
-                        </div>
-                    )}
+                {/* Contract Body formatted */}
+                <div className="relative">
+                    {formatContractText(contract.content, true)}
                 </div>
 
                 {/* Footer */}
@@ -304,8 +351,8 @@ export default function ContractSignPage() {
                     {/* Step 0: Read */}
                     {step === 0 && (
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-700 leading-relaxed h-[60vh] overflow-y-auto p-2 border rounded-xl bg-slate-50">
-                                {contract.content}
+                            <div className="h-[60vh] overflow-y-auto p-4 border rounded-xl bg-white mb-4">
+                                {formatContractText(contract.content, false)}
                             </div>
                             <div className="mt-4 text-center">
                                 <p className="text-sm text-slate-500 mb-4">내용을 모두 확인하셨습니까?</p>
