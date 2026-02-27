@@ -200,6 +200,19 @@ export default function ContractSignPage() {
         const renderBody = (textBody) => {
             return textBody.split('\n').map((line, idx) => {
                 const trimmed = line.trim();
+
+                // Match the intro sentence for custom styling and name highlighting
+                const introMatch = trimmed.match(/^(.*?)\s*\(이하\s*"사업주"라\s*함\)와\s*(.*?)\s*\(이하\s*"근로자"라\s*함\)은\(는\)\s*다음과 같이 근로계약을 체결한다\.?$/);
+                if (introMatch) {
+                    const employerName = introMatch[1].trim() || '____________';
+                    const employeeName = introMatch[2].trim() || '____________';
+                    return (
+                        <div key={idx} className={`text-slate-900 leading-[1.8] min-h-[1.2em] mb-4 mt-2 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>
+                            <strong className="font-extrabold">{employerName}</strong>(이하 "사업주"라 함)와 <strong className="font-extrabold">{employeeName}</strong>(이하 "근로자"라 함)은(는) 다음과 같이 근로계약을 체결한다.
+                        </div>
+                    );
+                }
+
                 if (/^\d+\.\s/.test(trimmed)) {
                     return <div key={idx} className={`font-bold text-slate-900 mt-3 mb-1 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>{line}</div>;
                 }
