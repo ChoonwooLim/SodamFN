@@ -249,7 +249,12 @@ export default function Payslip() {
     return (
         <div className="page animate-fade" style={{ paddingBottom: '100px' }}>
             <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h1 className="page-title">급여명세서</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button onClick={() => navigate('/')} className="btn-ghost" style={{ padding: '6px', borderRadius: '10px' }}>
+                        <ChevronLeft size={20} />
+                    </button>
+                    <h1 className="page-title" style={{ margin: 0 }}>급여명세서</h1>
+                </div>
                 {hasPayroll && (
                     <button onClick={handleDownload} disabled={downloading} className="btn btn-outline" style={{ padding: '6px 12px', fontSize: '0.75rem', minHeight: 'auto', display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {downloading ? <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite' }} /> : <Download size={14} />}
