@@ -214,12 +214,12 @@ export default function ContractSignPage() {
                 }
 
                 if (/^\d+\.\s/.test(trimmed)) {
-                    return <div key={idx} className={`font-bold text-slate-900 mt-3 mb-1 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>{line}</div>;
+                    return <div key={idx} className={`font-bold text-slate-900 mt-2 mb-0.5 ${isA4 ? 'text-[14px]' : 'text-[15px]'}`}>{line}</div>;
                 }
                 if (trimmed.startsWith('-')) {
-                    return <div key={idx} className={`pl-[5pt] text-slate-700 leading-relaxed mb-0.5 ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
+                    return <div key={idx} className={`pl-[5pt] text-slate-700 leading-snug mb-0.5 ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
                 }
-                return <div key={idx} className={`text-slate-800 leading-[1.6] min-h-[1.2em] ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
+                return <div key={idx} className={`text-slate-800 leading-snug min-h-[1.2em] ${isA4 ? 'text-[13px]' : 'text-[14px]'}`}>{line}</div>;
             });
         };
 
@@ -255,9 +255,9 @@ export default function ContractSignPage() {
                     </div>
 
                     {/* Structured Signature Box */}
-                    <div className={`border-2 border-slate-300 rounded-lg p-5 flex flex-col gap-3 bg-white relative ${isA4 ? 'text-[12px]' : 'text-[13px]'} leading-relaxed`}>
+                    <div className={`border-2 border-slate-300 rounded-lg p-3 flex flex-col gap-1 bg-white relative ${isA4 ? 'text-[12px]' : 'text-[13px]'} leading-snug`}>
                         {/* Employer */}
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-1">
                             <div className="font-bold text-slate-900 mb-1">(사업주)</div>
                             <div className="flex items-center">
                                 <div className="w-16 text-slate-500">사업체명</div>
@@ -276,10 +276,10 @@ export default function ContractSignPage() {
                             </div>
                         </div>
 
-                        <div className="h-px bg-slate-200 my-1"></div>
+                        <div className="h-px bg-slate-200 my-0.5"></div>
 
                         {/* Employee */}
-                        <div className="flex flex-col gap-1.5 relative">
+                        <div className="flex flex-col gap-1 relative">
                             <div className="font-bold text-slate-900 mb-1">(근로자)</div>
                             <div className="flex items-start">
                                 <div className="w-16 text-slate-500">주소</div>
@@ -347,7 +347,7 @@ export default function ContractSignPage() {
         return (
             <div style={paperStyle} className="text-slate-900 font-serif">
                 {/* Title */}
-                <h1 className="text-center text-2xl font-black tracking-[0.3em] mb-6 pb-3 border-b-[3px] border-double border-slate-800">
+                <h1 className="text-center text-2xl font-black tracking-[0.3em] mb-4 pb-2 border-b-2 border-double border-slate-800">
                     표 준 근 로 계 약 서
                 </h1>
 
