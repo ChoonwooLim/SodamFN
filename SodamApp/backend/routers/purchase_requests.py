@@ -26,6 +26,29 @@ def create_purchase_request(
         service.session.add(req)
         service.session.commit()
         service.session.refresh(req)
+
+        # Send Kakao notification to admin
+        try:
+            from services.notification_service import NotificationService
+            from models import GlobalSetting
+            admin_phone_setting = service.session.exec(
+                select(GlobalSetting).where(GlobalSetting.key == "admin_phone")
+            ).first()
+            admin_phone = admin_phone_setting.value if admin_phone_setting else None
+
+            if admin_phone:
+                items_text = "\n".join([
+                    f"• {item.get('name', '')} {item.get('quantity', '')}".strip()
+                    for item in items
+                ])
+                NotificationService.send_purchase_request(
+                    phone_num=admin_phone,
+                    staff_name=staff_name,
+                    items_text=items_text
+                )
+        except Exception as e:
+            print(f"Kakao notification failed: {e}")
+
         return {"status": "success", "message": "구매 요청이 등록되었습니다.", "id": req.id}
     finally:
         service.close()

@@ -90,3 +90,15 @@ class NotificationService:
                 "#{link}": link
             }
         )
+
+    @classmethod
+    def send_purchase_request(cls, phone_num: str, staff_name: str, items_text: str):
+        """Sends purchase request notification to admin via KakaoTalk"""
+        return cls.send_alimtalk(
+            to=phone_num.replace("-", ""),
+            template_id="PURCHASE_REQ_01",
+            variables={
+                "#{name}": staff_name,
+                "#{items}": items_text
+            }
+        )

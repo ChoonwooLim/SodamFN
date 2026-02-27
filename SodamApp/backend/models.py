@@ -368,3 +368,12 @@ class PurchaseRequest(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, completed, rejected
     admin_note: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class EmergencyContact(SQLModel, table=True):
+    """비상연락처"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str  # 업체/서비스명 (예: 쿠팡이츠 AS센터)
+    phone: str  # 전화번호
+    category: str = ""  # 분류 (배달앱, 장비AS, 기타)
+    display_order: int = Field(default=0)

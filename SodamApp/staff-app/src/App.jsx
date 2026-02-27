@@ -11,6 +11,7 @@ const Documents = lazy(() => import('./pages/Documents'));
 const Payslip = lazy(() => import('./pages/Payslip'));
 const Profile = lazy(() => import('./pages/Profile'));
 const PurchaseRequest = lazy(() => import('./pages/PurchaseRequest'));
+const EmergencyContacts = lazy(() => import('./pages/EmergencyContacts'));
 
 function PageLoader() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="/payslip" element={<ProtectedRoute><Payslip /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/purchase-request" element={<ProtectedRoute><PurchaseRequest /></ProtectedRoute>} />
+          <Route path="/emergency" element={<ProtectedRoute><EmergencyContacts /></ProtectedRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

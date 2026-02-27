@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import {
-    Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart,
+    Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone,
     Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer
 } from 'lucide-react';
 
@@ -259,6 +259,12 @@ export default function Home() {
                         <ShoppingCart size={24} />
                     </div>
                     <span className="action-card-label">구매 요청</span>
+                </div>
+                <div className="action-card" onClick={() => navigate('/emergency')}>
+                    <div className="action-card-icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                        <Phone size={24} />
+                    </div>
+                    <span className="action-card-label">비상연락처</span>
                 </div>
             </div>
         </div>
