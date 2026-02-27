@@ -225,35 +225,6 @@ export default function Home() {
                 </span>
             </div>
             <div className="action-grid">
-                <div className="action-card" onClick={() => navigate('/contracts')}>
-                    <div className="action-card-icon" style={{ background: '#eef2ff', color: '#4f46e5' }}>
-                        <FileSignature size={24} />
-                    </div>
-                    <span className="action-card-label">전자계약</span>
-                    {pendingContracts > 0 && (
-                        <span className="badge badge-danger" style={{ fontSize: '0.7rem' }}>
-                            {pendingContracts}건 대기
-                        </span>
-                    )}
-                </div>
-                <div className="action-card" onClick={() => navigate('/documents')}>
-                    <div className="action-card-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-                        <FileText size={24} />
-                    </div>
-                    <span className="action-card-label">서류 제출</span>
-                </div>
-                <div className="action-card" onClick={() => navigate('/payslip')}>
-                    <div className="action-card-icon" style={{ background: '#d1fae5', color: '#059669' }}>
-                        <Wallet size={24} />
-                    </div>
-                    <span className="action-card-label">급여명세서</span>
-                </div>
-                <div className="action-card" onClick={() => navigate('/attendance')}>
-                    <div className="action-card-icon" style={{ background: '#ffe4e6', color: '#e11d48' }}>
-                        <Clock size={24} />
-                    </div>
-                    <span className="action-card-label">근무 기록</span>
-                </div>
                 <div className="action-card" onClick={() => navigate('/purchase-request')}>
                     <div className="action-card-icon" style={{ background: '#f0fdf4', color: '#16a34a' }}>
                         <ShoppingCart size={24} />
@@ -265,6 +236,35 @@ export default function Home() {
                         <Phone size={24} />
                     </div>
                     <span className="action-card-label">비상연락처</span>
+                </div>
+                <div className="action-card" onClick={() => navigate('/attendance')}>
+                    <div className="action-card-icon" style={{ background: '#ffe4e6', color: '#e11d48' }}>
+                        <Clock size={24} />
+                    </div>
+                    <span className="action-card-label">근무 기록</span>
+                </div>
+                <div className="action-card" onClick={() => navigate('/payslip')}>
+                    <div className="action-card-icon" style={{ background: '#d1fae5', color: '#059669' }}>
+                        <Wallet size={24} />
+                    </div>
+                    <span className="action-card-label">급여명세서</span>
+                </div>
+                <div className="action-card" onClick={() => navigate('/documents')}>
+                    <div className="action-card-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+                        <FileText size={24} />
+                    </div>
+                    <span className="action-card-label">서류 제출</span>
+                </div>
+                <div className="action-card" onClick={() => navigate('/contracts')}>
+                    <div className="action-card-icon" style={{ background: '#eef2ff', color: '#4f46e5' }}>
+                        <FileSignature size={24} />
+                    </div>
+                    <span className="action-card-label">전자계약</span>
+                    {pendingContracts > 0 && (
+                        <span className="badge badge-danger" style={{ fontSize: '0.7rem' }}>
+                            {pendingContracts}건 대기
+                        </span>
+                    )}
                 </div>
             </div>
         </div>

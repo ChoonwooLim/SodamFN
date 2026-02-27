@@ -368,6 +368,55 @@ def calculate_payroll(req: PayrollCalculateRequest):
     finally:
         service.close()
 
+@router.get("/staff/{staff_id}/{month}")
+def get_staff_payroll(staff_id: int, month: str):
+    """Staff-accessible payroll data for a specific month"""
+    service = DatabaseService()
+    try:
+        stmt = select(Payroll).where(Payroll.staff_id == staff_id, Payroll.month == month)
+        payroll = service.session.exec(stmt).first()
+        if not payroll:
+            return {"status": "not_found"}
+        
+        staff = service.session.get(Staff, staff_id)
+        details = json.loads(payroll.details_json) if payroll.details_json else {}
+        
+        return {
+            "status": "success",
+            "data": {
+                "month": payroll.month,
+                "staff_name": staff.name if staff else "",
+                "contract_type": staff.contract_type if staff else "",
+                "hourly_wage": staff.hourly_wage if staff else 0,
+                "base_pay": payroll.base_pay,
+                "holiday_pay": payroll.bonus_holiday,
+                "holiday_w1": payroll.holiday_w1,
+                "holiday_w2": payroll.holiday_w2,
+                "holiday_w3": payroll.holiday_w3,
+                "holiday_w4": payroll.holiday_w4,
+                "holiday_w5": payroll.holiday_w5,
+                "gross_pay": (payroll.base_pay or 0) + (payroll.bonus_holiday or 0),
+                "deduction_np": payroll.deduction_np,
+                "deduction_hi": payroll.deduction_hi,
+                "deduction_ei": payroll.deduction_ei,
+                "deduction_lti": payroll.deduction_lti,
+                "deduction_it": payroll.deduction_it,
+                "deduction_lit": payroll.deduction_lit,
+                "total_deductions": payroll.deductions,
+                "net_pay": (payroll.base_pay or 0) + (payroll.bonus_holiday or 0) - (payroll.deductions or 0),
+                "tax_support": payroll.bonus_tax_support,
+                "total_pay": payroll.total_pay,
+                "work_breakdown": details.get("work_breakdown", []),
+                "holiday_details": details.get("holiday_details", {}),
+                "bank_name": staff.bank_name if staff else "",
+                "account_number": staff.account_number if staff else "",
+                "account_holder": staff.account_holder if staff else "",
+                "transfer_status": payroll.transfer_status,
+            }
+        }
+    finally:
+        service.close()
+
 @router.post("/send-attendance-request")
 def send_attendance_request(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user)):
     service = DatabaseService()
