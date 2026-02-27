@@ -227,25 +227,29 @@ export default function ContractSignPage() {
                             <span className="font-bold text-sm">이미 서명된 계약서입니다. ({new Date(contract.signed_at).toLocaleString()})</span>
                         </div>
 
-                        {/* Contract Content */}
-                        <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-900 leading-relaxed p-4 border rounded-xl bg-white mb-8 font-serif print:print-clean print:print-content print:border-none">
-                            {contract.content}
+                        {/* Contract Content with Stamp Overlay */}
+                        <div className="relative p-4 border rounded-xl bg-white mb-8 font-serif print:print-clean print:print-content print:border-none">
+                            <div className="prose prose-sm max-w-none whitespace-pre-wrap text-slate-900 leading-relaxed">
+                                {contract.content}
+                            </div>
+                            {/* Stamp overlay - positioned at bottom-right of contract content, near (서명) */}
+                            {contract.signature_data && (
+                                <div className="absolute print:bottom-2 print:right-8" style={{ bottom: '8px', right: '24px' }}>
+                                    <img src={contract.signature_data} alt="서명" className="w-16 h-16 object-contain mix-blend-multiply print:w-14 print:h-14" />
+                                </div>
+                            )}
                         </div>
 
-                        {/* Signature Section */}
-                        <div className="mt-8 border-t pt-8 print:mt-4 print:pt-4 print:border-t-2 print:border-slate-800 print-break-avoid">
-                            <div className="flex justify-between items-end">
-                                <div className="text-sm space-y-2 print:text-base">
+                        {/* Signature Info */}
+                        <div className="border-t pt-4 print:mt-2 print:pt-2 print:border-t-2 print:border-slate-800 print-break-avoid">
+                            <div className="flex justify-between items-center">
+                                <div className="text-sm space-y-1 print:text-base">
                                     <p><strong>날짜:</strong> {new Date(contract.signed_at).toLocaleDateString()}</p>
                                     <p><strong>서명인:</strong> {contract.staff?.name || '(이름)'}</p>
                                 </div>
-                                <div className="relative w-32 h-32 flex items-center justify-center print:w-24 print:h-24">
-                                    {contract.signature_data ? (
-                                        <img src={contract.signature_data} alt="서명" className="w-24 h-24 object-contain mix-blend-multiply print:w-20 print:h-20" />
-                                    ) : (
-                                        <span className="text-xs text-slate-400 border px-2 py-1">서명 데이터 없음</span>
-                                    )}
-                                </div>
+                                {!contract.signature_data && (
+                                    <span className="text-xs text-slate-400 border px-2 py-1 rounded">서명 데이터 없음</span>
+                                )}
                             </div>
                         </div>
 
