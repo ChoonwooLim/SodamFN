@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight } from 'lucide-react';
+import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight, Truck, Lock } from 'lucide-react';
 import './UserManual.css';
 
 export default function UserManual() {
-    const [openSections, setOpenSections] = useState({ revenue: true, dedup: true, steps: true, faq: true });
+    const [openSections, setOpenSections] = useState({ revenue: true, delivery: true, dedup: true, steps: true, faq: true });
 
     const toggle = (key) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -20,6 +20,7 @@ export default function UserManual() {
                 <ul className="toc-list">
                     <li><a href="#revenue-upload">매출 데이터 업로드</a></li>
                     <li><a href="#file-types">지원 파일 형식</a></li>
+                    <li><a href="#delivery-upload">배달앱 정산 업로드</a></li>
                     <li><a href="#dedup">중복 방지 시스템</a></li>
                     <li><a href="#upload-steps">업로드 절차 (권장)</a></li>
                     <li><a href="#rollback">업로드 취소 (롤백)</a></li>
@@ -75,6 +76,18 @@ export default function UserManual() {
                                     <td>조회용 (DB 저장 안됨)</td>
                                     <td>—</td>
                                 </tr>
+                                <tr>
+                                    <td><span className="badge" style={{ background: '#9333ea' }}>쿠팡이츠 정산</span></td>
+                                    <td>'기본정산', '인출' 키워드</td>
+                                    <td>일별 배달앱 매출 (입금=인출)</td>
+                                    <td>정산 입금액</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge" style={{ background: '#06b6d4' }}>배달의민족 정산</span></td>
+                                    <td>'정산명세서' 또는 '주문중개'+'입금금액'</td>
+                                    <td>일별 배달앱 매출 (상세시트)</td>
+                                    <td>입금금액 기준</td>
+                                </tr>
                             </tbody>
                         </table>
 
@@ -107,6 +120,59 @@ export default function UserManual() {
                                 <tr><td>거래구분</td><td>구분, 승인구분, 상태, 거래구분</td></tr>
                             </tbody>
                         </table>
+                    </>
+                )}
+            </div>
+
+            {/* ═══ 1.5. 배달앱 정산 업로드 ═══ */}
+            <div className="manual-section" id="delivery-upload">
+                <h2 onClick={() => toggle('delivery')} style={{ cursor: 'pointer' }}>
+                    {openSections.delivery ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                    <Truck size={20} /> 배달앱 정산 업로드
+                </h2>
+                {openSections.delivery && (
+                    <>
+                        <p>
+                            배달의민족, 쿠팡이츠, 요기요 등 배달앱 정산 파일을 업로드할 수 있습니다.
+                            매장 매출(카드/현금)과는 <strong>별도 카테고리</strong>로 관리되므로 중복 걱정 없이 업로드하면 됩니다.
+                        </p>
+
+                        <h3>🛵 지원 배달앱</h3>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>배달앱</th><th>파일 형식</th><th>파싱 방식</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>쿠팡이츠</strong></td>
+                                    <td>정산내역.xlsx (비밀번호 없음)</td>
+                                    <td>'인출' 항목을 일별 정산금으로 추출</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>배달의민족</strong></td>
+                                    <td>정산명세서.xlsx (비밀번호 보호)</td>
+                                    <td>상세 시트에서 입금일별 정산금 추출</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div className="info-box tip">
+                            <span className="icon"><Lock size={16} /></span>
+                            <div>
+                                <strong>비밀번호 보호 파일:</strong> 배달의민족 등 비밀번호가 설정된 Excel 파일은
+                                자동으로 감지됩니다. 공통 비밀번호로 먼저 시도하고, 실패 시
+                                <strong> 비밀번호 입력 팝업</strong>이 자동으로 표시됩니다.
+                            </div>
+                        </div>
+
+                        <div className="info-box warning">
+                            <span className="icon">⚠️</span>
+                            <div>
+                                배달앱 매출은 <strong>매출 요약</strong>의 '배달앱매출' 항목과
+                                <strong> 배달앱 탭</strong>의 '배달별 정산 분석'에 반영됩니다.
+                                카드매출이나 현금매출에는 포함되지 않습니다.
+                            </div>
+                        </div>
                     </>
                 )}
             </div>
@@ -199,10 +265,19 @@ export default function UserManual() {
                             잘못된 데이터가 입력된 경우, 업로드 단위로 데이터를 되돌릴 수 있습니다:
                         </p>
                         <ol className="step-list">
-                            <li>매출 관리 또는 매입 관리 페이지에서 <strong>업로드 내역</strong> 탭을 클릭합니다.</li>
-                            <li>취소하려는 업로드 건의 <strong>「취소」</strong> 버튼을 클릭합니다.</li>
-                            <li>해당 업로드로 저장된 모든 데이터가 삭제되고, 손익계산서가 자동 재계산됩니다.</li>
+                            <li>매출 관리 또는 매입 관리 페이지에서 <strong>취소/기록</strong> 탭을 클릭합니다.</li>
+                            <li>취소하려는 업로드 건의 <strong>「↩」</strong> 버튼을 클릭합니다.</li>
+                            <li>해당 업로드로 저장된 모든 데이터가 삭제됩니다.</li>
+                            <li><strong>매출 및 매입 손익계산서가 자동으로 재계산</strong>됩니다.</li>
                         </ol>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>데이터 일관성:</strong> 롤백 시 매출 P/L과 비용 P/L이 모두 자동으로 재계산되므로,
+                                손익계산서에 남아있는 잔여 데이터 걱정이 없습니다.
+                            </div>
+                        </div>
 
                         <div className="info-box warning">
                             <span className="icon">⚠️</span>
@@ -250,8 +325,21 @@ export default function UserManual() {
 
                         <h3>Q. 배달앱 매출(배민, 쿠팡, 요기요)은 어떻게 입력하나요?</h3>
                         <p>
-                            현재 배달앱 정산내역은 별도 카테고리로 관리됩니다.
-                            매장 카드매출과는 별개이므로 중복 걱정 없이 업로드하시면 됩니다.
+                            각 배달앱의 정산 파일(.xlsx)을 매출 관리 페이지에서 업로드하면 됩니다.
+                            시스템이 <strong>자동으로 배달앱 형식을 감지</strong>하여 '배달앱매출'로 분류합니다.
+                            배달의민족 파일은 비밀번호가 있어도 <strong>자동 비밀번호 팝업</strong>이 표시됩니다.
+                        </p>
+
+                        <h3>Q. 비밀번호가 걸린 엑셀 파일은 어떻게 업로드하나요?</h3>
+                        <p>
+                            시스템이 비밀번호 보호 파일을 자동으로 감지합니다. 공통 비밀번호(630730 등)로 먼저 시도하고,
+                            실패 시 <strong>비밀번호 입력 팝업</strong>이 나타납니다. 올바른 비밀번호를 입력하면 정상 처리됩니다.
+                        </p>
+
+                        <h3>Q. 배달앱 매출은 어디서 확인하나요?</h3>
+                        <p>
+                            매출 관리 페이지 상단의 <strong>배달앱매출</strong> 카드에서 합계를 확인할 수 있고,
+                            <strong>배달앱 탭</strong>에서 채널별(배민, 쿠팡 등) 정산 분석도 볼 수 있습니다.
                         </p>
                     </div>
                 )}
