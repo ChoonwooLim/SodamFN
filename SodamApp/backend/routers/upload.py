@@ -422,13 +422,14 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                     skipped_count += 1
                     continue
                 
-                payment_method = 'Cash' if payment_type == 'cash' else 'Card'
+                payment_method = 'Cash' if payment_type == 'cash' else ('Delivery' if payment_type == 'delivery' else 'Card')
+                item_category = 'delivery' if payment_type == 'delivery' else 'store'
                 expense = DailyExpense(
                     date=date_obj,
                     vendor_name=vendor.name,
                     vendor_id=vendor.id,
                     amount=amount,
-                    category='store',
+                    category=item_category,
                     note=item.get('note', ''),
                     upload_id=upload_id,
                     payment_method=payment_method,
