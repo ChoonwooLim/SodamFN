@@ -450,6 +450,57 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
             
             session.commit()
         
+        # --- Save DeliveryRevenue (fee details) for delivery settlements ---
+        if file_type == "delivery_settlement" and result.get("summary"):
+            try:
+                import json as json_lib
+                from models import DeliveryRevenue
+                summary = result["summary"]
+                channel = summary.get("channel", "")
+                
+                # Parse year/month from the period string (e.g., "2026년 1월")
+                import re
+                period = summary.get("period", "")
+                period_match = re.search(r'(\d{4})년\s*(\d{1,2})월', period)
+                if period_match and channel:
+                    dr_year = int(period_match.group(1))
+                    dr_month = int(period_match.group(2))
+                    
+                    # Map channel name to DeliveryRevenue channel key
+                    CHANNEL_KEY_MAP = {"쿠팡": "Coupang", "배민": "Baemin", "배달의민족": "Baemin", "요기요": "Yogiyo", "땡겨요": "Ddangyo"}
+                    dr_channel = CHANNEL_KEY_MAP.get(channel, channel)
+                    
+                    with Session(engine) as dr_session:
+                        # Upsert: check if record already exists
+                        existing_dr = dr_session.exec(
+                            select(DeliveryRevenue).where(
+                                DeliveryRevenue.channel == dr_channel,
+                                DeliveryRevenue.year == dr_year,
+                                DeliveryRevenue.month == dr_month,
+                            )
+                        ).first()
+                        
+                        if existing_dr:
+                            existing_dr.total_sales = summary.get("total_sales", 0)
+                            existing_dr.total_fees = summary.get("total_fees", 0)
+                            existing_dr.settlement_amount = summary.get("total_amount", 0)
+                            existing_dr.order_count = summary.get("order_count", 0)
+                            dr_session.add(existing_dr)
+                        else:
+                            dr_record = DeliveryRevenue(
+                                channel=dr_channel,
+                                year=dr_year,
+                                month=dr_month,
+                                total_sales=summary.get("total_sales", 0),
+                                total_fees=summary.get("total_fees", 0),
+                                settlement_amount=summary.get("total_amount", 0),
+                                order_count=summary.get("order_count", 0),
+                            )
+                            dr_session.add(dr_record)
+                        dr_session.commit()
+            except Exception as e:
+                print(f"DeliveryRevenue save error (non-fatal): {e}")
+        
         # Sync P/L (expenses + revenue)
         if processed_months:
             try:
