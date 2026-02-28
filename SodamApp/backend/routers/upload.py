@@ -393,9 +393,10 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                 if not vendor:
                     # For card_detail: card company vendors should exist
                     # For pos_daily: may need to create cash or generic card vendor
+                    vendor_category = 'delivery' if payment_type == 'delivery' else 'store'
                     vendor = Vendor(
                         name=vendor_name,
-                        category='store',
+                        category=vendor_category,
                         item=f'소담김밥 건대매장:{payment_type}',
                         vendor_type='revenue',
                         created_by_upload_id=upload_id,
