@@ -665,6 +665,10 @@ class ExcelService:
             if '정산명세서' in first_rows_text or ('주문중개' in first_rows_text and '입금금액' in first_rows_text):
                 return self._parse_baemin_settlement(df, workbook=all_sheets_data)
 
+            # Priority 1.6: Yogiyo settlement (요기요 정산내역)
+            if '상호명' in first_rows_text and '주문번호' in first_rows_text and '주문일시' in first_rows_text:
+                return self._parse_yogiyo_settlement(df)
+
             # Priority 1.6: Delivery app packed format (쿠팡이츠 등)
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
             if len(df.columns) <= 2 and ('기본정산' in first_rows_text or '인출' in first_rows_text):
@@ -857,6 +861,175 @@ class ExcelService:
                 "record_count": len(data),
                 "channel": "배달의민족",
                 "period": f"{year}년 {month}월",
+            }
+        }
+
+    def _parse_yogiyo_settlement(self, df):
+        """
+        Parse 요기요 정산내역 (per-order format).
+        Columns: 상호명, 주문번호, 주문구분, 주문일시, 주문금액, 배달료, 수수료 columns.
+        Aggregates by date, calculates settlement per order.
+        """
+        import re, datetime
+        
+        # Find header rows (may be multi-row headers, rows 0-1)
+        # Find key column indices
+        date_col = None
+        amount_col = None
+        fee_cols = []     # columns to subtract (수수료, 할인 가게부담)
+        credit_cols = []  # columns to add back (요기요부담할인)
+        order_type_col = None
+        
+        # Scan first 3 rows for headers
+        for i in range(min(3, len(df))):
+            for j in range(len(df.columns)):
+                val = df.iloc[i, j]
+                if pd.isna(val):
+                    continue
+                cell = str(val).strip()
+                
+                if '주문일시' in cell:
+                    date_col = j
+                elif cell == '주문금액' and amount_col is None:
+                    amount_col = j
+                elif '주문합계' in cell and amount_col is None:
+                    amount_col = j
+                elif '주문구분' in cell:
+                    order_type_col = j
+                # Fee columns (to subtract)
+                elif '이용료' in cell or ('할인' in cell and '가게 부담' in cell):
+                    fee_cols.append(j)
+                elif '사장님 자체할인' in cell or '사장님포인트' in cell:
+                    fee_cols.append(j)
+                elif '사장님배달료' in cell:
+                    fee_cols.append(j)
+                # Credit columns (요기요 부담 = add back)
+                elif '요기요부담' in cell:
+                    credit_cols.append(j)
+        
+        if date_col is None or amount_col is None:
+            return {"status": "error", "message": "요기요 정산파일에서 주문일시/주문금액 컬럼을 찾을 수 없습니다."}
+        
+        # Find data start row (first row with valid date after headers)
+        data_start = 0
+        for i in range(min(3, len(df))):
+            val = df.iloc[i, date_col]
+            if pd.notna(val) and str(val).strip() != '주문일시':
+                try:
+                    if isinstance(val, datetime.datetime):
+                        data_start = i
+                        break
+                    datetime.datetime.strptime(str(val).strip()[:10], "%Y-%m-%d")
+                    data_start = i
+                    break
+                except:
+                    continue
+        
+        # Parse orders and aggregate by date
+        date_totals = {}  # date_str → {sales, fees, settlement}
+        
+        for i in range(data_start, len(df)):
+            raw_date = df.iloc[i, date_col]
+            if pd.isna(raw_date):
+                continue
+            
+            # Skip refund rows
+            if order_type_col is not None:
+                otype = df.iloc[i, order_type_col]
+                if pd.notna(otype) and '환불' in str(otype):
+                    continue
+            
+            # Parse date
+            try:
+                if isinstance(raw_date, datetime.datetime):
+                    d = raw_date.date()
+                elif isinstance(raw_date, datetime.date):
+                    d = raw_date
+                else:
+                    d = datetime.datetime.strptime(str(raw_date).strip()[:10], "%Y-%m-%d").date()
+            except:
+                continue
+            
+            # Get order amount
+            raw_amount = df.iloc[i, amount_col]
+            if pd.isna(raw_amount):
+                continue
+            try:
+                order_amount = float(raw_amount)
+            except:
+                continue
+            
+            # Calculate fees
+            total_fees = 0
+            for fc in fee_cols:
+                fv = df.iloc[i, fc] if fc < len(df.columns) else None
+                if pd.notna(fv):
+                    try:
+                        total_fees += abs(float(fv))
+                    except:
+                        pass
+            
+            # Credits (add back)
+            total_credits = 0
+            for cc in credit_cols:
+                cv = df.iloc[i, cc] if cc < len(df.columns) else None
+                if pd.notna(cv):
+                    try:
+                        total_credits += abs(float(cv))
+                    except:
+                        pass
+            
+            settlement = order_amount - total_fees + total_credits
+            
+            date_str = d.strftime("%Y-%m-%d")
+            if date_str not in date_totals:
+                date_totals[date_str] = {"sales": 0, "fees": 0, "settlement": 0, "orders": 0}
+            date_totals[date_str]["sales"] += order_amount
+            date_totals[date_str]["fees"] += total_fees
+            date_totals[date_str]["settlement"] += settlement
+            date_totals[date_str]["orders"] += 1
+        
+        if not date_totals:
+            return {"status": "error", "message": "요기요 정산파일에서 주문 데이터를 찾을 수 없습니다."}
+        
+        # Build entries
+        data = []
+        total_sales = 0
+        total_fees = 0
+        total_settlement = 0
+        total_orders = 0
+        
+        for date_str in sorted(date_totals.keys()):
+            dt = date_totals[date_str]
+            data.append({
+                "date": date_str,
+                "amount": int(dt["settlement"]),
+                "vendor_name": "요기요",
+                "note": f"요기요 정산 ({dt['orders']}건)",
+                "payment_type": "delivery",
+            })
+            total_sales += dt["sales"]
+            total_fees += dt["fees"]
+            total_settlement += dt["settlement"]
+            total_orders += dt["orders"]
+        
+        # Detect period
+        dates = sorted(date_totals.keys())
+        first_date = datetime.datetime.strptime(dates[0], "%Y-%m-%d")
+        
+        return {
+            "status": "success",
+            "file_type": "delivery_settlement",
+            "label": "🛵 배달앱 정산 (요기요)",
+            "data": data,
+            "summary": {
+                "total_amount": int(total_settlement),
+                "total_sales": int(total_sales),
+                "total_fees": int(total_fees),
+                "record_count": len(data),
+                "order_count": total_orders,
+                "channel": "요기요",
+                "period": f"{first_date.year}년 {first_date.month}월",
             }
         }
 
