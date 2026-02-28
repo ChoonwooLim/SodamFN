@@ -338,18 +338,24 @@ export default function RevenueManagement() {
                     if (response.data.status === 'success') {
                         totalCount += response.data.count || 0;
                         successCount++;
+                        // Show dedup info if applicable
+                        const d = response.data;
+                        let fileMsg = `✅ ${file.name}`;
+                        if (d.file_type_label) fileMsg += ` (${d.file_type_label})`;
+                        fileMsg += `: ${d.count || 0}건 저장`;
+                        if (d.skipped) fileMsg += `, ${d.skipped}건 중복 스킵`;
+                        if (d.dedup_skipped) fileMsg += `, ${d.dedup_skipped}건 카드중복 자동제외`;
+                        if (d.dedup_replaced) fileMsg += `, ${d.dedup_replaced}건 통합→상세 대체`;
+                        errorFiles.push(fileMsg); // reuse array for all file results
                     } else {
-                        errorFiles.push(`${file.name}: ${response.data.message}`);
+                        errorFiles.push(`❌ ${file.name}: ${response.data.message}`);
                     }
                 } catch (error) {
                     console.error(`Upload error for ${file.name}:`, error);
-                    errorFiles.push(`${file.name}: 업로드 실패`);
+                    errorFiles.push(`❌ ${file.name}: 업로드 실패`);
                 }
             }
-            let message = `${successCount}개 파일 처리 완료, 총 ${totalCount}건 저장됨`;
-            if (errorFiles.length > 0) {
-                message += `\n\n실패한 파일:\n${errorFiles.join('\n')}`;
-            }
+            let message = `📊 ${successCount}개 파일 처리 완료, 총 ${totalCount}건 저장됨\n\n${errorFiles.join('\n')}`;
             alert(message);
             fetchData();
         } catch (error) {

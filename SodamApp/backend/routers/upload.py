@@ -305,6 +305,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
         
         inserted_count = 0
         skipped_count = 0
+        dedup_skipped = 0
+        dedup_replaced = 0
         vendor_created_count = 0
         processed_months = set()
         
@@ -313,8 +315,66 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
             vendors = session.exec(select(Vendor)).all()
             vendor_by_name = {v.name: v for v in vendors}
             
+            # --- Smart Card Sales Deduplication ---
+            # Determine the date range of the upload data
+            upload_dates = set()
+            for item in revenue_data:
+                try:
+                    d = datetime.datetime.strptime(item['date'], "%Y-%m-%d").date()
+                    upload_dates.add(d)
+                except:
+                    pass
+            
+            if upload_dates:
+                min_date = min(upload_dates)
+                max_date = max(upload_dates)
+                
+                # Check what card data already exists in DB for this period
+                existing_card_expenses = session.exec(
+                    select(DailyExpense).where(
+                        DailyExpense.date >= min_date,
+                        DailyExpense.date <= max_date,
+                        DailyExpense.payment_method == 'Card',
+                        DailyExpense.category == 'store',
+                    )
+                ).all()
+                
+                existing_card_by_date = {}
+                for exp in existing_card_expenses:
+                    if exp.date not in existing_card_by_date:
+                        existing_card_by_date[exp.date] = []
+                    existing_card_by_date[exp.date].append(exp)
+                
+                # Determine if existing data is "aggregated" (카드매출(통합)) or "detailed" (per card company)
+                has_aggregated = any(
+                    exp.vendor_name == '카드매출(통합)' for exps in existing_card_by_date.values() for exp in exps
+                )
+                has_detailed = any(
+                    '카드' in (exp.vendor_name or '') and exp.vendor_name != '카드매출(통합)'
+                    for exps in existing_card_by_date.values() for exp in exps
+                )
+                
+                if file_type == "pos_daily" and has_detailed:
+                    # POS daily file uploaded AFTER card detail: skip card entries from POS
+                    print(f"[Dedup] POS daily upload: card detail already exists, will skip card entries")
+                elif file_type == "card_detail" and has_aggregated:
+                    # Card detail file uploaded AFTER POS daily: remove aggregated card entries
+                    print(f"[Dedup] Card detail upload: removing aggregated 카드매출(통합) entries")
+                    for exps in existing_card_by_date.values():
+                        for exp in exps:
+                            if exp.vendor_name == '카드매출(통합)':
+                                session.delete(exp)
+                                dedup_replaced += 1
+                    session.flush()
+            
             for item in revenue_data:
                 if item['amount'] <= 0:
+                    continue
+                
+                # --- Dedup: skip POS card entries if card detail already in DB ---
+                payment_type = item.get('payment_type', 'card')
+                if file_type == "pos_daily" and payment_type == 'card' and has_detailed:
+                    dedup_skipped += 1
                     continue
                 
                 vendor_name = item['vendor_name']
@@ -331,7 +391,6 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                 if not vendor:
                     # For card_detail: card company vendors should exist
                     # For pos_daily: may need to create cash or generic card vendor
-                    payment_type = item.get('payment_type', 'other')
                     vendor = Vendor(
                         name=vendor_name,
                         category='store',
@@ -356,7 +415,6 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                     skipped_count += 1
                     continue
                 
-                payment_type = item.get('payment_type', 'card')
                 payment_method = 'Cash' if payment_type == 'cash' else 'Card'
                 expense = DailyExpense(
                     date=date_obj,
@@ -392,13 +450,21 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                 print(f"Revenue Upload P/L Sync error: {e}")
         
         summary = result.get("summary", {})
+        dedup_msg = ""
+        if dedup_skipped > 0:
+            dedup_msg = f" (카드상세 데이터 존재로 POS 카드매출 {dedup_skipped}건 자동 제외)"
+        if dedup_replaced > 0:
+            dedup_msg = f" (POS 통합카드매출 {dedup_replaced}건을 카드사별 상세로 대체)"
+        
         return {
             "status": "success",
             "file_type": file_type,
             "file_type_label": result.get("file_type_label", ""),
-            "message": f"{inserted_count}건의 매출 내역이 저장되었습니다.",
+            "message": f"{inserted_count}건의 매출 내역이 저장되었습니다.{dedup_msg}",
             "count": inserted_count,
             "skipped": skipped_count,
+            "dedup_skipped": dedup_skipped,
+            "dedup_replaced": dedup_replaced,
             "vendors_created": vendor_created_count,
             "upload_id": upload_id,
             "summary": summary,
