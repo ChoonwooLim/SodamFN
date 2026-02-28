@@ -669,7 +669,12 @@ class ExcelService:
             if '상호명' in first_rows_text and '주문번호' in first_rows_text and '주문일시' in first_rows_text:
                 return self._parse_yogiyo_settlement(df)
 
-            # Priority 1.6: Delivery app packed format (쿠팡이츠 등)
+            # Priority 1.7: 땡겨요 settlement (땡겨요 정산내역)
+            # Variants: 2월 format uses (D)차감금액/(E)정산금액, 1월 format uses (B)차감금액/(C)정산금액
+            if '(A)주문결제' in first_rows_text and ('(D)차감금액' in first_rows_text or '(E)정산금액' in first_rows_text or ('(B)차감금액' in first_rows_text and '정산 내역' in first_rows_text)):
+                return self._parse_ddangyo_settlement(df)
+
+            # Priority 1.8: Delivery app packed format (쿠팡이츠 등)
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
             if len(df.columns) <= 2 and ('기본정산' in first_rows_text or '인출' in first_rows_text):
                 return self._parse_delivery_settlement(df)
@@ -1032,6 +1037,181 @@ class ExcelService:
                 "period": f"{first_date.year}년 {first_date.month}월",
             }
         }
+
+    def _parse_ddangyo_settlement(self, df):
+        """
+        Parse 땡겨요 정산내역.
+        Supports two formats:
+          Format A (주문별): 35 columns, date split into 년도/월/일 cols 3-5
+          Format B (일별): 19 columns, 입금(예정)일 single date col, 주문기간 for order dates
+        """
+        import re, datetime
+
+        # Extract year and month from title row (row 0)
+        year, month = None, None
+        title = str(df.iloc[0, 0]) if pd.notna(df.iloc[0, 0]) else ''
+        m = re.search(r'(\d{4})년\s*(\d{1,2})월', title)
+        if m:
+            year, month = int(m.group(1)), int(m.group(2))
+
+        if not year or not month:
+            return {"status": "error", "message": "땡겨요 정산파일에서 년/월 정보를 찾을 수 없습니다."}
+
+        # ── Detect format and find header/data rows ──
+        data_start = None
+        format_type = None  # 'per_order' or 'daily'
+
+        # Column indices (set by format detection)
+        date_cols = None       # For per-order: (year_col, month_col, day_col)
+        date_col = None        # For daily: single column index
+        order_period_col = None # For daily: 주문기간 column
+        settlement_col = None
+        order_amount_col = None
+        deposit_col = None     # For daily: 입금금액
+
+        for i in range(min(len(df), 50)):
+            row_text = ' '.join([str(v) for v in df.iloc[i].tolist() if pd.notna(v)])
+
+            # Format A: per-order (2월 형식) — has 년도/월/일 columns
+            if '년도' in row_text and '주문금액' in row_text:
+                format_type = 'per_order'
+                for j in range(len(df.columns)):
+                    val = str(df.iloc[i, j]).strip() if pd.notna(df.iloc[i, j]) else ''
+                    if val == '년도':
+                        year_col_idx = j
+                    elif val == '월' and date_cols is None:
+                        month_col_idx = j
+                    elif val == '일' and date_cols is None:
+                        day_col_idx = j
+                        date_cols = (year_col_idx, month_col_idx, day_col_idx)
+                    elif val == '(C)정산금액':
+                        settlement_col = j
+                    elif val == '주문금액' and order_amount_col is None:
+                        order_amount_col = j
+                data_start = i + 1
+                break
+
+            # Format B: daily (1월 형식) — has 입금(예정)일/입금상태/주문기간
+            if '입금(예정)일' in row_text and '입금상태' in row_text and '주문기간' in row_text:
+                format_type = 'daily'
+                for j in range(len(df.columns)):
+                    val = str(df.iloc[i, j]).strip() if pd.notna(df.iloc[i, j]) else ''
+                    if val == '입금(예정)일':
+                        date_col = j
+                    elif val == '주문기간':
+                        order_period_col = j
+                    elif val == '(C)정산금액':
+                        settlement_col = j
+                    elif val == '주문금액' and order_amount_col is None:
+                        order_amount_col = j
+                    elif val == '입금금액':
+                        deposit_col = j
+                data_start = i + 1
+                break
+
+        if data_start is None or settlement_col is None:
+            return {"status": "error", "message": "땡겨요 정산파일에서 상세 데이터 헤더를 찾을 수 없습니다."}
+
+        # ── Parse data rows ──
+        date_totals = {}  # date_str → {settlement, sales, orders}
+
+        for i in range(data_start, len(df)):
+            # Skip 합 계 row
+            first_cell = str(df.iloc[i, 0]).strip() if pd.notna(df.iloc[i, 0]) else ''
+            if '합 계' in first_cell or '합계' in first_cell:
+                break
+
+            try:
+                if format_type == 'per_order' and date_cols:
+                    # Format A: separate year/month/day columns
+                    y_col, m_col, d_col = date_cols
+                    yr = str(df.iloc[i, y_col]).strip() if pd.notna(df.iloc[i, y_col]) else ''
+                    mn = str(df.iloc[i, m_col]).strip() if pd.notna(df.iloc[i, m_col]) else ''
+                    dy = str(df.iloc[i, d_col]).strip() if pd.notna(df.iloc[i, d_col]) else ''
+                    if not yr or not mn or not dy:
+                        continue
+                    date_str = f"{int(float(yr))}-{int(float(mn)):02d}-{int(float(dy)):02d}"
+
+                elif format_type == 'daily' and date_col is not None:
+                    # Format B: 입금(예정)일 like "2026-01-16"
+                    # Always use 입금(예정)일 as the revenue date (per store accounting policy)
+                    raw_date = df.iloc[i, date_col]
+                    if pd.isna(raw_date) or str(raw_date).strip() == '':
+                        continue
+                    date_str = str(raw_date).strip()[:10]
+                else:
+                    continue
+
+                # Validate date
+                datetime.datetime.strptime(date_str, "%Y-%m-%d")
+            except Exception:
+                continue
+
+            # Get settlement amount (use 입금금액 for daily format if available, else 정산금액)
+            if format_type == 'daily' and deposit_col is not None:
+                settle_val = df.iloc[i, deposit_col]
+            else:
+                settle_val = df.iloc[i, settlement_col]
+            try:
+                settlement = int(float(settle_val)) if pd.notna(settle_val) else 0
+            except:
+                settlement = 0
+
+            # Get order amount if available
+            sales = 0
+            if order_amount_col is not None:
+                oa_val = df.iloc[i, order_amount_col]
+                try:
+                    sales = int(float(oa_val)) if pd.notna(oa_val) else 0
+                except:
+                    pass
+
+            if date_str not in date_totals:
+                date_totals[date_str] = {"settlement": 0, "sales": 0, "orders": 0}
+            date_totals[date_str]["settlement"] += settlement
+            date_totals[date_str]["sales"] += sales
+            date_totals[date_str]["orders"] += 1
+
+        if not date_totals:
+            return {"status": "error", "message": "땡겨요 정산파일에서 주문 데이터를 찾을 수 없습니다."}
+
+        # Build data entries
+        data = []
+        total_sales = 0
+        total_settlement = 0
+        total_orders = 0
+
+        for date_str in sorted(date_totals.keys()):
+            dt = date_totals[date_str]
+            data.append({
+                "date": date_str,
+                "amount": dt["settlement"],
+                "vendor_name": "땡겨요",
+                "note": f"땡겨요 정산 ({dt['orders']}건)",
+                "payment_type": "delivery",
+            })
+            total_sales += dt["sales"]
+            total_settlement += dt["settlement"]
+            total_orders += dt["orders"]
+
+        total_fees = total_sales - total_settlement if total_sales > 0 else 0
+
+        return {
+            "status": "success",
+            "file_type": "delivery_settlement",
+            "label": "🛵 배달앱 정산 (땡겨요)",
+            "data": data,
+            "summary": {
+                "total_amount": total_settlement,
+                "total_sales": total_sales,
+                "total_fees": total_fees,
+                "record_count": len(data),
+                "order_count": total_orders,
+                "channel": "땡겨요",
+                "period": f"{year}년 {month}월",
+            }
+        }
+
 
     def _parse_delivery_settlement(self, df):
         """
