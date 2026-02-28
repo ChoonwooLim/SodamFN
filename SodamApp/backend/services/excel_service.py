@@ -621,12 +621,92 @@ class ExcelService:
             elif '월별 승인내역' in first_rows_text:
                 return self._parse_card_summary_revenue(df)
             
+            # Priority 1.5: Delivery app packed format (쿠팡이츠 등)
+            # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
+            if len(df.columns) <= 2 and ('기본정산' in first_rows_text or '인출' in first_rows_text):
+                return self._parse_delivery_settlement(df)
+            
             # Priority 2: Universal pattern-based detection (any POS vendor)
             return self._parse_universal_revenue(df, file_contents)
         
         except Exception as e:
             import traceback
             return {"status": "error", "message": f"매출 파일 파싱 오류: {str(e)}"}
+
+    def _parse_delivery_settlement(self, df):
+        """
+        Parse delivery app settlement files with packed single-column format.
+        Supports: 쿠팡이츠, and similar formats.
+        
+        Format: "1. 2026.02.27인출-724,366원0원"
+        '인출' entries = actual money deposited to bank = revenue for P&L.
+        '기본정산' = Coupang-side receipt (not yet deposited), skipped.
+        """
+        import re
+        
+        # Regex: number. date type amount원 balance원
+        pattern = re.compile(
+            r'\d+\.\s*'
+            r'(\d{4}\.\d{2}\.\d{2})'
+            r'(기본정산|인출|보정|기타)'
+            r'(-?[\d,]+)원'
+        )
+        
+        daily_revenue = {}
+        total_count = 0
+        
+        for _, row in df.iterrows():
+            text = str(row.iloc[0])
+            match = pattern.search(text)
+            if not match:
+                continue
+            
+            date_str = match.group(1).replace('.', '-')  # 2026.02.27 -> 2026-02-27
+            tx_type = match.group(2)
+            amount_str = match.group(3).replace(',', '')
+            
+            try:
+                amount = int(amount_str)
+            except ValueError:
+                continue
+            
+            # 인출 = actual deposit to bank account = revenue for P&L
+            # Amount is negative in source, so use abs()
+            if tx_type == '인출':
+                daily_revenue[date_str] = daily_revenue.get(date_str, 0) + abs(amount)
+                total_count += 1
+        
+        results = []
+        total_amount = 0
+        date_range = [None, None]
+        
+        for date_str in sorted(daily_revenue.keys()):
+            amount = daily_revenue[date_str]
+            if date_range[0] is None:
+                date_range[0] = date_str
+            date_range[1] = date_str
+            
+            results.append({
+                'date': date_str,
+                'amount': amount,
+                'vendor_name': '쿠팡이츠',
+                'note': '쿠팡이츠 정산',
+                'payment_type': 'delivery',
+            })
+            total_amount += amount
+        
+        return {
+            "status": "success",
+            "file_type": "delivery_settlement",
+            "file_type_label": "🛵 배달앱 정산 (쿠팡이츠)",
+            "data": results,
+            "summary": {
+                "total_amount": total_amount,
+                "record_count": len(results),
+                "transaction_count": total_count,
+                "date_range": date_range,
+            }
+        }
 
     # ─── Keyword sets for universal column detection ───
     DATE_KEYWORDS = ['일자', '날짜', '일시', 'date', '매출일']
