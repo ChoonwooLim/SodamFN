@@ -222,8 +222,10 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
         # New session/connection might be safer for complex sync logic if it uses its own session
         try:
             with Session(engine) as sync_session:
+                from services.profit_loss_service import sync_revenue_to_pl
                 for (year, month) in sync_months:
                     sync_all_expenses(year, month, sync_session)
+                    sync_revenue_to_pl(year, month, sync_session)
                 sync_session.commit()
         except Exception as e:
             print(f"Rollback Sync Error: {e}")

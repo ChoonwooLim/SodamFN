@@ -110,37 +110,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
             for v in revenue_vendors
         ]
 
-        # ── Also fetch Revenue table entries (배달앱 data) ──
-        # Map delivery channels to vendor IDs
-        delivery_vendors = [v for v in revenue_vendors if v.category == "delivery"]
-        channel_to_vendor = {}
-        for ch_key, keyword in CHANNEL_KEYWORDS.items():
-            for v in delivery_vendors:
-                if keyword in v.name:
-                    channel_to_vendor[ch_key] = v
-                    break
-
-        revenue_entries = session.exec(
-            select(Revenue)
-            .where(Revenue.date >= start_date, Revenue.date < end_date)
-        ).all()
-
-        for rev in revenue_entries:
-            v = channel_to_vendor.get(rev.channel)
-            if v:
-                result.append({
-                    "id": f"rev_{rev.id}",  # prefix to distinguish from DailyExpense
-                    "date": str(rev.date),
-                    "vendor_id": v.id,
-                    "vendor_name": v.name,
-                    "amount": rev.amount or 0,
-                    "note": rev.description or "배달앱 정산",
-                    "category": "delivery",
-                    "ui_category": "delivery",
-                    "item": v.item,
-                    "source": "delivery_app",  # flag for frontend
-                    "_channel": rev.channel,  # channel key for edit API
-                })
+        # NOTE: Revenue table reads REMOVED — DailyExpense is single source of truth
 
         return {"status": "success", "data": result, "vendors": vendors_list}
 
@@ -227,31 +197,7 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
                 by_vendor_map[vname] = {"name": vname, "category": ui_cat, "total": 0}
             by_vendor_map[vname]["total"] += amount
 
-        # Also add Revenue table (Delivery App) data if not already covered
-        # (Assuming Revenue table data is separate from DailyExpense)
-        revenue_entries = session.exec(
-            select(Revenue)
-            .where(Revenue.date >= start_date, Revenue.date < end_date)
-        ).all()
-        
-        for rev in revenue_entries:
-            amount = rev.amount or 0
-            total += amount
-            by_category['delivery'] = by_category.get('delivery', 0) + amount
-            
-            day_str = str(rev.date)
-            if day_str not in by_day_map:
-                 by_day_map[day_str] = {"date": day_str, "total": 0, "cash": 0, "card": 0, "delivery": 0}
-            
-            by_day_map[day_str]["total"] += amount
-            by_day_map[day_str]["delivery"] += amount
-            
-            # Map channel to vendor name for by_vendor?
-            # CHANNEL_KEYWORDS map is available but simple mapping here:
-            vname = CHANNEL_KEYWORDS.get(rev.channel, rev.channel)
-            if vname not in by_vendor_map:
-                by_vendor_map[vname] = {"name": vname, "category": "delivery", "total": 0}
-            by_vendor_map[vname]["total"] += amount
+        # NOTE: Revenue table reads REMOVED — DailyExpense is single source of truth
 
 
         by_day = sorted(by_day_map.values(), key=lambda x: x["date"])
