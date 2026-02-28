@@ -323,11 +323,11 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
 
     # Vendor name keyword → channel mapping
     VENDOR_TO_CHANNEL = {
-        "쿠팡": "Coupang",
-        "배민": "Baemin",
-        "배달의민족": "Baemin",
-        "요기요": "Yogiyo",
-        "땡겨요": "Ddangyo",
+        "쿠팡": "쿠팡",
+        "배민": "배민",
+        "배달의민족": "배민",
+        "요기요": "요기요",
+        "땡겨요": "땡겨요",
     }
 
     def _match_channel(vendor_name: str) -> str:
@@ -402,10 +402,14 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
                 pass
 
             # If DailyExpense already has this channel, skip DeliveryRevenue (DailyExpense is truth)
-            if r.channel in mm["channels"] and mm["channels"][r.channel].get("source") == "daily_expense":
+            # Map legacy English channel names to Korean
+            LEGACY_CHANNEL_MAP = {"Coupang": "쿠팡", "Baemin": "배민", "Yogiyo": "요기요", "Ddangyo": "땡겨요"}
+            ch_name = LEGACY_CHANNEL_MAP.get(r.channel, r.channel)
+            
+            if ch_name in mm["channels"] and mm["channels"][ch_name].get("source") == "daily_expense":
                 continue
 
-            mm["channels"][r.channel] = {
+            mm["channels"][ch_name] = {
                 "total_sales": r.total_sales,
                 "total_fees": r.total_fees,
                 "settlement_amount": r.settlement_amount,
