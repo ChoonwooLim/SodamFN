@@ -412,6 +412,13 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
                 ).first()
                 
                 if existing:
+                    # For card revenue: multiple card company names map to same vendor
+                    # (e.g., 하나카드 + 하나구외환 → 소담김밥 건대본점 하나카드)
+                    # Accumulate amounts instead of skipping
+                    if payment_type == 'card' and existing.upload_id == upload_id:
+                        existing.amount += amount
+                        session.add(existing)
+                        continue
                     skipped_count += 1
                     continue
                 
