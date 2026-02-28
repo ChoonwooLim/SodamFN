@@ -608,6 +608,7 @@ class ExcelService:
                 return {"status": "error", "message": "파일을 읽을 수 없습니다."}
             
             # --- Detect file type by scanning first few rows ---
+            # Priority 1: Known specific formats (exact keyword match)
             first_rows_text = ''
             for i in range(min(5, len(df))):
                 row_vals = [str(v) for v in df.iloc[i].tolist() if pd.notna(v)]
@@ -617,17 +618,285 @@ class ExcelService:
                 return self._parse_pos_daily_revenue(df)
             elif '기간별 승인내역' in first_rows_text or ('No.' in first_rows_text and '카드사' in first_rows_text and '승인금액' in first_rows_text):
                 return self._parse_card_detail_revenue(df)
-            elif ('카드사명' in first_rows_text or '매입사명' in first_rows_text) and '승인금액' in first_rows_text and ('영업일자' in first_rows_text or '거래일자' in first_rows_text):
-                # POS system card sales detail (신용카드 매출내역)
-                return self._parse_pos_card_detail_revenue(df)
             elif '월별 승인내역' in first_rows_text:
                 return self._parse_card_summary_revenue(df)
-            else:
-                return {"status": "error", "message": "인식할 수 없는 매출 파일 형식입니다. 지원 형식: POS 일자별 매출, 카드상세매출, 월별 카드매출, 신용카드 매출내역"}
+            
+            # Priority 2: Universal pattern-based detection (any POS vendor)
+            return self._parse_universal_revenue(df, file_contents)
         
         except Exception as e:
             import traceback
             return {"status": "error", "message": f"매출 파일 파싱 오류: {str(e)}"}
+
+    # ─── Keyword sets for universal column detection ───
+    DATE_KEYWORDS = ['일자', '날짜', '일시', 'date', '매출일']
+    AMOUNT_KEYWORDS = ['금액', '매출', '승인금액', '매출액', '결제금액', '승인액', 'amount']
+    CARD_CORP_KEYWORDS = ['카드사', '매입사', '카드사명', '매입사명', '매입카드사', '발급사', '카드종류']
+    CASH_KEYWORDS = ['현금', 'cash', '현금매출']
+    CARD_TOTAL_KEYWORDS = ['카드매출', '카드합계', '카드', '신용카드']
+    STATUS_KEYWORDS = ['구분', '승인구분', '상태', '거래구분', '유형']
+    TOTAL_KEYWORDS = ['총매출', '총액', '합계', '순매출', '총합', 'total']
+
+    def _parse_universal_revenue(self, df, file_contents):
+        """
+        Universal revenue file parser — works with any POS vendor format.
+        
+        Strategy:
+        1. Auto-detect header row by scanning for date/amount keywords
+        2. Map columns flexibly using broad keyword sets
+        3. Classify file as 'daily_summary' or 'card_detail' by data pattern
+        4. Parse and return structured data
+        """
+        import io
+        
+        # Step 1: Find header row
+        header_row = -1
+        for i in range(min(10, len(df))):
+            row_vals = [str(v).strip() for v in df.iloc[i].tolist() if pd.notna(v)]
+            row_text = ' '.join(row_vals)
+            has_date = any(k in row_text for k in self.DATE_KEYWORDS)
+            has_amount = any(k in row_text for k in self.AMOUNT_KEYWORDS)
+            if has_date and has_amount:
+                header_row = i
+                break
+        
+        if header_row < 0:
+            return {"status": "error", "message": "날짜/금액 컬럼을 자동 감지할 수 없습니다. 헤더 행에 '일자', '금액' 등의 키워드가 포함되어야 합니다."}
+        
+        # Re-read with proper header
+        new_header = [str(v).strip() if pd.notna(v) else f'col_{j}' for j, v in enumerate(df.iloc[header_row])]
+        data_df = df.iloc[header_row + 1:].copy()
+        data_df.columns = new_header
+        cols = list(data_df.columns)
+        
+        # Step 2: Map columns using keyword matching
+        def find_col(keywords, exclude=None):
+            for c in cols:
+                cl = c.lower() if c else ''
+                if any(k in c or k in cl for k in keywords):
+                    if exclude and any(ex in c for ex in exclude):
+                        continue
+                    return c
+            return None
+        
+        date_col = find_col(self.DATE_KEYWORDS)
+        amount_col = find_col(self.AMOUNT_KEYWORDS, exclude=['현금', 'cash'])
+        card_corp_col = find_col(self.CARD_CORP_KEYWORDS)
+        status_col = find_col(self.STATUS_KEYWORDS)
+        
+        # Look for separate cash/card total columns (daily summary files)
+        cash_col = find_col(self.CASH_KEYWORDS)
+        card_total_col = find_col(self.CARD_TOTAL_KEYWORDS, exclude=['카드사'])
+        total_col = find_col(self.TOTAL_KEYWORDS)
+        
+        if not date_col:
+            return {"status": "error", "message": f"날짜 컬럼을 찾을 수 없습니다. 감지된 컬럼: {cols[:15]}"}
+        if not amount_col and not total_col and not (cash_col or card_total_col):
+            return {"status": "error", "message": f"금액 컬럼을 찾을 수 없습니다. 감지된 컬럼: {cols[:15]}"}
+        
+        print(f"[Universal] date={date_col}, amount={amount_col}, card_corp={card_corp_col}, "
+              f"status={status_col}, cash={cash_col}, card_total={card_total_col}, total={total_col}")
+
+        # Step 3: Classify file type by data pattern
+        # Count date frequency — daily summary has ~1 row/date, detail has many
+        date_counts = {}
+        sample_size = min(100, len(data_df))
+        for i in range(sample_size):
+            dv = data_df.iloc[i].get(date_col)
+            if pd.notna(dv):
+                ds = str(dv)[:10]
+                date_counts[ds] = date_counts.get(ds, 0) + 1
+        
+        avg_rows_per_date = (sum(date_counts.values()) / len(date_counts)) if date_counts else 1
+        
+        # If card company column exists AND avg > 2 rows per date → card transaction detail
+        # If separate cash/card columns exist OR avg ≈ 1 → daily summary
+        is_daily_summary = (cash_col or card_total_col or total_col) and not card_corp_col and avg_rows_per_date < 3
+        is_card_detail = card_corp_col is not None and avg_rows_per_date >= 2
+        
+        # Fallback: if card corp column exists, treat as detail regardless
+        if card_corp_col and not is_daily_summary:
+            is_card_detail = True
+        
+        if is_daily_summary:
+            return self._parse_universal_daily_summary(data_df, date_col, cash_col, card_total_col, total_col)
+        elif is_card_detail:
+            return self._parse_universal_card_detail(data_df, date_col, amount_col, card_corp_col, status_col)
+        else:
+            # Generic: treat as card detail if possible, otherwise daily
+            if amount_col:
+                return self._parse_universal_card_detail(data_df, date_col, amount_col, card_corp_col, status_col)
+            return {"status": "error", "message": f"파일 유형을 분류할 수 없습니다. 컬럼: {cols[:15]}"}
+
+    def _parse_universal_daily_summary(self, df, date_col, cash_col, card_col, total_col):
+        """Parse a daily summary file (one row per day, cash/card breakdown)."""
+        results = []
+        total_amount = 0
+        date_range = [None, None]
+        
+        def clean_num(val):
+            if pd.isna(val): return 0
+            try: return int(float(str(val).replace(',', '').replace('원', '')))
+            except: return 0
+        
+        for _, row in df.iterrows():
+            date_val = row.get(date_col)
+            if pd.isna(date_val): continue
+            
+            if isinstance(date_val, datetime.datetime):
+                date_str = date_val.strftime('%Y-%m-%d')
+            else:
+                ds = str(date_val).strip().replace('.', '-').replace('/', '-')
+                if len(ds) >= 10:
+                    date_str = ds[:10]
+                elif len(ds) >= 8 and ds[:4].isdigit():
+                    date_str = f"{ds[:4]}-{ds[4:6]}-{ds[6:8]}"
+                else:
+                    continue
+            
+            # Validate date
+            try:
+                datetime.datetime.strptime(date_str[:10], '%Y-%m-%d')
+            except:
+                continue
+            
+            if date_range[0] is None: date_range[0] = date_str
+            date_range[1] = date_str
+            
+            cash = clean_num(row.get(cash_col)) if cash_col else 0
+            card = clean_num(row.get(card_col)) if card_col else 0
+            total = clean_num(row.get(total_col)) if total_col else 0
+            
+            # If only total is available (no cash/card breakdown)
+            if total > 0 and cash == 0 and card == 0:
+                card = total  # Assume total is card if no breakdown
+            
+            # If we have total but no separate, use ratio
+            if total > 0 and (cash + card) > 0 and abs(total - (cash + card)) > 100:
+                # Total includes VAT or fees — scale proportionally
+                ratio = total / (cash + card) if (cash + card) > 0 else 1
+                cash = int(cash * ratio)
+                card = int(card * ratio)
+            
+            if cash > 0:
+                results.append({
+                    'date': date_str, 'amount': cash,
+                    'vendor_name': self.CASH_VENDOR_NAME,
+                    'note': '현금매출', 'payment_type': 'cash',
+                })
+            if card > 0:
+                results.append({
+                    'date': date_str, 'amount': card,
+                    'vendor_name': '카드매출(통합)',
+                    'note': '카드매출', 'payment_type': 'card',
+                })
+            total_amount += (cash + card)
+        
+        return {
+            "status": "success",
+            "file_type": "pos_daily",
+            "file_type_label": "📊 일자별 매출내역 (자동감지)",
+            "data": results,
+            "summary": {
+                "total_amount": total_amount,
+                "record_count": len(results),
+                "date_range": date_range,
+            }
+        }
+    
+    def _parse_universal_card_detail(self, df, date_col, amount_col, card_corp_col, status_col):
+        """Parse a card transaction detail file (many rows per day)."""
+        daily_card = {}
+        total_count = 0
+        cancel_count = 0
+        
+        for _, row in df.iterrows():
+            date_val = row.get(date_col)
+            amount_val = row.get(amount_col) if amount_col else None
+            
+            if pd.isna(date_val) or (amount_val is not None and pd.isna(amount_val)):
+                continue
+            
+            # Parse date
+            if isinstance(date_val, datetime.datetime):
+                date_str = date_val.strftime('%Y-%m-%d')
+            else:
+                ds = str(date_val).strip().replace('.', '-').replace('/', '-')
+                if '-' in ds:
+                    date_str = ds[:10]
+                elif len(ds) >= 8 and ds[:4].isdigit():
+                    date_str = f"{ds[:4]}-{ds[4:6]}-{ds[6:8]}"
+                else:
+                    continue
+            
+            # Validate date
+            try:
+                datetime.datetime.strptime(date_str[:10], '%Y-%m-%d')
+            except:
+                continue
+            
+            # Parse amount
+            try:
+                amt = int(float(str(amount_val).replace(',', '').replace('원', '')))
+            except (ValueError, TypeError):
+                continue
+            
+            # Check cancellation
+            if status_col:
+                tx_type = str(row.get(status_col, '')).strip()
+                if '취소' in tx_type:
+                    amt = -amt
+                    cancel_count += 1
+                else:
+                    total_count += 1
+            else:
+                total_count += 1
+            
+            # Card company name
+            if card_corp_col and pd.notna(row.get(card_corp_col)):
+                card_name = str(row.get(card_corp_col)).strip()
+            else:
+                card_name = '기타카드'
+            
+            key = (date_str, card_name)
+            daily_card[key] = daily_card.get(key, 0) + amt
+        
+        results = []
+        total_amount = 0
+        date_range = [None, None]
+        
+        for (date_str, card_name), amount in sorted(daily_card.items()):
+            if amount <= 0:
+                continue
+            
+            vendor_name = self.CARD_VENDOR_MAP.get(card_name, f'기타카드({card_name})')
+            
+            if date_range[0] is None: date_range[0] = date_str
+            date_range[1] = date_str
+            
+            results.append({
+                'date': date_str, 'amount': amount,
+                'vendor_name': vendor_name,
+                'note': f'카드매출({card_name})',
+                'payment_type': 'card',
+                'card_company': card_name,
+            })
+            total_amount += amount
+        
+        return {
+            "status": "success",
+            "file_type": "card_detail",
+            "file_type_label": "💳 카드매출 상세 (자동감지)",
+            "data": results,
+            "summary": {
+                "total_amount": total_amount,
+                "record_count": len(results),
+                "transaction_count": total_count,
+                "cancel_count": cancel_count,
+                "date_range": date_range,
+            }
+        }
+
     def _parse_pos_card_detail_revenue(self, df):
         """Parse POS system card sales detail file (신용카드 매출내역).
         Columns: NO, 구분, 영업일자, 거래일자, 거래시간, 포스번호, 승인번호,
