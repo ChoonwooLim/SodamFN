@@ -401,12 +401,25 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
             except:
                 pass
 
-            # If DailyExpense already has this channel, skip DeliveryRevenue (DailyExpense is truth)
-            # Map legacy English channel names to Korean
+            # If DailyExpense already has this channel, MERGE fee details from DeliveryRevenue
+            # (DailyExpense is truth for settlement amounts, DeliveryRevenue has fee details)
             LEGACY_CHANNEL_MAP = {"Coupang": "쿠팡", "Baemin": "배민", "Yogiyo": "요기요", "Ddangyo": "땡겨요"}
             ch_name = LEGACY_CHANNEL_MAP.get(r.channel, r.channel)
             
             if ch_name in mm["channels"] and mm["channels"][ch_name].get("source") == "daily_expense":
+                # Merge fee details into existing DailyExpense entry
+                existing = mm["channels"][ch_name]
+                existing["total_sales"] = r.total_sales if r.total_sales > 0 else existing["total_sales"]
+                existing["total_fees"] = r.total_fees
+                existing["order_count"] = r.order_count
+                existing["fee_rate"] = round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0
+                existing["fee_breakdown"] = fee_bd
+                # Update monthly totals with fee data
+                mm["total_fees"] += r.total_fees
+                mm["total_orders"] += r.order_count
+                if r.total_sales > 0:
+                    mm["total_sales"] = mm["total_sales"] - existing.get("_orig_sales", existing["settlement_amount"]) + r.total_sales
+                    existing["_orig_sales"] = r.total_sales
                 continue
 
             mm["channels"][ch_name] = {
