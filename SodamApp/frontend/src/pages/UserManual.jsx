@@ -88,6 +88,12 @@ export default function UserManual() {
                                     <td>일별 배달앱 매출 (상세시트)</td>
                                     <td>입금금액 기준</td>
                                 </tr>
+                                <tr>
+                                    <td><span className="badge" style={{ background: '#ef4444' }}>요기요 정산</span></td>
+                                    <td>'상호명'+'주문번호'+'주문일시' 키워드</td>
+                                    <td>주문별→일별 집계 (수수료 자동계산)</td>
+                                    <td>주문금액-수수료</td>
+                                </tr>
                             </tbody>
                         </table>
 
@@ -152,6 +158,11 @@ export default function UserManual() {
                                     <td><strong>배달의민족</strong></td>
                                     <td>정산명세서.xlsx (비밀번호 보호)</td>
                                     <td>상세 시트에서 입금일별 정산금 추출</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>요기요</strong></td>
+                                    <td>정산내역.xlsx (비밀번호 없음)</td>
+                                    <td>주문별 데이터를 일별 집계, 수수료 자동 계산</td>
                                 </tr>
                             </tbody>
                         </table>
