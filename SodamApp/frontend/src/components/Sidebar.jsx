@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -105,14 +105,24 @@ export default function Sidebar() {
 
             <div className="p-4 border-t border-slate-800">
                 {user.role === 'admin' && (
-                    <Link
-                        to="/staff-app-preview"
-                        className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/staff-app-preview' ? 'bg-emerald-500/20 text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
-                    >
-                        <Smartphone size={20} />
-                        <span className="font-medium text-sm">직원용 앱</span>
-                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">PWA</span>
-                    </Link>
+                    <>
+                        <Link
+                            to="/staff-app-preview"
+                            className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/staff-app-preview' ? 'bg-emerald-500/20 text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+                        >
+                            <Smartphone size={20} />
+                            <span className="font-medium text-sm">직원용 앱</span>
+                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">PWA</span>
+                        </Link>
+                        <Link
+                            to="/admin-app-preview"
+                            className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/admin-app-preview' ? 'bg-violet-500/20 text-violet-300' : 'text-violet-400 hover:bg-violet-500/10'}`}
+                        >
+                            <Monitor size={20} />
+                            <span className="font-medium text-sm">관리자 앱</span>
+                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-medium">모니터</span>
+                        </Link>
+                    </>
                 )}
                 <Link
                     to="/"

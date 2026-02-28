@@ -29,6 +29,7 @@ const EmergencyContactsAdmin = React.lazy(() => import('./pages/EmergencyContact
 const AnnouncementsAdmin = React.lazy(() => import('./pages/Announcements'));
 const BoardManagement = React.lazy(() => import('./pages/BoardManagement'));
 const DeployManagement = React.lazy(() => import('./pages/DeployManagement'));
+const AdminAppPreview = React.lazy(() => import('./pages/AdminAppPreview'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -121,6 +122,7 @@ export default function App() {
 
               {/* STAFF ROUTES */}
               <Route path="/staff-app-preview" element={<ProtectedRoute adminOnly><StaffAppPreview /></ProtectedRoute>} />
+              <Route path="/admin-app-preview" element={<ProtectedRoute adminOnly><AdminAppPreview /></ProtectedRoute>} />
               <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
               <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
               <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />

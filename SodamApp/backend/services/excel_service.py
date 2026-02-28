@@ -617,14 +617,136 @@ class ExcelService:
                 return self._parse_pos_daily_revenue(df)
             elif '기간별 승인내역' in first_rows_text or ('No.' in first_rows_text and '카드사' in first_rows_text and '승인금액' in first_rows_text):
                 return self._parse_card_detail_revenue(df)
+            elif ('카드사명' in first_rows_text or '매입사명' in first_rows_text) and '승인금액' in first_rows_text and ('영업일자' in first_rows_text or '거래일자' in first_rows_text):
+                # POS system card sales detail (신용카드 매출내역)
+                return self._parse_pos_card_detail_revenue(df)
             elif '월별 승인내역' in first_rows_text:
                 return self._parse_card_summary_revenue(df)
             else:
-                return {"status": "error", "message": "인식할 수 없는 매출 파일 형식입니다. 지원 형식: POS 일자별 매출, 카드상세매출, 월별 카드매출"}
+                return {"status": "error", "message": "인식할 수 없는 매출 파일 형식입니다. 지원 형식: POS 일자별 매출, 카드상세매출, 월별 카드매출, 신용카드 매출내역"}
         
         except Exception as e:
             import traceback
             return {"status": "error", "message": f"매출 파일 파싱 오류: {str(e)}"}
+    def _parse_pos_card_detail_revenue(self, df):
+        """Parse POS system card sales detail file (신용카드 매출내역).
+        Columns: NO, 구분, 영업일자, 거래일자, 거래시간, 포스번호, 승인번호,
+                 카드번호, 카드사명, 매입사명, 승인금액, 할부, 승인구분, ...
+        """
+        # Find header row
+        header_row = 0
+        for i in range(min(5, len(df))):
+            row_vals = [str(v) for v in df.iloc[i].tolist() if pd.notna(v)]
+            row_text = ' '.join(row_vals)
+            if ('영업일자' in row_text or '거래일자' in row_text) and '승인금액' in row_text:
+                header_row = i
+                break
+
+        # Set header
+        new_header = [str(v).strip() if pd.notna(v) else f'col_{j}' for j, v in enumerate(df.iloc[header_row])]
+        data_df = df.iloc[header_row + 1:].copy()
+        data_df.columns = new_header
+
+        # Resolve column names
+        date_col = None
+        for c in ['영업일자', '거래일자', '승인일자']:
+            if c in data_df.columns:
+                date_col = c
+                break
+
+        card_col = None
+        for c in ['카드사명', '매입사명', '매입카드사']:
+            if c in data_df.columns:
+                card_col = c
+                break
+
+        status_col = None
+        for c in ['구분', '승인구분']:
+            if c in data_df.columns:
+                status_col = c
+                break
+
+        if not date_col or '승인금액' not in data_df.columns:
+            return {"status": "error", "message": "신용카드 매출내역 컬럼을 인식할 수 없습니다."}
+
+        daily_card = {}
+        total_count = 0
+        cancel_count = 0
+
+        for _, row in data_df.iterrows():
+            date_val = row.get(date_col)
+            amount_val = row.get('승인금액')
+
+            if pd.isna(date_val) or pd.isna(amount_val):
+                continue
+
+            # Parse date
+            if isinstance(date_val, datetime.datetime):
+                date_str = date_val.strftime('%Y-%m-%d')
+            else:
+                ds = str(date_val).strip()
+                if '-' in ds:
+                    date_str = ds[:10]
+                elif len(ds) >= 8 and ds[:4].isdigit():
+                    date_str = f"{ds[:4]}-{ds[4:6]}-{ds[6:8]}"
+                else:
+                    continue
+
+            # Parse amount
+            try:
+                amt = int(float(str(amount_val).replace(',', '')))
+            except (ValueError, TypeError):
+                continue
+
+            # Check cancellation
+            tx_type = str(row.get(status_col, '')).strip() if status_col else ''
+            if '취소' in tx_type:
+                amt = -amt
+                cancel_count += 1
+            else:
+                total_count += 1
+
+            card_name = str(row.get(card_col, '기타카드')).strip() if card_col else '기타카드'
+            key = (date_str, card_name)
+            daily_card[key] = daily_card.get(key, 0) + amt
+
+        results = []
+        total_amount = 0
+        date_range = [None, None]
+
+        for (date_str, card_name), amount in sorted(daily_card.items()):
+            if amount <= 0:
+                continue
+
+            vendor_name = self.CARD_VENDOR_MAP.get(card_name, f'기타카드({card_name})')
+
+            if date_range[0] is None:
+                date_range[0] = date_str
+            date_range[1] = date_str
+
+            results.append({
+                'date': date_str,
+                'amount': amount,
+                'vendor_name': vendor_name,
+                'note': f'카드매출({card_name})',
+                'payment_type': 'card',
+                'card_company': card_name,
+            })
+            total_amount += amount
+
+        return {
+            "status": "success",
+            "file_type": "card_detail",
+            "file_type_label": "💳 신용카드 매출내역 (POS)",
+            "data": results,
+            "summary": {
+                "total_amount": total_amount,
+                "record_count": len(results),
+                "transaction_count": total_count,
+                "cancel_count": cancel_count,
+                "date_range": date_range,
+            }
+        }
 
     def _parse_pos_daily_revenue(self, df):
         """Parse POS daily revenue file (File 3 format)."""
