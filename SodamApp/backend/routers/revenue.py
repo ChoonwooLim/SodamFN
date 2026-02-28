@@ -444,3 +444,47 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
             "record_count": len(records),
         }
 
+
+# ─── DELETE delivery revenue by month ───
+
+@router.delete("/delivery-summary/{year}/{month}")
+def delete_delivery_revenue_month(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
+    """
+    Delete all delivery revenue data for a specific year/month.
+    Clears both DeliveryRevenue and Revenue tables, then re-syncs P/L.
+    """
+    with Session(engine) as session:
+        # 1. Delete from DeliveryRevenue table
+        dr_records = session.exec(
+            select(DeliveryRevenue)
+            .where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
+        ).all()
+        dr_count = len(dr_records)
+        for r in dr_records:
+            session.delete(r)
+
+        # 2. Delete from Revenue table (delivery app daily entries)
+        start_date = date(year, month, 1)
+        if month == 12:
+            end_date = date(year + 1, 1, 1)
+        else:
+            end_date = date(year, month + 1, 1)
+
+        rev_records = session.exec(
+            select(Revenue)
+            .where(Revenue.date >= start_date, Revenue.date < end_date)
+        ).all()
+        rev_count = len(rev_records)
+        for r in rev_records:
+            session.delete(r)
+
+        session.commit()
+
+        # 3. Re-sync P/L
+        sync_revenue_to_pl(year, month, session)
+
+        return {
+            "status": "success",
+            "message": f"{year}년 {month}월 배달앱 매출 데이터 삭제 완료",
+            "deleted": {"delivery_revenue": dr_count, "revenue": rev_count},
+        }
