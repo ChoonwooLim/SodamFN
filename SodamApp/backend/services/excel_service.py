@@ -583,6 +583,30 @@ class ExcelService:
         import io
         
         try:
+            # ── Try to decrypt password-protected files ──
+            COMMON_PASSWORDS = ['630730', '1234', '0000', '1111']
+            decrypted = False
+            try:
+                import msoffcrypto
+                office_file = msoffcrypto.OfficeFile(io.BytesIO(file_contents))
+                if office_file.is_encrypted():
+                    for pwd in COMMON_PASSWORDS:
+                        try:
+                            buf = io.BytesIO()
+                            office_file.load_key(password=pwd)
+                            office_file.decrypt(buf)
+                            file_contents = buf.getvalue()
+                            decrypted = True
+                            break
+                        except Exception:
+                            continue
+                    if not decrypted:
+                        return {"status": "error", "message": "비밀번호가 설정된 파일입니다. 비밀번호를 해제한 후 다시 업로드해주세요."}
+            except ImportError:
+                pass  # msoffcrypto not installed, skip
+            except Exception:
+                pass  # Not an encrypted Office file, continue normally
+
             # Try to read the file with different engines
             df = None
             for engine_name in ['openpyxl', 'xlrd', None]:
@@ -621,7 +645,11 @@ class ExcelService:
             elif '월별 승인내역' in first_rows_text:
                 return self._parse_card_summary_revenue(df)
             
-            # Priority 1.5: Delivery app packed format (쿠팡이츠 등)
+            # Priority 1.5: Baemin settlement format (배달의민족 정산명세서)
+            if '정산명세서' in first_rows_text or ('주문중개' in first_rows_text and '입금금액' in first_rows_text):
+                return self._parse_baemin_settlement(df)
+
+            # Priority 1.6: Delivery app packed format (쿠팡이츠 등)
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
             if len(df.columns) <= 2 and ('기본정산' in first_rows_text or '인출' in first_rows_text):
                 return self._parse_delivery_settlement(df)
@@ -632,6 +660,105 @@ class ExcelService:
         except Exception as e:
             import traceback
             return {"status": "error", "message": f"매출 파일 파싱 오류: {str(e)}"}
+
+    def _parse_baemin_settlement(self, df):
+        """
+        Parse 배달의민족 정산명세서 (summary sheet format).
+        Format: Row with headers (주문중개, 배달, ..., 입금금액), data row below.
+        Extracts 입금금액 as the total settlement amount.
+        """
+        import re
+        
+        # Find year and month from title
+        year, month = None, None
+        for i in range(min(3, len(df))):
+            row_text = ' '.join([str(v) for v in df.iloc[i].tolist() if pd.notna(v)])
+            m = re.search(r'(\d{4})\s*년\s*(\d{1,2})\s*월', row_text)
+            if m:
+                year = int(m.group(1))
+                month = int(m.group(2))
+                break
+        
+        if not year or not month:
+            return {"status": "error", "message": "정산명세서에서 년/월 정보를 찾을 수 없습니다."}
+        
+        # Find header row with 입금금액
+        header_row = None
+        deposit_col = None
+        order_col = None  # 주문중개 column (total sales)
+        delivery_col = None  # 배달 column (delivery fee)
+        
+        for i in range(len(df)):
+            row_vals = [str(v).strip() for v in df.iloc[i].tolist() if pd.notna(v)]
+            for j, val in enumerate(df.iloc[i].tolist()):
+                cell_text = str(val).strip() if pd.notna(val) else ''
+                if '입금금액' in cell_text:
+                    header_row = i
+                    deposit_col = j
+                if '주문중개' in cell_text:
+                    order_col = j
+                if cell_text.startswith('(B)') and '배달' in cell_text:
+                    delivery_col = j
+            if header_row is not None:
+                break
+        
+        if header_row is None or deposit_col is None:
+            return {"status": "error", "message": "정산명세서에서 입금금액 컬럼을 찾을 수 없습니다."}
+        
+        # Get data row (next non-empty row after header)
+        settlement_amount = 0
+        total_sales = 0
+        total_fees = 0
+        
+        for i in range(header_row + 1, len(df)):
+            val = df.iloc[i, deposit_col]
+            if pd.notna(val):
+                try:
+                    settlement_amount = int(float(val))
+                except (ValueError, TypeError):
+                    continue
+                
+                # Get total sales (주문중개)
+                if order_col is not None and pd.notna(df.iloc[i, order_col]):
+                    try:
+                        total_sales = int(float(df.iloc[i, order_col]))
+                    except:
+                        pass
+                
+                # Calculate fees (total_sales - settlement)
+                total_fees = total_sales - settlement_amount if total_sales > 0 else 0
+                break
+        
+        if settlement_amount <= 0:
+            return {"status": "error", "message": "정산명세서에서 입금금액을 찾을 수 없습니다."}
+        
+        # Generate a single entry for the month (use last day of month)
+        import calendar
+        last_day = calendar.monthrange(year, month)[1]
+        date_str = f"{year}-{month:02d}-{last_day:02d}"
+        
+        data = [{
+            "date": date_str,
+            "amount": settlement_amount,
+            "vendor_name": "배달의민족",
+            "note": f"배민 {month}월 정산 (입금금액)",
+            "payment_type": "delivery",
+        }]
+        
+        return {
+            "status": "success",
+            "file_type": "delivery_settlement",
+            "label": "🛵 배달앱 정산 (배달의민족)",
+            "data": data,
+            "summary": {
+                "total_amount": settlement_amount,
+                "total_sales": total_sales,
+                "total_fees": total_fees,
+                "record_count": 1,
+                "channel": "배달의민족",
+                "period": f"{year}년 {month}월",
+            }
+        }
 
     def _parse_delivery_settlement(self, df):
         """
