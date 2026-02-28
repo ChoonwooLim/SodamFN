@@ -83,7 +83,26 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
-                    if (response.data.status === 'success') {
+                    // Handle password-protected files
+                    if (response.data.status === 'password_required') {
+                        const pwd = prompt(`🔒 ${file.name}\n\n${response.data.message}`);
+                        if (pwd) {
+                            const retryFormData = new FormData();
+                            retryFormData.append('file', file);
+                            retryFormData.append('password', pwd);
+                            const retryResponse = await api.post(config.endpoints.excel, retryFormData, {
+                                headers: { 'Content-Type': 'multipart/form-data' }
+                            });
+                            if (retryResponse.data.status === 'success') {
+                                totalCount += retryResponse.data.count || 0;
+                                successCount++;
+                            } else {
+                                errorFiles.push(`${file.name}: ${retryResponse.data.message || '비밀번호 오류'}`);
+                            }
+                        } else {
+                            errorFiles.push(`${file.name}: 비밀번호 입력 취소`);
+                        }
+                    } else if (response.data.status === 'success') {
                         totalCount += response.data.count || 0;
                         successCount++;
                     } else {

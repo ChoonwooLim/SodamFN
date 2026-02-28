@@ -567,14 +567,11 @@ class ExcelService:
     }
     CASH_VENDOR_NAME = '소담김밥 건대본점 현금매출'
 
-    def parse_revenue_upload(self, file_contents: bytes):
+    def parse_revenue_upload(self, file_contents: bytes, password: str = None):
         """
-        Smart revenue file parser. Auto-detects file type and returns structured data.
-        
-        Supported formats:
-        1. POS 일자별 매출내역 (총매출, 현금, 카드 breakdown per day)
-        2. 카드상세매출내역 (individual card transactions)
-        3. 월별 카드매출내역 (monthly card summary)
+        Smart revenue upload parser.
+        Detects file type and delegates to appropriate parser.
+        Supports password-protected Excel files.
         
         Returns:
             dict with keys: status, file_type, data[], summary{}
@@ -585,14 +582,22 @@ class ExcelService:
         try:
             # ── Try to decrypt password-protected files ──
             COMMON_PASSWORDS = ['630730', '1234', '0000', '1111']
+            passwords_to_try = []
+            if password:
+                passwords_to_try.append(password)
+            passwords_to_try.extend(COMMON_PASSWORDS)
+            
             decrypted = False
+            is_encrypted = False
             try:
                 import msoffcrypto
                 office_file = msoffcrypto.OfficeFile(io.BytesIO(file_contents))
                 if office_file.is_encrypted():
-                    for pwd in COMMON_PASSWORDS:
+                    is_encrypted = True
+                    for pwd in passwords_to_try:
                         try:
                             buf = io.BytesIO()
+                            office_file = msoffcrypto.OfficeFile(io.BytesIO(file_contents))
                             office_file.load_key(password=pwd)
                             office_file.decrypt(buf)
                             file_contents = buf.getvalue()
@@ -601,11 +606,11 @@ class ExcelService:
                         except Exception:
                             continue
                     if not decrypted:
-                        return {"status": "error", "message": "비밀번호가 설정된 파일입니다. 비밀번호를 해제한 후 다시 업로드해주세요."}
+                        return {"status": "password_required", "message": "비밀번호가 설정된 파일입니다. 비밀번호를 입력해주세요."}
             except ImportError:
-                pass  # msoffcrypto not installed, skip
+                pass
             except Exception:
-                pass  # Not an encrypted Office file, continue normally
+                pass
 
             # Try to read the file with different engines
             df = None
@@ -645,9 +650,20 @@ class ExcelService:
             elif '월별 승인내역' in first_rows_text:
                 return self._parse_card_summary_revenue(df)
             
-            # Priority 1.5: Baemin settlement format (배달의민족 정산명세서)
+            # Also try reading all sheets for Baemin detection
+            # (Baemin files have 요약 + 상세 sheets, pandas only reads active/first sheet)
+            all_sheets_data = None
+            if is_encrypted or '정산명세서' in first_rows_text or ('주문중개' in first_rows_text and '입금금액' in first_rows_text):
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(io.BytesIO(file_contents))
+                    if '상세' in wb.sheetnames:
+                        all_sheets_data = wb
+                except Exception:
+                    pass
+
             if '정산명세서' in first_rows_text or ('주문중개' in first_rows_text and '입금금액' in first_rows_text):
-                return self._parse_baemin_settlement(df)
+                return self._parse_baemin_settlement(df, workbook=all_sheets_data)
 
             # Priority 1.6: Delivery app packed format (쿠팡이츠 등)
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
@@ -661,15 +677,15 @@ class ExcelService:
             import traceback
             return {"status": "error", "message": f"매출 파일 파싱 오류: {str(e)}"}
 
-    def _parse_baemin_settlement(self, df):
+    def _parse_baemin_settlement(self, df, workbook=None):
         """
-        Parse 배달의민족 정산명세서 (summary sheet format).
-        Format: Row with headers (주문중개, 배달, ..., 입금금액), data row below.
-        Extracts 입금금액 as the total settlement amount.
+        Parse 배달의민족 정산명세서.
+        Uses '상세' (detail) sheet for daily entries when available.
+        Falls back to '요약' (summary) sheet if detail not available.
         """
         import re
         
-        # Find year and month from title
+        # Find year and month from title (요약 sheet)
         year, month = None, None
         for i in range(min(3, len(df))):
             row_text = ' '.join([str(v) for v in df.iloc[i].tolist() if pd.notna(v)])
@@ -682,68 +698,152 @@ class ExcelService:
         if not year or not month:
             return {"status": "error", "message": "정산명세서에서 년/월 정보를 찾을 수 없습니다."}
         
-        # Find header row with 입금금액
-        header_row = None
-        deposit_col = None
-        order_col = None  # 주문중개 column (total sales)
-        delivery_col = None  # 배달 column (delivery fee)
+        import calendar
+        import datetime
         
-        for i in range(len(df)):
-            row_vals = [str(v).strip() for v in df.iloc[i].tolist() if pd.notna(v)]
-            for j, val in enumerate(df.iloc[i].tolist()):
-                cell_text = str(val).strip() if pd.notna(val) else ''
-                if '입금금액' in cell_text:
-                    header_row = i
-                    deposit_col = j
-                if '주문중개' in cell_text:
-                    order_col = j
-                if cell_text.startswith('(B)') and '배달' in cell_text:
-                    delivery_col = j
-            if header_row is not None:
-                break
-        
-        if header_row is None or deposit_col is None:
-            return {"status": "error", "message": "정산명세서에서 입금금액 컬럼을 찾을 수 없습니다."}
-        
-        # Get data row (next non-empty row after header)
-        settlement_amount = 0
+        data = []
+        total_settlement = 0
         total_sales = 0
         total_fees = 0
         
-        for i in range(header_row + 1, len(df)):
-            val = df.iloc[i, deposit_col]
-            if pd.notna(val):
-                try:
-                    settlement_amount = int(float(val))
-                except (ValueError, TypeError):
-                    continue
+        # ── Try detail sheet first ──
+        if workbook and '상세' in workbook.sheetnames:
+            ws = workbook['상세']
+            
+            # Find header row with 입금일, 입금 금액
+            header_row = None
+            col_map = {}  # column name → index
+            
+            for i in range(1, min(ws.max_row + 1, 10)):
+                row_vals = [c.value for c in ws[i][:26]]
+                for j, val in enumerate(row_vals):
+                    cell_text = str(val).strip() if val else ''
+                    if '입금일' in cell_text:
+                        header_row = i
+                        col_map['입금일'] = j
+                    if '입금 금액' in cell_text or '입금금액' in cell_text:
+                        col_map['입금금액'] = j
+                    if '주문중개' in cell_text:
+                        col_map['주문중개'] = j
+                if header_row is not None:
+                    break
+            
+            if header_row and '입금일' in col_map and '입금금액' in col_map:
+                # Parse data rows — aggregate by date
+                date_totals = {}  # date_str → {settlement, sales}
+                start_date = datetime.date(year, month, 1)
+                if month == 12:
+                    end_date = datetime.date(year + 1, 1, 1)
+                else:
+                    end_date = datetime.date(year, month + 1, 1)
                 
-                # Get total sales (주문중개)
-                if order_col is not None and pd.notna(df.iloc[i, order_col]):
+                for i in range(header_row + 1, ws.max_row + 1):
+                    row_vals = [c.value for c in ws[i][:26]]
+                    
+                    # Get 입금일
+                    raw_date = row_vals[col_map['입금일']]
+                    if raw_date is None:
+                        continue
+                    
+                    # Parse date
                     try:
-                        total_sales = int(float(df.iloc[i, order_col]))
+                        if isinstance(raw_date, datetime.datetime):
+                            d = raw_date.date()
+                        elif isinstance(raw_date, datetime.date):
+                            d = raw_date
+                        else:
+                            d = datetime.datetime.strptime(str(raw_date).strip(), "%Y-%m-%d").date()
+                    except Exception:
+                        continue
+                    
+                    # Only include dates within the target month
+                    if d < start_date or d >= end_date:
+                        continue
+                    
+                    # Get 입금금액
+                    settlement = row_vals[col_map['입금금액']]
+                    if settlement is None:
+                        continue
+                    try:
+                        settlement = int(float(settlement))
                     except:
-                        pass
+                        continue
+                    
+                    # Get 주문중개 (sales) if available
+                    sales = 0
+                    if '주문중개' in col_map:
+                        sv = row_vals[col_map['주문중개']]
+                        if sv is not None:
+                            try:
+                                sales = int(float(sv))
+                            except:
+                                pass
+                    
+                    date_str = d.strftime("%Y-%m-%d")
+                    if date_str not in date_totals:
+                        date_totals[date_str] = {"settlement": 0, "sales": 0}
+                    date_totals[date_str]["settlement"] += settlement
+                    date_totals[date_str]["sales"] += sales
                 
-                # Calculate fees (total_sales - settlement)
-                total_fees = total_sales - settlement_amount if total_sales > 0 else 0
-                break
+                # Build data entries
+                for date_str in sorted(date_totals.keys()):
+                    dt = date_totals[date_str]
+                    data.append({
+                        "date": date_str,
+                        "amount": dt["settlement"],
+                        "vendor_name": "배달의민족",
+                        "note": f"배민 정산",
+                        "payment_type": "delivery",
+                    })
+                    total_settlement += dt["settlement"]
+                    total_sales += dt["sales"]
         
-        if settlement_amount <= 0:
-            return {"status": "error", "message": "정산명세서에서 입금금액을 찾을 수 없습니다."}
+        # ── Fallback to summary sheet ──
+        if not data:
+            header_row = None
+            deposit_col = None
+            order_col = None
+            
+            for i in range(len(df)):
+                for j, val in enumerate(df.iloc[i].tolist()):
+                    cell_text = str(val).strip() if pd.notna(val) else ''
+                    if '입금금액' in cell_text:
+                        header_row = i
+                        deposit_col = j
+                    if '주문중개' in cell_text:
+                        order_col = j
+                if header_row is not None:
+                    break
+            
+            if header_row is not None and deposit_col is not None:
+                for i in range(header_row + 1, len(df)):
+                    val = df.iloc[i, deposit_col]
+                    if pd.notna(val):
+                        try:
+                            total_settlement = int(float(val))
+                        except:
+                            continue
+                        if order_col is not None and pd.notna(df.iloc[i, order_col]):
+                            try:
+                                total_sales = int(float(df.iloc[i, order_col]))
+                            except:
+                                pass
+                        break
+            
+            if total_settlement > 0:
+                last_day = calendar.monthrange(year, month)[1]
+                data.append({
+                    "date": f"{year}-{month:02d}-{last_day:02d}",
+                    "amount": total_settlement,
+                    "vendor_name": "배달의민족",
+                    "note": f"배민 {month}월 정산 (요약)",
+                    "payment_type": "delivery",
+                })
         
-        # Generate a single entry for the month (use last day of month)
-        import calendar
-        last_day = calendar.monthrange(year, month)[1]
-        date_str = f"{year}-{month:02d}-{last_day:02d}"
+        if not data:
+            return {"status": "error", "message": "정산명세서에서 입금 데이터를 찾을 수 없습니다."}
         
-        data = [{
-            "date": date_str,
-            "amount": settlement_amount,
-            "vendor_name": "배달의민족",
-            "note": f"배민 {month}월 정산 (입금금액)",
-            "payment_type": "delivery",
-        }]
+        total_fees = total_sales - total_settlement if total_sales > 0 else 0
         
         return {
             "status": "success",
@@ -751,10 +851,10 @@ class ExcelService:
             "label": "🛵 배달앱 정산 (배달의민족)",
             "data": data,
             "summary": {
-                "total_amount": settlement_amount,
+                "total_amount": total_settlement,
                 "total_sales": total_sales,
                 "total_fees": total_fees,
-                "record_count": 1,
+                "record_count": len(data),
                 "channel": "배달의민족",
                 "period": f"{year}년 {month}월",
             }

@@ -335,7 +335,34 @@ export default function RevenueManagement() {
                     const response = await api.post('/upload/excel/revenue', formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
-                    if (response.data.status === 'success') {
+
+                    // Handle password-protected files
+                    if (response.data.status === 'password_required') {
+                        const pwd = prompt(`🔒 ${file.name}\n\n${response.data.message}`);
+                        if (pwd) {
+                            const retryFormData = new FormData();
+                            retryFormData.append('file', file);
+                            retryFormData.append('password', pwd);
+                            const retryResponse = await api.post('/upload/excel/revenue', retryFormData, {
+                                headers: { 'Content-Type': 'multipart/form-data' }
+                            });
+                            if (retryResponse.data.status === 'password_required') {
+                                errorFiles.push(`🔒 ${file.name}: 비밀번호가 맞지 않습니다.`);
+                            } else if (retryResponse.data.status === 'success') {
+                                totalCount += retryResponse.data.count || 0;
+                                successCount++;
+                                const d = retryResponse.data;
+                                let fileMsg = `✅ ${file.name}`;
+                                if (d.file_type_label) fileMsg += ` (${d.file_type_label})`;
+                                fileMsg += `: ${d.count || 0}건 저장`;
+                                errorFiles.push(fileMsg);
+                            } else {
+                                errorFiles.push(`❌ ${file.name}: ${retryResponse.data.message}`);
+                            }
+                        } else {
+                            errorFiles.push(`⏭️ ${file.name}: 비밀번호 입력 취소`);
+                        }
+                    } else if (response.data.status === 'success') {
                         totalCount += response.data.count || 0;
                         successCount++;
                         // Show dedup info if applicable

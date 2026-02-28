@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from services.ocr_service import OCRService
 from services.excel_service import ExcelService
 from models import Expense, Revenue, Session, create_engine, SQLModel, User
@@ -264,10 +264,11 @@ async def upload_revenue_image(file: UploadFile = File(...), _admin: User = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/revenue")
-async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+async def upload_revenue_excel(file: UploadFile = File(...), password: str = Form(None), _admin: User = Depends(get_admin_user)):
     """
     Smart revenue Excel upload.
-    Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약
+    Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약, 배달앱 정산
+    Optional password for encrypted files.
     """
     import traceback
     from sqlmodel import select
@@ -277,7 +278,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), _admin: User = Depe
     try:
         content = await file.read()
         service = ExcelService("dummy_path")
-        result = service.parse_revenue_upload(content)
+        result = service.parse_revenue_upload(content, password=password)
         
         if result.get("status") == "error":
             return result
