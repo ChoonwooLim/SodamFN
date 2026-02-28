@@ -30,6 +30,7 @@ const AnnouncementsAdmin = React.lazy(() => import('./pages/Announcements'));
 const BoardManagement = React.lazy(() => import('./pages/BoardManagement'));
 const DeployManagement = React.lazy(() => import('./pages/DeployManagement'));
 const AdminAppPreview = React.lazy(() => import('./pages/AdminAppPreview'));
+const UserManual = React.lazy(() => import('./pages/UserManual'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -117,6 +118,7 @@ export default function App() {
               <Route path="/confirm" element={<ProtectedRoute adminOnly><ExpenseConfirm /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
               <Route path="/vendor-settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
+              <Route path="/manual" element={<ProtectedRoute adminOnly><UserManual /></ProtectedRoute>} />
               <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
               <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
 

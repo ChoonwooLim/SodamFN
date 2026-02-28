@@ -41,6 +41,7 @@ export default function Sidebar() {
             { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
             { icon: ClipboardList, label: '통합 게시판', path: '/board' },
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
+            { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
             { icon: Rocket, label: '배포 관리', path: '/deploy' },
         ]
