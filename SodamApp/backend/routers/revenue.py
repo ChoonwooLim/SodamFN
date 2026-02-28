@@ -315,34 +315,85 @@ def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_u
 def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user)):
     """
     Returns delivery app revenue summary.
-    If year=0, returns all records. Otherwise filters by year.
+    Sources: DailyExpense (primary, single source of truth) + DeliveryRevenue (legacy detail).
     Groups by year-month and provides per-channel data + monthly totals.
     """
     import json as json_lib
+    import calendar
+
+    # Vendor name keyword → channel mapping
+    VENDOR_TO_CHANNEL = {
+        "쿠팡": "Coupang",
+        "배민": "Baemin",
+        "배달의민족": "Baemin",
+        "요기요": "Yogiyo",
+        "땡겨요": "Ddangyo",
+    }
+
+    def _match_channel(vendor_name: str) -> str:
+        for keyword, channel in VENDOR_TO_CHANNEL.items():
+            if keyword in (vendor_name or ""):
+                return channel
+        return None
 
     with Session(engine) as session:
-        query = select(DeliveryRevenue)
-        if year > 0:
-            query = query.where(DeliveryRevenue.year == year)
-        query = query.order_by(DeliveryRevenue.year.desc(), DeliveryRevenue.month.desc())
-
-        records = session.exec(query).all()
-
-        # Group by year-month
         monthly = {}
+
+        # ── 1. Aggregate from DailyExpense (primary source) ──
+        de_query = select(DailyExpense).where(DailyExpense.category == "delivery")
+        if year > 0:
+            start = date(year, 1, 1)
+            end = date(year + 1, 1, 1)
+            de_query = de_query.where(DailyExpense.date >= start, DailyExpense.date < end)
+
+        de_records = session.exec(de_query).all()
+
+        # Group by (year, month, channel)
+        de_grouped = {}
+        for r in de_records:
+            ch = _match_channel(r.vendor_name)
+            if not ch:
+                continue
+            key = (r.date.year, r.date.month, ch)
+            de_grouped[key] = de_grouped.get(key, 0) + (r.amount or 0)
+
+        for (y, m, ch), total in de_grouped.items():
+            month_key = f"{y}-{m:02d}"
+            if month_key not in monthly:
+                monthly[month_key] = {
+                    "year": y, "month": m, "channels": {},
+                    "total_sales": 0, "total_fees": 0, "total_settlement": 0, "total_orders": 0,
+                }
+            mm = monthly[month_key]
+            if ch not in mm["channels"]:
+                mm["channels"][ch] = {
+                    "total_sales": total,  # settlement = total for uploaded files
+                    "total_fees": 0,
+                    "settlement_amount": total,
+                    "order_count": 0,
+                    "fee_rate": 0,
+                    "fee_breakdown": {},
+                    "source": "daily_expense",
+                }
+                mm["total_sales"] += total
+                mm["total_settlement"] += total
+
+        # ── 2. Merge DeliveryRevenue (legacy, has fee details) ──
+        dr_query = select(DeliveryRevenue)
+        if year > 0:
+            dr_query = dr_query.where(DeliveryRevenue.year == year)
+        dr_query = dr_query.order_by(DeliveryRevenue.year.desc(), DeliveryRevenue.month.desc())
+
+        records = session.exec(dr_query).all()
+
         for r in records:
             key = f"{r.year}-{r.month:02d}"
             if key not in monthly:
                 monthly[key] = {
-                    "year": r.year,
-                    "month": r.month,
-                    "channels": {},
-                    "total_sales": 0,
-                    "total_fees": 0,
-                    "total_settlement": 0,
-                    "total_orders": 0,
+                    "year": r.year, "month": r.month, "channels": {},
+                    "total_sales": 0, "total_fees": 0, "total_settlement": 0, "total_orders": 0,
                 }
-            m = monthly[key]
+            mm = monthly[key]
             fee_bd = {}
             try:
                 if r.fee_breakdown:
@@ -350,7 +401,11 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
             except:
                 pass
 
-            m["channels"][r.channel] = {
+            # If DailyExpense already has this channel, skip DeliveryRevenue (DailyExpense is truth)
+            if r.channel in mm["channels"] and mm["channels"][r.channel].get("source") == "daily_expense":
+                continue
+
+            mm["channels"][r.channel] = {
                 "total_sales": r.total_sales,
                 "total_fees": r.total_fees,
                 "settlement_amount": r.settlement_amount,
@@ -358,10 +413,10 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
                 "fee_rate": round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0,
                 "fee_breakdown": fee_bd,
             }
-            m["total_sales"] += r.total_sales
-            m["total_fees"] += r.total_fees
-            m["total_settlement"] += r.settlement_amount
-            m["total_orders"] += r.order_count
+            mm["total_sales"] += r.total_sales
+            mm["total_fees"] += r.total_fees
+            mm["total_settlement"] += r.settlement_amount
+            mm["total_orders"] += r.order_count
 
         # Convert to list & compute overall fee rate
         result = []
@@ -372,14 +427,15 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
 
         # Channel summary totals across all months
         channel_totals = {}
-        for r in records:
-            if r.channel not in channel_totals:
-                channel_totals[r.channel] = {"total_sales": 0, "total_fees": 0, "settlement_amount": 0, "order_count": 0}
-            ct = channel_totals[r.channel]
-            ct["total_sales"] += r.total_sales
-            ct["total_fees"] += r.total_fees
-            ct["settlement_amount"] += r.settlement_amount
-            ct["order_count"] += r.order_count
+        for m in monthly.values():
+            for ch, cd in m["channels"].items():
+                if ch not in channel_totals:
+                    channel_totals[ch] = {"total_sales": 0, "total_fees": 0, "settlement_amount": 0, "order_count": 0}
+                ct = channel_totals[ch]
+                ct["total_sales"] += cd.get("total_sales", 0)
+                ct["total_fees"] += cd.get("total_fees", 0)
+                ct["settlement_amount"] += cd.get("settlement_amount", 0)
+                ct["order_count"] += cd.get("order_count", 0)
 
         for ch, ct in channel_totals.items():
             ct["fee_rate"] = round(ct["total_fees"] / ct["total_sales"] * 100, 1) if ct["total_sales"] > 0 else 0
@@ -387,7 +443,7 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
         return {
             "monthly": result,
             "channel_totals": channel_totals,
-            "record_count": len(records),
+            "record_count": len(result),
         }
 
 
