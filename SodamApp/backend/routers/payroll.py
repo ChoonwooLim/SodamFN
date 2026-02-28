@@ -232,51 +232,51 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         if staff.contract_type != "정규직":
             week_idx = 0
-        # Sort keys to process in chronological order
-        for key in sorted(weeks.keys()):
-            w_atts = weeks[key]
-            # Get Sunday of this week
-            y, w = key
-            sun_date = date.fromisocalendar(y, w, 7)
-            
-            # REFINED CUTOFF RULE:
-            # "다음달 1일이 (화~토)이면 다음달 포함, 1일이 일요일이면 이번달 포함"
-            # Mathematically: sun_date <= 1st of next month stays in current.
-            if sun_date > next_month_1st or sun_date < target_month_dt.date():
-                continue
+            # Sort keys to process in chronological order
+            for key in sorted(weeks.keys()):
+                w_atts = weeks[key]
+                # Get Sunday of this week
+                y, w = key
+                sun_date = date.fromisocalendar(y, w, 7)
                 
-            # Treat store-closed days (Holidays) as 0 hours for the weekly sum
-            effective_atts = []
-            for a in w_atts:
-                is_company_holiday = a.date in company_holidays
-                is_store_closed = a.status == "Holiday" or is_company_holiday
+                # REFINED CUTOFF RULE:
+                # "다음달 1일이 (화~토)이면 다음달 포함, 1일이 일요일이면 이번달 포함"
+                # Mathematically: sun_date <= 1st of next month stays in current.
+                if sun_date > next_month_1st or sun_date < target_month_dt.date():
+                    continue
+                    
+                # Treat store-closed days (Holidays) as 0 hours for the weekly sum
+                effective_atts = []
+                for a in w_atts:
+                    is_company_holiday = a.date in company_holidays
+                    is_store_closed = a.status == "Holiday" or is_company_holiday
+                    
+                    # If store is closed (Sunday/Holiday), hours are 0 for holiday pay calculation
+                    effective_h = 0 if is_store_closed else a.total_hours
+                    effective_atts.append(effective_h)
+                    
+                w_hours = sum(effective_atts)
                 
-                # If store is closed (Sunday/Holiday), hours are 0 for holiday pay calculation
-                effective_h = 0 if is_store_closed else a.total_hours
-                effective_atts.append(effective_h)
+                # Rule 1: Check for Absence
+                # PROTECTION: Company Holidays or 'Holiday' status don't count as absence even if hours=0.
+                # Only status="Absence" triggers the penalty.
+                has_absence = any(a.status == "Absence" for a in w_atts)
                 
-            w_hours = sum(effective_atts)
-            
-            # Rule 1: Check for Absence
-            # PROTECTION: Company Holidays or 'Holiday' status don't count as absence even if hours=0.
-            # Only status="Absence" triggers the penalty.
-            has_absence = any(a.status == "Absence" for a in w_atts)
-            
-            print(f"DEBUG: Week {key} (Sun {sun_date}) -> Hours: {w_hours}, Absence: {has_absence}")
+                print(f"DEBUG: Week {key} (Sun {sun_date}) -> Hours: {w_hours}, Absence: {has_absence}")
 
-            if w_hours >= 15 and not has_absence:
-                # Formula: (Weekly Total / 5) * rate
-                avg_h = round(w_hours / 5, 2)
-                h_amt = int(avg_h * staff.hourly_wage)
-                total_holiday_pay += h_amt
-                print(f"  -> Holiday Pay: {h_amt}")
-                if week_idx < 5:
-                    holiday_per_week[week_idx] = h_amt
-                holiday_details[str(week_idx + 1)] = f"{w_hours}시간 / 5일 = {avg_h}시간"
-            elif has_absence and w_hours >= 15:
-                holiday_details[str(week_idx + 1)] = "결근으로 미지급"
-            
-            week_idx += 1
+                if w_hours >= 15 and not has_absence:
+                    # Formula: (Weekly Total / 5) * rate
+                    avg_h = round(w_hours / 5, 2)
+                    h_amt = int(avg_h * staff.hourly_wage)
+                    total_holiday_pay += h_amt
+                    print(f"  -> Holiday Pay: {h_amt}")
+                    if week_idx < 5:
+                        holiday_per_week[week_idx] = h_amt
+                    holiday_details[str(week_idx + 1)] = f"{w_hours}시간 / 5일 = {avg_h}시간"
+                elif has_absence and w_hours >= 15:
+                    holiday_details[str(week_idx + 1)] = "결근으로 미지급"
+                
+                week_idx += 1
         else:
             # For Regular staff, we can add a note in details
             holiday_details["info"] = "정규직은 월급에 주휴수당 포함"
