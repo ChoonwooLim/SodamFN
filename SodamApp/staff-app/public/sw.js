@@ -1,5 +1,5 @@
-// Cache version bumped: 2026-03-01
-const CACHE_NAME = 'sodam-staff-v2';
+// Cache version bumped: 2026-03-01 Orbitron migration
+const CACHE_NAME = 'sodam-staff-v3';
 const urlsToCache = [
     '/',
     '/index.html',
