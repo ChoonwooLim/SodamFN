@@ -251,7 +251,7 @@ export default function Home() {
                 </button>
                 <button className="quick-access-btn" onClick={() => navigate('/open-checklist')}
                     style={{ background: 'linear-gradient(135deg, #059669, #0d9488)' }}>
-                    <span style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>📋 오픈체크리스트</span>
+                    <span style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>📋 오픈 체크리스트</span>
                 </button>
             </div>
 
@@ -259,7 +259,7 @@ export default function Home() {
             <div className="quick-access-row">
                 <button className="quick-access-btn" onClick={() => navigate('/inventory-check')}
                     style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)' }}>
-                    <span style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>📦 오픈재고체크</span>
+                    <span style={{ color: '#fff', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>📦 오픈 재고체크</span>
                 </button>
                 <button className="quick-access-btn quick-access-chat" onClick={() => navigate('/staff-chat')}>
                     <div className="quick-access-icon">
