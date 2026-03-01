@@ -247,15 +247,15 @@ export default function InventoryCheckAdmin() {
                                 <div className="text-sm font-bold text-slate-700 mb-3">
                                     {cat === '기본' ? '📋 기본' : cat === '주먹밥' ? '🍙 주먹밥' : `📦 ${cat}`}
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 gap-3">
                                     {items.map(item => (
                                         <div key={item.id} className="bg-white rounded-lg p-3 border border-slate-100">
-                                            <label className="text-xs font-bold text-slate-600 block mb-1.5">{item.emoji} {item.name}</label>
+                                            <label className="text-sm font-bold text-slate-600 block mb-1.5">{item.emoji} {item.name}</label>
                                             <div className="flex items-center gap-2">
                                                 <input type="number" min="0" value={inventoryValues[String(item.id)] || 0}
                                                     onChange={e => setInventoryValues(prev => ({ ...prev, [String(item.id)]: parseInt(e.target.value) || 0 }))}
-                                                    className="w-full p-2 rounded-lg border border-cyan-200 text-center font-bold text-lg bg-cyan-50 outline-none focus:border-cyan-400 transition-colors" />
-                                                <span className="text-xs text-slate-500">{item.unit}</span>
+                                                    className="w-full p-2.5 rounded-lg border border-cyan-200 text-center font-bold text-xl bg-cyan-50 outline-none focus:border-cyan-400 transition-colors" />
+                                                <span className="text-sm text-slate-500">{item.unit}</span>
                                             </div>
                                         </div>
                                     ))}
