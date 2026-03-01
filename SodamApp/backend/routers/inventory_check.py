@@ -117,12 +117,14 @@ class InventoryCheckCreate(BaseModel):
 def create_inventory_check(data: InventoryCheckCreate, staff_id: int = 0, staff_name: str = ""):
     """직원이 오픈 재고 체크를 등록"""
     today = datetime.date.today()
+    # staff_id=0 means unknown/admin — set to None to avoid FK violation
+    db_staff_id = staff_id if staff_id > 0 else None
 
     with Session(engine) as session:
         existing = session.exec(
             select(InventoryCheck).where(
                 InventoryCheck.date == today,
-                InventoryCheck.staff_id == staff_id
+                InventoryCheck.staff_id == db_staff_id
             )
         ).first()
 
@@ -141,7 +143,7 @@ def create_inventory_check(data: InventoryCheckCreate, staff_id: int = 0, staff_
 
         record = InventoryCheck(
             date=today,
-            staff_id=staff_id,
+            staff_id=db_staff_id,
             staff_name=staff_name,
             items_json=items_str,
             note=data.note
