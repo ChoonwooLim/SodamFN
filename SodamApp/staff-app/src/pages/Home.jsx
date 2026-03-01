@@ -4,7 +4,7 @@ import api from '../api';
 import {
     Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone, Megaphone,
     Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer,
-    MessageSquarePlus, MessageCircle
+    MessageSquarePlus, MessageCircle, ClipboardList
 } from 'lucide-react';
 
 export default function Home() {
@@ -254,6 +254,17 @@ export default function Home() {
                         <MessageCircle size={20} />
                     </div>
                     <span>직원소통방</span>
+                </button>
+            </div>
+
+            {/* Quick Access Row 3 — 오픈 체크리스트 */}
+            <div className="quick-access-row">
+                <button className="quick-access-btn" onClick={() => navigate('/open-checklist')}
+                    style={{ background: 'linear-gradient(135deg, #059669, #0d9488)', flex: 1 }}>
+                    <div className="quick-access-icon" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                        <ClipboardList size={20} color="#fff" />
+                    </div>
+                    <span style={{ color: '#fff' }}>📋 오픈 체크리스트</span>
                 </button>
             </div>
 

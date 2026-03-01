@@ -39,6 +39,7 @@ export default function Sidebar() {
 
             { icon: Users, label: '직원 관리', path: '/staff' },
             { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
+            { icon: ClipboardList, label: '오픈 체크리스트', path: '/open-checklist' },
             { icon: ClipboardList, label: '통합 게시판', path: '/board' },
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },

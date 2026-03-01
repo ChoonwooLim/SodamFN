@@ -31,6 +31,7 @@ const BoardManagement = React.lazy(() => import('./pages/BoardManagement'));
 const DeployManagement = React.lazy(() => import('./pages/DeployManagement'));
 const AdminAppPreview = React.lazy(() => import('./pages/AdminAppPreview'));
 const UserManual = React.lazy(() => import('./pages/UserManual'));
+const OpenChecklistPage = React.lazy(() => import('./pages/OpenChecklistPage'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -111,6 +112,7 @@ export default function App() {
               <Route path="/board" element={<ProtectedRoute adminOnly><BoardManagement /></ProtectedRoute>} />
               <Route path="/deploy" element={<ProtectedRoute adminOnly><DeployManagement /></ProtectedRoute>} />
               <Route path="/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
+              <Route path="/open-checklist" element={<ProtectedRoute adminOnly><OpenChecklistPage /></ProtectedRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}
               <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />

@@ -16,6 +16,7 @@ const EmergencyContacts = lazy(() => import('./pages/EmergencyContacts'));
 const Suggestions = lazy(() => import('./pages/Suggestions'));
 const StaffChat = lazy(() => import('./pages/StaffChat'));
 const InstallGuide = lazy(() => import('./pages/InstallGuide'));
+const OpenChecklist = lazy(() => import('./pages/OpenChecklist'));
 
 function PageLoader() {
   return (
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="/emergency" element={<ProtectedRoute><EmergencyContacts /></ProtectedRoute>} />
               <Route path="/suggestions" element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
               <Route path="/staff-chat" element={<ProtectedRoute><StaffChat /></ProtectedRoute>} />
+              <Route path="/open-checklist" element={<ProtectedRoute><OpenChecklist /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}
