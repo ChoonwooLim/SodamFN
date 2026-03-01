@@ -411,6 +411,18 @@ class StaffChatMessage(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 
+class InventoryItem(SQLModel, table=True):
+    """재고 체크 항목 정의 (동적 관리)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str                       # 항목 이름 (예: 어묵, 계란, 스팸)
+    emoji: str = "📦"              # 이모지
+    unit: str = "개"               # 단위
+    category: str = "기타"         # 카테고리 (예: 기본, 주먹밥)
+    display_order: int = 0          # 표시 순서
+    is_active: bool = True          # 활성 여부
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
 class InventoryCheck(SQLModel, table=True):
     """오픈 재고 체크"""
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -418,20 +430,19 @@ class InventoryCheck(SQLModel, table=True):
     staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)
     staff_name: str = ""
 
-    # 어묵
+    # 동적 항목 값 (JSON: {"item_id": count, ...})
+    items_json: Optional[str] = None
+
+    # 기존 고정 컬럼 (하위 호환)
     fish_cake: int = 0
-
-    # 계란
     egg: int = 0
+    riceball_spam: int = 0
+    riceball_mild_tuna: int = 0
+    riceball_spicy_tuna: int = 0
+    riceball_bulgogi: int = 0
+    riceball_anchovy: int = 0
+    riceball_ham_cheese: int = 0
 
-    # 주먹밥
-    riceball_spam: int = 0        # 스팸
-    riceball_mild_tuna: int = 0   # 순한참치
-    riceball_spicy_tuna: int = 0  # 매콤참치
-    riceball_bulgogi: int = 0     # 불고기
-    riceball_anchovy: int = 0     # 멸치
-    riceball_ham_cheese: int = 0  # 햄치즈
-
-    note: Optional[str] = None    # 메모
+    note: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 

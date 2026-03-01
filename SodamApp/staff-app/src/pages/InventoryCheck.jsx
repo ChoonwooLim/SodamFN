@@ -3,32 +3,39 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, CheckCircle, History } from 'lucide-react';
 import api from '../api';
 
-const INVENTORY_FIELDS = [
-    { key: 'fish_cake', label: '어묵', emoji: '🐟', unit: '개' },
-    { key: 'egg', label: '계란', emoji: '🥚', unit: '개' },
-    { key: 'riceball_spam', label: '스팸', emoji: '✏️', unit: '개' },
-    { key: 'riceball_mild_tuna', label: '순한참치', emoji: '🐟', unit: '개' },
-    { key: 'riceball_spicy_tuna', label: '매콤참치', emoji: '🌶️', unit: '개' },
-    { key: 'riceball_bulgogi', label: '불고기', emoji: '🥩', unit: '개' },
-    { key: 'riceball_anchovy', label: '멸치', emoji: '🐟', unit: '개' },
-    { key: 'riceball_ham_cheese', label: '햄치즈', emoji: '🧀', unit: '개' },
-];
-
 export default function InventoryCheck() {
     const navigate = useNavigate();
-    const [inventory, setInventory] = useState({
-        fish_cake: 0, egg: 0,
-        riceball_spam: 0, riceball_mild_tuna: 0, riceball_spicy_tuna: 0,
-        riceball_bulgogi: 0, riceball_anchovy: 0, riceball_ham_cheese: 0,
-        note: ''
-    });
+    const [inventoryItems, setInventoryItems] = useState([]);
+    const [inventoryValues, setInventoryValues] = useState({});
+    const [note, setNote] = useState('');
     const [todayRecords, setTodayRecords] = useState([]);
     const [historyData, setHistoryData] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
 
-    useEffect(() => { fetchTodayRecords(); }, []);
+    useEffect(() => {
+        fetchItems();
+        fetchTodayRecords();
+    }, []);
+
+    const fetchItems = async () => {
+        try {
+            let res = await api.get('/inventory-items');
+            if (res.data.status === 'success') {
+                let items = res.data.data.filter(i => i.is_active);
+                if (items.length === 0) {
+                    await api.post('/inventory-items/seed');
+                    res = await api.get('/inventory-items');
+                    if (res.data.status === 'success') items = res.data.data.filter(i => i.is_active);
+                }
+                setInventoryItems(items);
+                const vals = {};
+                items.forEach(i => { vals[String(i.id)] = 0; });
+                setInventoryValues(vals);
+            }
+        } catch { /* ignore */ }
+    };
 
     const fetchTodayRecords = async () => {
         try {
@@ -54,7 +61,10 @@ export default function InventoryCheck() {
                 staffId = payload.staff_id || 0;
                 staffName = payload.real_name || '';
             }
-            await api.post(`/inventory-check?staff_id=${staffId}&staff_name=${encodeURIComponent(staffName)}`, inventory);
+            await api.post(`/inventory-check?staff_id=${staffId}&staff_name=${encodeURIComponent(staffName)}`, {
+                items: inventoryValues,
+                note: note || null
+            });
             setSubmitted(true);
             fetchTodayRecords();
             setTimeout(() => setSubmitted(false), 3000);
@@ -74,6 +84,17 @@ export default function InventoryCheck() {
         const date = new Date(d + 'T00:00:00');
         return `${date.getMonth() + 1}/${date.getDate()} (${['일', '월', '화', '수', '목', '금', '토'][date.getDay()]})`;
     };
+
+    // Group items by category
+    const categorized = {};
+    inventoryItems.forEach(item => {
+        if (!categorized[item.category]) categorized[item.category] = [];
+        categorized[item.category].push(item);
+    });
+
+    // Item name map for records
+    const itemNameMap = {};
+    inventoryItems.forEach(i => { itemNameMap[String(i.id)] = i; });
 
     return (
         <div className="page animate-fade" style={{ paddingBottom: 80 }}>
@@ -100,38 +121,28 @@ export default function InventoryCheck() {
                     )}
                 </div>
                 <div style={{ padding: '16px' }}>
-                    {/* 어묵 + 계란 */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
-                        {INVENTORY_FIELDS.slice(0, 2).map(f => (
-                            <div key={f.key} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #a5f3fc' }}>
-                                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#164e63', display: 'block', marginBottom: 6 }}>{f.emoji} {f.label}</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <input type="number" min="0" value={inventory[f.key]}
-                                        onChange={e => setInventory(prev => ({ ...prev, [f.key]: parseInt(e.target.value) || 0 }))}
-                                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #a5f3fc', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center', background: '#ecfeff', outline: 'none' }} />
-                                    <span style={{ fontSize: '0.8rem', color: '#64748b', flexShrink: 0 }}>{f.unit}</span>
-                                </div>
+                    {/* Dynamic categories */}
+                    {Object.entries(categorized).map(([cat, items]) => (
+                        <div key={cat} style={{ background: '#fff', borderRadius: 10, padding: '12px', border: '1px solid #a5f3fc', marginBottom: 14 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#164e63', marginBottom: 10 }}>
+                                {cat === '기본' ? '📋 기본' : cat === '주먹밥' ? '🍙 주먹밥' : `📦 ${cat}`}
                             </div>
-                        ))}
-                    </div>
-                    {/* 주먹밥 */}
-                    <div style={{ background: '#fff', borderRadius: 10, padding: '12px', border: '1px solid #a5f3fc', marginBottom: 14 }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#164e63', marginBottom: 10 }}>🍙 주먹밥</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                            {INVENTORY_FIELDS.slice(2).map(f => (
-                                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', minWidth: 56 }}>{f.emoji} {f.label}</span>
-                                    <input type="number" min="0" value={inventory[f.key]}
-                                        onChange={e => setInventory(prev => ({ ...prev, [f.key]: parseInt(e.target.value) || 0 }))}
-                                        style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #a5f3fc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'center', background: '#ecfeff', outline: 'none', maxWidth: 60 }} />
-                                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{f.unit}</span>
-                                </div>
-                            ))}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                                {items.map(item => (
+                                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', minWidth: 56 }}>{item.emoji} {item.name}</span>
+                                        <input type="number" min="0" value={inventoryValues[String(item.id)] || 0}
+                                            onChange={e => setInventoryValues(prev => ({ ...prev, [String(item.id)]: parseInt(e.target.value) || 0 }))}
+                                            style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #a5f3fc', fontSize: '0.95rem', fontWeight: 700, textAlign: 'center', background: '#ecfeff', outline: 'none', maxWidth: 60 }} />
+                                        <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{item.unit}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    ))}
                     {/* 메모 */}
-                    <textarea placeholder="메모 (선택사항)" value={inventory.note}
-                        onChange={e => setInventory(prev => ({ ...prev, note: e.target.value }))}
+                    <textarea placeholder="메모 (선택사항)" value={note}
+                        onChange={e => setNote(e.target.value)}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #a5f3fc', fontSize: '0.82rem', resize: 'vertical', minHeight: 48, maxHeight: 100, background: '#fff', outline: 'none', marginBottom: 12 }} />
                     {/* Submit */}
                     <button onClick={handleSubmit} disabled={submitting}
@@ -154,11 +165,15 @@ export default function InventoryCheck() {
                                 </span>
                             </div>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: '0.75rem' }}>
-                                <span style={{ background: '#f0fdf4', padding: '2px 8px', borderRadius: 6, color: '#064e3b' }}>🐟 어묵 {r.fish_cake}</span>
-                                <span style={{ background: '#fef3c7', padding: '2px 8px', borderRadius: 6, color: '#78350f' }}>🥚 계란 {r.egg}</span>
-                                <span style={{ background: '#eff6ff', padding: '2px 8px', borderRadius: 6, color: '#1e3a5f' }}>
-                                    🍙 스팸{r.riceball_spam} 순참{r.riceball_mild_tuna} 매참{r.riceball_spicy_tuna} 불고기{r.riceball_bulgogi} 멸치{r.riceball_anchovy} 햄치{r.riceball_ham_cheese}
-                                </span>
+                                {r.items && Object.entries(r.items).map(([itemId, count]) => {
+                                    const itemDef = itemNameMap[itemId];
+                                    if (!itemDef) return null;
+                                    return (
+                                        <span key={itemId} style={{ background: '#ecfeff', padding: '2px 8px', borderRadius: 6, color: '#164e63' }}>
+                                            {itemDef.emoji} {itemDef.name} {count}
+                                        </span>
+                                    );
+                                })}
                             </div>
                             {r.note && <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>💬 {r.note}</div>}
                         </div>
@@ -192,11 +207,15 @@ export default function InventoryCheck() {
                                         </span>
                                     </div>
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                        <span style={{ background: '#f0fdf4', padding: '1px 6px', borderRadius: 4, color: '#064e3b' }}>어묵{r.fish_cake}</span>
-                                        <span style={{ background: '#fef3c7', padding: '1px 6px', borderRadius: 4, color: '#78350f' }}>계란{r.egg}</span>
-                                        <span style={{ background: '#eff6ff', padding: '1px 6px', borderRadius: 4, color: '#1e3a5f' }}>
-                                            스{r.riceball_spam} 순{r.riceball_mild_tuna} 매{r.riceball_spicy_tuna} 불{r.riceball_bulgogi} 멸{r.riceball_anchovy} 햄{r.riceball_ham_cheese}
-                                        </span>
+                                        {r.items && Object.entries(r.items).map(([itemId, count]) => {
+                                            const itemDef = itemNameMap[itemId];
+                                            if (!itemDef) return <span key={itemId} className="bg-slate-100 px-1 rounded">#{itemId}: {count}</span>;
+                                            return (
+                                                <span key={itemId} style={{ background: '#ecfeff', padding: '1px 6px', borderRadius: 4, color: '#164e63' }}>
+                                                    {itemDef.emoji}{itemDef.name} {count}
+                                                </span>
+                                            );
+                                        })}
                                     </div>
                                     {r.note && <div style={{ color: '#64748b', marginTop: 2 }}>💬 {r.note}</div>}
                                 </div>
