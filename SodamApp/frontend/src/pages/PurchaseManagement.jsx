@@ -141,6 +141,13 @@ export default function PurchaseManagement() {
     const [uploadResult, setUploadResult] = useState(null);
     const fileInputRef = useRef(null);
 
+    // Vendor Review Modal (2-step upload)
+    const [showVendorReview, setShowVendorReview] = useState(false);
+    const [previewData, setPreviewData] = useState(null);
+    const [vendorDecisions, setVendorDecisions] = useState({});
+    const [confirmLoading, setConfirmLoading] = useState(false);
+    const [showNewCategoryFor, setShowNewCategoryFor] = useState(null);
+
     // Batch selection
     const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -363,36 +370,144 @@ export default function PurchaseManagement() {
         }
     };
 
-    // ─── Upload ───
+    // ─── Upload (2-step: preview → review → confirm) ───
     const handleUpload = async (e) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
         setUploadLoading(true);
         setUploadResult(null);
 
-        let results = [];
         try {
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                setUploadProgress(`(${i + 1}/${files.length}) ${file.name} 처리 중...`);
-                const formData = new FormData();
-                formData.append('file', file);
-                try {
-                    const response = await api.post('/purchase/upload', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' }
-                    });
-                    results.push({ file: file.name, ...response.data });
-                } catch (error) {
-                    results.push({ file: file.name, status: 'error', message: error.response?.data?.detail || '업로드 실패' });
+            // For the first file, use preview API
+            const file = files[0];
+            setUploadProgress(`${file.name} 분석 중...`);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await api.post('/purchase/upload/preview', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            if (response.data.status === 'error') {
+                setUploadResult([{ file: file.name, status: 'error', message: response.data.message }]);
+                return;
+            }
+
+            const preview = response.data;
+            setPreviewData(preview);
+
+            // If there are vendors to review, show modal
+            if (preview.vendor_review && preview.vendor_review.length > 0) {
+                // Initialize decisions
+                const initialDecisions = {};
+                preview.vendor_review.forEach(vr => {
+                    if (vr.is_new) {
+                        initialDecisions[vr.vendor_name] = {
+                            action: 'new',
+                            category: null,
+                        };
+                    } else {
+                        initialDecisions[vr.vendor_name] = {
+                            action: null,
+                            vendor_id: null,
+                            category: null,
+                        };
+                    }
+                });
+                setVendorDecisions(initialDecisions);
+                setShowVendorReview(true);
+            } else {
+                // No vendors to review — confirm directly
+                await confirmUpload(preview.records, {});
+            }
+
+            // Handle remaining files with direct upload
+            if (files.length > 1) {
+                let extraResults = [];
+                for (let i = 1; i < files.length; i++) {
+                    const extraFile = files[i];
+                    setUploadProgress(`(${i + 1}/${files.length}) ${extraFile.name} 처리 중...`);
+                    const extraForm = new FormData();
+                    extraForm.append('file', extraFile);
+                    try {
+                        const extraRes = await api.post('/purchase/upload', extraForm, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        });
+                        extraResults.push({ file: extraFile.name, ...extraRes.data });
+                    } catch (error) {
+                        extraResults.push({ file: extraFile.name, status: 'error', message: error.response?.data?.detail || '업로드 실패' });
+                    }
+                }
+                if (extraResults.length > 0) {
+                    setUploadResult(prev => [...(prev || []), ...extraResults]);
                 }
             }
-            setUploadResult(results);
-            fetchData();
+        } catch (error) {
+            setUploadResult([{ file: files[0].name, status: 'error', message: error.response?.data?.detail || '업로드 실패' }]);
         } finally {
             setUploadLoading(false);
             setUploadProgress('');
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
+    };
+
+    const confirmUpload = async (records, decisions) => {
+        setConfirmLoading(true);
+        try {
+            const response = await api.post('/purchase/upload/confirm', {
+                records,
+                vendor_decisions: decisions,
+            });
+            setUploadResult(prev => [
+                ...(prev || []),
+                { file: previewData?.card_company || '업로드', ...response.data }
+            ]);
+            setShowVendorReview(false);
+            setPreviewData(null);
+            setVendorDecisions({});
+            fetchData();
+        } catch (error) {
+            alert('업로드 확인 중 오류가 발생했습니다: ' + (error.response?.data?.detail || error.message));
+        } finally {
+            setConfirmLoading(false);
+        }
+    };
+
+    const handleVendorDecision = (vendorName, action, vendorId = null) => {
+        setVendorDecisions(prev => ({
+            ...prev,
+            [vendorName]: {
+                action,
+                vendor_id: vendorId,
+                category: action === 'merge' ? null : prev[vendorName]?.category,
+            }
+        }));
+        if (action === 'new') {
+            setShowNewCategoryFor(vendorName);
+        }
+    };
+
+    const handleNewVendorCategory = (vendorName, category) => {
+        setVendorDecisions(prev => ({
+            ...prev,
+            [vendorName]: {
+                ...prev[vendorName],
+                action: 'new',
+                category,
+            }
+        }));
+        setShowNewCategoryFor(null);
+    };
+
+    const canConfirmUpload = () => {
+        if (!previewData?.vendor_review) return true;
+        return previewData.vendor_review.every(vr => {
+            const dec = vendorDecisions[vr.vendor_name];
+            if (!dec) return false;
+            if (dec.action === 'merge' && dec.vendor_id) return true;
+            if (dec.action === 'new' && dec.category) return true;
+            return false;
+        });
     };
 
     // ─── Summary values ───
@@ -936,6 +1051,156 @@ export default function PurchaseManagement() {
                                     </div>
                                 );
                             })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══════════════════════════════════════════ */}
+            {/* VENDOR REVIEW MODAL (2-step upload) */}
+            {/* ═══════════════════════════════════════════ */}
+            {showVendorReview && previewData && (
+                <div className="modal-overlay" style={{ zIndex: 1200 }}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '85vh', overflow: 'auto' }}>
+                        <div className="modal-header">
+                            <h3>🔍 거래처 확인 ({previewData.card_company})</h3>
+                            <button className="modal-close" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            {/* Summary */}
+                            <div style={{ background: '#0f172a', borderRadius: 12, padding: '14px 18px', marginBottom: 16 }}>
+                                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
+                                    <span style={{ color: '#94a3b8' }}>📋 총 파싱: <strong style={{ color: '#e2e8f0' }}>{previewData.total_parsed}건</strong></span>
+                                    {previewData.auto_classified > 0 && (
+                                        <span style={{ color: '#94a3b8' }}>🤖 자동분류: <strong style={{ color: '#38bdf8' }}>{previewData.auto_classified}건</strong></span>
+                                    )}
+                                    <span style={{ color: '#94a3b8' }}>🔍 확인 필요: <strong style={{ color: '#fb923c' }}>{previewData.vendor_review.length}건</strong></span>
+                                </div>
+                            </div>
+
+                            {/* Vendor Review List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                {previewData.vendor_review.map((vr, idx) => {
+                                    const dec = vendorDecisions[vr.vendor_name] || {};
+                                    const isDecided = (dec.action === 'merge' && dec.vendor_id) || (dec.action === 'new' && dec.category);
+
+                                    return (
+                                        <div key={idx} style={{
+                                            background: isDecided ? '#0f291a' : '#1e293b',
+                                            border: `1px solid ${isDecided ? '#16a34a' : '#334155'}`,
+                                            borderRadius: 12,
+                                            padding: '14px 16px',
+                                            transition: 'all 0.2s',
+                                        }}>
+                                            {/* Vendor Name Header */}
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                                <div>
+                                                    <span style={{ fontWeight: 700, fontSize: 15, color: '#f1f5f9' }}>
+                                                        {vr.vendor_name}
+                                                    </span>
+                                                    <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>
+                                                        {vr.record_count}건 · {formatNumber(vr.total_amount)}원
+                                                    </span>
+                                                </div>
+                                                {isDecided && (
+                                                    <span style={{ fontSize: 11, background: '#16a34a', color: '#fff', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>
+                                                        ✓ 결정완료
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Similar Vendors */}
+                                            {vr.similar_vendors.length > 0 && (
+                                                <div style={{ marginBottom: 10 }}>
+                                                    <div style={{ fontSize: 12, color: '#fb923c', fontWeight: 600, marginBottom: 6 }}>
+                                                        ⚠️ 유사한 기존 거래처가 있습니다:
+                                                    </div>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                        {vr.similar_vendors.map(sv => (
+                                                            <button
+                                                                key={sv.id}
+                                                                onClick={() => handleVendorDecision(vr.vendor_name, 'merge', sv.id)}
+                                                                style={{
+                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                    padding: '8px 12px', borderRadius: 8,
+                                                                    background: dec.action === 'merge' && dec.vendor_id === sv.id ? '#1e3a5f' : '#0f172a',
+                                                                    border: `1px solid ${dec.action === 'merge' && dec.vendor_id === sv.id ? '#3b82f6' : '#1e293b'}`,
+                                                                    color: '#e2e8f0', cursor: 'pointer', fontSize: 13, textAlign: 'left',
+                                                                    transition: 'all 0.15s', width: '100%',
+                                                                }}
+                                                            >
+                                                                <span>
+                                                                    🏪 <strong>{sv.name}</strong>
+                                                                    <span style={{ color: '#64748b', marginLeft: 6, fontSize: 12 }}>({sv.category})</span>
+                                                                </span>
+                                                                <span style={{ fontSize: 12, color: '#3b82f6' }}>→ 동일 거래처로 병합</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* New Vendor Button */}
+                                            <button
+                                                onClick={() => handleVendorDecision(vr.vendor_name, 'new')}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', gap: 8,
+                                                    padding: '8px 12px', borderRadius: 8,
+                                                    background: dec.action === 'new' ? '#1a2e1a' : '#0f172a',
+                                                    border: `1px solid ${dec.action === 'new' ? '#16a34a' : '#1e293b'}`,
+                                                    color: dec.action === 'new' ? '#4ade80' : '#94a3b8',
+                                                    cursor: 'pointer', fontSize: 13, width: '100%',
+                                                    transition: 'all 0.15s',
+                                                }}
+                                            >
+                                                ➕ 신규 거래처로 등록
+                                                {dec.action === 'new' && dec.category && (
+                                                    <span style={{ marginLeft: 'auto', fontSize: 12, background: '#16a34a20', padding: '2px 8px', borderRadius: 6 }}>
+                                                        {EXPENSE_CATEGORIES.find(c => c.id === dec.category)?.icon} {dec.category}
+                                                    </span>
+                                                )}
+                                            </button>
+
+                                            {/* Category Selection for New Vendor */}
+                                            {showNewCategoryFor === vr.vendor_name && (
+                                                <div style={{ marginTop: 10, background: '#0f172a', borderRadius: 10, padding: 12, border: '1px solid #334155' }}>
+                                                    <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8, fontWeight: 600 }}>📂 카테고리를 선택하세요:</div>
+                                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                                        {EXPENSE_CATEGORIES.map(cat => (
+                                                            <button
+                                                                key={cat.id}
+                                                                onClick={() => handleNewVendorCategory(vr.vendor_name, cat.id)}
+                                                                style={{
+                                                                    padding: '6px 10px', borderRadius: 8, fontSize: 12,
+                                                                    background: dec.category === cat.id ? `${cat.color}30` : '#1e293b',
+                                                                    border: `1px solid ${dec.category === cat.id ? cat.color : '#334155'}`,
+                                                                    color: dec.category === cat.id ? cat.color : '#94a3b8',
+                                                                    cursor: 'pointer', fontWeight: 500, transition: 'all 0.15s',
+                                                                }}
+                                                            >
+                                                                {cat.icon} {cat.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <button className="btn-cancel" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>취소</button>
+                            <button
+                                className="btn-save"
+                                disabled={!canConfirmUpload() || confirmLoading}
+                                onClick={() => confirmUpload(previewData.records, vendorDecisions)}
+                                style={{ opacity: canConfirmUpload() ? 1 : 0.5 }}
+                            >
+                                {confirmLoading ? '저장 중...' : `✅ ${previewData.total_parsed}건 업로드 확인`}
+                            </button>
                         </div>
                     </div>
                 </div>

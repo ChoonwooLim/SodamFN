@@ -342,6 +342,281 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         raise HTTPException(status_code=500, detail=error_detail)
 
 
+# ─── 2-Step Upload: Preview → Confirm ───
+
+def _find_similar_vendors(vendor_name: str, existing_vendors: list, min_overlap: int = 3) -> list:
+    """3글자 이상 겹치는 유사 거래처를 찾는다."""
+    similar = []
+    vn = vendor_name.strip()
+    if len(vn) < min_overlap:
+        return similar
+    for v in existing_vendors:
+        ev_name = v.name.strip()
+        if ev_name == vn:
+            # Exact match — not "similar", it's the same
+            continue
+        # Check if any substring of length min_overlap overlaps
+        matched = False
+        for i in range(len(vn) - min_overlap + 1):
+            substr = vn[i:i + min_overlap]
+            if substr in ev_name:
+                matched = True
+                break
+        if not matched:
+            for i in range(len(ev_name) - min_overlap + 1):
+                substr = ev_name[i:i + min_overlap]
+                if substr in vn:
+                    matched = True
+                    break
+        if matched:
+            similar.append({
+                "id": v.id,
+                "name": v.name,
+                "category": v.category or "기타경비",
+            })
+    return similar
+
+
+@router.post("/api/purchase/upload/preview")
+async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+    """
+    Step 1: Parse file, auto-exclude card payments/salary, find similar vendors.
+    Returns parsed records + vendor review data for user confirmation.
+    """
+    import traceback, tempfile, os
+    from services.purchase_parser import parse_purchase_file
+    from services.smart_classifier import apply_rules
+
+    try:
+        content = await file.read()
+        filename = file.filename or "purchase_upload.xlsx"
+
+        suffix = os.path.splitext(filename)[1]
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            records = parse_purchase_file(tmp_path, filename)
+        finally:
+            os.unlink(tmp_path)
+
+        if not records:
+            return {"status": "error", "message": "파싱된 매입 데이터가 없습니다. 파일 형식을 확인해주세요."}
+
+        # Apply AI classification
+        auto_classified_count = apply_rules(records)
+        card_company = records[0].get('card_company', '알수없음')
+
+        # Serialize records (dates to string)
+        serialized = []
+        for r in records:
+            sr = dict(r)
+            if hasattr(sr['date'], 'isoformat'):
+                sr['date'] = sr['date'].isoformat()
+            else:
+                sr['date'] = str(sr['date'])
+            serialized.append(sr)
+
+        # Load existing vendors for similarity check
+        with Session(engine) as session:
+            existing_vendors = session.exec(
+                select(Vendor).where(Vendor.vendor_type == "expense")
+            ).all()
+
+            # Build vendor review list
+            vendor_names_in_file = list(set(r['vendor_name'] for r in records))
+            vendor_by_name = {v.name: v for v in existing_vendors}
+
+            vendor_review = []
+            for vn in sorted(vendor_names_in_file):
+                if vn in vendor_by_name:
+                    # Exact match exists — no review needed
+                    continue
+                similar = _find_similar_vendors(vn, existing_vendors)
+                vendor_review.append({
+                    "vendor_name": vn,
+                    "similar_vendors": similar,
+                    "is_new": len(similar) == 0,
+                    "record_count": sum(1 for r in records if r['vendor_name'] == vn),
+                    "total_amount": sum(r['amount'] for r in records if r['vendor_name'] == vn),
+                })
+
+        return {
+            "status": "success",
+            "card_company": card_company,
+            "records": serialized,
+            "total_parsed": len(records),
+            "auto_classified": auto_classified_count,
+            "vendor_review": vendor_review,
+        }
+
+    except ValueError as ve:
+        return {"status": "error", "message": str(ve)}
+    except Exception as e:
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Upload Preview Error: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
+
+
+class VendorDecision(BaseModel):
+    action: str  # "merge" | "new"
+    vendor_id: Optional[int] = None  # for merge
+    category: Optional[str] = None  # for new
+
+class ConfirmUploadPayload(BaseModel):
+    records: List[dict]
+    vendor_decisions: dict  # vendor_name -> VendorDecision
+
+
+@router.post("/api/purchase/upload/confirm")
+async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = Depends(get_admin_user)):
+    """
+    Step 2: Save records with user's vendor decisions applied.
+    """
+    import traceback
+    from services.profit_loss_service import sync_all_expenses
+
+    try:
+        records = payload.records
+        decisions = payload.vendor_decisions
+
+        if not records:
+            return {"status": "error", "message": "저장할 데이터가 없습니다."}
+
+        card_company = records[0].get('card_company', '알수없음')
+
+        # Create Upload History
+        with Session(engine) as session:
+            upload_history = UploadHistory(
+                filename=f"confirmed_{card_company}.xlsx",
+                upload_type="purchase",
+                record_count=0,
+                status="active"
+            )
+            session.add(upload_history)
+            session.commit()
+            session.refresh(upload_history)
+            upload_id = upload_history.id
+
+        inserted_count = 0
+        skipped_count = 0
+        vendor_created_count = 0
+        processed_months = set()
+
+        with Session(engine) as session:
+            # Build vendor lookup
+            vendors = session.exec(select(Vendor)).all()
+            vendor_by_name = {v.name: v for v in vendors}
+            vendor_by_id = {v.id: v for v in vendors}
+
+            for rec in records:
+                vendor_name = rec['vendor_name']
+                date_str = rec['date']
+                amount = rec.get('amount', 0)
+                category = rec.get('category', '기타경비')
+
+                if amount <= 0:
+                    continue
+
+                try:
+                    date_obj = datetime.strptime(str(date_str)[:10], "%Y-%m-%d").date()
+                except:
+                    continue
+
+                # Apply vendor decision
+                decision = decisions.get(vendor_name)
+                if decision:
+                    dec = decision if isinstance(decision, dict) else decision.dict()
+                    if dec.get('action') == 'merge' and dec.get('vendor_id'):
+                        # Merge: use existing vendor
+                        merged_vendor = vendor_by_id.get(dec['vendor_id'])
+                        if merged_vendor:
+                            vendor_name = merged_vendor.name
+                            category = merged_vendor.category or category
+                    elif dec.get('action') == 'new' and dec.get('category'):
+                        category = dec['category']
+
+                # Find or create vendor
+                vendor = vendor_by_name.get(vendor_name)
+                if not vendor:
+                    vendor = Vendor(
+                        name=vendor_name,
+                        category=category,
+                        vendor_type="expense",
+                        created_by_upload_id=upload_id,
+                    )
+                    session.add(vendor)
+                    session.flush()
+                    vendor_by_name[vendor_name] = vendor
+                    vendor_by_id[vendor.id] = vendor
+                    vendor_created_count += 1
+
+                # Duplicate check
+                existing = session.exec(
+                    select(DailyExpense).where(
+                        DailyExpense.date == date_obj,
+                        DailyExpense.vendor_id == vendor.id,
+                        DailyExpense.amount == amount,
+                    )
+                ).first()
+
+                if existing:
+                    skipped_count += 1
+                    continue
+
+                note_parts = []
+                if rec.get('card_company'):
+                    note_parts.append(f"카드사:{rec['card_company']}")
+                if rec.get('approval_no') and str(rec['approval_no']) not in ['', 'nan']:
+                    note_parts.append(f"승인:{rec['approval_no']}")
+
+                expense = DailyExpense(
+                    date=date_obj,
+                    vendor_name=vendor_name,
+                    vendor_id=vendor.id,
+                    amount=amount,
+                    category=category,
+                    note=", ".join(note_parts) if note_parts else None,
+                    upload_id=upload_id,
+                )
+                session.add(expense)
+                inserted_count += 1
+                processed_months.add((date_obj.year, date_obj.month))
+
+            # Update history
+            upload_record = session.get(UploadHistory, upload_id)
+            if upload_record:
+                upload_record.record_count = inserted_count
+                session.add(upload_record)
+            session.commit()
+
+        # Sync P/L
+        if processed_months:
+            try:
+                with Session(engine) as sync_session:
+                    for (year, month) in processed_months:
+                        sync_all_expenses(year, month, sync_session)
+                    sync_session.commit()
+            except Exception as e:
+                print(f"Purchase Confirm P/L Sync error: {e}")
+
+        return {
+            "status": "success",
+            "message": f"{card_company} {inserted_count}건 저장 완료 (중복 {skipped_count}건 제외, 신규 거래처 {vendor_created_count}개)",
+            "card_company": card_company,
+            "count": inserted_count,
+            "skipped": skipped_count,
+            "vendors_created": vendor_created_count,
+            "upload_id": upload_id,
+        }
+
+    except Exception as e:
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Purchase Confirm Error: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
+
+
 # ─── POST create single purchase ───
 
 @router.post("/api/purchase")

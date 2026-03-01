@@ -418,7 +418,12 @@ def parse_hyundai(filepath: str) -> List[Dict]:
 
 def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
     """Generic bank transfer parser (국민은행, 수협은행 등).
-    Reuses the same column format as 신한은행: 거래일자, 출금(원), 내용."""
+    Reuses the same column format as 신한은행: 거래일자, 출금(원), 내용.
+    
+    Excludes:
+    - 카드대금 결제 (삼성카드, 현대카드, 롯데카드 등 — 카드 명세서로 별도 업로드)
+    - 직원 급여 이체 (Staff 테이블 기반 동적 감지)
+    """
     try:
         df = pd.read_excel(filepath, header=None, engine='xlrd')
     except Exception:
@@ -434,6 +439,23 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
 
     df.columns = df.iloc[header_idx].values
     df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+    # ── 카드대금 제외 키워드 ──
+    CARD_PAYMENT_KEYWORDS = [
+        '삼성카드', '현대카드', '롯데카드', '신한카드', '비씨카드',
+        '하나카드', '국민카드', 'KB카드', '우리카드', '카드대금',
+    ]
+
+    # ── 직원 이름 (Staff DB에서 가져옴) ──
+    staff_names = set()
+    try:
+        from database import engine as db_engine
+        from sqlmodel import Session as DBSession, text
+        with DBSession(db_engine) as session:
+            result = session.exec(text("SELECT name FROM staff"))
+            staff_names = {r[0].strip() for r in result if r[0]}
+    except Exception:
+        pass
 
     # Try to find amount and vendor columns flexibly
     amount_col = None
@@ -452,6 +474,9 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
         vendor_col = df.columns[1] if len(df.columns) > 1 else None
 
     records = []
+    excluded_cards = 0
+    excluded_salary = 0
+
     for _, row in df.iterrows():
         use_date = _normalize_date(row.get('거래일자'))
         if not use_date:
@@ -463,6 +488,16 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
 
         vendor_name = str(row.get(vendor_col, '')).strip() if vendor_col else ''
         if not vendor_name or vendor_name == 'nan':
+            continue
+
+        # ① 카드대금 결제 제외
+        if any(kw in vendor_name for kw in CARD_PAYMENT_KEYWORDS):
+            excluded_cards += 1
+            continue
+
+        # ② 직원 급여 이체 제외
+        if vendor_name in staff_names:
+            excluded_salary += 1
             continue
 
         category = classify_category(vendor_name, '')
@@ -477,6 +512,9 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
             'business_type': '은행이체',
             'is_cancelled': False,
         })
+
+    if excluded_cards or excluded_salary:
+        print(f"  [{bank_name}] 카드대금 {excluded_cards}건, 직원급여 {excluded_salary}건 제외")
 
     return records
 
