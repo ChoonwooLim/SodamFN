@@ -124,13 +124,13 @@ export default function InventoryCheck() {
                     {/* Dynamic categories */}
                     {Object.entries(categorized).map(([cat, items]) => (
                         <div key={cat} style={{ background: '#fff', borderRadius: 10, padding: '12px', border: '1px solid #a5f3fc', marginBottom: 14 }}>
-                            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#164e63', marginBottom: 10 }}>
+                            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#164e63', marginBottom: 10 }}>
                                 {cat === '기본' ? '📋 기본' : cat === '주먹밥' ? '🍙 주먹밥' : `📦 ${cat}`}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
                                 {items.map(item => (
                                     <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
-                                        <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#334155', minWidth: 80 }}>{item.emoji} {item.name}</span>
+                                        <span style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', minWidth: 90 }}><span style={{ fontSize: '0.9rem' }}>{item.emoji}</span> {item.name}</span>
                                         <input type="number" min="0" value={inventoryValues[String(item.id)] || 0}
                                             onChange={e => setInventoryValues(prev => ({ ...prev, [String(item.id)]: parseInt(e.target.value) || 0 }))}
                                             style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #a5f3fc', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center', background: '#ecfeff', outline: 'none', maxWidth: 80 }} />
