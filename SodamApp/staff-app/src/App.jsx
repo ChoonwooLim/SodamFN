@@ -17,6 +17,7 @@ const Suggestions = lazy(() => import('./pages/Suggestions'));
 const StaffChat = lazy(() => import('./pages/StaffChat'));
 const InstallGuide = lazy(() => import('./pages/InstallGuide'));
 const OpenChecklist = lazy(() => import('./pages/OpenChecklist'));
+const InventoryCheck = lazy(() => import('./pages/InventoryCheck'));
 
 function PageLoader() {
   return (
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="/suggestions" element={<ProtectedRoute><Suggestions /></ProtectedRoute>} />
               <Route path="/staff-chat" element={<ProtectedRoute><StaffChat /></ProtectedRoute>} />
               <Route path="/open-checklist" element={<ProtectedRoute><OpenChecklist /></ProtectedRoute>} />
+              <Route path="/inventory-check" element={<ProtectedRoute><InventoryCheck /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

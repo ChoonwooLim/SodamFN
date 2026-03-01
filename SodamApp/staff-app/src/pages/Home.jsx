@@ -241,7 +241,7 @@ export default function Home() {
                 </button>
             </div>
 
-            {/* Quick Access Row 2 — 건의사항 & 직원소통방 */}
+            {/* Quick Access Row 2 — 건의사항 & 오픈체크리스트 */}
             <div className="quick-access-row">
                 <button className="quick-access-btn quick-access-suggestions" onClick={() => navigate('/suggestions')}>
                     <div className="quick-access-icon">
@@ -249,22 +249,29 @@ export default function Home() {
                     </div>
                     <span>건의사항</span>
                 </button>
+                <button className="quick-access-btn" onClick={() => navigate('/open-checklist')}
+                    style={{ background: 'linear-gradient(135deg, #059669, #0d9488)' }}>
+                    <div className="quick-access-icon" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                        <ClipboardList size={20} color="#fff" />
+                    </div>
+                    <span style={{ color: '#fff' }}>오픈체크리스트</span>
+                </button>
+            </div>
+
+            {/* Quick Access Row 3 — 오픈재고체크 & 직원소통방 */}
+            <div className="quick-access-row">
+                <button className="quick-access-btn" onClick={() => navigate('/inventory-check')}
+                    style={{ background: 'linear-gradient(135deg, #0891b2, #0e7490)' }}>
+                    <div className="quick-access-icon" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                        <ClipboardList size={20} color="#fff" />
+                    </div>
+                    <span style={{ color: '#fff' }}>📦 오픈재고체크</span>
+                </button>
                 <button className="quick-access-btn quick-access-chat" onClick={() => navigate('/staff-chat')}>
                     <div className="quick-access-icon">
                         <MessageCircle size={20} />
                     </div>
                     <span>직원소통방</span>
-                </button>
-            </div>
-
-            {/* Quick Access Row 3 — 오픈 체크리스트 */}
-            <div className="quick-access-row">
-                <button className="quick-access-btn" onClick={() => navigate('/open-checklist')}
-                    style={{ background: 'linear-gradient(135deg, #059669, #0d9488)', flex: 1 }}>
-                    <div className="quick-access-icon" style={{ background: 'rgba(255,255,255,0.2)' }}>
-                        <ClipboardList size={20} color="#fff" />
-                    </div>
-                    <span style={{ color: '#fff' }}>📋 오픈 체크리스트</span>
                 </button>
             </div>
 
