@@ -1,4 +1,5 @@
-const CACHE_NAME = 'sodam-staff-v1';
+// Cache version bumped: 2026-03-01
+const CACHE_NAME = 'sodam-staff-v2';
 const urlsToCache = [
     '/',
     '/index.html',
