@@ -303,8 +303,8 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
         if not use_date:
             continue
 
-        # '출금(원)' is the amount, '내용' is the vendor/description
-        amount = _clean_amount(row.get('출금(원)', 0))
+        # '출금(원)' or '출금' is the amount, '내용' is the vendor/description
+        amount = _clean_amount(row.get('출금(원)', row.get('출금', 0)))
         if amount == 0:
             continue
 
