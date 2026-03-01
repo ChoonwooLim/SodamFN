@@ -401,7 +401,8 @@ class ExcelService:
             elif find_col(['거래일자']) and find_col(['출금']):
                 format_detected = "bank_transfer"
                 date_col = find_col(['거래일자'])
-                item_col = find_col(['내용', '적요', '거래내용', '메모'])
+                # Prioritize '내용' (counterparty name) over '적요' (transfer method like '모바일')
+                item_col = find_col(['내용', '거래내용', '메모']) or find_col(['적요'])
                 amount_col = find_col(['출금', '출금(원)', '출금액', '이체금액'])
                 category_col = None  # Bank statements usually don't have category
                 
