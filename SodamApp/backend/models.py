@@ -409,3 +409,29 @@ class StaffChatMessage(SQLModel, table=True):
     staff_name: str = ""
     message: str
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class InventoryCheck(SQLModel, table=True):
+    """오픈 재고 체크"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: datetime.date = Field(index=True)
+    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)
+    staff_name: str = ""
+
+    # 어묵
+    fish_cake: int = 0
+
+    # 계란
+    egg: int = 0
+
+    # 주먹밥
+    riceball_spam: int = 0        # 스팸
+    riceball_mild_tuna: int = 0   # 순한참치
+    riceball_spicy_tuna: int = 0  # 매콤참치
+    riceball_bulgogi: int = 0     # 불고기
+    riceball_anchovy: int = 0     # 멸치
+    riceball_ham_cheese: int = 0  # 햄치즈
+
+    note: Optional[str] = None    # 메모
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+

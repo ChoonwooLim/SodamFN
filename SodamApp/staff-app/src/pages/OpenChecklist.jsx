@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp, Send, CheckCircle } from 'lucide-react';
+import api from '../api';
 
 const CHECKLIST_SECTIONS = [
     {
@@ -49,7 +50,7 @@ const CHECKLIST_SECTIONS = [
             { text: '순대', type: 'check' },
             { text: '계란', type: 'check' },
             { text: '어묵', type: 'check' },
-            { text: '→ 남은 계란 / 어묵 개수는 매일 체크리스트에 기록', type: 'info' },
+            { text: '→ 남은 계란 / 어묵 개수는 아래 재고 체크에 기록', type: 'info' },
         ]
     },
     { id: 5, emoji: '🐟', title: '5. 꼬치어묵', items: [{ text: '끝이 빠지지 않도록 단단히 꽂기', type: 'check' }] },
@@ -110,10 +111,62 @@ const CHECKLIST_SECTIONS = [
     },
 ];
 
+const INVENTORY_FIELDS = [
+    { key: 'fish_cake', label: '어묵', emoji: '🐟', unit: '개' },
+    { key: 'egg', label: '계란', emoji: '🥚', unit: '개' },
+    { key: 'riceball_spam', label: '스팸', emoji: '✏️', unit: '개' },
+    { key: 'riceball_mild_tuna', label: '순한참치', emoji: '🐟', unit: '개' },
+    { key: 'riceball_spicy_tuna', label: '매콤참치', emoji: '🌶️', unit: '개' },
+    { key: 'riceball_bulgogi', label: '불고기', emoji: '🥩', unit: '개' },
+    { key: 'riceball_anchovy', label: '멸치', emoji: '🐟', unit: '개' },
+    { key: 'riceball_ham_cheese', label: '햄치즈', emoji: '🧀', unit: '개' },
+];
+
 export default function OpenChecklist() {
     const navigate = useNavigate();
     const [expandedSections, setExpandedSections] = useState(new Set([1, 2, 9, 10]));
     const [checkedItems, setCheckedItems] = useState(new Set());
+
+    // Inventory Check
+    const [inventory, setInventory] = useState({
+        fish_cake: 0, egg: 0,
+        riceball_spam: 0, riceball_mild_tuna: 0, riceball_spicy_tuna: 0,
+        riceball_bulgogi: 0, riceball_anchovy: 0, riceball_ham_cheese: 0,
+        note: ''
+    });
+    const [todayRecords, setTodayRecords] = useState([]);
+    const [submitting, setSubmitting] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
+
+    useEffect(() => { fetchTodayRecords(); }, []);
+
+    const fetchTodayRecords = async () => {
+        try {
+            const res = await api.get('/inventory-check/today');
+            if (res.data.status === 'success') setTodayRecords(res.data.data);
+        } catch { /* ignore */ }
+    };
+
+    const handleSubmitInventory = async () => {
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            let staffId = 0, staffName = '';
+            if (token) {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                staffId = payload.staff_id || 0;
+                staffName = payload.real_name || '';
+            }
+            await api.post(`/inventory-check?staff_id=${staffId}&staff_name=${encodeURIComponent(staffName)}`, inventory);
+            setSubmitted(true);
+            fetchTodayRecords();
+            setTimeout(() => setSubmitted(false), 3000);
+        } catch (err) {
+            alert('저장 실패: ' + (err.response?.data?.detail || err.message));
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const toggleSection = (id) => {
         setExpandedSections(prev => {
@@ -142,7 +195,6 @@ export default function OpenChecklist() {
     const renderItem = (item, secId, idx) => {
         const key = `${secId}-${idx}`;
         const isChecked = checkedItems.has(key);
-
         const styles = {
             check: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '6px 8px', borderRadius: 8 },
             sub: { display: 'flex', gap: 6, padding: '2px 8px', paddingLeft: 36, fontSize: '0.82rem', color: '#64748b' },
@@ -151,14 +203,11 @@ export default function OpenChecklist() {
             timeline: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', marginTop: 4, background: '#eff6ff', borderRadius: 8, fontWeight: 600, fontSize: '0.82rem', color: '#1e40af' },
             info: { display: 'flex', alignItems: 'flex-start', gap: 6, padding: '3px 8px', marginLeft: 16, fontSize: '0.8rem', color: '#475569', fontStyle: 'italic' },
         };
-
         if (item.type === 'check') {
             return (
                 <label key={key} style={{ ...styles.check, cursor: 'pointer' }}>
-                    <input
-                        type="checkbox" checked={isChecked} onChange={() => toggleCheck(key)}
-                        style={{ width: 18, height: 18, marginTop: 2, accentColor: '#10b981', flexShrink: 0 }}
-                    />
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleCheck(key)}
+                        style={{ width: 18, height: 18, marginTop: 2, accentColor: '#10b981', flexShrink: 0 }} />
                     <span style={{ fontSize: '0.85rem', color: isChecked ? '#94a3b8' : '#1e293b', textDecoration: isChecked ? 'line-through' : 'none' }}>
                         {item.text}
                     </span>
@@ -189,15 +238,9 @@ export default function OpenChecklist() {
             {/* Progress */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                 <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 8, overflow: 'hidden' }}>
-                    <div style={{
-                        height: '100%', width: `${progress}%`,
-                        background: 'linear-gradient(90deg, #10b981, #14b8a6)',
-                        borderRadius: 8, transition: 'width 0.5s ease'
-                    }} />
+                    <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg, #10b981, #14b8a6)', borderRadius: 8, transition: 'width 0.5s ease' }} />
                 </div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>
-                    {checkedCount}/{totalCheckItems}
-                </span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', whiteSpace: 'nowrap' }}>{checkedCount}/{totalCheckItems}</span>
             </div>
 
             {/* Sections */}
@@ -205,28 +248,15 @@ export default function OpenChecklist() {
                 {CHECKLIST_SECTIONS.map(section => {
                     const isExpanded = expandedSections.has(section.id);
                     const sectionCheckCount = section.items.filter(i => i.type === 'check').length;
-                    const sectionChecked = section.items.filter((item, idx) =>
-                        item.type === 'check' && checkedItems.has(`${section.id}-${idx}`)
-                    ).length;
-
+                    const sectionChecked = section.items.filter((item, idx) => item.type === 'check' && checkedItems.has(`${section.id}-${idx}`)).length;
                     return (
                         <div key={section.id} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-                            <button
-                                onClick={() => toggleSection(section.id)}
-                                style={{
-                                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                    padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer',
-                                }}
-                            >
+                            <button onClick={() => toggleSection(section.id)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <span style={{ fontSize: '1.1rem' }}>{section.emoji}</span>
                                     <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e293b' }}>{section.title}</span>
                                     {sectionCheckCount > 0 && (
-                                        <span style={{
-                                            fontSize: '0.7rem', padding: '2px 8px', borderRadius: 12, fontWeight: 600,
-                                            background: sectionChecked === sectionCheckCount ? '#dcfce7' : '#f1f5f9',
-                                            color: sectionChecked === sectionCheckCount ? '#16a34a' : '#64748b',
-                                        }}>
+                                        <span style={{ fontSize: '0.7rem', padding: '2px 8px', borderRadius: 12, fontWeight: 600, background: sectionChecked === sectionCheckCount ? '#dcfce7' : '#f1f5f9', color: sectionChecked === sectionCheckCount ? '#16a34a' : '#64748b' }}>
                                             {sectionChecked}/{sectionCheckCount}
                                         </span>
                                     )}
@@ -243,6 +273,84 @@ export default function OpenChecklist() {
                 })}
             </div>
 
+            {/* ═══ 📦 오픈 재고 체크 입력 폼 ═══ */}
+            <div style={{ marginTop: 24, border: '2px solid #10b981', borderRadius: 16, background: 'linear-gradient(135deg, #ecfdf5, #f0fdfa)', overflow: 'hidden' }}>
+                <div style={{ background: 'linear-gradient(135deg, #059669, #0d9488)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1.2rem' }}>📦</span>
+                    <span style={{ color: '#fff', fontWeight: 800, fontSize: '1rem' }}>오픈 재고 체크</span>
+                    {submitted && (
+                        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: 8, fontSize: '0.75rem', color: '#fff', fontWeight: 600 }}>
+                            <CheckCircle size={14} /> 저장완료
+                        </span>
+                    )}
+                </div>
+                <div style={{ padding: '16px' }}>
+                    {/* 어묵 + 계란 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+                        {INVENTORY_FIELDS.slice(0, 2).map(f => (
+                            <div key={f.key} style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #d1fae5' }}>
+                                <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#064e3b', display: 'block', marginBottom: 6 }}>{f.emoji} {f.label}</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <input type="number" min="0" value={inventory[f.key]}
+                                        onChange={e => setInventory(prev => ({ ...prev, [f.key]: parseInt(e.target.value) || 0 }))}
+                                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid #a7f3d0', fontSize: '1.1rem', fontWeight: 700, textAlign: 'center', background: '#f0fdf4', outline: 'none' }} />
+                                    <span style={{ fontSize: '0.8rem', color: '#64748b', flexShrink: 0 }}>{f.unit}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {/* 주먹밥 */}
+                    <div style={{ background: '#fff', borderRadius: 10, padding: '12px', border: '1px solid #d1fae5', marginBottom: 14 }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#064e3b', marginBottom: 10 }}>🍙 주먹밥</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            {INVENTORY_FIELDS.slice(2).map(f => (
+                                <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155', minWidth: 56 }}>{f.emoji} {f.label}</span>
+                                    <input type="number" min="0" value={inventory[f.key]}
+                                        onChange={e => setInventory(prev => ({ ...prev, [f.key]: parseInt(e.target.value) || 0 }))}
+                                        style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #d1fae5', fontSize: '0.95rem', fontWeight: 700, textAlign: 'center', background: '#f0fdf4', outline: 'none', maxWidth: 60 }} />
+                                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{f.unit}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {/* 메모 */}
+                    <textarea placeholder="메모 (선택사항)" value={inventory.note}
+                        onChange={e => setInventory(prev => ({ ...prev, note: e.target.value }))}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #d1fae5', fontSize: '0.82rem', resize: 'vertical', minHeight: 48, maxHeight: 100, background: '#fff', outline: 'none', marginBottom: 12 }} />
+                    {/* Submit */}
+                    <button onClick={handleSubmitInventory} disabled={submitting}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 0', background: submitted ? 'linear-gradient(135deg, #16a34a, #059669)' : 'linear-gradient(135deg, #059669, #0d9488)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.9rem', cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1, transition: 'all 0.3s' }}>
+                        {submitting ? '저장 중...' : submitted ? (<><CheckCircle size={18} /> 저장 완료!</>) : (<><Send size={18} /> 재고 체크 저장</>)}
+                    </button>
+                </div>
+            </div>
+
+            {/* Today's Records */}
+            {todayRecords.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                    <h3 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>📊 오늘의 재고 기록</h3>
+                    {todayRecords.map((r, idx) => (
+                        <div key={idx} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', marginBottom: 8 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b' }}>👤 {r.staff_name || '직원'}</span>
+                                <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                    {r.created_at ? new Date(r.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: '0.75rem' }}>
+                                <span style={{ background: '#f0fdf4', padding: '2px 8px', borderRadius: 6, color: '#064e3b' }}>🐟 어묵 {r.fish_cake}</span>
+                                <span style={{ background: '#fef3c7', padding: '2px 8px', borderRadius: 6, color: '#78350f' }}>🥚 계란 {r.egg}</span>
+                                <span style={{ background: '#eff6ff', padding: '2px 8px', borderRadius: 6, color: '#1e3a5f' }}>
+                                    🍙 스팸{r.riceball_spam} 순참{r.riceball_mild_tuna} 매참{r.riceball_spicy_tuna} 불고기{r.riceball_bulgogi} 멸치{r.riceball_anchovy} 햄치{r.riceball_ham_cheese}
+                                </span>
+                            </div>
+                            {r.note && <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 4 }}>💬 {r.note}</div>}
+                        </div>
+                    ))}
+                </div>
+            )}
+
             {/* Notice */}
             <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 14, marginTop: 16 }}>
                 <h3 style={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e3a5f', marginBottom: 8 }}>😊 안내사항</h3>
@@ -252,25 +360,6 @@ export default function OpenChecklist() {
                     ))}
                 </ul>
             </div>
-
-            {/* Download Button */}
-            <button
-                onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = '/images/checklist/inventory_check.png';
-                    link.download = '오픈_재고_체크.png';
-                    link.click();
-                }}
-                style={{
-                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    padding: '14px 0', marginTop: 16,
-                    background: 'linear-gradient(135deg, #059669, #0d9488)',
-                    color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.9rem',
-                    cursor: 'pointer', boxShadow: '0 4px 14px rgba(5,150,105,0.25)',
-                }}
-            >
-                <Download size={18} /> 📋 오픈 재고 체크 다운로드
-            </button>
         </div>
     );
 }
