@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight, Truck, Lock } from 'lucide-react';
+import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight, Truck, Lock, ShoppingBag, ClipboardList, Filter } from 'lucide-react';
 import './UserManual.css';
 
 export default function UserManual() {
-    const [openSections, setOpenSections] = useState({ revenue: true, delivery: true, dedup: true, steps: true, faq: true });
+    const [openSections, setOpenSections] = useState({ revenue: true, delivery: true, dedup: true, steps: true, purchase: true, checklist: true, faq: true });
 
     const toggle = (key) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -24,6 +24,8 @@ export default function UserManual() {
                     <li><a href="#dedup">중복 방지 시스템</a></li>
                     <li><a href="#upload-steps">업로드 절차 (권장)</a></li>
                     <li><a href="#rollback">업로드 취소 (롤백)</a></li>
+                    <li><a href="#purchase-smart">매입 관리 스마트 업로드</a></li>
+                    <li><a href="#open-checklist">오픈 체크리스트 (직원용)</a></li>
                     <li><a href="#faq">자주 묻는 질문</a></li>
                 </ul>
             </div>
@@ -300,7 +302,151 @@ export default function UserManual() {
                 )}
             </div>
 
-            {/* ═══ 4. FAQ ═══ */}
+            {/* ═══ 4. 매입 관리 스마트 업로드 ═══ */}
+            <div className="manual-section" id="purchase-smart">
+                <h2 onClick={() => toggle('purchase')} style={{ cursor: 'pointer' }}>
+                    {openSections.purchase ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                    <ShoppingBag size={20} /> 매입 관리 스마트 업로드
+                </h2>
+                {openSections.purchase && (
+                    <>
+                        <p>
+                            은행 거래내역이나 카드 명세서를 업로드하면 시스템이 자동으로
+                            <strong> 불필요한 내역을 제외</strong>하고, <strong>유사 거래처를 매칭</strong>하여
+                            정확한 매입 데이터를 관리할 수 있습니다.
+                        </p>
+
+                        <h3><Filter size={16} /> 자동 제외 기능</h3>
+                        <p>은행 거래내역 업로드 시 다음 항목이 <strong>자동으로 제외</strong>됩니다:</p>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>제외 항목</th><th>기준</th><th>이유</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span className="badge red">카드대금 결제</span></td>
+                                    <td>삼성카드, 현대카드, 롯데카드 등</td>
+                                    <td>카드 명세서에서 별도 업로드</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge amber">직원 급여</span></td>
+                                    <td>직원관리 DB에 등록된 이름</td>
+                                    <td>인건비 모듈에서 별도 관리</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>🔍 유사 거래처 매칭</h3>
+                        <p>
+                            업로드된 거래처명이 기존 등록된 거래처와 <strong>3글자 이상 겹칠 때</strong> 확인 모달이 표시됩니다.
+                        </p>
+                        <div className="flow-diagram">
+                            <div className="flow-step">📂 파일 업로드</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">🤖 자동 분석</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">🔍 거래처 확인 모달</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">✅ 확인 후 저장</div>
+                        </div>
+
+                        <p>모달에서 각 거래처에 대해 다음 중 하나를 선택합니다:</p>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>선택</th><th>설명</th><th>예시</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span className="badge blue">동일 거래처 병합</span></td>
+                                    <td>기존 거래처로 매핑하여 저장</td>
+                                    <td>"다인푸드시스템" → "다인푸드"</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge green">신규 거래처 등록</span></td>
+                                    <td>카테고리 선택 후 신규 등록</td>
+                                    <td>"새마을마트" → 원재료비</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>📋 지원 은행/카드</h3>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>금융기관</th><th>파일 형식</th><th>자동 제외</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong>신한은행</strong></td><td>.xls</td><td>카드대금 + 직원급여 + 외국인직원</td></tr>
+                                <tr><td><strong>국민은행</strong></td><td>.xls/.xlsx</td><td>카드대금 + 직원급여</td></tr>
+                                <tr><td><strong>수협은행</strong></td><td>.xls/.xlsx</td><td>카드대금 + 직원급여</td></tr>
+                                <tr><td><strong>롯데카드</strong></td><td>.xls (HTML)</td><td>—</td></tr>
+                                <tr><td><strong>삼성카드</strong></td><td>.xlsx</td><td>—</td></tr>
+                                <tr><td><strong>신한카드</strong></td><td>.xls</td><td>—</td></tr>
+                                <tr><td><strong>현대카드</strong></td><td>.xls (HTML)</td><td>—</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>AI 자동 분류:</strong> 거래처명을 기반으로 카테고리(원재료비, 소모품비, 수도광열비 등)가
+                                자동 분류됩니다. 사용자가 카테고리를 수정하면 AI가 학습하여 다음 업로드부터 반영합니다.
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ═══ 5. 오픈 체크리스트 ═══ */}
+            <div className="manual-section" id="open-checklist">
+                <h2 onClick={() => toggle('checklist')} style={{ cursor: 'pointer' }}>
+                    {openSections.checklist ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                    <ClipboardList size={20} /> 오픈 체크리스트
+                </h2>
+                {openSections.checklist && (
+                    <>
+                        <p>
+                            매장 오픈 준비 절차를 단계별로 확인할 수 있는 체크리스트입니다.
+                            <strong> 직원용 앱</strong>과 <strong>관리페이지</strong> 양쪽에서 사용할 수 있습니다.
+                        </p>
+
+                        <h3>📱 접근 방법</h3>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>위치</th><th>접근 경로</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>직원용 앱</strong></td>
+                                    <td>홈 화면 → 📋 오픈 체크리스트 버튼 (에메랄드 그라데이션)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>관리자 페이지</strong></td>
+                                    <td>좌측 사이드바 → 오픈 체크리스트 메뉴</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>✅ 주요 기능</h3>
+                        <ul style={{ lineHeight: 2, paddingLeft: 20 }}>
+                            <li><strong>10단계 체크리스트</strong> — 집기 세팅부터 어묵 담기까지</li>
+                            <li><strong>인터랙티브 체크박스</strong> — 완료한 항목 체크 가능</li>
+                            <li><strong>진행률 표시</strong> — 상단 프로그레스 바로 진행 상황 한눈에</li>
+                            <li><strong>섹션 접기/펼치기</strong> — 필요한 섹션만 확인 가능</li>
+                            <li><strong>재고 체크 다운로드</strong> — 오픈 재고 체크 이미지 다운로드</li>
+                        </ul>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>매일 초기화:</strong> 체크리스트는 페이지 접속 시마다 초기화됩니다.
+                                매일 새로 체크하면서 오픈 준비를 진행하세요.
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ═══ 6. FAQ ═══ */}
             <div className="manual-section" id="faq">
                 <h2 onClick={() => toggle('faq')} style={{ cursor: 'pointer' }}>
                     {openSections.faq ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
@@ -351,6 +497,26 @@ export default function UserManual() {
                         <p>
                             매출 관리 페이지 상단의 <strong>배달앱매출</strong> 카드에서 합계를 확인할 수 있고,
                             <strong>배달앱 탭</strong>에서 채널별(배민, 쿠팡 등) 정산 분석도 볼 수 있습니다.
+                        </p>
+
+                        <h3>Q. 은행 내역 업로드 시 직원 급여가 자동으로 빠지나요?</h3>
+                        <p>
+                            네, <strong>직원관리에 등록된 이름</strong>과 일치하는 이체 내역은
+                            자동으로 제외됩니다. 카드대금 결제(삼성카드, 현대카드 등)도 자동 제외됩니다.
+                        </p>
+
+                        <h3>Q. 거래처 확인 모달은 언제 나타나나요?</h3>
+                        <p>
+                            업로드한 파일에 <strong>기존에 등록되지 않은 거래처</strong>가 있고,
+                            기존 거래처와 <strong>3글자 이상 겹치는</strong> 이름이면 유사 거래처 확인 모달이 나타납니다.
+                            완전히 새로운 이름이면 신규 거래처로 카테고리만 선택하면 됩니다.
+                        </p>
+
+                        <h3>Q. 직원앱에서 오픈 체크리스트를 어떻게 사용하나요?</h3>
+                        <p>
+                            직원 앱 홈 화면에서 <strong>📋 오픈 체크리스트</strong> 버튼을 터치하면
+                            10단계 오픈 절차를 순서대로 확인할 수 있습니다.
+                            각 항목을 체크하면 진행률이 표시되고, 하단에서 재고 체크 이미지를 다운로드할 수 있습니다.
                         </p>
                     </div>
                 )}
