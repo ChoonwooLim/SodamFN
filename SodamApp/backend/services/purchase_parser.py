@@ -1,7 +1,7 @@
 """
-Purchase (매입) Excel Parser Service
-Supports: 롯데카드, 삼성카드, 신한카드, 신한은행 송금, 현대카드
-Auto-detects card company and format (HTML-as-xls vs real Excel).
+Purchase (매입) Excel/PDF Parser Service
+Supports: 롯데카드, 삼성카드, 신한카드, 신한은행 송금(XLS/PDF), 현대카드
+Auto-detects card company and format (HTML-as-xls vs real Excel vs PDF).
 """
 import os
 import re
@@ -241,6 +241,109 @@ def parse_shinhan_card(filepath: str) -> List[Dict]:
             'business_type': business_type,
             'is_cancelled': is_cancelled,
         })
+
+    return records
+
+
+def parse_shinhan_bank_pdf(filepath: str) -> List[Dict]:
+    """Parse 신한은행 거래내역 PDF (pdfplumber).
+
+    Same filtering logic as XLS parser: excludes card payments & staff salary.
+    """
+    import pdfplumber
+
+    # ── 카드대금 제외 키워드 ──
+    CARD_PAYMENT_KEYWORDS = [
+        '삼성카드', '현대카드', '롯데카드', '신한카드', '비씨카드',
+        '하나카드', '국민카드', 'KB카드', '우리카드', '카드대금',
+    ]
+
+    # ── 직원 이름 ──
+    staff_names = set()
+    try:
+        from database import engine as db_engine
+        from sqlmodel import Session as DBSession, text
+        with DBSession(db_engine) as session:
+            result = session.exec(text("SELECT name FROM staff"))
+            staff_names = {r[0].strip() for r in result if r[0]}
+    except Exception:
+        pass
+    FOREIGN_STAFF = {'PHAM THI THUY LINH', 'DAO KIM HONG NGOC', 'JINJINSHUN'}
+    staff_names.update(FOREIGN_STAFF)
+
+    VENDOR_ALIASES = {
+        '최희상': '홍성상회',
+        '김영민': '찬들농산',
+        '유용운': '창미포장',
+    }
+
+    records = []
+    excluded_cards = 0
+    excluded_salary = 0
+
+    with pdfplumber.open(filepath) as pdf:
+        for page in pdf.pages:
+            tables = page.extract_tables()
+            for table in tables:
+                for row in table:
+                    if not row or len(row) < 6:
+                        continue
+                    # row: [날짜, 시간, 적요, 출금, 입금, 내용, 잔액, 거래점]
+                    date_val = str(row[0] or '').strip()
+                    use_date = _normalize_date(date_val)
+                    if not use_date:
+                        continue
+
+                    amount = _clean_amount(row[3])  # 출금
+                    if amount == 0:
+                        continue
+
+                    vendor_name = str(row[5] or '').strip() if len(row) > 5 else ''
+                    if not vendor_name or vendor_name == 'None':
+                        vendor_name = str(row[2] or '').strip()  # fallback to 적요
+                    if not vendor_name:
+                        continue
+
+                    # ① 카드대금 제외
+                    if any(kw in vendor_name for kw in CARD_PAYMENT_KEYWORDS):
+                        excluded_cards += 1
+                        continue
+
+                    # ② 직원 급여 제외
+                    if vendor_name in staff_names:
+                        excluded_salary += 1
+                        continue
+
+                    # ③ 개인 이름 → 상호명
+                    if vendor_name in VENDOR_ALIASES:
+                        vendor_name = VENDOR_ALIASES[vendor_name]
+
+                    category = classify_category(vendor_name, '')
+
+                    # ④ 임차료 월초 날짜 조정
+                    if category == '임차료' and use_date:
+                        if isinstance(use_date, str):
+                            d = datetime.strptime(use_date, '%Y-%m-%d').date()
+                        else:
+                            d = use_date
+                        if d.day <= 5:
+                            first_of_month = d.replace(day=1)
+                            last_of_prev = first_of_month - timedelta(days=1)
+                            use_date = str(last_of_prev)
+
+                    records.append({
+                        'date': use_date,
+                        'vendor_name': vendor_name,
+                        'amount': amount,
+                        'category': category,
+                        'card_company': '신한은행',
+                        'approval_no': '',
+                        'business_type': '은행이체',
+                        'is_cancelled': False,
+                    })
+
+    if excluded_cards or excluded_salary:
+        print(f"  [신한은행PDF] 카드대금 {excluded_cards}건, 직원급여 {excluded_salary}건 제외")
 
     return records
 
@@ -535,6 +638,8 @@ def detect_card_company(filepath: str, filename: str) -> str:
     elif '수협' in fn or 'suhyup' in fn:
         return 'suhyup_bank'
     elif '신한은행' in fn or '송금' in fn:
+        if fn.endswith('.pdf'):
+            return 'shinhan_bank_pdf'
         return 'shinhan_bank'
     elif '신한카드' in fn or '신한' in fn:
         return 'shinhan_card'
@@ -561,6 +666,7 @@ def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
         'samsung': parse_samsung,
         'shinhan_card': parse_shinhan_card,
         'shinhan_bank': parse_shinhan_bank,
+        'shinhan_bank_pdf': parse_shinhan_bank_pdf,
         'kookmin_bank': lambda fp: _parse_generic_bank(fp, '국민은행'),
         'suhyup_bank': lambda fp: _parse_generic_bank(fp, '수협은행'),
         'hyundai': parse_hyundai,
