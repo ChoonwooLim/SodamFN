@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package } from 'lucide-react';
 
 export default function Sidebar() {
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [boardOpen, setBoardOpen] = useState(false);
 
     // Close drawer on route change
     useEffect(() => {
         setMobileOpen(false);
+    }, [location.pathname]);
+
+    // Auto-expand board submenu if current path is in board group
+    useEffect(() => {
+        const boardPaths = ['/board', '/open-checklist', '/inventory-check-admin'];
+        if (boardPaths.some(p => location.pathname.startsWith(p))) {
+            setBoardOpen(true);
+        }
     }, [location.pathname]);
 
     // Get user info from localStorage
@@ -29,32 +38,61 @@ export default function Sidebar() {
         }
     }
 
-    const menuItems = user.role === 'admin'
+    const mainMenuItems = user.role === 'admin'
         ? [
             { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
             { icon: BarChart3, label: '매출 관리', path: '/revenue' },
             { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
-
             { icon: Users, label: '직원 관리', path: '/staff' },
             { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
-            { icon: ClipboardList, label: '오픈 체크리스트', path: '/open-checklist' },
-            { icon: ClipboardList, label: '통합 게시판', path: '/board' },
+        ]
+        : [
+            { icon: LayoutDashboard, label: '대시보드', path: '/staff-dashboard' },
+            { icon: FileSignature, label: '내 전자계약', path: '/contracts/my' },
+        ];
+
+    const boardSubItems = [
+        { icon: ClipboardList, label: '공지/건의/소통', path: '/board', color: 'text-amber-400' },
+        { icon: ClipboardList, label: '오픈 체크리스트', path: '/open-checklist', color: 'text-emerald-400' },
+        { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-cyan-400' },
+    ];
+
+    const bottomMenuItems = user.role === 'admin'
+        ? [
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
             { icon: Rocket, label: '배포 관리', path: '/deploy' },
         ]
         : [
-            { icon: LayoutDashboard, label: '대시보드', path: '/staff-dashboard' },
-            { icon: FileSignature, label: '내 전자계약', path: '/contracts/my' },
             { icon: Settings, label: '설정', path: '/settings' },
         ];
 
     const handleLogout = () => {
         localStorage.clear();
         window.location.href = '/';
+    };
+
+    const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
+
+    const renderMenuItem = (item) => {
+        const Icon = item.icon;
+        const isActive = location.pathname === item.path;
+        return (
+            <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+            >
+                <Icon size={20} />
+                <span className="font-medium text-sm">{item.label}</span>
+            </Link>
+        );
     };
 
     const sidebarContent = (
@@ -85,24 +123,51 @@ export default function Sidebar() {
                 </h1>
             </div>
 
-            <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
-                {menuItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.path;
-                    return (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+            <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
+                {mainMenuItems.map(renderMenuItem)}
+
+                {/* ═══ 통합게시판관리 (접이식 서브메뉴) ═══ */}
+                {user.role === 'admin' && (
+                    <div>
+                        <button
+                            onClick={() => setBoardOpen(!boardOpen)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isBoardActive
+                                ? 'bg-blue-600/20 text-blue-300'
                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                 }`}
                         >
-                            <Icon size={20} />
-                            <span className="font-medium text-sm">{item.label}</span>
-                        </Link>
-                    );
-                })}
+                            <ClipboardList size={20} />
+                            <span className="font-medium text-sm flex-1 text-left">통합게시판관리</span>
+                            {boardOpen
+                                ? <ChevronUp size={16} className="text-slate-500" />
+                                : <ChevronDown size={16} className="text-slate-500" />
+                            }
+                        </button>
+                        {boardOpen && (
+                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
+                                {boardSubItems.map(sub => {
+                                    const SubIcon = sub.icon;
+                                    const isSubActive = location.pathname === sub.path;
+                                    return (
+                                        <Link
+                                            key={sub.path}
+                                            to={sub.path}
+                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
+                                                ? 'bg-slate-800 text-white font-semibold'
+                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
+                                                }`}
+                                        >
+                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
+                                            <span>{sub.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {bottomMenuItems.map(renderMenuItem)}
             </nav>
 
             <div className="p-4 border-t border-slate-800">
