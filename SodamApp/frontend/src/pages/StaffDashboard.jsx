@@ -20,7 +20,9 @@ import {
     ShieldX,
     Wallet,
     Timer,
+    ClipboardList,
 } from 'lucide-react';
+import OpenChecklist from '../components/OpenChecklist';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -33,6 +35,7 @@ export default function StaffDashboard() {
     const [loading, setLoading] = useState(true);
     const [cameraOpen, setCameraOpen] = useState(false);
     const [scanMessage, setScanMessage] = useState("");
+    const [checklistOpen, setChecklistOpen] = useState(false);
 
     // GPS State
     const [gpsLoading, setGpsLoading] = useState(false);
@@ -207,9 +210,9 @@ export default function StaffDashboard() {
                 {/* GPS Status Banner */}
                 {(gpsLoading || gpsError || gpsResult) && (
                     <div className={`rounded-2xl p-5 border transition-all ${gpsLoading ? 'bg-blue-50 border-blue-200' :
-                            gpsError ? 'bg-red-50 border-red-200' :
-                                gpsResult?.verified ? 'bg-emerald-50 border-emerald-200' :
-                                    'bg-orange-50 border-orange-200'
+                        gpsError ? 'bg-red-50 border-red-200' :
+                            gpsResult?.verified ? 'bg-emerald-50 border-emerald-200' :
+                                'bg-orange-50 border-orange-200'
                         }`}>
                         <div className="flex items-center gap-3">
                             {gpsLoading ? (
@@ -417,6 +420,27 @@ export default function StaffDashboard() {
                         </button>
                     </div>
 
+                    {/* 4.5. Open Checklist Widget */}
+                    <div className="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-2xl p-6 shadow-lg shadow-emerald-500/20 text-white">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold flex items-center gap-2 mb-2">
+                                    <ClipboardList size={20} />
+                                    오픈 체크리스트
+                                </h2>
+                                <p className="text-emerald-100 text-sm">
+                                    매일 오픈 준비 절차를<br />단계별로 확인하세요.
+                                </p>
+                            </div>
+                            <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                                <span className="text-xl">📋</span>
+                            </div>
+                        </div>
+                        <button onClick={() => setChecklistOpen(true)} className="w-full mt-6 py-3 bg-white text-emerald-600 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-colors">
+                            체크리스트 열기
+                        </button>
+                    </div>
+
                     {/* 5. History Widget with GPS columns */}
                     <div className="md:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
@@ -510,6 +534,9 @@ export default function StaffDashboard() {
                     <p className="text-white/50 text-sm mt-6 font-medium">QR 코드를 사각형 안에 비춰주세요</p>
                 </div>
             )}
+
+            {/* Open Checklist Modal */}
+            <OpenChecklist isOpen={checklistOpen} onClose={() => setChecklistOpen(false)} />
         </div>
     );
 }
