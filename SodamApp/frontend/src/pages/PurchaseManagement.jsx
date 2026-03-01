@@ -856,13 +856,13 @@ export default function PurchaseManagement() {
             {viewMode === 'upload' && (
                 <div className="purchase-upload">
                     <div className="upload-section">
-                        <h3>📤 카드사/은행 엑셀 업로드</h3>
+                        <h3>📤 카드사/은행 엑셀/PDF 업로드</h3>
                         <p className="upload-desc">
-                            카드사에서 다운받은 이용내역 엑셀 파일을 업로드하세요.<br />
-                            롯데카드, 삼성카드, 신한카드, 신한은행, 현대카드를 자동 인식합니다.
+                            카드사에서 다운받은 이용내역 엑셀 또는 PDF 파일을 업로드하세요.<br />
+                            롯데카드, 삼성카드, 신한카드, 신한은행(XLS/PDF), 현대카드를 자동 인식합니다.
                         </p>
 
-                        <div className="supported-cards">
+                        <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                             {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
                                 <span className="supported-card-badge" key={card} style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}>
                                     {card}
@@ -883,14 +883,14 @@ export default function PurchaseManagement() {
                                 <>
                                     <UploadCloud size={40} />
                                     <p><strong>클릭</strong> 또는 <strong>드래그</strong>하여 파일 업로드</p>
-                                    <span className="upload-hint">.xls, .xlsx 파일 (여러 파일 동시 가능)</span>
+                                    <span className="upload-hint">.xls, .xlsx, .pdf 파일 (여러 파일 동시 가능)</span>
                                 </>
                             )}
                         </div>
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".xls,.xlsx"
+                            accept=".xls,.xlsx,.pdf"
                             multiple
                             onChange={handleUpload}
                             style={{ display: 'none' }}
