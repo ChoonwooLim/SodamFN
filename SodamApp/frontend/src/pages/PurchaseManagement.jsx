@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
 import api from '../api';
 import './PurchaseManagement.css';
 
@@ -118,6 +118,7 @@ export default function PurchaseManagement() {
     const [year, setYear] = useState(defaultDate.getFullYear());
     const [month, setMonth] = useState(defaultDate.getMonth() + 1);
     const [viewMode, setViewMode] = useState('dashboard'); // dashboard | list | household | upload
+    const [uploadTab, setUploadTab] = useState('excel'); // excel | history
     const [data, setData] = useState([]);
     const [summary, setSummary] = useState({ total: 0, count: 0, by_category: {}, by_card_company: {}, by_bank_transfer: {}, top_vendors: [] });
     const [loading, setLoading] = useState(false);
@@ -879,76 +880,91 @@ export default function PurchaseManagement() {
             {/* UPLOAD VIEW */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'upload' && (
-                <div className="purchase-upload">
+                <div className="purchase-upload upload-mode">
                     <div className="upload-section">
-                        <h3>📤 카드사/은행 엑셀/PDF 업로드</h3>
-                        <p className="upload-desc">
-                            카드사에서 다운받은 이용내역 엑셀 또는 PDF 파일을 업로드하세요.<br />
-                            롯데카드, 삼성카드, 신한카드, 신한은행(XLS/PDF), 현대카드를 자동 인식합니다.
-                        </p>
-
-                        <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                            {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
-                                <span className="supported-card-badge" key={card} style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}>
-                                    {card}
-                                </span>
-                            ))}
+                        <div className="upload-tabs">
+                            <button
+                                className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`}
+                                onClick={() => setUploadTab('excel')}
+                            >
+                                <FileSpreadsheet size={16} /> 엑셀/PDF 업로드
+                            </button>
+                            <button
+                                className={`upload-tab-btn ${uploadTab === 'history' ? 'active history' : ''}`}
+                                onClick={() => setUploadTab('history')}
+                            >
+                                <RotateCcw size={16} /> 취소/기록
+                            </button>
                         </div>
 
-                        <div
-                            className={`upload-dropzone ${uploadLoading ? 'uploading' : ''}`}
-                            onClick={() => !uploadLoading && fileInputRef.current?.click()}
-                        >
-                            {uploadLoading ? (
-                                <>
-                                    <div className="spinner" />
-                                    <p>{uploadProgress}</p>
-                                </>
-                            ) : (
-                                <>
-                                    <UploadCloud size={40} />
-                                    <p><strong>클릭</strong> 또는 <strong>드래그</strong>하여 파일 업로드</p>
-                                    <span className="upload-hint">.xls, .xlsx, .pdf 파일 (여러 파일 동시 가능)</span>
-                                </>
-                            )}
-                        </div>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xls,.xlsx,.pdf"
-                            multiple
-                            onChange={handleUpload}
-                            style={{ display: 'none' }}
-                        />
-
-                        {/* Upload Results */}
-                        {uploadResult && (
-                            <div className="upload-results">
-                                <h4>📋 업로드 결과</h4>
-                                {uploadResult.map((r, i) => (
-                                    <div className={`upload-result-item ${r.status}`} key={i}>
-                                        <div className="ur-file">{r.file}</div>
-                                        {r.status === 'success' ? (
-                                            <div className="ur-detail">
-                                                <span className="ur-card">{r.card_company}</span>
-                                                <span className="ur-count">✅ {r.count}건 저장</span>
-                                                {r.skipped > 0 && <span className="ur-skipped">⏭️ {r.skipped}건 중복</span>}
-                                                {r.vendors_created > 0 && <span className="ur-vendors">🏪 {r.vendors_created}개 거래처 생성</span>}
-                                                {r.auto_classified > 0 && <span className="ur-auto">🤖 {r.auto_classified}건 자동분류</span>}
-                                            </div>
-                                        ) : (
-                                            <div className="ur-error">❌ {r.message}</div>
-                                        )}
-                                    </div>
-                                ))}
+                        {uploadTab === 'history' ? (
+                            <div className="upload-history-wrapper">
+                                <UploadHistorySection onRollback={fetchData} />
                             </div>
-                        )}
-                    </div>
+                        ) : (
+                            <>
+                                <div
+                                    className="upload-drop-zone"
+                                    onClick={() => !uploadLoading && fileInputRef.current?.click()}
+                                >
+                                    {uploadLoading ? (
+                                        <div className="upload-loading">
+                                            <div className="spinner" />
+                                            <p>{uploadProgress || '처리 중입니다...'}</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="upload-icon-box excel">
+                                                <UploadCloud size={32} />
+                                            </div>
+                                            <p className="upload-main-text">
+                                                클릭하여 엑셀/PDF 파일 선택
+                                            </p>
+                                            <p className="upload-sub-text">
+                                                카드사 이용내역 .xls, .xlsx, .pdf 파일 — 여러 파일 동시 가능
+                                            </p>
+                                            <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: 12 }}>
+                                                {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
+                                                    <span className="supported-card-badge" key={card} style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}>
+                                                        {card}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".xls,.xlsx,.pdf"
+                                    multiple
+                                    onChange={handleUpload}
+                                    style={{ display: 'none' }}
+                                />
 
-                    {/* Upload History */}
-                    <div className="upload-section">
-                        <h3>📜 업로드 이력</h3>
-                        <UploadHistorySection onRollback={fetchData} />
+                                {/* Upload Results */}
+                                {uploadResult && (
+                                    <div className="upload-results" style={{ marginTop: 16 }}>
+                                        {uploadResult.map((r, i) => (
+                                            <div className={`upload-result-item ${r.status}`} key={i}>
+                                                <div className="ur-file">{r.file}</div>
+                                                {r.status === 'success' ? (
+                                                    <div className="ur-detail">
+                                                        <span className="ur-card">{r.card_company}</span>
+                                                        <span className="ur-count">✅ {r.count}건 저장</span>
+                                                        {r.skipped > 0 && <span className="ur-skipped">⏭️ {r.skipped}건 중복</span>}
+                                                        {r.vendors_created > 0 && <span className="ur-vendors">🏪 {r.vendors_created}개 거래처 생성</span>}
+                                                        {r.auto_classified > 0 && <span className="ur-auto">🤖 {r.auto_classified}건 자동분류</span>}
+                                                    </div>
+                                                ) : (
+                                                    <div className="ur-error">❌ {r.message}</div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
             )}
