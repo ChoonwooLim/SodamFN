@@ -756,6 +756,18 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
                 session.add(sv_exp)
                 same_vendor_updated += 1
             
+            # ─── 거래처(Vendor) 테이블도 동기화 ───
+            linked_vendor = None
+            if expense.vendor_id:
+                linked_vendor = session.get(Vendor, expense.vendor_id)
+            if not linked_vendor:
+                linked_vendor = session.exec(
+                    select(Vendor).where(Vendor.name == original_vendor_name)
+                ).first()
+            if linked_vendor and linked_vendor.category != payload.category:
+                linked_vendor.category = payload.category
+                session.add(linked_vendor)
+            
             session.commit()
         
         # Sync P/L for all affected months
