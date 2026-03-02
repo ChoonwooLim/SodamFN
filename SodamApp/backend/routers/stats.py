@@ -286,10 +286,22 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
         # --- Auto Sync P/L if category changed (in separate session) ---
         if payload.category is not None:
             with Session(engine) as sync_session:
-                # Find all months where this vendor has expenses
+                # Find all expenses linked to this vendor
                 expenses = sync_session.exec(
                     select(DailyExpense).where(DailyExpense.vendor_id == vendor_id)
                 ).all()
+                
+                # ─── 매입 내역(DailyExpense) 카테고리도 동기화 ───
+                updated_expenses = 0
+                for exp in expenses:
+                    if exp.category != payload.category:
+                        exp.category = payload.category
+                        sync_session.add(exp)
+                        updated_expenses += 1
+                
+                if updated_expenses > 0:
+                    sync_session.commit()
+                    print(f"[PATCH VENDOR] Updated {updated_expenses} expenses to category '{payload.category}'")
                 
                 # AI 학습: 이 벤더의 모든 거래처명에 대해 카테고리 규칙 학습
                 from services.smart_classifier import learn_rule
