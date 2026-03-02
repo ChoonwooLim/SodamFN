@@ -1141,6 +1141,59 @@
     transform: translateY(-1px);
 }
 
+/* ── Empty State ── */
+.purchase-page .purchase-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    text-align: center;
+}
+
+.purchase-page .purchase-empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.7;
+}
+
+.purchase-page .purchase-empty h3 {
+    color: #475569;
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 6px;
+}
+
+.purchase-page .purchase-empty-date {
+    color: #94a3b8;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 16px;
+}
+
+.purchase-page .purchase-empty-hint {
+    color: #cbd5e1;
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.5;
+}
+
+.purchase-page .purchase-empty-hint strong {
+    color: #94a3b8;
+}
+
+/* ── Loading ── */
+.purchase-page .purchase-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    gap: 12px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
 /* ── Loading Spinner ── */
 .purchase-page .spinner {
     border: 3px solid #e2e8f0;

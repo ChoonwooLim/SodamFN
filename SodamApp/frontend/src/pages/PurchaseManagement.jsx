@@ -757,7 +757,10 @@ export default function PurchaseManagement() {
                         <div className="purchase-empty">
                             <div className="purchase-empty-icon">{isHouseholdMode ? '📒' : '📋'}</div>
                             <h3>{isHouseholdMode ? '개인 생활비 내역이 없습니다' : '사업용 매입 내역이 없습니다'}</h3>
-                            <p>{year}년 {month}월</p>
+                            <p className="purchase-empty-date">{year}년 {month}월</p>
+                            <p className="purchase-empty-hint">
+                                우측 상단 <strong>+ 매입 추가</strong> 또는 <strong>업로드</strong> 탭에서 데이터를 등록하세요
+                            </p>
                         </div>
                     ) : (
                         <div className="purchase-list">
