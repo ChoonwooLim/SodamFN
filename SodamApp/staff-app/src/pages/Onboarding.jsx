@@ -41,14 +41,14 @@ export default function Onboarding({ onComplete }) {
         );
     };
 
-    const requestNotification = async () => {
-        // User clicked "허용" — respect their intent regardless of browser result
+    const requestNotification = () => {
+        // Fire-and-forget: trigger the browser prompt but don't wait for response
+        // (in iframes, requestPermission() can hang forever)
         try {
             if ('Notification' in window) {
-                await Notification.requestPermission();
+                Notification.requestPermission().catch(() => { });
             }
-        } catch { /* ignore — some browsers don't support this */ }
-        // Always mark as granted since user explicitly chose to allow
+        } catch { /* ignore */ }
         setNotificationGranted(true);
     };
 
