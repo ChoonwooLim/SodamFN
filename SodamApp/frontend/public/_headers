@@ -1,0 +1,14 @@
+# index.html은 절대 캐시하지 않음
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# JS/CSS 번들은 해시가 포함되므로 장기 캐시 가능
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
