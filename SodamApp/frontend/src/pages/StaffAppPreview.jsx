@@ -66,6 +66,7 @@ export default function StaffAppPreview() {
                             src={`${STAFF_APP_URL}?_t=${Date.now()}`}
                             title="직원용 앱"
                             className="desktop-iframe"
+                            allow="geolocation; notifications"
                         />
                     </div>
                 ) : (
@@ -91,6 +92,7 @@ export default function StaffAppPreview() {
                             src={`${STAFF_APP_URL}?_t=${Date.now()}`}
                             title="직원용 앱"
                             className="phone-iframe"
+                            allow="geolocation; notifications"
                         />
                         {/* Home indicator */}
                         {device === 'phone' && <div className="phone-home-indicator" />}
