@@ -16,8 +16,9 @@ export default function Onboarding({ onComplete }) {
 
     const requestLocation = async () => {
         setLocationRequesting(true);
+
+        // Quick check via Permissions API (skip if unsupported — e.g. Safari)
         try {
-            // First check via Permissions API (more reliable than getCurrentPosition)
             if (navigator.permissions) {
                 const perm = await navigator.permissions.query({ name: 'geolocation' });
                 if (perm.state === 'granted') {
@@ -26,25 +27,18 @@ export default function Onboarding({ onComplete }) {
                     return;
                 }
             }
-            // Fallback: actually request position
-            navigator.geolocation.getCurrentPosition(
-                () => { setLocationGranted(true); setLocationRequesting(false); },
-                (err) => {
-                    // PERMISSION_DENIED = 1, other errors (timeout, unavailable) = permission was granted
-                    if (err.code === 1) {
-                        setLocationGranted(false);
-                    } else {
-                        // GPS timeout or unavailable ≠ permission denied
-                        setLocationGranted(true);
-                    }
-                    setLocationRequesting(false);
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
-            );
-        } catch {
-            setLocationGranted(false);
-            setLocationRequesting(false);
-        }
+        } catch { /* Permissions API not supported for geolocation — proceed to actual request */ }
+
+        // Actually request position (this triggers the browser permission dialog)
+        navigator.geolocation.getCurrentPosition(
+            () => { setLocationGranted(true); setLocationRequesting(false); },
+            (err) => {
+                // code 1 = PERMISSION_DENIED, anything else = GPS issue (permission was granted)
+                setLocationGranted(err.code !== 1);
+                setLocationRequesting(false);
+            },
+            { enableHighAccuracy: true, timeout: 15000 }
+        );
     };
 
     const requestNotification = async () => {
