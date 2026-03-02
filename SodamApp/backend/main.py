@@ -56,11 +56,7 @@ cors_origins = [
     "http://127.0.0.1:5175",
     "http://127.0.0.1:5176",
     "http://127.0.0.1:5177",
-    # Render production
-    "https://sodam-frontend.onrender.com",
-    "https://sodamfn-frontend.onrender.com",
-    "https://sodamfn.onrender.com",
-    # Cloudflare Pages production
+    # Cloudflare Pages / Orbitron production
     "https://sodam-staff.pages.dev",
     "https://sodamfn.twinverse.org",
 ]
