@@ -896,7 +896,7 @@ export default function PurchaseManagement() {
                                 className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`}
                                 onClick={() => setUploadTab('excel')}
                             >
-                                <FileSpreadsheet size={16} /> 엑셀/PDF 업로드
+                                <FileSpreadsheet size={16} /> 문서 업로드
                             </button>
                             <button
                                 className={`upload-tab-btn ${uploadTab === 'history' ? 'active history' : ''}`}
@@ -1032,10 +1032,10 @@ export default function PurchaseManagement() {
                                                 <UploadCloud size={32} />
                                             </div>
                                             <p className="upload-main-text">
-                                                클릭하여 엑셀/PDF 파일 선택
+                                                클릭하여 문서 파일 선택
                                             </p>
                                             <p className="upload-sub-text">
-                                                카드사 이용내역 .xls, .xlsx, .pdf 파일 — 여러 파일 동시 가능
+                                                .xls, .xlsx, .pdf, .doc, .docx, .hwp, .csv 파일 — 여러 파일 동시 가능
                                             </p>
                                             <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: 12 }}>
                                                 {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
@@ -1050,7 +1050,7 @@ export default function PurchaseManagement() {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept=".xls,.xlsx,.pdf"
+                                    accept=".xls,.xlsx,.pdf,.doc,.docx,.hwp,.csv"
                                     multiple
                                     onChange={handleUpload}
                                     style={{ display: 'none' }}

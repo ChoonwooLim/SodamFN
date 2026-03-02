@@ -1384,7 +1384,7 @@ export default function RevenueManagement() {
                                 className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`}
                                 onClick={() => setUploadTab('excel')}
                             >
-                                <FileSpreadsheet size={16} /> 엑셀 업로드
+                                <FileSpreadsheet size={16} /> 문서 업로드
                             </button>
                             <button
                                 className={`upload-tab-btn ${uploadTab === 'history' ? 'active history' : ''}`}
@@ -1414,12 +1414,12 @@ export default function RevenueManagement() {
                                             {uploadTab === 'camera' ? <Camera size={32} /> : <UploadCloud size={32} />}
                                         </div>
                                         <p className="upload-main-text">
-                                            {uploadTab === 'camera' ? '클릭하여 이미지 선택' : '클릭하여 엑셀 파일 선택'}
+                                            {uploadTab === 'camera' ? '클릭하여 이미지 선택' : '클릭하여 문서 파일 선택'}
                                         </p>
                                         <p className="upload-sub-text">
                                             {uploadTab === 'camera'
                                                 ? '영수증 또는 매출 내역 이미지를 업로드하세요'
-                                                : '필수 컬럼: 날짜, 금액, 채널(옵션) — 여러 파일 선택 가능'}
+                                                : '엑셀, PDF, 워드, HWP, CSV 등 다양한 문서 지원 — 여러 파일 선택 가능'}
                                         </p>
                                     </>
                                 )}
@@ -1438,7 +1438,7 @@ export default function RevenueManagement() {
                     />
                     <input
                         type="file"
-                        accept=".xlsx, .xls"
+                        accept=".xlsx,.xls,.pdf,.doc,.docx,.hwp,.csv"
                         multiple
                         style={{ display: 'none' }}
                         ref={excelInputRef}
