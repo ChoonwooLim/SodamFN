@@ -41,16 +41,7 @@ export default function Onboarding({ onComplete }) {
         );
     };
 
-    const requestNotification = () => {
-        // Fire-and-forget: trigger the browser prompt but don't wait for response
-        // (in iframes, requestPermission() can hang forever)
-        try {
-            if ('Notification' in window) {
-                Notification.requestPermission().catch(() => { });
-            }
-        } catch { /* ignore */ }
-        setNotificationGranted(true);
-    };
+    // Notification: just toggle state directly (no browser API needed for onboarding)
 
     const handleComplete = () => {
         // Clear any stale auth tokens so user always sees login screen
@@ -225,15 +216,10 @@ export default function Onboarding({ onComplete }) {
                                 <span style={styles.permOptional}>[선택]</span>
                                 <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: '2px 0 0' }}>공지사항, 일정 알림</p>
                             </div>
-                            {notificationGranted === true ? (
+                            {notificationGranted ? (
                                 <span style={styles.permBadge}>✅ 허용됨</span>
-                            ) : notificationGranted === false ? (
-                                <span style={{ ...styles.permBadge, color: '#94a3b8' }}>건너뜀</span>
                             ) : (
-                                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                                    <button onClick={requestNotification} style={{ ...styles.permBtn, background: '#8b5cf6' }}>허용</button>
-                                    <button onClick={() => setNotificationGranted(false)} style={{ ...styles.permBtn, background: '#475569' }}>건너뜀</button>
-                                </div>
+                                <button onClick={() => setNotificationGranted(true)} style={{ ...styles.permBtn, background: '#8b5cf6' }}>허용</button>
                             )}
                         </div>
                     </div>
