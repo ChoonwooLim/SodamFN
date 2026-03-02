@@ -152,6 +152,7 @@ export default function PurchaseManagement() {
     const [confirmLoading, setConfirmLoading] = useState(false);
     const [showNewCategoryFor, setShowNewCategoryFor] = useState(null);
     const [excludedVendors, setExcludedVendors] = useState(new Set());
+    const [dismissedSimilars, setDismissedSimilars] = useState(new Set()); // per-similar-vendor dismiss
 
     // Batch selection
     const [selectedIds, setSelectedIds] = useState(new Set());
@@ -1303,26 +1304,72 @@ export default function PurchaseManagement() {
                                                             ⚠️ 유사한 기존 거래처가 있습니다:
                                                         </div>
                                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                            {vr.similar_vendors.map(sv => (
-                                                                <button
-                                                                    key={sv.id}
-                                                                    onClick={() => handleVendorDecision(vr.vendor_name, 'merge', sv.id)}
-                                                                    style={{
+                                                            {vr.similar_vendors.map(sv => {
+                                                                const dismissKey = `${vr.vendor_name}::${sv.id}`;
+                                                                const isDismissed = dismissedSimilars.has(dismissKey);
+                                                                const isMerged = dec.action === 'merge' && dec.vendor_id === sv.id;
+
+                                                                if (isDismissed) {
+                                                                    return (
+                                                                        <div key={sv.id} style={{
+                                                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                                            padding: '6px 12px', borderRadius: 8,
+                                                                            background: '#0f172a', border: '1px solid #1e293b',
+                                                                            opacity: 0.4,
+                                                                        }}>
+                                                                            <span style={{ textDecoration: 'line-through', color: '#64748b', fontSize: 13 }}>
+                                                                                🏪 {sv.name} <span style={{ fontSize: 11 }}>({sv.category})</span>
+                                                                            </span>
+                                                                            <button
+                                                                                onClick={() => setDismissedSimilars(prev => { const n = new Set(prev); n.delete(dismissKey); return n; })}
+                                                                                style={{ fontSize: 10, background: '#334155', color: '#94a3b8', padding: '3px 8px', borderRadius: 5, border: '1px solid #475569', cursor: 'pointer', fontWeight: 600 }}
+                                                                            >↩ 복원</button>
+                                                                        </div>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <div key={sv.id} style={{
                                                                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                                         padding: '8px 12px', borderRadius: 8,
-                                                                        background: dec.action === 'merge' && dec.vendor_id === sv.id ? '#1e3a5f' : '#0f172a',
-                                                                        border: `1px solid ${dec.action === 'merge' && dec.vendor_id === sv.id ? '#3b82f6' : '#1e293b'}`,
-                                                                        color: '#e2e8f0', cursor: 'pointer', fontSize: 13, textAlign: 'left',
-                                                                        transition: 'all 0.15s', width: '100%',
-                                                                    }}
-                                                                >
-                                                                    <span>
-                                                                        🏪 <strong>{sv.name}</strong>
-                                                                        <span style={{ color: '#64748b', marginLeft: 6, fontSize: 12 }}>({sv.category})</span>
-                                                                    </span>
-                                                                    <span style={{ fontSize: 12, color: '#3b82f6' }}>→ 동일 거래처로 병합</span>
-                                                                </button>
-                                                            ))}
+                                                                        background: isMerged ? '#1e3a5f' : '#0f172a',
+                                                                        border: `1px solid ${isMerged ? '#3b82f6' : '#1e293b'}`,
+                                                                        transition: 'all 0.15s',
+                                                                    }}>
+                                                                        <span style={{ color: '#e2e8f0', fontSize: 13 }}>
+                                                                            🏪 <strong>{sv.name}</strong>
+                                                                            <span style={{ color: '#64748b', marginLeft: 6, fontSize: 12 }}>({sv.category})</span>
+                                                                        </span>
+                                                                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                                            <button
+                                                                                onClick={() => handleVendorDecision(vr.vendor_name, 'merge', sv.id)}
+                                                                                style={{
+                                                                                    fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 6, padding: '4px 10px',
+                                                                                    background: isMerged ? '#2563eb' : '#1e293b',
+                                                                                    color: isMerged ? '#fff' : '#3b82f6',
+                                                                                    border: `1px solid ${isMerged ? '#3b82f6' : '#334155'}`,
+                                                                                    transition: 'all 0.15s',
+                                                                                }}
+                                                                            >{isMerged ? '✓ 병합' : '→ 병합'}</button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    // If this was the merge target, clear the decision
+                                                                                    if (isMerged) {
+                                                                                        setVendorDecisions(prev => { const n = { ...prev }; delete n[vr.vendor_name]; return n; });
+                                                                                    }
+                                                                                    setDismissedSimilars(prev => { const n = new Set(prev); n.add(dismissKey); return n; });
+                                                                                }}
+                                                                                style={{
+                                                                                    fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: 6, padding: '4px 8px',
+                                                                                    background: '#1e293b', color: '#ef4444', border: '1px solid #334155',
+                                                                                    transition: 'all 0.15s',
+                                                                                }}
+                                                                                title="이 거래처 제외 (관련없음)"
+                                                                            >✕</button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
                                                     </div>
                                                 )}

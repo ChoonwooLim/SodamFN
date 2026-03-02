@@ -344,27 +344,51 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
 
 # ─── 2-Step Upload: Preview → Confirm ───
 
-def _find_similar_vendors(vendor_name: str, existing_vendors: list, min_overlap: int = 3) -> list:
-    """3글자 이상 겹치는 유사 거래처를 찾는다."""
+def _find_similar_vendors(vendor_name: str, existing_vendors: list, min_overlap: int = 4) -> list:
+    """유사 거래처를 찾는다. 공통 접두어/접미어를 제거한 후 비교."""
+    import re
+    
+    # Common words to strip before comparison (these cause false positives)
+    STRIP_WORDS = [
+        '주식회사', '(주)', '㈜', '유한회사', '(유)',
+        '상사', '마트', '편의점',
+    ]
+    
+    def normalize_name(name: str) -> str:
+        """Strip common business suffixes/prefixes for comparison."""
+        n = name.strip()
+        for w in STRIP_WORDS:
+            n = n.replace(w, '')
+        # Remove spaces, parentheses, special chars
+        n = re.sub(r'[\s\(\)\-\_\.]', '', n)
+        return n
+    
     similar = []
-    vn = vendor_name.strip()
+    vn_raw = vendor_name.strip()
+    vn = normalize_name(vn_raw)
+    
     if len(vn) < min_overlap:
         return similar
+    
     for v in existing_vendors:
-        ev_name = v.name.strip()
-        if ev_name == vn:
+        ev_raw = v.name.strip()
+        if ev_raw == vn_raw:
             # Exact match — not "similar", it's the same
             continue
+        ev = normalize_name(ev_raw)
+        if len(ev) < min_overlap:
+            continue
+        
         # Check if any substring of length min_overlap overlaps
         matched = False
         for i in range(len(vn) - min_overlap + 1):
             substr = vn[i:i + min_overlap]
-            if substr in ev_name:
+            if substr in ev:
                 matched = True
                 break
         if not matched:
-            for i in range(len(ev_name) - min_overlap + 1):
-                substr = ev_name[i:i + min_overlap]
+            for i in range(len(ev) - min_overlap + 1):
+                substr = ev[i:i + min_overlap]
                 if substr in vn:
                     matched = True
                     break
