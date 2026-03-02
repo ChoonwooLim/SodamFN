@@ -385,7 +385,8 @@ export default function PurchaseManagement() {
             formData.append('file', file);
 
             const response = await api.post('/purchase/upload/preview', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 60000, // 60s — PDF parsing can take longer
             });
 
             if (response.data.status === 'error') {
@@ -443,7 +444,18 @@ export default function PurchaseManagement() {
                 }
             }
         } catch (error) {
-            setUploadResult([{ file: files[0].name, status: 'error', message: error.response?.data?.detail || '업로드 실패' }]);
+            let msg = '업로드 실패';
+            if (error.code === 'ECONNABORTED') {
+                msg = 'PDF 파싱 시간 초과 (60초). 파일 크기를 확인하세요.';
+            } else if (error.response?.data?.detail) {
+                msg = typeof error.response.data.detail === 'string'
+                    ? error.response.data.detail
+                    : JSON.stringify(error.response.data.detail);
+            } else if (error.message) {
+                msg = error.message;
+            }
+            console.error('Upload error:', error);
+            setUploadResult([{ file: files[0].name, status: 'error', message: msg }]);
         } finally {
             setUploadLoading(false);
             setUploadProgress('');
