@@ -70,7 +70,7 @@ export default function LoginPage() {
             if (payload.role === 'admin') {
                 navigate('/dashboard');
             } else {
-                navigate('/contracts/my');
+                navigate('/staff-dashboard');
             }
         } catch (e) {
             console.error("Failed to process token", e);

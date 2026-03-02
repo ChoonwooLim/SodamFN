@@ -33,6 +33,12 @@ export default function Onboarding({ onComplete }) {
     };
 
     const handleComplete = () => {
+        // Clear any stale auth tokens so user always sees login screen
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_role');
+        localStorage.removeItem('user_name');
+        localStorage.removeItem('staff_id');
+
         localStorage.setItem('onboarding_completed', 'true');
         localStorage.setItem('location_permission_handled', 'true');
         localStorage.setItem('terms_agreed', new Date().toISOString());
