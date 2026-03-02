@@ -307,7 +307,7 @@ const styles = {
     agreementTitle: { color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 700, flex: 1 },
     agreementPreview: { background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '10px 12px', maxHeight: '80px', overflow: 'auto', marginBottom: '10px', fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5 },
     required: { color: '#f87171', fontSize: '0.7rem', fontWeight: 700 },
-    checkLabel: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' },
+    checkLabel: { display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none', color: '#fbbf24', fontSize: '0.85rem', fontWeight: 600 },
     checkbox: { width: '22px', height: '22px', borderRadius: '6px', border: '2px solid #475569', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', transition: 'all 0.2s' },
     checkboxOn: { background: '#3b82f6', borderColor: '#3b82f6' },
     permCard: { width: '100%', background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '14px', marginBottom: '12px', border: '1px solid rgba(255,255,255,0.08)' },
