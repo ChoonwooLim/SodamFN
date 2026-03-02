@@ -434,7 +434,7 @@ export default function PurchaseManagement() {
                 setShowVendorReview(true);
             } else {
                 // No vendors to review — confirm directly
-                await confirmUpload(preview.records, {});
+                await confirmUpload(preview.records, {}, preview.original_filename);
             }
 
             // Handle remaining files with direct upload
@@ -478,12 +478,13 @@ export default function PurchaseManagement() {
         }
     };
 
-    const confirmUpload = async (records, decisions) => {
+    const confirmUpload = async (records, decisions, originalFilename = null) => {
         setConfirmLoading(true);
         try {
             const response = await api.post('/purchase/upload/confirm', {
                 records,
                 vendor_decisions: decisions,
+                original_filename: originalFilename || previewData?.original_filename,
             });
             setUploadResult(prev => [
                 ...(prev || []),
@@ -1431,7 +1432,7 @@ export default function PurchaseManagement() {
                                 disabled={!canConfirmUpload() || confirmLoading}
                                 onClick={() => {
                                     const filtered = previewData.records.filter(r => !excludedVendors.has(r.vendor_name));
-                                    confirmUpload(filtered, vendorDecisions);
+                                    confirmUpload(filtered, vendorDecisions, previewData?.original_filename);
                                 }}
                                 style={{
                                     opacity: canConfirmUpload() ? 1 : 0.5,

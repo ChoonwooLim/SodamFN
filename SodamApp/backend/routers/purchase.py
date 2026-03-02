@@ -469,6 +469,7 @@ async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = D
         return {
             "status": "success",
             "card_company": card_company,
+            "original_filename": filename,
             "records": serialized,
             "total_parsed": len(records),
             "auto_classified": auto_classified_count,
@@ -491,6 +492,7 @@ class VendorDecision(BaseModel):
 class ConfirmUploadPayload(BaseModel):
     records: List[dict]
     vendor_decisions: dict  # vendor_name -> VendorDecision
+    original_filename: Optional[str] = None
 
 
 @router.post("/api/purchase/upload/confirm")
@@ -513,7 +515,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
         # Create Upload History
         with Session(engine) as session:
             upload_history = UploadHistory(
-                filename=f"confirmed_{card_company}.xlsx",
+                filename=payload.original_filename or f"confirmed_{card_company}.xlsx",
                 upload_type="purchase",
                 record_count=0,
                 status="active"
