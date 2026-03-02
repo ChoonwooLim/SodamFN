@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import {
-    ShoppingCart, Send, CheckCircle, Clock, AlertCircle, ChevronLeft, Plus, Trash2
+    ShoppingCart, Send, CheckCircle, Clock, AlertCircle, ChevronLeft, Plus, Trash2, ArrowLeft
 } from 'lucide-react';
 
 export default function PurchaseRequest() {
+    const navigate = useNavigate();
     const [items, setItems] = useState([{ name: '', quantity: '', note: '' }]);
     const [history, setHistory] = useState([]);
     const [submitting, setSubmitting] = useState(false);
@@ -60,8 +62,11 @@ export default function PurchaseRequest() {
 
     return (
         <div className="page animate-fade">
-            <div className="page-header">
-                <h1 className="page-title">재료 구매 요청</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <ArrowLeft size={22} color="#475569" />
+                </button>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>재료 구매 요청</h1>
             </div>
 
             {message && (

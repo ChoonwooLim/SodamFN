@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
-import { FileText, CheckCircle, Clock, ChevronRight, FileSignature } from 'lucide-react';
+import { FileText, CheckCircle, Clock, ChevronRight, FileSignature, ArrowLeft } from 'lucide-react';
 
 export default function Contracts() {
     const navigate = useNavigate();
@@ -34,8 +34,11 @@ export default function Contracts() {
 
     return (
         <div className="page animate-fade">
-            <div className="page-header">
-                <h1 className="page-title">전자계약</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <ArrowLeft size={22} color="#475569" />
+                </button>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 800, flex: 1 }}>전자계약</h1>
                 {pending.length > 0 && (
                     <span className="badge badge-danger">{pending.length}건 대기</span>
                 )}

@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api, { API_BASE } from '../api';
 import {
-    FileText, Camera, Upload, CheckCircle, Clock, ImageIcon, AlertCircle
+    FileText, Camera, Upload, CheckCircle, Clock, ImageIcon, AlertCircle, ArrowLeft
 } from 'lucide-react';
 
 const REQUIRED_DOCS = [
@@ -13,6 +14,7 @@ const REQUIRED_DOCS = [
 ];
 
 export default function Documents() {
+    const navigate = useNavigate();
     const [uploads, setUploads] = useState({});
     const [uploading, setUploading] = useState(null);
     const [message, setMessage] = useState('');
@@ -74,8 +76,11 @@ export default function Documents() {
 
     return (
         <div className="page animate-fade">
-            <div className="page-header">
-                <h1 className="page-title">서류 제출</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <ArrowLeft size={22} color="#475569" />
+                </button>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>서류 제출</h1>
             </div>
 
             {message && (

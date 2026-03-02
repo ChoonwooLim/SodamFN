@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import {
     Clock, MapPin, ShieldCheck, Shield, Coffee, LogOut as LogOutIcon,
-    Loader2, ShieldX, AlertTriangle, Timer, Wallet, Calendar
+    Loader2, ShieldX, AlertTriangle, Timer, Wallet, Calendar, ArrowLeft
 } from 'lucide-react';
 
 export default function Attendance() {
@@ -91,8 +91,11 @@ export default function Attendance() {
 
     return (
         <div className="page animate-fade">
-            <div className="page-header">
-                <h1 className="page-title">출퇴근</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    <ArrowLeft size={22} color="#475569" />
+                </button>
+                <h1 style={{ fontSize: '1.25rem', fontWeight: 800, flex: 1 }}>출퇴근</h1>
                 <span className="badge badge-info">
                     <MapPin size={12} /> GPS 인증
                 </span>
