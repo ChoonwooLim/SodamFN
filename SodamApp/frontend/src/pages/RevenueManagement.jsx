@@ -1396,7 +1396,7 @@ export default function RevenueManagement() {
 
                         {uploadTab === 'history' ? (
                             <div className="upload-history-wrapper">
-                                <UploadHistoryList type="revenue" />
+                                <UploadHistoryList type="revenue" onRollback={fetchData} />
                             </div>
                         ) : (
                             <div

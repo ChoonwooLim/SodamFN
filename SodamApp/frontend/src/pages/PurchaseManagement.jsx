@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet, Camera } from 'lucide-react';
 import api from '../api';
+import UploadHistoryList from '../components/UploadHistoryList';
 import './PurchaseManagement.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -907,7 +908,7 @@ export default function PurchaseManagement() {
 
                         {uploadTab === 'history' ? (
                             <div className="upload-history-wrapper">
-                                <UploadHistorySection onRollback={fetchData} />
+                                <UploadHistoryList type="purchase" onRollback={fetchData} />
                             </div>
                         ) : uploadTab === 'camera' ? (
                             <>
@@ -1396,65 +1397,6 @@ export default function PurchaseManagement() {
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
-
-
-// ─── Upload History Sub-component ───
-function UploadHistorySection({ onRollback }) {
-    const [history, setHistory] = useState([]);
-
-    useEffect(() => {
-        fetchHistory();
-    }, []);
-
-    const fetchHistory = async () => {
-        try {
-            const res = await api.get('/uploads/history', { params: { type: 'purchase' } });
-            setHistory(res.data || []);
-        } catch (err) {
-            console.error('History fetch error:', err);
-        }
-    };
-
-    const handleRollback = async (id) => {
-        if (!window.confirm('이 업로드를 롤백하시겠습니까? 해당 업로드로 추가된 모든 데이터가 삭제됩니다.')) return;
-        try {
-            await api.delete(`/uploads/${id}`);
-            fetchHistory();
-            onRollback?.();
-        } catch (err) {
-            console.error('Rollback error:', err);
-            alert('롤백 실패');
-        }
-    };
-
-    if (history.length === 0) {
-        return <p style={{ color: '#94a3b8', fontSize: 14, textAlign: 'center', padding: 20 }}>업로드 이력이 없습니다.</p>;
-    }
-
-    return (
-        <div className="upload-history-list">
-            {history.map(h => (
-                <div className={`history-item ${h.status}`} key={h.id}>
-                    <div className="hi-info">
-                        <span className="hi-filename">{h.filename}</span>
-                        <span className="hi-meta">
-                            {h.record_count}건 · {new Date(h.created_at).toLocaleString('ko-KR')}
-                        </span>
-                    </div>
-                    <div className="hi-actions">
-                        {h.status === 'active' ? (
-                            <button className="hi-rollback" onClick={() => handleRollback(h.id)}>
-                                <RotateCcw size={14} /> 롤백
-                            </button>
-                        ) : (
-                            <span className="hi-rolled-back">롤백됨</span>
-                        )}
-                    </div>
-                </div>
-            ))}
         </div>
     );
 }

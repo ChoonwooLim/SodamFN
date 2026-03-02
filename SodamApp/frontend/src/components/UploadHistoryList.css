@@ -1,75 +1,193 @@
+/* ═══════════════════════════════════════════
+   Upload History List — Shared Component
+   ═══════════════════════════════════════════ */
+
 .upload-history-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 1rem 0;
+    gap: 12px;
+    padding: 8px 0;
 }
 
+.history-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.history-empty svg {
+    margin-bottom: 12px;
+    opacity: 0.3;
+}
+
+.history-empty p {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* ── History Item Card ── */
 .history-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1rem;
-    padding: 1rem;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
     transition: all 0.2s;
 }
 
 .history-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
+.history-item.rolled-back {
+    opacity: 0.55;
+    background: #fafafa;
+}
+
+/* Icon circle */
+.history-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
+.history-icon.active {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.history-icon.cancelled {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+/* Info section */
 .history-info {
     flex: 1;
     min-width: 0;
-    /* truncate text */
 }
 
 .history-filename {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: #f1f5f9;
+    margin-bottom: 4px;
 }
 
 .history-meta {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    font-size: 0.8rem;
+    gap: 10px;
+    font-size: 12px;
     color: #94a3b8;
 }
 
-.history-count {
-    background: rgba(0, 0, 0, 0.2);
-    padding: 0.1rem 0.4rem;
-    border-radius: 0.25rem;
-    font-family: monospace;
+.history-meta svg {
+    flex-shrink: 0;
 }
 
+.history-count {
+    display: inline-flex;
+    align-items: center;
+    background: #e2e8f0;
+    color: #475569;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Actions */
+.history-actions {
+    flex-shrink: 0;
+}
+
+/* Rollback / Cancel Button */
 .rollback-btn {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 0.75rem;
-    background: rgba(244, 63, 94, 0.1);
-    /* Rose color */
-    color: #fb7185;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 2px solid #fecaca;
+    border-radius: 10px;
+    background: white;
+    color: #dc2626;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
     transition: all 0.2s;
 }
 
 .rollback-btn:hover:not(:disabled) {
-    background: #f43f5e;
-    color: white;
-    transform: scale(1.05);
+    background: #fef2f2;
+    border-color: #f87171;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
+.rollback-btn:active:not(:disabled) {
+    transform: scale(0.95);
 }
 
 .rollback-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.rollback-btn .spinner-small {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #fecaca;
+    border-top: 2px solid #dc2626;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+/* Status Badge */
+.history-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.history-status-badge.cancelled {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.history-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: #94a3b8;
+    font-size: 13px;
+    gap: 8px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
