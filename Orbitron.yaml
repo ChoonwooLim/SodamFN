@@ -1,6 +1,6 @@
 # Orbitron Deployment Configuration
 # SodamFN Enterprise Management Platform
-# 3 Services: Backend (FastAPI), Admin Frontend (React), Staff App (React PWA)
+# Backend (FastAPI) + Admin Frontend (React) + Staff App (Cloudflare Pages)
 
 project:
   name: sodam-fn
@@ -24,9 +24,9 @@ services:
       - key: SECRET_KEY
         generate: true
       - key: FRONTEND_URL
-        from: service.sodam-frontend.url
+        value: "https://sodamfn.twinverse.org"
       - key: STAFF_APP_URL
-        from: service.sodam-staff.url
+        value: "https://sodam-staff.pages.dev"
     healthCheck:
       path: /api/health
       interval: 30
@@ -42,29 +42,27 @@ services:
     publish: ./dist
     env:
       - key: VITE_API_URL
-        from: service.sodam-backend.url
+        value: "https://sodamfn.twinverse.org"
       - key: VITE_STAFF_APP_URL
-        from: service.sodam-staff.url
+        value: "https://sodam-staff.pages.dev"
     routes:
       - source: "/*"
         rewrite: /index.html
 
-  # ─────────────────────────────────────────────
-  # Staff App - PWA (Vite + React)
-  # ─────────────────────────────────────────────
-  - name: sodam-staff
-    type: static
-    rootDir: SodamApp/staff-app
-    build:
-      command: "npm install && npm run build"
-    publish: ./dist
+# ─────────────────────────────────────────────
+# Post-deploy: Staff App → Cloudflare Pages
+# 재배포 시 자동으로 직원앱도 함께 빌드/배포
+# ─────────────────────────────────────────────
+postDeploy:
+  - name: deploy-staff-app
+    command: |
+      cd SodamApp/staff-app
+      npm install
+      npm run build
+      npx wrangler pages deploy dist --project-name sodam-staff --branch main
     env:
       - key: VITE_API_URL
-        from: service.sodam-backend.url
-    routes:
-      - source: "/*"
-        rewrite: /index.html
-    pwa: true
+        value: "https://sodamfn.twinverse.org"
 
 databases:
   - name: sodam-db
