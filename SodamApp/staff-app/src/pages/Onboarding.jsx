@@ -42,19 +42,14 @@ export default function Onboarding({ onComplete }) {
     };
 
     const requestNotification = async () => {
+        // User clicked "허용" — respect their intent regardless of browser result
         try {
-            if (!('Notification' in window)) {
-                // iOS Safari PWA doesn't support Notification API
-                setNotificationGranted(true); // treat as OK, push will be handled elsewhere
-                return;
+            if ('Notification' in window) {
+                await Notification.requestPermission();
             }
-            const perm = await Notification.requestPermission();
-            // 'granted' or 'default' (user dismissed) — both mean not denied
-            setNotificationGranted(perm !== 'denied');
-        } catch {
-            // Permission request failed (some browsers block it)
-            setNotificationGranted(true); // don't block onboarding for this
-        }
+        } catch { /* ignore — some browsers don't support this */ }
+        // Always mark as granted since user explicitly chose to allow
+        setNotificationGranted(true);
     };
 
     const handleComplete = () => {
