@@ -24,6 +24,112 @@ async def upload_expense_image(file: UploadFile = File(...), _admin: User = Depe
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/upload/image/purchase")
+async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+    """
+    Processes a receipt image for purchase management.
+    OCR → extract vendor/amount/date → save to DB.
+    """
+    import traceback
+    from sqlmodel import select
+    from models import Vendor, DailyExpense, UploadHistory
+    from services.profit_loss_service import sync_all_expenses
+    
+    try:
+        content = await file.read()
+        service = OCRService()
+        ocr_result = service.process_receipt_image(content)
+        
+        if ocr_result.get("status") != "success":
+            return ocr_result
+        
+        data = ocr_result["data"]
+        vendor_name = data["vendor_name"]
+        total_amount = data["total_amount"]
+        date_str = data["date"]
+        category = data.get("category", "기타비용")
+        
+        try:
+            date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except Exception:
+            date_obj = datetime.date.today()
+        
+        # Create Upload History
+        with Session(engine) as session:
+            upload_history = UploadHistory(
+                filename=file.filename or "receipt_photo.jpg",
+                upload_type="purchase",
+                record_count=0,
+                status="active"
+            )
+            session.add(upload_history)
+            session.commit()
+            session.refresh(upload_history)
+            upload_id = upload_history.id
+        
+        # Save to DB
+        with Session(engine) as session:
+            # Find or create vendor
+            vendor = session.exec(
+                select(Vendor).where(Vendor.name == vendor_name)
+            ).first()
+            
+            if not vendor:
+                vendor = Vendor(
+                    name=vendor_name,
+                    category=category,
+                    vendor_type="expense",
+                    created_by_upload_id=upload_id
+                )
+                session.add(vendor)
+                session.flush()
+            
+            # Create DailyExpense
+            expense = DailyExpense(
+                date=date_obj,
+                vendor_name=vendor_name,
+                vendor_id=vendor.id,
+                amount=total_amount,
+                category=category,
+                note=f"📸 영수증 촬영 업로드",
+                upload_id=upload_id,
+                card_company="영수증",
+            )
+            session.add(expense)
+            
+            # Update history
+            upload_record = session.get(UploadHistory, upload_id)
+            if upload_record:
+                upload_record.record_count = 1
+                session.add(upload_record)
+            
+            session.commit()
+        
+        # Sync P/L
+        try:
+            with Session(engine) as sync_session:
+                sync_all_expenses(date_obj.year, date_obj.month, sync_session)
+                sync_session.commit()
+        except Exception:
+            pass
+        
+        return {
+            "status": "success",
+            "message": ocr_result.get("message", "영수증 업로드 완료"),
+            "data": data,
+            "upload_id": upload_id,
+            "saved": {
+                "vendor_name": vendor_name,
+                "amount": total_amount,
+                "date": date_str,
+                "category": category,
+            }
+        }
+    except Exception as e:
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Receipt Image Upload Error: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/upload/excel/expense")
 async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
     """

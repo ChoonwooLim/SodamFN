@@ -731,6 +731,156 @@
     min-height: 200px;
 }
 
+/* ── Camera Tab ── */
+.upload-tab-btn.active.camera {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.upload-icon-box.camera {
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+}
+
+/* ── OCR Result Card ── */
+.ocr-result-card {
+    background: white;
+    border-radius: 20px;
+    border: 2px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ocr-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    color: white;
+}
+
+.ocr-result-badge {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.ocr-confidence {
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+.ocr-result-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.ocr-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+}
+
+.ocr-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.ocr-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.ocr-value.amount {
+    color: #059669;
+    font-size: 18px;
+}
+
+.ocr-items {
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border-radius: 12px;
+    border: 1px solid #d1fae5;
+}
+
+.ocr-items-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ocr-item-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+    color: #334155;
+    border-bottom: 1px solid #ecfdf5;
+}
+
+.ocr-item-row:last-child {
+    border-bottom: none;
+}
+
+.ocr-result-footer {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.ocr-btn {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ocr-btn.secondary {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.ocr-btn.secondary:hover {
+    background: #e2e8f0;
+}
+
+.ocr-btn.success {
+    background: linear-gradient(135deg, #22c55e, #059669);
+    color: white;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+}
+
+.ocr-btn.success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.4);
+}
+
+.ocr-saved-note {
+    text-align: center;
+    font-size: 12px;
+    color: #059669;
+    font-weight: 600;
+    padding: 0 20px 16px;
+    margin: 0;
+}
+
 .upload-results {
     margin-top: 32px;
 }

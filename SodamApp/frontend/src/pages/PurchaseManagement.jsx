@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet, Camera } from 'lucide-react';
 import api from '../api';
 import './PurchaseManagement.css';
 
@@ -118,7 +118,7 @@ export default function PurchaseManagement() {
     const [year, setYear] = useState(defaultDate.getFullYear());
     const [month, setMonth] = useState(defaultDate.getMonth() + 1);
     const [viewMode, setViewMode] = useState('dashboard'); // dashboard | list | household | upload
-    const [uploadTab, setUploadTab] = useState('excel'); // excel | history
+    const [uploadTab, setUploadTab] = useState('camera'); // camera | excel | history
     const [data, setData] = useState([]);
     const [summary, setSummary] = useState({ total: 0, count: 0, by_category: {}, by_card_company: {}, by_bank_transfer: {}, top_vendors: [] });
     const [loading, setLoading] = useState(false);
@@ -141,6 +141,8 @@ export default function PurchaseManagement() {
     const [uploadProgress, setUploadProgress] = useState('');
     const [uploadResult, setUploadResult] = useState(null);
     const fileInputRef = useRef(null);
+    const imageInputRef = useRef(null);
+    const [ocrResult, setOcrResult] = useState(null);
 
     // Vendor Review Modal (2-step upload)
     const [showVendorReview, setShowVendorReview] = useState(false);
@@ -884,6 +886,12 @@ export default function PurchaseManagement() {
                     <div className="upload-section">
                         <div className="upload-tabs">
                             <button
+                                className={`upload-tab-btn ${uploadTab === 'camera' ? 'active camera' : ''}`}
+                                onClick={() => { setUploadTab('camera'); setOcrResult(null); }}
+                            >
+                                <Camera size={16} /> 촬영/이미지
+                            </button>
+                            <button
                                 className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`}
                                 onClick={() => setUploadTab('excel')}
                             >
@@ -901,6 +909,111 @@ export default function PurchaseManagement() {
                             <div className="upload-history-wrapper">
                                 <UploadHistorySection onRollback={fetchData} />
                             </div>
+                        ) : uploadTab === 'camera' ? (
+                            <>
+                                {!ocrResult ? (
+                                    <div
+                                        className="upload-drop-zone"
+                                        onClick={() => !uploadLoading && imageInputRef.current?.click()}
+                                    >
+                                        {uploadLoading ? (
+                                            <div className="upload-loading">
+                                                <div className="spinner" />
+                                                <p>🔍 영수증 분석 중...</p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="upload-icon-box camera">
+                                                    <Camera size={32} />
+                                                </div>
+                                                <p className="upload-main-text">
+                                                    영수증 촬영 또는 이미지 선택
+                                                </p>
+                                                <p className="upload-sub-text">
+                                                    매입 영수증을 촬영하면 자동으로 거래처, 금액, 날짜를 분석합니다
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="ocr-result-card">
+                                        <div className="ocr-result-header">
+                                            <span className="ocr-result-badge">📸 분석 완료</span>
+                                            <span className="ocr-confidence">정확도 {Math.round((ocrResult.confidence || 0.9) * 100)}%</span>
+                                        </div>
+                                        <div className="ocr-result-body">
+                                            <div className="ocr-field">
+                                                <span className="ocr-label">🏪 거래처</span>
+                                                <span className="ocr-value">{ocrResult.vendor_name}</span>
+                                            </div>
+                                            <div className="ocr-field">
+                                                <span className="ocr-label">💰 금액</span>
+                                                <span className="ocr-value amount">{(ocrResult.total_amount || 0).toLocaleString()}원</span>
+                                            </div>
+                                            <div className="ocr-field">
+                                                <span className="ocr-label">📅 날짜</span>
+                                                <span className="ocr-value">{ocrResult.date}</span>
+                                            </div>
+                                            <div className="ocr-field">
+                                                <span className="ocr-label">📂 카테고리</span>
+                                                <span className="ocr-value">{ocrResult.category}</span>
+                                            </div>
+                                            {ocrResult.items && ocrResult.items.length > 0 && (
+                                                <div className="ocr-items">
+                                                    <span className="ocr-label">🛒 품목</span>
+                                                    <div className="ocr-items-list">
+                                                        {ocrResult.items.map((item, i) => (
+                                                            <div key={i} className="ocr-item-row">
+                                                                <span>{item.name}</span>
+                                                                <span>{item.amount?.toLocaleString()}원</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="ocr-result-footer">
+                                            <button className="ocr-btn secondary" onClick={() => setOcrResult(null)}>🔄 다시 촬영</button>
+                                            <button className="ocr-btn success" onClick={() => { setOcrResult(null); fetchData(); }}>
+                                                ✅ 저장 완료
+                                            </button>
+                                        </div>
+                                        <p className="ocr-saved-note">✅ 데이터가 이미 자동 저장되었습니다</p>
+                                    </div>
+                                )}
+                                <input
+                                    ref={imageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    capture="environment"
+                                    style={{ display: 'none' }}
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0];
+                                        if (!file) return;
+                                        setUploadLoading(true);
+                                        setOcrResult(null);
+                                        try {
+                                            const formData = new FormData();
+                                            formData.append('file', file);
+                                            const response = await api.post('/upload/image/purchase', formData, {
+                                                headers: { 'Content-Type': 'multipart/form-data' },
+                                                timeout: 30000,
+                                            });
+                                            if (response.data.status === 'success') {
+                                                setOcrResult(response.data.data);
+                                            } else {
+                                                alert('분석 실패: ' + (response.data.message || '알 수 없는 오류'));
+                                            }
+                                        } catch (err) {
+                                            console.error('Image upload error:', err);
+                                            alert('업로드 중 오류: ' + (err.response?.data?.detail || err.message));
+                                        } finally {
+                                            setUploadLoading(false);
+                                            if (imageInputRef.current) imageInputRef.current.value = '';
+                                        }
+                                    }}
+                                />
+                            </>
                         ) : (
                             <>
                                 <div
