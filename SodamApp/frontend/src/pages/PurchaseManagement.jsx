@@ -1035,7 +1035,7 @@ export default function PurchaseManagement() {
                                                 클릭하여 문서 파일 선택
                                             </p>
                                             <p className="upload-sub-text">
-                                                .xls, .xlsx, .pdf, .doc, .docx, .hwp, .csv 파일 — 여러 파일 동시 가능
+                                                .xls, .xlsx, .pdf, .csv 파일 — 여러 파일 동시 가능
                                             </p>
                                             <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: 12 }}>
                                                 {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
@@ -1050,7 +1050,7 @@ export default function PurchaseManagement() {
                                 <input
                                     ref={fileInputRef}
                                     type="file"
-                                    accept=".xls,.xlsx,.pdf,.doc,.docx,.hwp,.csv"
+                                    accept=".xls,.xlsx,.pdf,.csv"
                                     multiple
                                     onChange={handleUpload}
                                     style={{ display: 'none' }}

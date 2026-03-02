@@ -629,6 +629,11 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
 def detect_card_company(filepath: str, filename: str) -> str:
     """Auto-detect card company from filename."""
     fn = filename.lower()
+    
+    # CSV files → generic CSV parser
+    if fn.endswith('.csv'):
+        return 'csv'
+    
     if '롯데' in fn or 'lotte' in fn:
         return 'lotte'
     elif '삼성' in fn or 'samsung' in fn:
@@ -648,9 +653,116 @@ def detect_card_company(filepath: str, filename: str) -> str:
     return 'unknown'
 
 
+def parse_csv(filepath: str) -> List[Dict]:
+    """
+    Parse a generic CSV file for purchase records.
+    Auto-detects encoding (UTF-8 or EUC-KR) and column mapping.
+    
+    Expected columns (flexible matching):
+      - 날짜/일자/date → date
+      - 거래처/가맹점/업체/vendor/상호 → vendor_name
+      - 금액/이용금액/amount/결제금액 → amount
+      - 카테고리/분류/category (optional)
+    """
+    import csv
+    
+    # Try UTF-8 first, then EUC-KR (common for Korean files)
+    content = None
+    for encoding in ['utf-8-sig', 'utf-8', 'euc-kr', 'cp949']:
+        try:
+            with open(filepath, 'r', encoding=encoding) as f:
+                content = f.read()
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    
+    if content is None:
+        return []
+    
+    lines = content.strip().split('\n')
+    if len(lines) < 2:
+        return []
+    
+    reader = csv.reader(lines)
+    headers_raw = next(reader)
+    headers = [h.strip().lower().replace(' ', '') for h in headers_raw]
+    
+    # Column mapping — flexible matching
+    date_col = None
+    vendor_col = None
+    amount_col = None
+    category_col = None
+    
+    date_keywords = ['날짜', '일자', 'date', '거래일', '이용일', '결제일']
+    vendor_keywords = ['거래처', '가맹점', '업체', '상호', 'vendor', '이용가맹점', '가맹점명', '내용']
+    amount_keywords = ['금액', '이용금액', 'amount', '결제금액', '출금', '지출', '이용금액(원)']
+    category_keywords = ['카테고리', '분류', 'category', '업종']
+    
+    for i, h in enumerate(headers):
+        if date_col is None and any(k in h for k in date_keywords):
+            date_col = i
+        if vendor_col is None and any(k in h for k in vendor_keywords):
+            vendor_col = i
+        if amount_col is None and any(k in h for k in amount_keywords):
+            amount_col = i
+        if category_col is None and any(k in h for k in category_keywords):
+            category_col = i
+    
+    if date_col is None or amount_col is None:
+        # Fallback: assume first=date, second=vendor, third=amount
+        if len(headers) >= 3:
+            date_col = 0
+            vendor_col = 1
+            amount_col = 2
+        else:
+            return []
+    
+    if vendor_col is None:
+        vendor_col = 1 if date_col != 1 else 0
+    
+    records = []
+    for row in reader:
+        if len(row) <= max(date_col, vendor_col, amount_col):
+            continue
+        
+        try:
+            date_val = _normalize_date(row[date_col].strip())
+            if not date_val:
+                continue
+        except Exception:
+            continue
+        
+        vendor_name = row[vendor_col].strip()
+        if not vendor_name:
+            continue
+        
+        amount = _clean_amount(row[amount_col])
+        if amount <= 0:
+            continue
+        
+        category = '기타경비'
+        if category_col is not None and category_col < len(row) and row[category_col].strip():
+            category = row[category_col].strip()
+        else:
+            category = classify_category(vendor_name)
+        
+        records.append({
+            'date': date_val,
+            'vendor_name': vendor_name,
+            'amount': amount,
+            'category': category,
+            'card_company': 'CSV',
+            'approval_no': '',
+            'business_type': '',
+            'is_cancelled': False,
+        })
+    
+    return records
+
+
 def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
     """
-    Parse a purchase Excel file and return standardized records.
+    Parse a purchase Excel/PDF/CSV file and return standardized records.
     Auto-detects card company and file format.
 
     Returns list of dicts:
@@ -670,6 +782,7 @@ def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
         'kookmin_bank': lambda fp: _parse_generic_bank(fp, '국민은행'),
         'suhyup_bank': lambda fp: _parse_generic_bank(fp, '수협은행'),
         'hyundai': parse_hyundai,
+        'csv': parse_csv,
     }
 
     parser = parsers.get(company)
@@ -682,3 +795,4 @@ def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
     active_records = [r for r in records if not r.get('is_cancelled', False)]
 
     return active_records
+

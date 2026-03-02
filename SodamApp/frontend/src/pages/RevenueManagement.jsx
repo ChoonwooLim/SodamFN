@@ -1419,7 +1419,7 @@ export default function RevenueManagement() {
                                         <p className="upload-sub-text">
                                             {uploadTab === 'camera'
                                                 ? '영수증 또는 매출 내역 이미지를 업로드하세요'
-                                                : '엑셀, PDF, 워드, HWP, CSV 등 다양한 문서 지원 — 여러 파일 선택 가능'}
+                                                : '엑셀, PDF, CSV 파일 지원 — 여러 파일 선택 가능'}
                                         </p>
                                     </>
                                 )}
@@ -1438,7 +1438,7 @@ export default function RevenueManagement() {
                     />
                     <input
                         type="file"
-                        accept=".xlsx,.xls,.pdf,.doc,.docx,.hwp,.csv"
+                        accept=".xlsx,.xls,.pdf,.csv"
                         multiple
                         style={{ display: 'none' }}
                         ref={excelInputRef}
