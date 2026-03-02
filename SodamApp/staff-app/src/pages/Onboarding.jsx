@@ -14,21 +14,52 @@ export default function Onboarding({ onComplete }) {
     const currentStep = STEPS[step];
     const canProceedTerms = termsAgreed && privacyAgreed;
 
-    const requestLocation = () => {
+    const requestLocation = async () => {
         setLocationRequesting(true);
-        navigator.geolocation.getCurrentPosition(
-            () => { setLocationGranted(true); setLocationRequesting(false); },
-            () => { setLocationGranted(false); setLocationRequesting(false); },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
+        try {
+            // First check via Permissions API (more reliable than getCurrentPosition)
+            if (navigator.permissions) {
+                const perm = await navigator.permissions.query({ name: 'geolocation' });
+                if (perm.state === 'granted') {
+                    setLocationGranted(true);
+                    setLocationRequesting(false);
+                    return;
+                }
+            }
+            // Fallback: actually request position
+            navigator.geolocation.getCurrentPosition(
+                () => { setLocationGranted(true); setLocationRequesting(false); },
+                (err) => {
+                    // PERMISSION_DENIED = 1, other errors (timeout, unavailable) = permission was granted
+                    if (err.code === 1) {
+                        setLocationGranted(false);
+                    } else {
+                        // GPS timeout or unavailable ≠ permission denied
+                        setLocationGranted(true);
+                    }
+                    setLocationRequesting(false);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        } catch {
+            setLocationGranted(false);
+            setLocationRequesting(false);
+        }
     };
 
     const requestNotification = async () => {
-        if ('Notification' in window) {
+        try {
+            if (!('Notification' in window)) {
+                // iOS Safari PWA doesn't support Notification API
+                setNotificationGranted(true); // treat as OK, push will be handled elsewhere
+                return;
+            }
             const perm = await Notification.requestPermission();
-            setNotificationGranted(perm === 'granted');
-        } else {
-            setNotificationGranted(false);
+            // 'granted' or 'default' (user dismissed) — both mean not denied
+            setNotificationGranted(perm !== 'denied');
+        } catch {
+            // Permission request failed (some browsers block it)
+            setNotificationGranted(true); // don't block onboarding for this
         }
     };
 
@@ -210,7 +241,10 @@ export default function Onboarding({ onComplete }) {
                             ) : notificationGranted === false ? (
                                 <span style={{ ...styles.permBadge, color: '#94a3b8' }}>건너뜀</span>
                             ) : (
-                                <button onClick={requestNotification} style={{ ...styles.permBtn, background: '#8b5cf6' }}>허용</button>
+                                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                                    <button onClick={requestNotification} style={{ ...styles.permBtn, background: '#8b5cf6' }}>허용</button>
+                                    <button onClick={() => setNotificationGranted(false)} style={{ ...styles.permBtn, background: '#475569' }}>건너뜀</button>
+                                </div>
                             )}
                         </div>
                     </div>
