@@ -102,50 +102,46 @@ def _extract_card_corp(vendor_name: str) -> Optional[str]:
 @router.get("/stats/sales")
 def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get_current_user)):
     """
-    Get card sales stats from DailyExpense revenue records.
-    Looks for DailyExpense records where vendor_name contains card company names
-    (e.g. '신한카드매출', '삼성카드매출', '카드매출(통합)').
+    Get card sales stats from DailyExpense records linked to revenue-type vendors.
+    Uses Vendor.vendor_type='revenue' to find card revenue entries.
     """
+    from models import Vendor
+    
     with Session(engine) as session:
-        # Get all card-related revenue entries in the date range
-        card_revenue = session.exec(
+        # Get all revenue-type vendor IDs
+        revenue_vendors = session.exec(
+            select(Vendor).where(Vendor.vendor_type == 'revenue')
+        ).all()
+        revenue_vendor_ids = {v.id for v in revenue_vendors}
+        vendor_id_to_name = {v.id: v.name for v in revenue_vendors}
+        
+        # Get DailyExpense entries linked to revenue vendors in date range
+        expenses = session.exec(
             select(DailyExpense).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
-                DailyExpense.amount > 0,  # revenue entries have positive amounts
             )
         ).all()
         
-        # Filter to card-related entries and categorize
+        # Filter to revenue entries only (by vendor_id or known vendor_name patterns)
         card_entries = []
-        for entry in card_revenue:
+        for entry in expenses:
             vn = entry.vendor_name or ''
-            # Check if this is a card revenue entry
-            if '카드' in vn and ('매출' in vn or '승인' in vn or entry.category in ('매장매출', None)):
-                corp = _extract_card_corp(vn) or vn
-                card_entries.append({
-                    'date': entry.date,
-                    'amount': entry.amount,
-                    'card_corp': corp,
-                })
-            elif vn == '카드매출(통합)':
-                card_entries.append({
-                    'date': entry.date,
-                    'amount': entry.amount,
-                    'card_corp': '카드매출(통합)',
-                })
-        
-        # If no dedicated card entries, try all revenue-type vendors
-        if not card_entries:
-            all_revenue = session.exec(
-                select(DailyExpense).where(
-                    DailyExpense.date >= start_date,
-                    DailyExpense.date <= end_date,
-                    DailyExpense.category.in_(['매장매출', '카드매출']),
-                )
-            ).all()
-            for entry in all_revenue:
-                corp = _extract_card_corp(entry.vendor_name) or entry.vendor_name or '기타'
+            
+            # Match by vendor_id (linked to revenue vendor)
+            if entry.vendor_id and entry.vendor_id in revenue_vendor_ids:
+                corp = _extract_card_corp(vn)
+                if corp:
+                    card_entries.append({
+                        'date': entry.date,
+                        'amount': entry.amount,
+                        'card_corp': corp,
+                    })
+                continue
+            
+            # Match by vendor_name pattern (for unlinked entries)
+            if '카드매출' in vn or vn == '카드매출(통합)':
+                corp = _extract_card_corp(vn) or '카드매출(통합)'
                 card_entries.append({
                     'date': entry.date,
                     'amount': entry.amount,
