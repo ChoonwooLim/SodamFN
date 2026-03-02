@@ -46,19 +46,35 @@ export default function Attendance() {
         }
     }, [navigate, fetchData]);
 
-    const getPosition = useCallback(() => {
+    // Single GPS attempt with configurable options
+    const gpsAttempt = useCallback((options) => {
         return new Promise((resolve, reject) => {
             if (!navigator.geolocation) { reject(new Error('GPS 미지원')); return; }
             navigator.geolocation.getCurrentPosition(
-                (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-                (err) => {
-                    const m = { 1: '위치 권한 거부', 2: '위치 사용 불가', 3: '시간 초과' };
-                    reject(new Error(m[err.code] || '위치 오류'));
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
+                (err) => reject(err),
+                options
             );
         });
     }, []);
+
+    // 3-stage GPS strategy: high accuracy → low accuracy → error with guidance
+    const getPosition = useCallback(async () => {
+        // Stage 1: High accuracy (GPS), 15s timeout
+        try {
+            return await gpsAttempt({ enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+        } catch (err1) {
+            if (err1.code === 1) throw new Error('위치 권한이 거부되었습니다.\n설정 → 앱/사이트 → 위치 권한을 허용해주세요.');
+            // Stage 2: Low accuracy (WiFi/Cell tower), 10s timeout
+            try {
+                return await gpsAttempt({ enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 });
+            } catch (err2) {
+                if (err2.code === 1) throw new Error('위치 권한이 거부되었습니다.\n설정 → 앱/사이트 → 위치 권한을 허용해주세요.');
+                // Stage 3: All failed
+                throw new Error('위치를 가져올 수 없습니다.\n📱 위치 서비스(GPS)가 켜져 있는지 확인하고,\n실외나 창가에서 다시 시도해주세요.');
+            }
+        }
+    }, [gpsAttempt]);
 
     const handleAttendance = async (action) => {
         setGpsLoading(true);
@@ -87,7 +103,6 @@ export default function Attendance() {
 
     const canCheckin = !status.checked_in;
     const canCheckout = status.checked_in && !status.checked_out;
-    const allDone = status.checked_in && status.checked_out;
 
     return (
         <div className="page animate-fade">
