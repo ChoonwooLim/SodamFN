@@ -283,8 +283,9 @@ export default function PurchaseManagement() {
             await api.delete(`/purchase/${id}`);
             fetchData();
         } catch (err) {
-            console.error(err);
-            alert('삭제 실패');
+            console.error('Delete error:', err);
+            const msg = err.response?.data?.detail || err.message || '삭제 실패';
+            alert(`삭제 실패: ${msg}`);
         }
     };
 
@@ -525,6 +526,7 @@ export default function PurchaseManagement() {
     const canConfirmUpload = () => {
         if (!previewData?.vendor_review) return true;
         return previewData.vendor_review.every(vr => {
+            if (excludedVendors.has(vr.vendor_name)) return true;
             const dec = vendorDecisions[vr.vendor_name];
             if (!dec) return false;
             if (dec.action === 'merge' && dec.vendor_id) return true;
@@ -1244,9 +1246,22 @@ export default function PurchaseManagement() {
                                     const filtered = previewData.records.filter(r => !excludedVendors.has(r.vendor_name));
                                     confirmUpload(filtered, vendorDecisions);
                                 }}
-                                style={{ opacity: canConfirmUpload() ? 1 : 0.5 }}
+                                style={{
+                                    opacity: canConfirmUpload() ? 1 : 0.5,
+                                    background: canConfirmUpload() ? 'linear-gradient(135deg, #22c55e, #059669)' : '#334155',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '12px 28px',
+                                    borderRadius: 12,
+                                    fontSize: 15,
+                                    fontWeight: 800,
+                                    cursor: canConfirmUpload() ? 'pointer' : 'not-allowed',
+                                    boxShadow: canConfirmUpload() ? '0 4px 20px rgba(34, 197, 94, 0.4)' : 'none',
+                                    transition: 'all 0.3s ease',
+                                    letterSpacing: '0.5px',
+                                }}
                             >
-                                {confirmLoading ? '저장 중...' : `✅ ${previewData.total_parsed - previewData.records.filter(r => excludedVendors.has(r.vendor_name)).length}건 업로드 확인`}
+                                {confirmLoading ? '⏳ 저장 중...' : `🚀 ${previewData.total_parsed - previewData.records.filter(r => excludedVendors.has(r.vendor_name)).length}건 업로드 확인`}
                             </button>
                         </div>
                     </div>
