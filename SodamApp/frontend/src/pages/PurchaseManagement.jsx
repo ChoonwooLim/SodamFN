@@ -282,12 +282,19 @@ export default function PurchaseManagement() {
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('이 내역을 삭제하시겠습니까?')) return;
+        console.log('[DELETE] Attempting to delete expense id:', id);
+        if (!window.confirm('이 내역을 삭제하시겠습니까?')) {
+            console.log('[DELETE] User cancelled');
+            return;
+        }
         try {
-            await api.delete(`/purchase/${id}`);
+            console.log('[DELETE] Sending DELETE request to /purchase/' + id);
+            const res = await api.delete(`/purchase/${id}`);
+            console.log('[DELETE] Response:', res.data);
             fetchData();
         } catch (err) {
-            console.error('Delete error:', err);
+            console.error('[DELETE] Error:', err);
+            console.error('[DELETE] Response:', err.response?.status, err.response?.data);
             const msg = err.response?.data?.detail || err.message || '삭제 실패';
             alert(`삭제 실패: ${msg}`);
         }
