@@ -642,11 +642,11 @@ def detect_card_company(filepath: str, filename: str) -> str:
         return 'kookmin_bank'
     elif '수협' in fn or 'suhyup' in fn:
         return 'suhyup_bank'
-    elif '신한은행' in fn or '송금' in fn:
+    elif '신한은행' in fn or '송금' in fn or 'shinhanbank' in fn:
         if fn.endswith('.pdf'):
             return 'shinhan_bank_pdf'
         return 'shinhan_bank'
-    elif '신한카드' in fn or '신한' in fn:
+    elif '신한카드' in fn or '신한' in fn or 'shinhancard' in fn or 'shinhan' in fn:
         return 'shinhan_card'
     elif '현대' in fn or 'hyundai' in fn:
         return 'hyundai'
