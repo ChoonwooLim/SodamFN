@@ -297,6 +297,7 @@ def calculate_payroll(req: PayrollCalculateRequest):
         d_np, d_hi, d_ei, d_lti, d_it, d_lit = 0, 0, 0, 0, 0, 0
         
         if staff.contract_type == "정규직" or staff.insurance_4major:
+            # 정규직 또는 4대보험 가입 직원: 4대보험 + 간이세액표 소득세
             insurances = calculate_insurances(
                 taxable_income, 
                 year=target_year,
@@ -315,9 +316,32 @@ def calculate_payroll(req: PayrollCalculateRequest):
             )
             d_lit = int(d_it * 0.1 / 10) * 10
         else:
-            # Freelancer/Part-time simplified tax (3.3%)
-            d_it = int(gross_pay * 0.03 / 10) * 10
-            d_lit = int(d_it * 0.1 / 10) * 10
+            # ── 일용직/아르바이트 (2026 법규 기준) ──
+            # 1) 고용보험: 0.9% (일용직도 의무 가입)
+            d_ei = int(gross_pay * 0.009 / 10) * 10
+            
+            # 2) 소득세: 일당 15만원 초과분에만 적용
+            #    공식: (일급 - 150,000) × 6% × (1 - 55%) = 2.7%
+            #    일당 15만원 이하면 소득세 0원
+            #    ※ 시급제 아르바이트는 근무시간으로 일당 계산
+            month_attendances = [a for a in all_attendances 
+                                 if a.date.year == target_year and a.date.month == target_month]
+            work_days = [a for a in month_attendances if a.total_hours > 0]
+            
+            daily_tax_total = 0
+            for att in work_days:
+                daily_wage = int(att.total_hours * (staff.hourly_wage or 0))
+                if daily_wage > 150000:
+                    # (일급 - 150,000) × 6% × 45% (= 55% 세액공제 후)
+                    day_tax = int((daily_wage - 150000) * 0.06 * 0.45)
+                    # 소액부징수: 1,000원 미만이면 미징수
+                    if day_tax >= 1000:
+                        daily_tax_total += day_tax
+            
+            d_it = int(daily_tax_total / 10) * 10  # 원 단위 절사
+            d_lit = int(d_it * 0.1 / 10) * 10      # 지방소득세: 소득세의 10%
+            
+            # 국민연금/건강보험: 미가입 (insurance_4major=False일 때)
             
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
