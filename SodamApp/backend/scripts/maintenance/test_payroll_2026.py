@@ -1,75 +1,79 @@
 """
-Verification test: Compare system calculations against 2026 Jan payroll Excel data
+Verification test: Compare system calculations against 2026 Feb payroll
+(세무사 산출 급여명세서와 시스템 계산 결과 비교)
 """
 from utils.payroll_calc_utils import calculate_insurances, calculate_korean_income_tax
 
 def verify():
-    print("=== Excel vs System Verification ===\n")
+    print("=" * 60)
+    print("  세무사 산출 기준 검증 (2026년 2월 허윤희)")
+    print("=" * 60)
     
-    # 1. 허윤희: 4대보험, 보수월액=1,500,000, total_gross=1,803,600
-    print("--- 허윤희 (4대보험, 보수월액=1,500,000) ---")
-    ins = calculate_insurances(1803600, 2026, insurance_base=1500000)
-    it = calculate_korean_income_tax(1803600)
+    # 허윤희: 4대보험, 보수월액=1,500,000, 총지급액=1,680,000
+    gross_pay = 1680000
+    insurance_base = 1500000
+    
+    print(f"\n총 지급액: {gross_pay:>12,}원")
+    print(f"보수월액:   {insurance_base:>12,}원")
+    print()
+    
+    ins = calculate_insurances(gross_pay, 2026, insurance_base=insurance_base)
+    it = calculate_korean_income_tax(gross_pay, dependents=1, children=0)
     lit = int(it * 0.1 / 10) * 10
-    print(f"  NP: {ins['np']:>8,}  (Excel: 71,250)")
-    print(f"  HI: {ins['hi']:>8,}  (Excel: 53,920)")
-    print(f"  LTI: {ins['lti']:>7,}  (Excel:  7,080)")
-    print(f"  EI: {ins['ei']:>8,}  (Excel: 13,500)")
-    print(f"  IT: {it:>8,}  (Excel: 15,110)")
-    print(f"  LIT: {lit:>7,}  (Excel:  1,510)")
-    print()
     
-    # 2. 정수현: 4대보험, 보수월액=1,867,000
-    print("--- 정수현 (4대보험, 보수월액=1,867,000) ---")
-    ins2 = calculate_insurances(2217600, 2026, insurance_base=1867000)
-    it2 = calculate_korean_income_tax(2217600)
-    lit2 = int(it2 * 0.1 / 10) * 10
-    print(f"  NP: {ins2['np']:>8,}  (Excel: 88,680)")
-    print(f"  HI: {ins2['hi']:>8,}  (Excel: 67,140)")
-    print(f"  LTI: {ins2['lti']:>7,}  (Excel:  8,820)")
-    print(f"  EI: {ins2['ei']:>8,}  (Excel: 16,810)")
-    print(f"  IT: {it2:>8,}  (Excel: 26,270)")
-    print(f"  LIT: {lit2:>7,}  (Excel:  2,620)")
-    print()
+    expected = {
+        "np": 71250,
+        "hi": 53920,
+        "lti": 7080,
+        "ei": 13500,
+        "it": 12640,
+        "lit": 1260,
+    }
     
-    # 3. 김금순: 정규직, 월급 3,200,000 (기본급3M + 식대200K)
-    print("--- 김금순 (정규직, 월급 3,200,000, 식대비과세) ---")
-    taxable = 3200000 - 200000
-    ins3 = calculate_insurances(taxable, 2026, insurance_base=3000000)
-    it3 = calculate_korean_income_tax(taxable)
-    lit3 = int(it3 * 0.1 / 10) * 10
-    print(f"  NP: {ins3['np']:>8,}  (Excel: 142,500)")
-    print(f"  HI: {ins3['hi']:>8,}  (Excel: 107,850)")
-    print(f"  LTI: {ins3['lti']:>7,}  (Excel:  14,170)")
-    print(f"  IT: {it3:>8,}  (Excel:  91,460)")
-    print(f"  LIT: {lit3:>7,}  (Excel:   9,140)")
-    total_ded = ins3['np'] + ins3['hi'] + ins3['lti'] + ins3['ei'] + it3 + lit3
-    print(f"  Total Deductions: {total_ded:>8,}  (Excel: 365,120)")
-    print(f"  Tax Support: {total_ded:>8,}  (= Deductions for 정규직)")
-    print()
+    items = [
+        ("국민연금", "np", ins["np"]),
+        ("건강보험", "hi", ins["hi"]),
+        ("장기요양", "lti", ins["lti"]),
+        ("고용보험", "ei", ins["ei"]),
+        ("소득세  ", "it", it),
+        ("지방소득세", "lit", lit),
+    ]
     
-    # 4. 이채정: 3.3% 원천징수, gross=1,135,200
-    print("--- 이채정 (3.3%% 원천징수, gross=1,135,200) ---")
-    it4 = int(1135200 * 0.03 / 10) * 10
-    lit4 = int(it4 * 0.1 / 10) * 10
-    print(f"  IT(3%%): {it4:>8,}  (Excel: IT=37,461.6)")
-    print(f"  LIT(0.3%%): {lit4:>5,}")
-    print(f"  Total: {it4+lit4:>8,}")
-    print()
+    all_pass = True
+    total_calc = 0
+    total_expected = 0
     
-    # 5. 김다은: 3.3% 원천징수, gross=1,047,200
-    print("--- 김다은 (3.3%% 원천징수, gross=1,047,200) ---")
-    it5 = int(1047200 * 0.03 / 10) * 10
-    lit5 = int(it5 * 0.1 / 10) * 10
-    print(f"  IT(3%%): {it5:>8,}  (Excel: IT=34,557.6)")
-    print(f"  LIT(0.3%%): {lit5:>5,}")
-    print(f"  Total: {it5+lit5:>8,}")
+    for label, key, calc_val in items:
+        exp_val = expected[key]
+        match = "✅" if calc_val == exp_val else "❌"
+        if calc_val != exp_val:
+            all_pass = False
+        print(f"  {label}: {calc_val:>8,}원  (세무사: {exp_val:>8,}원) {match}")
+        total_calc += calc_val
+        total_expected += exp_val
     
-    print("\n=== Summary ===")
-    print("4대보험: 보수월액 기반 계산으로 Excel과 정합성 향상")
-    print("소득세: 개선된 간이세액표 근사 적용")
-    print("3.3%: 원천징수 로직 정확히 동작")
-    print("정규직: 제세공과금 지원금 = 공제 합계 자동 계산")
+    print(f"\n  공제액 합계: {total_calc:>8,}원  (세무사: {total_expected:>8,}원) {'✅' if total_calc == total_expected else '❌'}")
+    print(f"  차인지급액: {gross_pay - total_calc:>8,}원  (세무사: {gross_pay - total_expected:>8,}원)")
+    
+    print(f"\n{'=' * 60}")
+    if all_pass:
+        print("  ✅ 모든 항목이 세무사 산출 결과와 일치합니다!")
+    else:
+        print("  ❌ 일부 항목이 불일치합니다. 확인 필요!")
+    print(f"{'=' * 60}")
+    
+    # Additional test: 소득세 간이세액표 몇 가지 추가 검증
+    print(f"\n\n--- 간이세액표 추가 검증 ---")
+    test_cases = [
+        (1500000, 1, 8920, "150만원/1인"),
+        (1680000, 1, 12640, "168만원/1인 (허윤희)"),
+        (3000000, 1, 73900, "300만원/1인"),
+    ]
+    
+    for income, deps, expected_tax, label in test_cases:
+        calc_tax = calculate_korean_income_tax(income, dependents=deps)
+        match = "✅" if calc_tax == expected_tax else "❌"
+        print(f"  {label}: {calc_tax:>8,}원 (기대: {expected_tax:>8,}원) {match}")
 
 if __name__ == "__main__":
     verify()
