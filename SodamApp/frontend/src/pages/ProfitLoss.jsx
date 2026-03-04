@@ -16,6 +16,7 @@ const REVENUE_FIELDS = [
 const EXPENSE_FIELDS = [
     { key: 'expense_labor', label: '인건비', auto: true, group: 'expense-labor' },
     { key: 'expense_retirement', label: '퇴직금적립', auto: true, group: 'expense-labor' },
+    { key: 'expense_insurance', label: '4대보험료(사업주)', group: 'expense-labor' },
     { key: 'expense_ingredient', label: '원재료비', group: 'expense-material' },
     { key: 'expense_material', label: '소모품비', group: 'expense-material' },
     { key: 'expense_utility', label: '수도광열비', group: 'expense-utility' },
@@ -23,7 +24,6 @@ const EXPENSE_FIELDS = [
     { key: 'expense_repair', label: '수선비', group: 'expense-facility' },
     { key: 'expense_depreciation', label: '감가상각비', group: 'expense-facility' },
     { key: 'expense_tax', label: '세금과공과', group: 'expense-tax' },
-    { key: 'expense_insurance', label: '보험료', group: 'expense-tax' },
     { key: 'expense_card_fee', label: '카드수수료', group: 'expense-etc' },
     { key: 'expense_other', label: '기타경비', group: 'expense-etc' },
 ];
@@ -209,9 +209,20 @@ export default function ProfitLoss() {
         return data.reduce((sum, d) => sum + (d[field] || 0), 0);
     };
 
+    // Count months that have any data (revenue or expense > 0)
+    const activeMonthCount = useMemo(() => {
+        const count = MONTHS.filter(m => {
+            const md = data.find(d => d.month === m) || {};
+            const hasRevenue = REVENUE_FIELDS.some(f => (md[f.key] || 0) !== 0);
+            const hasExpense = EXPENSE_FIELDS.some(f => (md[f.key] || 0) !== 0);
+            return hasRevenue || hasExpense;
+        }).length;
+        return count || 1; // avoid division by zero
+    }, [data]);
+
     const calcYearAverage = (field) => {
         const total = calcYearTotal(field);
-        return Math.round(total / 6);
+        return Math.round(total / activeMonthCount);
     };
 
     const renderCell = (month, field, value) => {
@@ -467,7 +478,7 @@ export default function ProfitLoss() {
                                 <td key={m} className="subtotal">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
                             ))}
                             <td className="total"><strong>{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</strong></td>
-                            <td className="average"><strong>{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / 6))}</strong></td>
+                            <td className="average"><strong>{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / activeMonthCount))}</strong></td>
                             <td className="percentage">100%</td>
                         </tr>
                     </tbody>
@@ -496,12 +507,12 @@ export default function ProfitLoss() {
                     <div className="summary-card revenue-card">
                         <div className="card-label">총 수입</div>
                         <div className="card-value">{formatNumber(totalRevenue)}원</div>
-                        <div className="card-avg">월평균 {formatNumber(Math.round(totalRevenue / 6))}원</div>
+                        <div className="card-avg">월평균 {formatNumber(Math.round(totalRevenue / activeMonthCount))}원</div>
                     </div>
                     <div className="summary-card expense-card">
                         <div className="card-label">총 지출</div>
                         <div className="card-value">{formatNumber(totalExpense)}원</div>
-                        <div className="card-avg">월평균 {formatNumber(Math.round(totalExpense / 6))}원</div>
+                        <div className="card-avg">월평균 {formatNumber(Math.round(totalExpense / activeMonthCount))}원</div>
                     </div>
                     <div className="summary-card profit-card">
                         <div className="card-label">순수익</div>
@@ -911,7 +922,7 @@ export default function ProfitLoss() {
                                 <td key={m} className="pl-data">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
                             ))}
                             <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</td>
-                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / 6))}</td>
+                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / activeMonthCount))}</td>
                         </tr>
 
                         {/* Expense Section */}
@@ -940,7 +951,7 @@ export default function ProfitLoss() {
                                 <td key={m} className="pl-data">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
                             ))}
                             <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</td>
-                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / 6))}</td>
+                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / activeMonthCount))}</td>
                         </tr>
 
                         {/* Profit Row */}
@@ -955,7 +966,7 @@ export default function ProfitLoss() {
                                 {formatNumber(data.reduce((s, d) => s + calcProfit(d), 0))}
                             </td>
                             <td className="pl-data average profit-positive">
-                                {formatNumber(Math.round(data.reduce((s, d) => s + calcProfit(d), 0) / 6))}
+                                {formatNumber(Math.round(data.reduce((s, d) => s + calcProfit(d), 0) / activeMonthCount))}
                             </td>
                         </tr>
                     </tbody>

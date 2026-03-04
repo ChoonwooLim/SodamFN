@@ -118,8 +118,8 @@ def sync_all_expenses(year: int, month: int, session: Session):
         
         # Get all fields that SHOULD be updated by this function
         managed_fields = set(CATEGORY_TO_PL_FIELD.values())
-        # expense_labor, expense_retirement은 별도 관리 (sync_labor_cost / 수동입력)
-        excluded_fields = {'expense_labor', 'expense_retirement'}
+        # expense_labor, expense_retirement, expense_insurance는 별도 관리 (sync_labor_cost)
+        excluded_fields = {'expense_labor', 'expense_retirement', 'expense_insurance'}
         managed_fields -= excluded_fields
         
         for field in managed_fields:
@@ -313,19 +313,31 @@ def sync_summary_material_cost(year: int, month: int, session: Session):
 def sync_labor_cost(year: int, month: int, session: Session):
     """
     Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
-    Also calculates expense_retirement as 10% of labor cost.
+    Also calculates:
+      - expense_retirement as 10% of labor cost
+      - expense_insurance as employer-side 4대보험 (matches employee deductions)
     """
     
     month_str = f"{year}-{month:02d}"
     
-    # Calculate sum of all payroll total_pay for the month
-    total_labor = session.exec(
-        select(func.sum(Payroll.total_pay))
-        .where(Payroll.month == month_str)
-    ).one() or 0
+    # Fetch all payroll records for the month
+    payrolls = session.exec(
+        select(Payroll).where(Payroll.month == month_str)
+    ).all()
+    
+    # Calculate sum of all payroll total_pay (순수 인건비)
+    total_labor = sum(p.total_pay or 0 for p in payrolls)
     
     # Calculate retirement fund as 10% of labor cost
-    retirement_fund = int(int(total_labor) * 0.1)
+    retirement_fund = int(total_labor * 0.1)
+    
+    # Calculate employer-side 4대보험료
+    # 사업주 부담분 = 직원 부담분 (국민연금·건강보험·장기요양·고용보험 노사 반반)
+    employer_insurance = sum(
+        (p.deduction_np or 0) + (p.deduction_hi or 0) + 
+        (p.deduction_lti or 0) + (p.deduction_ei or 0) 
+        for p in payrolls
+    )
     
     # Find or create MonthlyProfitLoss record
     pl_record = session.exec(
@@ -334,18 +346,20 @@ def sync_labor_cost(year: int, month: int, session: Session):
     ).first()
     
     if pl_record:
-        pl_record.expense_labor = int(total_labor)
+        pl_record.expense_labor = total_labor
         pl_record.expense_retirement = retirement_fund
+        pl_record.expense_insurance = employer_insurance
         session.add(pl_record)
     else:
         # Create a new record if it doesn't exist
         pl_record = MonthlyProfitLoss(
             year=year,
             month=month,
-            expense_labor=int(total_labor),
-            expense_retirement=retirement_fund
+            expense_labor=total_labor,
+            expense_retirement=retirement_fund,
+            expense_insurance=employer_insurance
         )
         session.add(pl_record)
     
     session.commit()
-    return int(total_labor)
+    return total_labor
