@@ -121,10 +121,15 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
     output = []
     for r in results:
         total_revenue = r.revenue_store + r.revenue_coupang + r.revenue_baemin + r.revenue_yogiyo + r.revenue_ddangyo
-        expense_rent_fee = getattr(r, 'expense_rent_fee', 0) or 0
-        total_expense = (r.expense_labor + r.expense_rent + expense_rent_fee + r.expense_utility + 
-                        r.expense_vat + r.expense_biz_tax + r.expense_income_tax + 
-                        r.expense_card_fee + r.expense_material + r.expense_retirement)
+        # Dynamically sum all expense_ fields (excludes legacy/personal fields)
+        EXPENSE_KEYS = [
+            'expense_labor', 'expense_ingredient', 'expense_material',
+            'expense_utility', 'expense_rent', 'expense_repair',
+            'expense_depreciation', 'expense_tax', 'expense_insurance',
+            'expense_insurance_employee', 'expense_tax_employee',
+            'expense_card_fee', 'expense_retirement', 'expense_other',
+        ]
+        total_expense = sum(getattr(r, k, 0) or 0 for k in EXPENSE_KEYS)
         profit = total_revenue - total_expense
         
         output.append({

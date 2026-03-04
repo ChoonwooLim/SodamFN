@@ -48,7 +48,11 @@ export default function StaffDetail() {
         salary_payment_method: '근로자 계좌 입금',
         dependents_count: 1,
         children_count: 0,
-        insurance_base_salary: 0
+        insurance_base_salary: 0,
+        np_exempt: false,
+        durunnuri_support: false,
+        tax_support_enabled: false,
+        birth_date: ''
     });
 
     const [documents, setDocuments] = useState([]); // List of uploaded documents
@@ -165,7 +169,7 @@ export default function StaffDetail() {
         }
 
         // Handle number inputs with commas
-        if (name === 'hourly_wage' || name === 'monthly_salary' || name === 'insurance_base_salary') {
+        if (name === 'hourly_wage' || name === 'monthly_salary' || name === 'insurance_base_salary' || name === 'dependents_count' || name === 'children_count') {
             newValue = value.replace(/,/g, '');
             if (isNaN(newValue) && newValue !== '-') return; // Allow empty or negative temporarily? strict for now
             if (newValue === '') {
@@ -539,6 +543,16 @@ export default function StaffDetail() {
                                         placeholder="000000-0000000"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 mb-1">생년월일</label>
+                                    <input
+                                        type="date"
+                                        name="birth_date"
+                                        value={formData.birth_date || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -684,6 +698,42 @@ export default function StaffDetail() {
                                     </div>
                                 </div>
 
+                                {/* 보험/세금 옵션 체크박스들 */}
+                                {(formData.insurance_4major || formData.contract_type === '정규직') && (
+                                    <div className="flex flex-wrap gap-x-5 gap-y-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="np_exempt"
+                                                checked={formData.np_exempt || false}
+                                                onChange={handleChange}
+                                                className="w-4 h-4 text-orange-500 rounded"
+                                            />
+                                            <span className="text-xs font-medium text-slate-600">국민연금 면제 <span className="text-slate-400">(60세+)</span></span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="durunnuri_support"
+                                                checked={formData.durunnuri_support || false}
+                                                onChange={handleChange}
+                                                className="w-4 h-4 text-green-500 rounded"
+                                            />
+                                            <span className="text-xs font-medium text-slate-600">두루누리 지원 <span className="text-slate-400">(NP·EI 80%감면)</span></span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="tax_support_enabled"
+                                                checked={formData.tax_support_enabled || false}
+                                                onChange={handleChange}
+                                                className="w-4 h-4 text-purple-500 rounded"
+                                            />
+                                            <span className="text-xs font-medium text-slate-600">세금 대납 <span className="text-slate-400">(사업주 부담)</span></span>
+                                        </label>
+                                    </div>
+                                )}
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="relative">
                                         <label className="block text-sm font-medium text-slate-500 mb-1">시급</label>
@@ -711,19 +761,76 @@ export default function StaffDetail() {
 
                                 {/* 보수월액 - visible when 4대보험 or 정규직 */}
                                 {(formData.insurance_4major || formData.contract_type === '정규직') && (
-                                    <div className="relative">
-                                        <label className="block text-sm font-medium text-slate-500 mb-1">보수월액 <span className="text-xs text-slate-400">(4대보험 산정기준)</span></label>
-                                        <input
-                                            type="text"
-                                            name="insurance_base_salary"
-                                            value={formData.insurance_base_salary ? Number(formData.insurance_base_salary).toLocaleString() : ''}
-                                            onChange={handleChange}
-                                            className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-amber-500 outline-none font-bold"
-                                            placeholder="0 (미입력시 총급여 기준)"
-                                        />
-                                        <span className="absolute right-3 top-[34px] text-slate-400 text-sm">원</span>
+                                    <div>
+                                        <div className="flex items-end gap-2">
+                                            <div className="relative flex-1">
+                                                <label className="block text-sm font-medium text-slate-500 mb-1">보수월액 <span className="text-xs text-slate-400">(4대보험 산정기준)</span></label>
+                                                <input
+                                                    type="text"
+                                                    name="insurance_base_salary"
+                                                    value={formData.insurance_base_salary ? Number(formData.insurance_base_salary).toLocaleString() : ''}
+                                                    onChange={handleChange}
+                                                    className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-amber-500 outline-none font-bold"
+                                                    placeholder="0 (미입력시 총급여 기준)"
+                                                />
+                                                <span className="absolute right-3 top-[34px] text-slate-400 text-sm">원</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const resp = await api.get(`/payroll/calc-insurance-base/${id}`);
+                                                        if (resp.data.status === 'success') {
+                                                            const { insurance_base_salary, method, breakdown } = resp.data.data;
+                                                            const details = Object.entries(breakdown)
+                                                                .map(([k, v]) => `${k}: ${typeof v === 'number' ? v.toLocaleString() : v}`)
+                                                                .join('\n');
+                                                            if (window.confirm(
+                                                                `[${method}]\n\n${details}\n\n산출 보수월액: ${insurance_base_salary.toLocaleString()}원\n\n적용하시겠습니까?`
+                                                            )) {
+                                                                setFormData(prev => ({ ...prev, insurance_base_salary }));
+                                                            }
+                                                        } else {
+                                                            alert(resp.data.message || '산출할 수 없습니다.');
+                                                        }
+                                                    } catch (err) {
+                                                        console.error(err);
+                                                        alert(err.response?.data?.detail || '보수월액 산출 중 오류');
+                                                    }
+                                                }}
+                                                className="px-3 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 shadow-sm transition-all whitespace-nowrap"
+                                            >
+                                                자동산출
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
+
+                                {/* 소득세 산정 기준 - 부양가족/자녀 */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="relative">
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">부양가족 수 <span className="text-xs text-slate-400">(본인 포함)</span></label>
+                                        <input
+                                            type="number"
+                                            name="dependents_count"
+                                            value={formData.dependents_count ?? 1}
+                                            onChange={handleChange}
+                                            min="1"
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <label className="block text-sm font-medium text-slate-500 mb-1">20세 이하 자녀 <span className="text-xs text-slate-400">(세액공제)</span></label>
+                                        <input
+                                            type="number"
+                                            name="children_count"
+                                            value={formData.children_count ?? 0}
+                                            onChange={handleChange}
+                                            min="0"
+                                            className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                        />
+                                    </div>
+                                </div>
 
                                 <div className="space-y-3">
                                     <label className="block text-sm font-medium text-slate-500">급여 계좌</label>

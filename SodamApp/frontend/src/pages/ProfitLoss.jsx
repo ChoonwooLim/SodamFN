@@ -17,6 +17,8 @@ const EXPENSE_FIELDS = [
     { key: 'expense_labor', label: '인건비', auto: true, group: 'expense-labor' },
     { key: 'expense_retirement', label: '퇴직금적립', auto: true, group: 'expense-labor' },
     { key: 'expense_insurance', label: '4대보험료(사업주)', group: 'expense-labor' },
+    { key: 'expense_insurance_employee', label: '4대보험료(직원)', auto: true, group: 'expense-labor' },
+    { key: 'expense_tax_employee', label: '원천세(직원)', auto: true, group: 'expense-labor' },
     { key: 'expense_ingredient', label: '원재료비', group: 'expense-material' },
     { key: 'expense_material', label: '소모품비', group: 'expense-material' },
     { key: 'expense_utility', label: '수도광열비', group: 'expense-utility' },

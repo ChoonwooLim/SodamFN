@@ -48,9 +48,9 @@ def _run_migrations():
                 print(f"  Migration: Adding {column} to {table}...")
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
                 conn.commit()
-                print(f"  ✅ {column} added successfully")
+                print(f"  [OK] {column} added successfully")
             else:
-                print(f"  ✓ {table}.{column} already exists")
+                print(f"  [OK] {table}.{column} already exists")
 
 if __name__ == "__main__":
     init_db()

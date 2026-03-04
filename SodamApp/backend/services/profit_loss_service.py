@@ -118,8 +118,8 @@ def sync_all_expenses(year: int, month: int, session: Session):
         
         # Get all fields that SHOULD be updated by this function
         managed_fields = set(CATEGORY_TO_PL_FIELD.values())
-        # expense_labor, expense_retirement, expense_insurance는 별도 관리 (sync_labor_cost)
-        excluded_fields = {'expense_labor', 'expense_retirement', 'expense_insurance'}
+        # expense_labor, expense_retirement, expense_insurance, expense_insurance_employee, expense_tax_employee는 별도 관리 (sync_labor_cost)
+        excluded_fields = {'expense_labor', 'expense_retirement', 'expense_insurance', 'expense_insurance_employee', 'expense_tax_employee'}
         managed_fields -= excluded_fields
         
         for field in managed_fields:
@@ -325,19 +325,33 @@ def sync_labor_cost(year: int, month: int, session: Session):
         select(Payroll).where(Payroll.month == month_str)
     ).all()
     
-    # Calculate sum of all payroll total_pay (순수 인건비)
-    total_labor = sum(p.total_pay or 0 for p in payrolls)
-    
-    # Calculate retirement fund as 10% of labor cost
-    retirement_fund = int(total_labor * 0.1)
-    
-    # Calculate employer-side 4대보험료
-    # 사업주 부담분 = 직원 부담분 (국민연금·건강보험·장기요양·고용보험 노사 반반)
-    employer_insurance = sum(
+    # Calculate employee-side 4대보험 deductions
+    employee_insurance = sum(
         (p.deduction_np or 0) + (p.deduction_hi or 0) + 
         (p.deduction_lti or 0) + (p.deduction_ei or 0) 
         for p in payrolls
     )
+    
+    # Calculate employee-side withholding tax (소득세 + 지방소득세)
+    employee_tax = sum(
+        (p.deduction_it or 0) + (p.deduction_lit or 0) 
+        for p in payrolls
+    )
+    
+    # Calculate net pay (실수령액) = total_pay - all deductions
+    total_labor_net = sum(p.total_pay or 0 for p in payrolls) - employee_insurance - employee_tax
+    
+    # 사업주 세금 대납 (bonus_tax_support): 정규직 등 사업주가 공제액을 대신 부담하는 경우
+    # 해당 직원의 인건비는 실수령액이 아니라 총지급액(gross) 기준으로 반영
+    tax_support_total = sum(p.bonus_tax_support or 0 for p in payrolls)
+    total_labor_net += tax_support_total
+    
+    # Calculate retirement fund as 10% of gross labor cost (세전 기준 유지)
+    total_labor_gross = sum(p.total_pay or 0 for p in payrolls) + tax_support_total
+    retirement_fund = int(total_labor_gross * 0.1)
+    
+    # Employer-side 4대보험료 = employee deductions (노사 반반)
+    employer_insurance = employee_insurance
     
     # Find or create MonthlyProfitLoss record
     pl_record = session.exec(
@@ -346,20 +360,23 @@ def sync_labor_cost(year: int, month: int, session: Session):
     ).first()
     
     if pl_record:
-        pl_record.expense_labor = total_labor
+        pl_record.expense_labor = total_labor_net
         pl_record.expense_retirement = retirement_fund
         pl_record.expense_insurance = employer_insurance
+        pl_record.expense_insurance_employee = employee_insurance
+        pl_record.expense_tax_employee = employee_tax
         session.add(pl_record)
     else:
-        # Create a new record if it doesn't exist
         pl_record = MonthlyProfitLoss(
             year=year,
             month=month,
-            expense_labor=total_labor,
+            expense_labor=total_labor_net,
             expense_retirement=retirement_fund,
-            expense_insurance=employer_insurance
+            expense_insurance=employer_insurance,
+            expense_insurance_employee=employee_insurance,
+            expense_tax_employee=employee_tax,
         )
         session.add(pl_record)
     
     session.commit()
-    return total_labor
+    return total_labor_net

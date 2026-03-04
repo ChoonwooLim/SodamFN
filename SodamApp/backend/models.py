@@ -1,7 +1,7 @@
 from typing import Optional, List
 from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
 import datetime
-from datetime import time
+from datetime import time, date
 
 # --- Financials ---
 
@@ -94,9 +94,13 @@ class Staff(SQLModel, table=True):
     email: Optional[str] = None # 이메일 주소
     address: Optional[str] = None # Added for contract
     resident_number: Optional[str] = None # Added for contract
+    birth_date: Optional[date] = None # 생년월일 (국민연금 자동 면제 등)
     contract_type: str = Field(default="아르바이트") # 정규직, 아르바이트, 일용직
     insurance_4major: bool = Field(default=False) # 4대보험 가입여부
     insurance_base_salary: int = Field(default=0) # 보수월액 (4대보험 산정 기준 신고 월 보수액)
+    np_exempt: bool = Field(default=False) # 국민연금 면제 (60세 이상 등)
+    durunnuri_support: bool = Field(default=False) # 두루누리 사회보험 지원 (NP/EI 80% 감면)
+    tax_support_enabled: bool = Field(default=False) # 사업주 세금 대납 (공제액을 사업주가 대신 부담)
     monthly_salary: int = Field(default=0) # 월급 (if applicable)
     work_schedule: Optional[str] = None # 근무시간 (e.g. "09:00~18:00") - KEEPING FOR BACKWARD COMPAT, but using new fields below
     
@@ -297,7 +301,9 @@ class MonthlyProfitLoss(SQLModel, table=True):
     expense_repair: int = 0       # 수선비 (시설·장비 수리)
     expense_depreciation: int = 0 # 감가상각비 (기계·인테리어 구입)
     expense_tax: int = 0          # 세금과공과 (부가세·소득세·지방세)
-    expense_insurance: int = 0    # 보험료 (4대보험·화재보험)
+    expense_insurance: int = 0    # 보험료 (4대보험 사업주 부담분)
+    expense_insurance_employee: int = 0  # 4대보험료 (직원 부담분)
+    expense_tax_employee: int = 0        # 원천세 (직원 소득세+지방소득세)
     expense_card_fee: int = 0     # 카드수수료
     expense_retirement: int = 0   # 퇴직금적립 (인건비 10% 자동)
     expense_other: int = 0        # 기타경비

@@ -70,6 +70,12 @@ class StaffUpdate(BaseModel):
     salary_payment_date: Optional[str] = None
     salary_payment_method: Optional[str] = None
 
+    # Insurance & Tax Options
+    np_exempt: Optional[bool] = None  # 국민연금 면제 (60세 이상)
+    durunnuri_support: Optional[bool] = None  # 두루누리 지원 (NP/EI 80% 감면)
+    tax_support_enabled: Optional[bool] = None  # 세금 대납 (사업주 부담)
+    birth_date: Optional[date] = None  # 생년월일
+
 class AttendanceAction(BaseModel):
     staff_id: int
     action: str  # "checkin" or "checkout"

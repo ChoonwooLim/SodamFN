@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -n \"VITE,FASTAPI,STAFF\" -c \"blue,green,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:staff\"",
     "dev:frontend": "vite",
-    "dev:backend": "cd ../backend && .\\.venv\\Scripts\\python.exe main.py",
+    "dev:backend": "cd ../backend && (for /f \"tokens=5\" %a in ('netstat -ano ^| findstr :8000 ^| findstr LISTENING') do taskkill /PID %a /F >nul 2>&1) & .\\.venv\\Scripts\\python.exe main.py",
     "dev:staff": "cd ../staff-app && npx vite",
     "build": "vite build",
     "lint": "eslint .",

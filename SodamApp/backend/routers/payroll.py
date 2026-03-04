@@ -303,10 +303,23 @@ def calculate_payroll(req: PayrollCalculateRequest):
                 year=target_year,
                 insurance_base=staff.insurance_base_salary or 0
             )
-            d_np = insurances["np"]
+            # 국민연금 면제: 생년월일 기준 60세 이상 자동 면제 또는 수동 설정
+            is_np_exempt = staff.np_exempt  # 수동 설정
+            if not is_np_exempt and staff.birth_date:
+                from dateutil.relativedelta import relativedelta
+                payroll_date = date(target_year, target_month, 1)
+                age = relativedelta(payroll_date, staff.birth_date).years
+                if age >= 60:
+                    is_np_exempt = True
+            d_np = 0 if is_np_exempt else insurances["np"]
             d_hi = insurances["hi"]
             d_lti = insurances["lti"]
             d_ei = insurances["ei"]
+            
+            # 두루누리 사회보험 지원: NP/EI 80% 감면 (직원은 20%만 납부)
+            if getattr(staff, 'durunnuri_support', False):
+                d_np = int(d_np * 0.2 / 10) * 10
+                d_ei = int(d_ei * 0.2 / 10) * 10
             
             # Precise Income Tax using dependents/children
             d_it = calculate_korean_income_tax(
@@ -346,9 +359,9 @@ def calculate_payroll(req: PayrollCalculateRequest):
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
         
-        # Tax Support (제세공과금 지원금) for Regular Staff
+        # Tax Support (제세공과금 지원금) - 사업주 세금 대납
         tax_support = 0
-        if staff.contract_type == "정규직":
+        if getattr(staff, 'tax_support_enabled', False):
             # Company reimburses all deductions
             tax_support = total_deductions
 
@@ -509,3 +522,129 @@ def execute_transfer(payroll_id: int, admin: User = Depends(get_admin_user)):
 def get_bulk_transfer_data(payroll_ids: List[int] = Body(..., embed=True), admin: User = Depends(get_admin_user)):
     data = BankingService.get_bulk_transfer_data(payroll_ids)
     return {"status": "success", "data": data}
+
+@router.get("/calc-insurance-base/{staff_id}")
+def calc_insurance_base_salary(staff_id: int, year: int = None, admin: User = Depends(get_admin_user)):
+    """
+    보수월액 자동 산출 (건강보험·국민연금 정기결정 방식)
+    
+    기존 직원: 전년도 총 보수(비과세 제외) ÷ 근무월수 → 천원 단위 반올림
+    신규 직원: 시급 × 주당 예상시간 × 52.14 ÷ 12 또는 월급
+    """
+    service = DatabaseService()
+    try:
+        staff = service.session.get(Staff, staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        
+        # 기준년도: default = 올해 (전년도 데이터 사용)
+        if year is None:
+            year = date.today().year
+        prev_year = year - 1
+        
+        # 전년도 급여 데이터 조회
+        payrolls = service.session.exec(
+            select(Payroll).where(
+                Payroll.staff_id == staff_id,
+                Payroll.month >= f"{prev_year}-01",
+                Payroll.month <= f"{prev_year}-12"
+            )
+        ).all()
+        
+        method = ""
+        breakdown = {}
+        
+        if payrolls and len(payrolls) >= 1:
+            # === 정기결정 방식: 전년도 실적 기반 ===
+            months_worked = len(payrolls)
+            total_gross = 0
+            total_non_taxable = 0
+            
+            for p in payrolls:
+                gross = (p.base_pay or 0) + (p.bonus_holiday or 0)
+                total_gross += gross
+                # 비과세: 식대 200,000원 (정규직만)
+                if staff.contract_type == "정규직":
+                    total_non_taxable += 200000
+            
+            taxable_total = total_gross - total_non_taxable
+            base_salary = round(taxable_total / months_worked / 1000) * 1000  # 천원 단위 반올림
+            
+            method = "정기결정 (전년도 실적)"
+            breakdown = {
+                "기준년도": prev_year,
+                "근무월수": months_worked,
+                "총보수": total_gross,
+                "비과세합계": total_non_taxable,
+                "과세보수합계": taxable_total,
+                "산출보수월액": base_salary,
+            }
+        else:
+            # === 취득시결정 방식: 예상 소득 기반 ===
+            if staff.contract_type == "정규직" and staff.monthly_salary > 0:
+                # 정규직: 월급 - 비과세(식대 20만)
+                base_salary = round((staff.monthly_salary - 200000) / 1000) * 1000
+                method = "취득시결정 (월급 기준)"
+                breakdown = {
+                    "월급": staff.monthly_salary,
+                    "비과세(식대)": 200000,
+                    "산출보수월액": base_salary,
+                }
+            elif staff.hourly_wage > 0:
+                # 시급제: 시급 × 주당 예상시간 × 52.14 / 12
+                # 주당 시간 추정: 올해 데이터 사용 가능하면 평균, 아니면 40시간 기본
+                current_payrolls = service.session.exec(
+                    select(Payroll).where(
+                        Payroll.staff_id == staff_id,
+                        Payroll.month >= f"{year}-01",
+                        Payroll.month <= f"{year}-12"
+                    )
+                ).all()
+                
+                if current_payrolls:
+                    # 올해 데이터로 월평균 추정
+                    total_gross = sum((p.base_pay or 0) + (p.bonus_holiday or 0) for p in current_payrolls)
+                    avg_monthly = total_gross / len(current_payrolls)
+                    base_salary = round(avg_monthly / 1000) * 1000
+                    method = f"취득시결정 (올해 {len(current_payrolls)}개월 평균)"
+                    breakdown = {
+                        "올해총보수": total_gross,
+                        "근무월수": len(current_payrolls),
+                        "월평균": int(avg_monthly),
+                        "산출보수월액": base_salary,
+                    }
+                else:
+                    # 시급 기반 추정 (주 40시간 기준)
+                    weekly_hours = 40
+                    annual_est = staff.hourly_wage * weekly_hours * 52.14
+                    base_salary = round(annual_est / 12 / 1000) * 1000
+                    method = "취득시결정 (시급×40h 추정)"
+                    breakdown = {
+                        "시급": staff.hourly_wage,
+                        "주당시간(추정)": weekly_hours,
+                        "연간추정": int(annual_est),
+                        "산출보수월액": base_salary,
+                    }
+            else:
+                return {
+                    "status": "error",
+                    "message": "급여 데이터가 부족하여 보수월액을 산출할 수 없습니다."
+                }
+        
+        # 국민연금 상·하한 (2026년 기준)
+        NP_MIN = 370000
+        NP_MAX = 6170000
+        capped = max(NP_MIN, min(base_salary, NP_MAX))
+        if capped != base_salary:
+            breakdown["상하한적용"] = f"{base_salary:,} → {capped:,}"
+        
+        return {
+            "status": "success",
+            "data": {
+                "insurance_base_salary": base_salary,
+                "method": method,
+                "breakdown": breakdown,
+            }
+        }
+    finally:
+        service.close()
