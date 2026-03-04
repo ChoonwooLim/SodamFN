@@ -101,6 +101,30 @@ const phases = [
                     { text: '오프라인 모드 지원', done: false },
                 ],
             },
+            {
+                name: '모듈형 커스터마이징 엔진',
+                status: 'planned',
+                items: [
+                    { text: '드래그 앤 드롭 모듈 선택기 (매장별 기능 ON/OFF)', done: false },
+                    { text: '매출관리·급여·재고·예약 등 독립 모듈 분리', done: false },
+                    { text: '매장별 대시보드 레이아웃 커스텀 (위젯 구성)', done: false },
+                    { text: '업종별 기본 모듈 프리셋 (음식점/카페/소매/서비스)', done: false },
+                    { text: '모듈별 독립 권한 설정 (직원별 접근 제어)', done: false },
+                    { text: '커스텀 데이터 필드 추가 (매장별 고유 항목)', done: false },
+                ],
+            },
+            {
+                name: '업종별 템플릿 & 마켓플레이스',
+                status: 'planned',
+                items: [
+                    { text: '업종별 스타터 템플릿 (메뉴/상품/서비스 구조)', done: false },
+                    { text: '맞춤 보고서 템플릿 (업종별 KPI 대시보드)', done: false },
+                    { text: '모듈 마켓플레이스 (서드파티 확장 모듈)', done: false },
+                    { text: '매장 간 모듈 설정 복제/공유 기능', done: false },
+                    { text: 'API 웹훅 지원 (외부 시스템 연동 자동화)', done: false },
+                    { text: '화이트라벨 지원 (브랜드별 로고/테마 변경)', done: false },
+                ],
+            },
         ],
     },
     {
