@@ -33,6 +33,7 @@ const AdminAppPreview = React.lazy(() => import('./pages/AdminAppPreview'));
 const UserManual = React.lazy(() => import('./pages/UserManual'));
 const OpenChecklistPage = React.lazy(() => import('./pages/OpenChecklistPage'));
 const InventoryCheckAdmin = React.lazy(() => import('./pages/InventoryCheckAdmin'));
+const DevelopmentRoadmap = React.lazy(() => import('./pages/DevelopmentRoadmap'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -115,6 +116,7 @@ export default function App() {
               <Route path="/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
               <Route path="/open-checklist" element={<ProtectedRoute adminOnly><OpenChecklistPage /></ProtectedRoute>} />
               <Route path="/inventory-check-admin" element={<ProtectedRoute adminOnly><InventoryCheckAdmin /></ProtectedRoute>} />
+              <Route path="/roadmap" element={<ProtectedRoute adminOnly><DevelopmentRoadmap /></ProtectedRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}
               <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
