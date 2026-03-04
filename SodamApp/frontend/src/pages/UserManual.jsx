@@ -11,7 +11,7 @@ export default function UserManual() {
         <div className="manual-page">
             <div className="manual-header">
                 <h1><BookOpen size={28} /> 사용 매뉴얼</h1>
-                <p>SodamFN 관리 시스템의 주요 기능 사용법을 안내합니다.</p>
+                <p>셈하나 관리 시스템의 주요 기능 사용법을 안내합니다.</p>
             </div>
 
             {/* 목차 */}

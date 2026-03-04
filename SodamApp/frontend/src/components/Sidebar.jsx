@@ -64,7 +64,7 @@ export default function Sidebar() {
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
-            { icon: Rocket, label: '개발계획', path: '/roadmap' },
+            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
             { icon: Rocket, label: '배포 관리', path: '/deploy' },
         ]
         : [
@@ -119,8 +119,8 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <h1 className="text-lg font-black tracking-tighter bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                    SODAM<span className="text-blue-500">FN</span>
+                <h1 className="text-lg font-black tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                    셈<span className="text-blue-500">하나</span> <span className="text-slate-600 font-light">|</span> SEM<span className="text-blue-500">HANA</span>
                 </h1>
             </div>
 

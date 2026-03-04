@@ -40,10 +40,19 @@
 .login-title {
     font-size: 1.75rem;
     font-weight: 800;
-    background: linear-gradient(to right, #fff, #94a3b8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #fff;
     margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+.login-title .brand-highlight {
+    color: #3b82f6;
+}
+
+.login-title .brand-sep {
+    opacity: 0.25;
+    font-weight: 300;
+    margin: 0 0.15em;
 }
 
 .login-subtitle {

@@ -254,9 +254,9 @@ export default function DevelopmentRoadmap() {
                         </button>
                         <div>
                             <h1 className="text-2xl md:text-3xl font-black text-slate-900">
-                                SODAM<span className="text-blue-600">FN</span> 개발 로드맵
+                                셈<span className="text-blue-600">하나</span> 개발 로드맵
                             </h1>
-                            <p className="text-slate-500 text-sm mt-1">세무·노무·재무 통합 플랫폼으로의 진화 계획</p>
+                            <p className="text-slate-500 text-sm mt-1">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
                         </div>
                     </div>
 
@@ -270,7 +270,7 @@ export default function DevelopmentRoadmap() {
                                 <h2 className="text-lg font-bold mb-2">비전: 소규모 사업자를 위한 올인원 경영관리 플랫폼</h2>
                                 <p className="text-slate-300 text-sm leading-relaxed">
                                     세무사·노무사 없이도 급여 정산, 세금 신고, 노무 관리, 재무 분석까지 —
-                                    소담FN이 소규모 사업자의 <strong>경영 파트너</strong>가 되겠습니다.
+                                    <strong>셈하나</strong>가 소규모 사업자의 <strong>경영 파트너</strong>가 되겠습니다.
                                 </p>
                                 <div className="flex flex-wrap gap-2 mt-4">
                                     {['세무 자동화', '노무 관리', '재무 분석', 'SaaS 플랫폼'].map(tag => (

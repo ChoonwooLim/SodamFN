@@ -129,8 +129,8 @@ export default function LoginPage() {
                     <div className="login-logo-wrapper">
                         <Lock className="text-white" size={36} />
                     </div>
-                    <h1 className="login-title">SODAM FN</h1>
-                    <p className="login-subtitle">소담 관리 시스템에 오신 것을 환영합니다</p>
+                    <h1 className="login-title">셈<span className="brand-highlight">하나</span><span className="brand-sep">|</span>SEM<span className="brand-highlight">HANA</span></h1>
+                    <p className="login-subtitle">셈하나 관리 시스템에 오신 것을 환영합니다</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="login-form">

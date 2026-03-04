@@ -59,7 +59,7 @@ export default function SignupPage() {
                     <div className="login-logo-wrapper">
                         <UserPlus className="text-white" size={36} />
                     </div>
-                    <h1 className="login-title">SODAM FN</h1>
+                    <h1 className="login-title">셈<span className="brand-highlight">하나</span><span className="brand-sep">|</span>SEM<span className="brand-highlight">HANA</span></h1>
                     <p className="login-subtitle">새로운 계정을 생성하세요</p>
                 </div>
 
