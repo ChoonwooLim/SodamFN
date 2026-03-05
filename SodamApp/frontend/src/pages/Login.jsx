@@ -76,7 +76,7 @@ export default function LoginPage() {
             } else if (payload.role === 'guest') {
                 navigate('/guest');
             } else {
-                navigate('/staff-dashboard');
+                navigate('/dashboard');
             }
         } catch (e) {
             console.error("Failed to process token", e);

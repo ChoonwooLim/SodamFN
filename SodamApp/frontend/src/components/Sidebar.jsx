@@ -49,7 +49,7 @@ export default function Sidebar() {
             { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
         ]
         : [
-            { icon: LayoutDashboard, label: '대시보드', path: '/staff-dashboard' },
+            { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
             { icon: FileSignature, label: '내 전자계약', path: '/contracts/my' },
         ];
 

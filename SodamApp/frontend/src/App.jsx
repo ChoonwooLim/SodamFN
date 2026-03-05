@@ -16,7 +16,7 @@ const LoginPage = React.lazy(() => import('./pages/Login'));
 const ContractMyPage = React.lazy(() => import('./pages/ContractMy'));
 const ContractSignPage = React.lazy(() => import('./pages/ContractSign'));
 const SignupPage = React.lazy(() => import('./pages/Signup'));
-const StaffDashboard = React.lazy(() => import('./pages/StaffDashboard'));
+
 const CardSales = React.lazy(() => import('./pages/CardSales'));
 const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
@@ -58,7 +58,7 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (adminOnly && role !== 'admin' && role !== 'superadmin') {
-    return <Navigate to="/staff-dashboard" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -160,7 +160,7 @@ export default function App() {
               {/* STAFF ROUTES */}
               <Route path="/staff-app-preview" element={<ProtectedRoute adminOnly><StaffAppPreview /></ProtectedRoute>} />
               <Route path="/admin-app-preview" element={<ProtectedRoute adminOnly><AdminAppPreview /></ProtectedRoute>} />
-              <Route path="/staff-dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
+
               <Route path="/contracts/my" element={<ProtectedRoute><ContractMyPage /></ProtectedRoute>} />
               <Route path="/contracts/:id/sign" element={<ProtectedRoute><ContractSignPage /></ProtectedRoute>} />
 

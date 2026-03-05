@@ -6,7 +6,7 @@ import {
     Calculator, PieChart, Clock, FileText, Receipt, Smartphone,
     UserPlus, CheckCircle2, Star, ChevronDown, Menu, X, Lock, Globe,
     Zap, HeartHandshake, Award, LogIn, Building2, Send, Mail, Phone,
-    FileCheck, MessageSquare
+    FileCheck, MessageSquare, Briefcase, ExternalLink, HelpCircle
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════
