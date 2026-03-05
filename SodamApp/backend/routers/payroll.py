@@ -30,6 +30,12 @@ class PayrollCalculateRequest(BaseModel):
     staff_id: int
     month: str # YYYY-MM
 
+class InsuranceBaseImport(BaseModel):
+    staff_name: str
+    total_remuneration: int  # 전년도 보수총액
+    months_worked: int  # 근무월수
+    staff_id: Optional[int] = None  # 직접 ID 지정 (선택)
+
 @router.get("/attendance/{staff_id}/{month}")
 def get_monthly_attendance(staff_id: int, month: str):
     service = DatabaseService()
@@ -296,7 +302,14 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         d_np, d_hi, d_ei, d_lti, d_it, d_lit = 0, 0, 0, 0, 0, 0
         
-        if staff.contract_type == "정규직" or staff.insurance_4major:
+        if staff.contract_type == "사업소득자":
+            # ── 사업소득자 (프리랜서 3.3% 원천징수) ──
+            # 소득세: 지급총액 × 3.0%
+            d_it = int(gross_pay * 0.03 / 10) * 10
+            # 지방소득세: 소득세 × 10% (= 지급총액 × 0.3%)
+            d_lit = int(d_it * 0.1 / 10) * 10
+            # 4대보험 공제 없음 (직장가입자 아님)
+        elif staff.contract_type == "정규직" or staff.insurance_4major:
             # 정규직 또는 4대보험 가입 직원: 4대보험 + 간이세액표 소득세
             insurances = calculate_insurances(
                 taxable_income, 
@@ -402,6 +415,64 @@ def calculate_payroll(req: PayrollCalculateRequest):
         
         return {"status": "success", "data": existing.model_dump()}
         
+    finally:
+        service.close()
+
+@router.post("/import-insurance-base")
+def import_insurance_base(
+    entries: List[InsuranceBaseImport] = Body(...),
+    admin: User = Depends(get_admin_user)
+):
+    """
+    직장가입자 보수총액 통보서 기반 보수월액 일괄 설정.
+    세무사가 제공한 전년도 보수총액과 근무월수로 보수월액을 산출하여 Staff 레코드에 저장합니다.
+    """
+    service = DatabaseService()
+    try:
+        results = []
+        for entry in entries:
+            # Find staff by ID or name
+            if entry.staff_id:
+                staff = service.session.get(Staff, entry.staff_id)
+            else:
+                stmt = select(Staff).where(Staff.name == entry.staff_name)
+                staff = service.session.exec(stmt).first()
+            
+            if not staff:
+                results.append({
+                    "staff_name": entry.staff_name,
+                    "status": "error",
+                    "message": f"직원 '{entry.staff_name}'을(를) 찾을 수 없습니다."
+                })
+                continue
+            
+            if entry.months_worked <= 0:
+                results.append({
+                    "staff_name": staff.name,
+                    "status": "error",
+                    "message": "근무월수가 0 이하입니다."
+                })
+                continue
+            
+            # 보수월액 산출: 보수총액 ÷ 근무월수 → 천원 단위 반올림
+            base_salary = round(entry.total_remuneration / entry.months_worked / 1000) * 1000
+            
+            old_value = staff.insurance_base_salary
+            staff.insurance_base_salary = base_salary
+            service.session.add(staff)
+            
+            results.append({
+                "staff_name": staff.name,
+                "staff_id": staff.id,
+                "status": "success",
+                "total_remuneration": entry.total_remuneration,
+                "months_worked": entry.months_worked,
+                "old_insurance_base": old_value,
+                "new_insurance_base": base_salary,
+            })
+        
+        service.session.commit()
+        return {"status": "success", "results": results}
     finally:
         service.close()
 

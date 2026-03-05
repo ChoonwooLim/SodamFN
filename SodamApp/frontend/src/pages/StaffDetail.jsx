@@ -682,6 +682,7 @@ export default function StaffDetail() {
                                             <option value="정규직">정규직</option>
                                             <option value="아르바이트">아르바이트</option>
                                             <option value="일용직">일용직</option>
+                                            <option value="사업소득자">사업소득자 (3.3%)</option>
                                         </select>
                                     </div>
                                     <div className="flex items-end pb-1.5">
@@ -801,6 +802,30 @@ export default function StaffDetail() {
                                                 className="px-3 py-2.5 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 shadow-sm transition-all whitespace-nowrap"
                                             >
                                                 자동산출
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const totalStr = window.prompt('전년도 보수총액을 입력해주세요 (원)\n(예: 13267800)');
+                                                    if (!totalStr) return;
+                                                    const monthsStr = window.prompt('근무월수를 입력해주세요 (개월)\n(예: 9)');
+                                                    if (!monthsStr) return;
+                                                    const total = parseInt(totalStr.replace(/,/g, ''));
+                                                    const months = parseInt(monthsStr);
+                                                    if (isNaN(total) || isNaN(months) || months <= 0) {
+                                                        alert('올바른 숫자를 입력해주세요.');
+                                                        return;
+                                                    }
+                                                    const baseSalary = Math.round(total / months / 1000) * 1000;
+                                                    if (window.confirm(
+                                                        `[통보서 기준]\n\n보수총액: ${total.toLocaleString()}원\n근무월수: ${months}개월\n\n산출 보수월액: ${baseSalary.toLocaleString()}원\n\n적용하시겠습니까?`
+                                                    )) {
+                                                        setFormData(prev => ({ ...prev, insurance_base_salary: baseSalary }));
+                                                    }
+                                                }}
+                                                className="px-3 py-2.5 bg-teal-500 text-white rounded-xl text-xs font-bold hover:bg-teal-600 shadow-sm transition-all whitespace-nowrap"
+                                            >
+                                                통보서
                                             </button>
                                         </div>
                                     </div>

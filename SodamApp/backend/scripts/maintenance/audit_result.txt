@@ -1,0 +1,243 @@
+﻿==========================================================================================
+  ALL EMPLOYEES - PAYROLL SETTINGS AUDIT (2026-03 onward)
+==========================================================================================
+
+--- [?덉쑄?? (ID=4) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: True
+  insurance_base_salary: 1,500,000
+  hourly_wage: 12,000
+  monthly_salary: 0
+  birth_date: 1979-04-01 (age=46)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=1,500,000):
+     NP=71,250  HI=53,920  LTI=7,080  EI=13,500  TOTAL=145,750
+
+--- [?뺣챸二? (ID=3) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: True
+  insurance_base_salary: 1,400,000
+  hourly_wage: 12,000
+  monthly_salary: 0
+  birth_date: 1994-04-06 (age=31)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: True
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=1,400,000):
+     NP=13,300  HI=50,330  LTI=6,610  EI=2,520  TOTAL=72,760
+
+--- [?뺤닔?? (ID=9) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: True
+  insurance_base_salary: 1,868,000
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: 1980-06-27 (age=45)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: True
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=1,868,000):
+     NP=17,740  HI=67,150  LTI=8,820  EI=3,360  TOTAL=97,070
+
+--- [怨좎꽍紐? (ID=1) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 36,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [?대Ц?? (ID=10) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [?곕??? (ID=11) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [源?⑤━] (ID=12) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [由? (ID=13) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [源?ㅼ?] (ID=14) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [?댁콈?? (ID=7) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [沅뚰븯?] (ID=15) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [?ㅼ＜由? (ID=6) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?댁궗
+  insurance_4major: True
+  insurance_base_salary: 5,173,000
+  hourly_wage: 12,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=5,173,000):
+     NP=245,718  HI=185,960  LTI=24,430  EI=46,550  TOTAL=502,658
+
+--- [源吏?? (ID=5) ---
+  contract_type: ?뺢퇋吏?
+  status: ?ъ쭅
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 15,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=0):
+     NP=19,000  HI=10,080  LTI=1,320  EI=0  TOTAL=30,400
+  !! WARNING: insurance_base_salary=0, will fallback to gross_pay each month
+
+--- [?뺤닔誘? (ID=16) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: False
+  insurance_base_salary: 0
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: None (age=None)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> Part-time/Daily: EI only (0.9% of gross)
+  >> IT: daily wage > 150,000 threshold
+
+--- [源湲덉닚] (ID=2) ---
+  contract_type: ?뺢퇋吏?
+  status: ?ъ쭅
+  insurance_4major: True
+  insurance_base_salary: 3,000,000
+  hourly_wage: 13,770
+  monthly_salary: 3,400,000
+  birth_date: 1973-02-18 (age=53)
+  np_exempt: False (auto=False -> effective=False)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=3,000,000):
+     NP=142,500  HI=107,850  LTI=14,170  EI=27,000  TOTAL=291,520
+
+--- [源?쒕났] (ID=8) ---
+  contract_type: ?꾨Ⅴ諛붿씠??
+  status: ?ъ쭅
+  insurance_4major: True
+  insurance_base_salary: 1,500,000
+  hourly_wage: 11,000
+  monthly_salary: 0
+  birth_date: 1963-02-18 (age=63)
+  np_exempt: True (auto=True -> effective=True)
+  durunnuri_support: False
+  dependents: 1, children: 0
+  >> 4-INSURANCE (base=1,500,000):
+     NP=0  HI=53,920  LTI=7,080  EI=13,500  TOTAL=74,500
+
+==========================================================================================
+  CROSS-CHECK: Known accountant figures
+==========================================================================================
+
+  [Heo Yun-hee] base=1,500,000, gross=1,680,000
+    NP: calc=  71,250  expected=  71,250  PASS
+    HI: calc=  53,920  expected=  53,920  PASS
+    LTI: calc=   7,080  expected=   7,080  PASS
+    EI: calc=  13,500  expected=  13,500  PASS
+    IT: calc=  12,640  expected=  12,640  PASS
+    LIT: calc=   1,260  expected=   1,260  PASS
+
+  Overall: ALL PASS
+==========================================================================================
