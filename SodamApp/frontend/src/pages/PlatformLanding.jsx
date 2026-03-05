@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     Shield, BarChart3, Users, CreditCard, Store, ArrowRight, ArrowDown,
-    LogIn, ChevronDown, Zap, LineChart, Clock, CheckCircle2, Phone,
-    Mail, MessageSquare, FileText, Star, Award, Lock, Smartphone,
-    UserPlus, Building2, Receipt, Calculator, PieChart, Send,
-    ChevronRight, ExternalLink, Briefcase, Globe, HeartHandshake,
-    HelpCircle, X, Menu
+    Calculator, PieChart, Clock, FileText, Receipt, Smartphone,
+    UserPlus, CheckCircle2, Star, ChevronDown, Menu, X, Lock, Globe,
+    Zap, HeartHandshake, Award, LogIn, Building2, Send, Mail, Phone,
+    FileCheck, MessageSquare
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════
@@ -34,6 +33,8 @@ const FEATURES = [
     { icon: CreditCard, title: '급여 이체', desc: '계산된 급여를 원클릭으로 일괄 이체. 이체 내역이 자동으로 기록됩니다.', color: 'text-indigo-400', bg: 'from-indigo-500/20 to-indigo-600/5' },
     { icon: Store, title: '멀티 매장', desc: '여러 매장을 하나의 대시보드에서 통합 관리. 매장별 성과를 비교 분석합니다.', color: 'text-teal-400', bg: 'from-teal-500/20 to-teal-600/5' },
     { icon: Smartphone, title: '직원 전용 앱', desc: '직원이 스마트폰에서 출퇴근, 급여확인, 계약서 열람, 건의사항 제출이 가능합니다.', color: 'text-orange-400', bg: 'from-orange-500/20 to-orange-600/5' },
+    { icon: Shield, title: '역할별 권한 관리', desc: 'SuperAdmin, Admin, Staff, Guest 4단계 역할 체계. 역할에 따라 메뉴와 기능 접근이 자동으로 제어됩니다.', color: 'text-violet-400', bg: 'from-violet-500/20 to-violet-600/5' },
+    { icon: FileCheck, title: '매장 사용신청', desc: '간편 신청 폼으로 무료/유료 사용을 신청하면 관리자가 검토 후 매장을 개설하고 관리자 계정을 발급합니다.', color: 'text-lime-400', bg: 'from-lime-500/20 to-lime-600/5' },
 ];
 
 const PLANS = [
@@ -66,13 +67,18 @@ const FAQS = [
     { q: '무료 플랜에서 유료로 업그레이드하면 데이터가 유지되나요?', a: '네, 플랜 업그레이드 시 모든 기존 데이터가 그대로 유지됩니다. 언제든지 플랜을 변경할 수 있습니다.' },
     { q: '해지하면 위약금이 있나요?', a: '아니요, 월 단위 구독이므로 언제든지 해지할 수 있으며 위약금은 없습니다.' },
     { q: '전화 상담이 가능한가요?', a: '평일 09:00~18:00 전화 상담을 운영합니다. Premium 플랜은 전담 매니저가 배정됩니다.' },
+    { q: '회원가입 후 바로 사용할 수 있나요?', a: '가입 후 Guest 계정으로 기능을 미리 확인한 뒤, 매장 사용신청을 제출합니다. 관리자가 승인하면 매장 관리자 아이디가 발급되어 모든 기능을 사용할 수 있습니다.' },
+    { q: '역할(권한)은 어떻게 나뉘나요?', a: 'SuperAdmin(플랫폼 총괄), Admin(매장 관리자), Staff(매장 직원), Guest(미등록 가입자) 4단계로 나뉩니다. 각 역할에 따라 접근 가능한 메뉴와 기능이 자동 제어됩니다.' },
+    { q: '매장 사용신청은 어떻게 하나요?', a: '회원가입 후 Guest 대시보드에서 "무료 사용 신청" 또는 "유료 사용 신청" 버튼을 눌러 매장명, 업종, 대표자 정보를 입력하면 됩니다. 관리자가 매장 상황을 검토한 후 승인해 드립니다.' },
+    { q: 'Staff(직원)은 어떻게 접근하나요?', a: '매장 관리자(Admin)가 직원을 등록하면 Staff 전용 모바일 앱을 통해 출퇴근 체크, 급여확인, 계약서 열람이 가능합니다. Staff는 관리 페이지에는 접근할 수 없습니다.' },
 ];
 
 const STEPS = [
-    { num: '01', title: '회원가입', desc: '이메일과 비밀번호로 간편하게 가입하세요. 1분이면 충분합니다.', icon: UserPlus },
-    { num: '02', title: '매장 정보 입력', desc: '매장명, 업종, 주소를 입력하면 맞춤 설정이 자동으로 적용됩니다.', icon: Building2 },
-    { num: '03', title: '직원 등록', desc: '직원 이름, 급여 정보, 근무 시간을 등록하세요. 엑셀 업로드도 가능합니다.', icon: Users },
-    { num: '04', title: '바로 사용', desc: '급여계산, 출퇴근 관리, 매출 분석까지 모든 기능을 즉시 사용할 수 있습니다.', icon: Zap },
+    { num: '01', title: '회원가입', desc: '이메일과 비밀번호로 간편하게 가입하세요. 자동으로 Guest 계정이 생성됩니다.', icon: UserPlus },
+    { num: '02', title: 'Guest 입장', desc: 'Guest 대시보드에서 셈하나의 모든 기능을 미리 확인하고 요금제를 비교하세요.', icon: Globe },
+    { num: '03', title: '매장 사용신청', desc: '무료 또는 유료 사용을 선택하고 매장 정보를 간단히 입력하여 신청합니다.', icon: FileCheck },
+    { num: '04', title: '관리자 승인', desc: '관리자가 매장 정보를 검토한 후 승인하면 매장 관리자 아이디가 발급됩니다.', icon: Shield },
+    { num: '05', title: '바로 사용', desc: '발급된 아이디로 로그인하면 급여계산, 출퇴근, 매출분석 등 모든 기능을 사용합니다.', icon: Zap },
 ];
 
 const TESTIMONIALS = [
@@ -272,10 +278,10 @@ export default function PlatformLandingPage() {
                 <div className="max-w-5xl mx-auto">
                     <motion.div className="text-center mb-16" initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp}>
                         <div className="text-amber-400 text-sm font-bold mb-2">HOW TO START</div>
-                        <h2 className="text-3xl md:text-4xl font-black mb-4">가입부터 사용까지 <span className="text-amber-400">4단계</span></h2>
+                        <h2 className="text-3xl md:text-4xl font-black mb-4">가입부터 사용까지 <span className="text-amber-400">5단계</span></h2>
                         <p className="text-slate-400 text-lg">복잡한 설정 없이 5분이면 시작할 수 있습니다</p>
                     </motion.div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 relative">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-6 relative">
                         {/* Connection line */}
                         <div className="hidden md:block absolute top-16 left-[12.5%] right-[12.5%] h-0.5 bg-gradient-to-r from-amber-500/50 via-amber-400/30 to-amber-500/50" />
                         {STEPS.map((step, i) => {

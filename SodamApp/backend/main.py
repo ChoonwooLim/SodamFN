@@ -100,8 +100,10 @@ app.include_router(deploy.router, prefix="/api")
 app.include_router(distribute.router, prefix="/api")
 
 from routers import inventory_check
+from routers import store_applications
 app.include_router(inventory_check.router, prefix="/api")
 app.include_router(superadmin.router, prefix="/api/superadmin")
+app.include_router(store_applications.router, prefix="/api/store-applications")
 
 @app.get("/")
 def read_root():

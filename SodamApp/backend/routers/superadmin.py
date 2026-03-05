@@ -10,7 +10,8 @@ from sqlmodel import Session, select, func, col
 from database import engine
 from models import (
     Business, SubscriptionPlan, User, Staff, Revenue, 
-    Expense, Payroll, Announcement, MonthlyProfitLoss, Vendor
+    Expense, Payroll, Announcement, MonthlyProfitLoss, Vendor,
+    StoreApplication
 )
 from routers.auth import get_current_user
 
@@ -367,7 +368,7 @@ def update_user_role(
     admin: User = Depends(get_superadmin_user)
 ):
     """사용자 권한 변경"""
-    if role not in ("superadmin", "admin", "staff"):
+    if role not in ("superadmin", "admin", "staff", "guest"):
         raise HTTPException(status_code=400, detail="유효하지 않은 권한입니다.")
     
     with Session(engine) as s:
@@ -665,4 +666,167 @@ def onboard_new_business(
                 "admin_username": admin_username,
             },
             "message": f"'{biz.name}' 매장이 성공적으로 등록되었습니다."
+        }
+
+
+# ==========================================
+# 8. 매장 사용신청 관리 (Guest → Admin 승인 워크플로우)
+# ==========================================
+
+class ApplicationApproval(BaseModel):
+    admin_username: str  # 할당할 Admin 아이디
+    admin_password: str  # 할당할 Admin 비밀번호
+    admin_note: Optional[str] = None
+    plan_id: Optional[int] = None  # 요금제 ID
+
+class ApplicationRejection(BaseModel):
+    admin_note: str = ""  # 거절 사유
+
+
+@router.get("/store-applications")
+def list_store_applications(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    admin: User = Depends(get_superadmin_user)
+):
+    """전체 사용신청 목록 (상태별 필터 가능)"""
+    with Session(engine) as s:
+        stmt = select(StoreApplication)
+        if status_filter:
+            stmt = stmt.where(StoreApplication.status == status_filter)
+        applications = s.exec(stmt.order_by(
+            # pending을 먼저 보여주기
+            StoreApplication.status.desc(),
+            StoreApplication.created_at.desc()
+        )).all()
+        
+        results = []
+        for app in applications:
+            # 신청자 정보 가져오기
+            user = s.get(User, app.user_id)
+            results.append({
+                "id": app.id,
+                "user_id": app.user_id,
+                "applicant_username": user.username if user else None,
+                "applicant_name": user.real_name if user else None,
+                "applicant_email": user.email if user else None,
+                "business_name": app.business_name,
+                "business_type": app.business_type,
+                "owner_name": app.owner_name,
+                "phone": app.phone,
+                "address": app.address,
+                "business_number": app.business_number,
+                "region": app.region,
+                "plan_type": app.plan_type,
+                "staff_count": app.staff_count,
+                "message": app.message,
+                "status": app.status,
+                "admin_note": app.admin_note,
+                "assigned_username": app.assigned_username,
+                "created_at": app.created_at.isoformat() if app.created_at else None,
+                "reviewed_at": app.reviewed_at.isoformat() if app.reviewed_at else None,
+            })
+        
+        return {"status": "success", "data": results}
+
+
+@router.post("/store-applications/{application_id}/approve")
+def approve_store_application(
+    application_id: int,
+    data: ApplicationApproval,
+    admin: User = Depends(get_superadmin_user)
+):
+    """
+    사용신청 승인: Business 생성 + User를 Admin으로 전환 + 비밀번호 설정
+    """
+    from routers.auth import get_password_hash
+    
+    with Session(engine) as s:
+        application = s.get(StoreApplication, application_id)
+        if not application:
+            raise HTTPException(status_code=404, detail="신청서를 찾을 수 없습니다.")
+        if application.status != "pending":
+            raise HTTPException(status_code=400, detail=f"이미 처리된 신청입니다. (상태: {application.status})")
+        
+        # Admin 아이디 중복 확인
+        existing = s.exec(select(User).where(User.username == data.admin_username)).first()
+        if existing and existing.id != application.user_id:
+            raise HTTPException(status_code=400, detail=f"'{data.admin_username}' 아이디가 이미 존재합니다.")
+        
+        # 1. Business 생성
+        biz = Business(
+            name=application.business_name,
+            business_number=application.business_number,
+            business_type=application.business_type,
+            owner_name=application.owner_name,
+            phone=application.phone,
+            address=application.address,
+            region=application.region,
+            plan_id=data.plan_id,
+            subscription_start=date.today(),
+        )
+        s.add(biz)
+        s.flush()  # Get biz.id
+        
+        # 2. User를 Guest → Admin으로 전환
+        user = s.get(User, application.user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="신청자 계정을 찾을 수 없습니다.")
+        
+        user.username = data.admin_username
+        user.hashed_password = get_password_hash(data.admin_password)
+        user.role = "admin"
+        user.grade = "admin"
+        user.business_id = biz.id
+        user.subscription_type = application.plan_type
+        user.approved_at = datetime.now()
+        user.approved_by = admin.id
+        s.add(user)
+        
+        # 3. 신청서 상태 업데이트
+        application.status = "approved"
+        application.admin_note = data.admin_note
+        application.reviewed_by = admin.id
+        application.reviewed_at = datetime.now()
+        application.assigned_username = data.admin_username
+        application.assigned_business_id = biz.id
+        s.add(application)
+        
+        s.commit()
+        
+        return {
+            "status": "success",
+            "message": f"'{application.business_name}' 매장이 승인되었습니다.",
+            "data": {
+                "business_id": biz.id,
+                "business_name": biz.name,
+                "admin_username": data.admin_username,
+                "plan_type": application.plan_type,
+            }
+        }
+
+
+@router.post("/store-applications/{application_id}/reject")
+def reject_store_application(
+    application_id: int,
+    data: ApplicationRejection,
+    admin: User = Depends(get_superadmin_user)
+):
+    """사용신청 거절"""
+    with Session(engine) as s:
+        application = s.get(StoreApplication, application_id)
+        if not application:
+            raise HTTPException(status_code=404, detail="신청서를 찾을 수 없습니다.")
+        if application.status != "pending":
+            raise HTTPException(status_code=400, detail=f"이미 처리된 신청입니다. (상태: {application.status})")
+        
+        application.status = "rejected"
+        application.admin_note = data.admin_note
+        application.reviewed_by = admin.id
+        application.reviewed_at = datetime.now()
+        s.add(application)
+        s.commit()
+        
+        return {
+            "status": "success",
+            "message": f"'{application.business_name}' 사용신청이 거절되었습니다."
         }

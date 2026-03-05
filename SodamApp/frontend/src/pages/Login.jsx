@@ -58,6 +58,8 @@ export default function LoginPage() {
             localStorage.setItem('user_role', payload.role);
             localStorage.setItem('staff_id', payload.staff_id || "");
             localStorage.setItem('user_id', payload.user_id || "");
+            localStorage.setItem('subscription_type', payload.subscription_type || "");
+            localStorage.setItem('business_id', payload.business_id || "");
 
             if (rememberMe) {
                 localStorage.setItem('sodam_remembered_user', payload.sub);
@@ -71,6 +73,8 @@ export default function LoginPage() {
                 navigate('/superadmin');
             } else if (payload.role === 'admin') {
                 navigate('/dashboard');
+            } else if (payload.role === 'guest') {
+                navigate('/guest');
             } else {
                 navigate('/staff-dashboard');
             }

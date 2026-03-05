@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 import httpx
 from sqlmodel import select
-from models import User
+from models import User, StoreApplication
 from services.database_service import DatabaseService
 import config
 
@@ -82,10 +82,28 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         service.close()
 
 def get_admin_user(current_user: User = Depends(get_current_user)):
-    if current_user.role != "admin":
+    if current_user.role not in ('admin', 'superadmin'):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The user doesn't have enough privileges"
+        )
+    return current_user
+
+def get_admin_or_above(current_user: User = Depends(get_current_user)):
+    """Admin 또는 SuperAdmin 권한 확인"""
+    if current_user.role not in ('admin', 'superadmin'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="관리자 권한이 필요합니다."
+        )
+    return current_user
+
+def get_active_user(current_user: User = Depends(get_current_user)):
+    """Guest가 아닌 활성 사용자(staff, admin, superadmin) 확인"""
+    if current_user.role == 'guest':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="매장 사용 승인이 필요합니다. 사용신청을 먼저 제출해 주세요."
         )
     return current_user
 
@@ -129,7 +147,7 @@ async def get_or_create_social_user(provider: str, provider_id: str, email: str,
                 profile_image=profile_image,
                 provider=provider,
                 provider_id=provider_id,
-                role="staff",
+                role="guest",
                 grade="normal"
             )
             service.session.add(user)
@@ -158,7 +176,7 @@ async def signup(user_data: UserCreate):
             hashed_password=get_password_hash(user_data.password),
             email=user_data.email,
             real_name=user_data.real_name,
-            role="staff",
+            role="guest",
             grade="normal"
         )
         service.session.add(new_user)
@@ -197,7 +215,9 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 "real_name": user.real_name,
                 "profile_image": user.profile_image,
                 "staff_id": user.staff_id, 
-                "user_id": user.id
+                "user_id": user.id,
+                "subscription_type": user.subscription_type,
+                "business_id": user.business_id
             }, 
             expires_delta=access_token_expires
         )
@@ -245,7 +265,9 @@ async def google_callback(code: str):
             "real_name": user.real_name,
             "profile_image": user.profile_image,
             "staff_id": user.staff_id, 
-            "user_id": user.id
+            "user_id": user.id,
+            "subscription_type": user.subscription_type,
+            "business_id": user.business_id
         })
         return RedirectResponse(url=f"{config.FRONTEND_URL}/login?token={app_token}")
 
@@ -287,11 +309,12 @@ async def naver_callback(code: str, state: str):
             "real_name": user.real_name,
             "profile_image": user.profile_image,
             "staff_id": user.staff_id, 
-            "user_id": user.id
+            "user_id": user.id,
+            "subscription_type": user.subscription_type,
+            "business_id": user.business_id
         })
         return RedirectResponse(url=f"{config.FRONTEND_URL}/login?token={app_token}")
 
-@router.get("/kakao")
 async def kakao_login():
     url = f"https://kauth.kakao.com/oauth/authorize?client_id={config.KAKAO_CLIENT_ID}&redirect_uri={config.BACKEND_URL}/api/auth/kakao/callback&response_type=code"
     return RedirectResponse(url)
@@ -331,7 +354,9 @@ async def kakao_callback(code: str):
             "real_name": user.real_name,
             "profile_image": user.profile_image,
             "staff_id": user.staff_id, 
-            "user_id": user.id
+            "user_id": user.id,
+            "subscription_type": user.subscription_type,
+            "business_id": user.business_id
         })
         return RedirectResponse(url=f"{config.FRONTEND_URL}/login?token={app_token}")
 

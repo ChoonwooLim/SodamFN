@@ -217,8 +217,15 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
     hashed_password: Optional[str] = None # Optional for social logins
-    role: str = Field(default="staff") # superadmin, admin, staff
+    role: str = Field(default="guest") # superadmin, admin, staff, guest
     grade: str = Field(default="normal") # normal, vip, vvip, admin
+    
+    # Subscription (Admin only)
+    subscription_type: Optional[str] = None  # free, basic, premium
+    
+    # Approval tracking
+    approved_at: Optional[datetime.datetime] = None  # SuperAdmin 승인 시점
+    approved_by: Optional[int] = None  # 승인한 SuperAdmin user_id
     
     # Social Login Fields
     provider: Optional[str] = None # google, naver, kakao
@@ -505,3 +512,34 @@ class InventoryCheck(SQLModel, table=True):
     note: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+
+class StoreApplication(SQLModel, table=True):
+    """매장 사용 신청 (Guest → Admin 전환 워크플로우)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    
+    # 매장 기본 정보
+    business_name: str              # 매장명
+    business_type: str = Field(default="음식점")  # 업종
+    owner_name: str = ""            # 대표자명
+    phone: str = ""                 # 연락처
+    address: Optional[str] = None   # 주소
+    business_number: Optional[str] = None  # 사업자등록번호
+    region: Optional[str] = None    # 지역
+    
+    # 신청 정보
+    plan_type: str = Field(default="free")  # free, basic, premium
+    staff_count: int = Field(default=1)     # 예상 직원 수
+    message: Optional[str] = None           # 추가 메시지
+    
+    # 처리 상태
+    status: str = Field(default="pending")  # pending, approved, rejected
+    admin_note: Optional[str] = None        # SuperAdmin 메모
+    reviewed_by: Optional[int] = None       # 검토한 SuperAdmin ID
+    
+    # 승인 시 생성된 정보
+    assigned_username: Optional[str] = None  # 할당된 Admin 아이디
+    assigned_business_id: Optional[int] = None  # 생성된 매장 ID
+    
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    reviewed_at: Optional[datetime.datetime] = None

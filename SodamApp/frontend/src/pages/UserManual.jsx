@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight, Truck, Lock, ShoppingBag, ClipboardList, Filter } from 'lucide-react';
+import { BookOpen, Upload, CreditCard, ArrowRightLeft, AlertTriangle, CheckCircle, Info, ChevronDown, ChevronRight, Truck, Lock, ShoppingBag, ClipboardList, Filter, UserPlus, Shield, Users, Store, FileText, Smartphone, Globe } from 'lucide-react';
 import './UserManual.css';
 
 export default function UserManual() {
-    const [openSections, setOpenSections] = useState({ revenue: true, delivery: true, dedup: true, steps: true, purchase: true, checklist: true, faq: true });
+    const [openSections, setOpenSections] = useState({ signup: true, roles: true, revenue: true, delivery: true, dedup: true, steps: true, purchase: true, checklist: true, faq: true });
 
     const toggle = (key) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -18,6 +18,8 @@ export default function UserManual() {
             <div className="toc">
                 <h3>📑 목차</h3>
                 <ul className="toc-list">
+                    <li><a href="#signup-apply">회원가입 & 매장 사용신청</a></li>
+                    <li><a href="#roles">역할/권한 체계</a></li>
                     <li><a href="#revenue-upload">매출 데이터 업로드</a></li>
                     <li><a href="#file-types">지원 파일 형식</a></li>
                     <li><a href="#delivery-upload">배달앱 정산 업로드</a></li>
@@ -28,6 +30,246 @@ export default function UserManual() {
                     <li><a href="#open-checklist">오픈 체크리스트 (직원용)</a></li>
                     <li><a href="#faq">자주 묻는 질문</a></li>
                 </ul>
+            </div>
+
+            {/* ═══ 0. 회원가입 & 매장 사용신청 ═══ */}
+            <div className="manual-section" id="signup-apply">
+                <h2 onClick={() => toggle('signup')} style={{ cursor: 'pointer' }}>
+                    {openSections.signup ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                    <UserPlus size={20} /> 회원가입 & 매장 사용신청
+                </h2>
+                {openSections.signup && (
+                    <>
+                        <p>
+                            셈하나는 <strong>회원가입 → Guest 입장 → 매장 사용신청 → 관리자 승인 → Admin 전환</strong>의
+                            단계를 거쳐 매장 관리 시스템을 사용합니다.
+                        </p>
+
+                        <h3>📝 가입 절차 (5단계)</h3>
+                        <div className="flow-diagram">
+                            <div className="flow-step">👤 회원가입</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">🌐 Guest 입장</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">📋 매장 사용신청</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">🛡️ 관리자 승인</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: '1px solid #fbbf24' }}>🚀 Admin 사용</div>
+                        </div>
+
+                        <h3>STEP 01: 회원가입</h3>
+                        <ol className="step-list">
+                            <li>셈하나 메인 페이지에서 <strong>"무료로 시작하기"</strong> 또는 <strong>"회원가입"</strong> 버튼을 클릭합니다.</li>
+                            <li>이메일, 비밀번호, 이름을 입력하고 가입합니다.</li>
+                            <li>가입 즉시 <strong>Guest 계정</strong>이 자동 생성됩니다.</li>
+                        </ol>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>소셜 로그인:</strong> Google, 네이버, 카카오 계정으로도 간편 가입이 가능합니다.
+                                소셜 로그인 시에도 Guest 계정으로 자동 생성됩니다.
+                            </div>
+                        </div>
+
+                        <h3>STEP 02: Guest 대시보드</h3>
+                        <p>
+                            Guest로 로그인하면 <strong>Guest 전용 대시보드</strong>가 표시됩니다.
+                            이 페이지에서 다음을 확인할 수 있습니다:
+                        </p>
+                        <ul style={{ lineHeight: 2, paddingLeft: 20 }}>
+                            <li><strong>기능 미리보기</strong> — 급여계산, 매출분석, GPS 출퇴근 등 셈하나의 핵심 기능</li>
+                            <li><strong>요금제 비교</strong> — Free / Basic / Premium 3단계 요금제 상세 비교</li>
+                            <li><strong>사용신청 버튼</strong> — 무료 또는 유료 사용을 신청하는 CTA</li>
+                            <li><strong>신청 현황</strong> — 신청 후 검토 중/승인/거절 상태를 실시간 확인</li>
+                        </ul>
+
+                        <h3>STEP 03: 매장 사용신청</h3>
+                        <p>
+                            Guest 대시보드에서 <strong>"무료 사용 신청"</strong> 또는 <strong>"유료 사용 신청"</strong> 버튼을 누르면
+                            매장 사용신청 페이지로 이동합니다.
+                        </p>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>입력 항목</th><th>필수 여부</th><th>설명</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong>요금제 선택</strong></td><td>필수</td><td>Free(0원) / Basic(29,900원) / Premium(59,900원)</td></tr>
+                                <tr><td><strong>매장명</strong></td><td>필수</td><td>예: 소담김밥 강남점</td></tr>
+                                <tr><td><strong>업종</strong></td><td>필수</td><td>음식점, 카페, 소매점, 편의점, 서비스업, 기타</td></tr>
+                                <tr><td><strong>지역</strong></td><td>필수</td><td>서울, 경기, 인천, 부산 등 17개 시도</td></tr>
+                                <tr><td><strong>대표자명</strong></td><td>필수</td><td>매장 대표자 실명</td></tr>
+                                <tr><td><strong>연락처</strong></td><td>필수</td><td>010-0000-0000 형식</td></tr>
+                                <tr><td>사업자등록번호</td><td>선택</td><td>000-00-00000 형식</td></tr>
+                                <tr><td>주소</td><td>선택</td><td>매장 소재지</td></tr>
+                                <tr><td>예상 직원 수</td><td>선택</td><td>매장 직원 인원 (기본값 1명)</td></tr>
+                                <tr><td>추가 메시지</td><td>선택</td><td>기타 요청사항이나 질문</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div className="info-box warning">
+                            <span className="icon">⚠️</span>
+                            <div>
+                                <strong>중복 신청 불가:</strong> 이미 검토 대기(pending) 중인 신청이 있으면
+                                추가 신청이 제한됩니다. 기존 신청이 처리된 후 재신청할 수 있습니다.
+                            </div>
+                        </div>
+
+                        <h3>STEP 04: 관리자 승인</h3>
+                        <p>
+                            신청이 접수되면 플랫폼 관리자(SuperAdmin)가 매장 정보를 검토합니다.
+                            Guest 대시보드의 <strong>"내 사용신청 현황"</strong>에서 실시간 상태를 확인할 수 있습니다.
+                        </p>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>상태</th><th>설명</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span className="badge amber">검토 중</span></td>
+                                    <td>관리자가 매장 정보를 검토하고 있습니다</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge green">승인 완료</span></td>
+                                    <td>승인되었습니다. 발급된 Admin 아이디가 표시됩니다</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge red">거절</span></td>
+                                    <td>거절되었습니다. 관리자 메모가 함께 표시됩니다</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>STEP 05: Admin 사용 시작</h3>
+                        <ol className="step-list">
+                            <li>신청이 승인되면 Guest 대시보드에 <strong>발급된 Admin 아이디</strong>가 표시됩니다.</li>
+                            <li>기존 Guest 계정에서 <strong>로그아웃</strong>합니다.</li>
+                            <li>발급된 Admin 아이디와 비밀번호로 <strong>새로 로그인</strong>합니다.</li>
+                            <li>Admin 대시보드에서 직원 등록, 급여 관리, 매출 분석 등 모든 기능을 사용합니다.</li>
+                        </ol>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>비밀번호 변경:</strong> 최초 로그인 후 설정 페이지에서 비밀번호를
+                                반드시 변경하는 것을 권장합니다.
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* ═══ 0.5. 역할/권한 체계 ═══ */}
+            <div className="manual-section" id="roles">
+                <h2 onClick={() => toggle('roles')} style={{ cursor: 'pointer' }}>
+                    {openSections.roles ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                    <Shield size={20} /> 역할/권한 체계
+                </h2>
+                {openSections.roles && (
+                    <>
+                        <p>
+                            셈하나는 <strong>4단계 역할 체계</strong>로 보안과 기능 접근을 관리합니다.
+                            각 역할에 따라 접근 가능한 메뉴와 기능이 자동으로 제어됩니다.
+                        </p>
+
+                        <h3>🏗️ 역할 계층 구조</h3>
+                        <div className="flow-diagram">
+                            <div className="flow-step" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', border: '1px solid #fbbf24' }}>🛡️ SuperAdmin</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', border: '1px solid #60a5fa' }}>👔 Admin</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', border: '1px solid #818cf8' }}>👷 Staff</div>
+                            <span className="flow-arrow">→</span>
+                            <div className="flow-step">🌐 Guest</div>
+                        </div>
+
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>역할</th><th>설명</th><th>주요 권한</th><th>접근 경로</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span className="badge amber">SuperAdmin</span></td>
+                                    <td>플랫폼 총괄 운영자</td>
+                                    <td>전체 매장 관리, 사용신청 승인/거절, 사용자 권한 변경, 요금 정산, 통계 분석, 공지 배포</td>
+                                    <td>SuperAdmin Dashboard</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge blue">Admin</span></td>
+                                    <td>매장 관리자 (유료/무료)</td>
+                                    <td>직원 관리, 급여 계산, 매출/지출 관리, 손익계산서, 전자계약, 매장 설정</td>
+                                    <td>Admin Dashboard (PC/모바일)</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge" style={{ background: '#6366f1' }}>Staff</span></td>
+                                    <td>매장 직원</td>
+                                    <td>GPS 출퇴근, 급여명세서 확인, 근로계약서 열람, 건의사항 제출, 오픈 체크리스트</td>
+                                    <td>직원 전용 모바일 앱</td>
+                                </tr>
+                                <tr>
+                                    <td><span className="badge" style={{ background: '#64748b' }}>Guest</span></td>
+                                    <td>미등록 가입자</td>
+                                    <td>기능 미리보기, 요금제 확인, 매장 사용신청</td>
+                                    <td>Guest Dashboard</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>💳 Admin 구독 유형</h3>
+                        <p>Admin 계정은 구독 유형에 따라 사용 가능한 기능이 달라집니다:</p>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>구독</th><th>월 요금</th><th>직원 제한</th><th>주요 기능</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Free</strong></td><td>0원</td><td>3명</td>
+                                    <td>급여계산, GPS 출퇴근, 기본 매출입력, 직원앱</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Basic</strong></td><td>29,900원</td><td>10명</td>
+                                    <td>+ 매출분석, 손익계산서, 전자계약, 카드매출 자동분석</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Premium</strong></td><td>59,900원</td><td>50명</td>
+                                    <td>+ 멀티매장, API연동, 커스텀 리포트, 전담지원</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h3>👷 Staff 접근 제한</h3>
+                        <div className="info-box warning">
+                            <span className="icon">⚠️</span>
+                            <div>
+                                <strong>모바일 전용:</strong> Staff(직원) 계정은 <strong>직원 전용 모바일 앱</strong>에서만 접근할 수 있습니다.
+                                Admin 관리 대시보드(PC 페이지)에는 접속할 수 없습니다. Staff 계정은 매장 관리자(Admin)가
+                                직원 관리 메뉴에서 생성하고 관리합니다.
+                            </div>
+                        </div>
+
+                        <h3>🔑 계정 생성 방식</h3>
+                        <table className="manual-table">
+                            <thead>
+                                <tr><th>역할</th><th>생성 방식</th><th>아이디 형식</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Guest</td><td>회원가입 시 자동 생성</td><td>이메일 또는 소셜 아이디</td></tr>
+                                <tr><td>Admin</td><td>SuperAdmin이 승인 시 생성</td><td>지정 아이디 (예: sodam005)</td></tr>
+                                <tr><td>Staff</td><td>Admin이 직원 등록 시 생성</td><td>매장코드_이름 (예: sodam001_홍길동)</td></tr>
+                                <tr><td>SuperAdmin</td><td>시스템 초기 설정</td><td>고정 아이디</td></tr>
+                            </tbody>
+                        </table>
+
+                        <div className="info-box tip">
+                            <span className="icon">💡</span>
+                            <div>
+                                <strong>보안:</strong> 모든 비밀번호는 해싱 처리되어 저장되며, JWT 토큰 기반 인증을 사용합니다.
+                                역할별 접근 제어는 서버 측에서도 이중으로 검증됩니다.
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ═══ 1. 매출 데이터 업로드 ═══ */}
@@ -520,6 +762,50 @@ export default function UserManual() {
                         </p>
                     </div>
                 )}
+            </div>
+
+            {/* ═══ 7. 역할/사용신청 FAQ 추가 ═══ */}
+            <div className="manual-section" id="faq-roles">
+                <h2><Shield size={20} /> 역할 & 사용신청 관련 FAQ</h2>
+                <>
+                    <h3>Q. 가입하면 바로 매장 관리를 할 수 있나요?</h3>
+                    <p>
+                        아니요. 가입 시 <strong>Guest 계정</strong>으로 생성됩니다. Guest 대시보드에서
+                        기능을 미리 확인한 후, <strong>매장 사용신청</strong>을 제출해야 합니다.
+                        관리자가 승인하면 <strong>Admin 아이디</strong>가 발급되어 모든 기능을 사용할 수 있습니다.
+                    </p>
+
+                    <h3>Q. 사용신청 승인까지 얼마나 걸리나요?</h3>
+                    <p>
+                        일반적으로 <strong>1~2 영업일</strong> 이내에 처리됩니다.
+                        승인/거절 결과는 Guest 대시보드에서 실시간으로 확인할 수 있습니다.
+                    </p>
+
+                    <h3>Q. 거절되면 어떻게 하나요?</h3>
+                    <p>
+                        거절 시 관리자의 메모(거절 사유)가 표시됩니다.
+                        사유를 확인한 후 내용을 수정하여 <strong>재신청</strong>할 수 있습니다.
+                    </p>
+
+                    <h3>Q. Guest 계정과 Admin 계정은 같은 건가요?</h3>
+                    <p>
+                        아닙니다. Guest 계정은 가입 시 자동 생성되는 임시 계정이고,
+                        Admin 계정은 <strong>SuperAdmin이 승인 시 별도로 발급</strong>하는 매장 관리자 계정입니다.
+                        승인 후에는 발급된 Admin 아이디로 로그인합니다.
+                    </p>
+
+                    <h3>Q. 무료에서 유료로 업그레이드하려면?</h3>
+                    <p>
+                        현재 무료(Free) 플랜으로 승인받은 경우, 관리자에게 연락하여 플랜 업그레이드를 요청하면 됩니다.
+                        기존의 모든 데이터는 <strong>그대로 유지</strong>됩니다.
+                    </p>
+
+                    <h3>Q. 직원(Staff)은 어떻게 등록하나요?</h3>
+                    <p>
+                        Admin으로 로그인한 후 <strong>직원 관리</strong> 메뉴에서 직원을 등록합니다.
+                        등록된 직원은 <strong>직원 전용 모바일 앱</strong>을 통해 출퇴근, 급여확인 등을 할 수 있습니다.
+                    </p>
+                </>
             </div>
         </div>
     );

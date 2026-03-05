@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, Building2, Users, CreditCard, Bell, BarChart3,
     Plus, Edit2, Trash2, Eye, TrendingUp, TrendingDown,
-    Globe, Shield, Settings, RefreshCw, Search, Filter
+    Globe, Shield, Settings, RefreshCw, Search, Filter,
+    FileText, CheckCircle2, XCircle, Clock3, UserPlus
 } from 'lucide-react';
 import api from '../api';
 
 const TABS = [
     { key: 'stores', label: '매장 관리', icon: Building2 },
+    { key: 'applications', label: '사용신청', icon: FileText },
     { key: 'monitoring', label: '실시간 모니터링', icon: TrendingUp },
     { key: 'billing', label: '요금 정산', icon: CreditCard },
     { key: 'users', label: '사용자 관리', icon: Users },
@@ -51,6 +53,13 @@ export default function SuperAdminDashboard() {
     // Plans
     const [plans, setPlans] = useState([]);
 
+    // Applications (사용신청)
+    const [applications, setApplications] = useState([]);
+    const [approvalModal, setApprovalModal] = useState(null);
+    const [approvalForm, setApprovalForm] = useState({ admin_username: '', admin_password: '', admin_note: '' });
+    const [rejectionModal, setRejectionModal] = useState(null);
+    const [rejectionNote, setRejectionNote] = useState('');
+
     const fetchData = useCallback(async (tab) => {
         setLoading(true);
         try {
@@ -87,6 +96,11 @@ export default function SuperAdminDashboard() {
                 case 'analytics': {
                     const res = await api.get('/superadmin/analytics');
                     setAnalyticsData(res.data.data);
+                    break;
+                }
+                case 'applications': {
+                    const res = await api.get('/superadmin/store-applications');
+                    setApplications(res.data.data || []);
                     break;
                 }
             }
@@ -170,6 +184,36 @@ export default function SuperAdminDashboard() {
 
     const fmt = (n) => (n || 0).toLocaleString();
 
+    const handleApproveApplication = async () => {
+        if (!approvalForm.admin_username || !approvalForm.admin_password) {
+            alert('Admin 아이디와 비밀번호를 입력해 주세요.');
+            return;
+        }
+        try {
+            await api.post(`/superadmin/store-applications/${approvalModal.id}/approve`, approvalForm);
+            setApprovalModal(null);
+            setApprovalForm({ admin_username: '', admin_password: '', admin_note: '' });
+            fetchData('applications');
+            alert('사용신청이 승인되었습니다.');
+        } catch (err) {
+            alert(err.response?.data?.detail || '승인 오류');
+        }
+    };
+
+    const handleRejectApplication = async () => {
+        try {
+            await api.post(`/superadmin/store-applications/${rejectionModal.id}/reject`, { admin_note: rejectionNote });
+            setRejectionModal(null);
+            setRejectionNote('');
+            fetchData('applications');
+            alert('사용신청이 거절되었습니다.');
+        } catch (err) {
+            alert(err.response?.data?.detail || '거절 오류');
+        }
+    };
+
+    const pendingCount = applications.filter(a => a.status === 'pending').length;
+
     // ==========================================
     // RENDER
     // ==========================================
@@ -199,17 +243,23 @@ export default function SuperAdminDashboard() {
                 <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
                     {TABS.map(tab => {
                         const Icon = tab.icon;
+                        const showBadge = tab.key === 'applications' && pendingCount > 0;
                         return (
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${activeTab === tab.key
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all relative ${activeTab === tab.key
                                     ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30'
                                     : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                                     }`}
                             >
                                 <Icon size={16} />
                                 {tab.label}
+                                {showBadge && (
+                                    <span className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full ${activeTab === tab.key ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
+                                        {pendingCount}
+                                    </span>
+                                )}
                             </button>
                         );
                     })}
@@ -413,6 +463,7 @@ export default function SuperAdminDashboard() {
                                                                 <option value="superadmin">SuperAdmin</option>
                                                                 <option value="admin">Admin</option>
                                                                 <option value="staff">Staff</option>
+                                                                <option value="guest">Guest</option>
                                                             </select>
                                                         </td>
                                                         <td className="p-3 text-center text-slate-400">{u.business_id || '-'}</td>
@@ -533,6 +584,180 @@ export default function SuperAdminDashboard() {
                                         ))}
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* =========== 7. APPLICATIONS (사용신청 관리) =========== */}
+                        {activeTab === 'applications' && (
+                            <div className="space-y-4">
+                                <h2 className="text-lg font-bold flex items-center gap-2">
+                                    <FileText size={20} className="text-amber-400" />
+                                    사용신청 관리 ({applications.length})
+                                    {pendingCount > 0 && (
+                                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                                            대기 {pendingCount}건
+                                        </span>
+                                    )}
+                                </h2>
+
+                                {applications.length === 0 ? (
+                                    <div className="text-center py-16 text-slate-400">
+                                        <FileText size={40} className="mx-auto mb-3 opacity-30" />
+                                        <p>아직 사용신청이 없습니다.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {applications.map(app => {
+                                            const isPending = app.status === 'pending';
+                                            const isApproved = app.status === 'approved';
+                                            return (
+                                                <div key={app.id} className={`bg-white/5 rounded-2xl p-5 border transition-all ${isPending ? 'border-amber-500/30 hover:border-amber-500/50' :
+                                                    isApproved ? 'border-emerald-500/20' : 'border-red-500/20'
+                                                    }`}>
+                                                    <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap mb-2">
+                                                                <span className="font-bold text-lg">{app.business_name}</span>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isPending ? 'bg-amber-500/20 text-amber-400' :
+                                                                    isApproved ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                        'bg-red-500/20 text-red-400'
+                                                                    }`}>
+                                                                    {isPending ? '검토 대기' : isApproved ? '승인 완료' : '거절'}
+                                                                </span>
+                                                                <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                                                                    {app.plan_type === 'free' ? '무료' : app.plan_type === 'basic' ? 'Basic' : 'Premium'}
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-400">
+                                                                <div>대표: <span className="text-white">{app.owner_name}</span></div>
+                                                                <div>연락처: <span className="text-white">{app.phone}</span></div>
+                                                                <div>업종: <span className="text-white">{app.business_type}</span></div>
+                                                                <div>지역: <span className="text-white">{app.region || '-'}</span></div>
+                                                                <div>예상 직원: <span className="text-white">{app.staff_count}명</span></div>
+                                                                <div>사업자번호: <span className="text-white">{app.business_number || '-'}</span></div>
+                                                            </div>
+                                                            {app.message && (
+                                                                <div className="mt-2 text-sm bg-white/5 rounded-lg px-3 py-2 text-slate-300">
+                                                                    💬 {app.message}
+                                                                </div>
+                                                            )}
+                                                            <div className="mt-2 text-xs text-slate-500">
+                                                                신청자: {app.applicant_name || app.applicant_username} {app.applicant_email ? `(${app.applicant_email})` : ''} · {app.created_at ? new Date(app.created_at).toLocaleString('ko-KR') : ''}
+                                                            </div>
+                                                            {isApproved && app.assigned_username && (
+                                                                <div className="mt-2 text-sm text-emerald-400 bg-emerald-500/10 rounded-lg px-3 py-2">
+                                                                    ✅ Admin ID: <strong>{app.assigned_username}</strong>
+                                                                </div>
+                                                            )}
+                                                            {app.admin_note && (
+                                                                <div className="mt-2 text-sm text-slate-300 bg-white/5 rounded-lg px-3 py-2">
+                                                                    📝 관리자 메모: {app.admin_note}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {isPending && (
+                                                            <div className="flex gap-2 sm:flex-col">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setApprovalModal(app);
+                                                                        setApprovalForm({ admin_username: '', admin_password: '', admin_note: '' });
+                                                                    }}
+                                                                    className="flex items-center gap-1 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-xl text-sm font-bold hover:bg-emerald-500/30 transition-all"
+                                                                >
+                                                                    <CheckCircle2 size={14} /> 승인
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setRejectionModal(app);
+                                                                        setRejectionNote('');
+                                                                    }}
+                                                                    className="flex items-center gap-1 px-4 py-2 bg-red-500/20 text-red-400 rounded-xl text-sm font-bold hover:bg-red-500/30 transition-all"
+                                                                >
+                                                                    <XCircle size={14} /> 거절
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Approval Modal */}
+                                {approvalModal && (
+                                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                            <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                                                <CheckCircle2 size={20} className="text-emerald-400" /> 사용신청 승인
+                                            </h3>
+                                            <p className="text-sm text-slate-400 mb-5">{approvalModal.business_name} · {approvalModal.owner_name}</p>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">Admin 아이디 *</label>
+                                                    <input
+                                                        value={approvalForm.admin_username}
+                                                        onChange={e => setApprovalForm(p => ({ ...p, admin_username: e.target.value }))}
+                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        placeholder="매장 관리자 아이디 (예: sodam005)"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">Admin 비밀번호 *</label>
+                                                    <input
+                                                        type="password"
+                                                        value={approvalForm.admin_password}
+                                                        onChange={e => setApprovalForm(p => ({ ...p, admin_password: e.target.value }))}
+                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        placeholder="초기 비밀번호"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">관리자 메모 (선택)</label>
+                                                    <textarea
+                                                        value={approvalForm.admin_note}
+                                                        onChange={e => setApprovalForm(p => ({ ...p, admin_note: e.target.value }))}
+                                                        rows={2}
+                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
+                                                        placeholder="승인 시 참고 메모"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3 mt-6">
+                                                <button onClick={() => setApprovalModal(null)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={handleApproveApplication} className="flex-1 py-2.5 bg-emerald-500 text-slate-900 rounded-xl font-bold hover:bg-emerald-400 shadow-lg flex items-center justify-center gap-2">
+                                                    <UserPlus size={16} /> 승인 및 계정 생성
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Rejection Modal */}
+                                {rejectionModal && (
+                                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                            <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                                                <XCircle size={20} className="text-red-400" /> 사용신청 거절
+                                            </h3>
+                                            <p className="text-sm text-slate-400 mb-5">{rejectionModal.business_name} · {rejectionModal.owner_name}</p>
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">거절 사유</label>
+                                                <textarea
+                                                    value={rejectionNote}
+                                                    onChange={e => setRejectionNote(e.target.value)}
+                                                    rows={3}
+                                                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none resize-none focus:ring-2 focus:ring-red-500"
+                                                    placeholder="거절 사유를 입력해 주세요"
+                                                />
+                                            </div>
+                                            <div className="flex gap-3 mt-6">
+                                                <button onClick={() => setRejectionModal(null)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={handleRejectApplication} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-400 shadow-lg">거절</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>

@@ -36,6 +36,8 @@ const OpenChecklistPage = React.lazy(() => import('./pages/OpenChecklistPage'));
 const InventoryCheckAdmin = React.lazy(() => import('./pages/InventoryCheckAdmin'));
 const DevelopmentRoadmap = React.lazy(() => import('./pages/DevelopmentRoadmap'));
 const SuperAdminDashboard = React.lazy(() => import('./pages/SuperAdminDashboard'));
+const GuestDashboard = React.lazy(() => import('./pages/GuestDashboard'));
+const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationForm'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -49,6 +51,11 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   const role = localStorage.getItem('user_role');
 
   if (!token) return <Navigate to="/" replace />;
+
+  // Guest users can only access guest routes
+  if (role === 'guest') {
+    return <Navigate to="/guest" replace />;
+  }
 
   if (adminOnly && role !== 'admin' && role !== 'superadmin') {
     return <Navigate to="/staff-dashboard" replace />;
@@ -65,13 +72,21 @@ const SuperAdminRoute = ({ children }) => {
   return children;
 };
 
+const GuestRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('user_role');
+  if (!token) return <Navigate to="/login" replace />;
+  if (role !== 'guest') return <Navigate to="/dashboard" replace />;
+  return children;
+};
+
 const Layout = ({ children }) => {
   // Use location to trigger re-render on route change
   // eslint-disable-next-line no-unused-vars
   const location = useLocation();
   const role = localStorage.getItem('user_role');
   const isAdmin = role === 'admin' || role === 'superadmin';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/' || location.pathname === '/store';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/' || location.pathname === '/store' || location.pathname === '/guest' || location.pathname === '/apply';
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
@@ -129,6 +144,8 @@ export default function App() {
               <Route path="/inventory-check-admin" element={<ProtectedRoute adminOnly><InventoryCheckAdmin /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute adminOnly><DevelopmentRoadmap /></ProtectedRoute>} />
               <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
+              <Route path="/guest" element={<GuestRoute><GuestDashboard /></GuestRoute>} />
+              <Route path="/apply" element={<GuestRoute><StoreApplicationForm /></GuestRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}
               <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />
