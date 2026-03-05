@@ -61,24 +61,24 @@ const phases = [
         modules: [
             {
                 name: '멀티테넌트 아키텍처',
-                status: 'planned',
+                status: 'done',
                 items: [
-                    { text: '사업자별 독립 데이터 스토어', done: false },
-                    { text: '업종별 맞춤 설정 (음식점, 소매, 서비스업)', done: false },
-                    { text: '요금제 및 결제 시스템', done: false },
-                    { text: '온보딩 자동화 (가입 → 설정 → 사용)', done: false },
+                    { text: '사업자별 독립 데이터 스토어', done: true },
+                    { text: '업종별 맞춤 설정 (음식점, 소매, 서비스업)', done: true },
+                    { text: '요금제 및 결제 시스템', done: true },
+                    { text: '온보딩 자동화 (가입 → 설정 → 사용)', done: true },
                 ],
             },
             {
                 name: 'SuperAdmin 대시보드',
-                status: 'planned',
+                status: 'done',
                 items: [
-                    { text: '멀티테넌트 매장 등록/해지 관리', done: false },
-                    { text: '전체 매장 매출·인건비 실시간 모니터링', done: false },
-                    { text: '매장별 요금제 관리 및 이용료 정산', done: false },
-                    { text: '3단계 권한 체계 (SuperAdmin → Admin → Staff)', done: false },
-                    { text: '매장별 이슈 관리 및 공지사항 일괄 배포', done: false },
-                    { text: '업종별·지역별 통계 및 벤치마크 리포트', done: false },
+                    { text: '멀티테넌트 매장 등록/해지 관리', done: true },
+                    { text: '전체 매장 매출·인건비 실시간 모니터링', done: true },
+                    { text: '매장별 요금제 관리 및 이용료 정산', done: true },
+                    { text: '3단계 권한 체계 (SuperAdmin → Admin → Staff)', done: true },
+                    { text: '매장별 이슈 관리 및 공지사항 일괄 배포', done: true },
+                    { text: '업종별·지역별 통계 및 벤치마크 리포트', done: true },
                 ],
             },
             {

@@ -1,0 +1,18 @@
+﻿Businesses: 1
+  ID=1 name=Sodam Gimbap type=restaurant plan=3 status=active
+Plans: 3
+  ID=1 name=Free monthly=0 staff=3
+  ID=2 name=Basic monthly=29,900 staff=10
+  ID=3 name=Premium monthly=59,900 staff=50
+Users: 9
+  ID=2 username=sodam2025 role=staff business_id=1
+  ID=4 username= role=staff business_id=1
+  ID=5 username=jetski_final_2 role=staff business_id=1
+  ID=6 username=testuser role=staff business_id=1
+  ID=7 username=sodam004 role=staff business_id=1
+  ID=8 username=sodam001 role=staff business_id=1
+  ID=3 username=sodam002 role=staff business_id=1
+  ID=9 username=sodam000 role=staff business_id=1
+  ID=1 username=admin role=superadmin business_id=1
+Staff: 16 assigned, 0 unassigned
+Vendors: 276 assigned, 0 unassigned

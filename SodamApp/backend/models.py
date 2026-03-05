@@ -3,6 +3,47 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationsh
 import datetime
 from datetime import time, date
 
+# --- Multi-Tenant (SaaS) ---
+
+class SubscriptionPlan(SQLModel, table=True):
+    """SaaS 요금제"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)  # 무료, 기본, 프리미엄
+    price_monthly: int = 0  # 월 이용료 (원)
+    price_yearly: int = 0   # 연 이용료 (원)
+    max_staff: int = 5       # 최대 직원 수
+    max_revenue_entries: int = 1000  # 월 최대 매출 건수
+    features_json: Optional[str] = None  # 포함 기능 (급여, 재무, POS 등)
+    is_active: bool = True
+
+class Business(SQLModel, table=True):
+    """사업장 (테넌트)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)  # 사업장명 (예: 소담김밥)
+    business_number: Optional[str] = None  # 사업자등록번호
+    business_type: str = Field(default="음식점")  # 음식점, 소매, 서비스업
+    owner_name: Optional[str] = None  # 대표자명
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    region: Optional[str] = None  # 지역 (서울, 경기, 부산 등)
+    
+    # 요금제
+    plan_id: Optional[int] = Field(default=None, foreign_key="subscriptionplan.id")
+    plan: Optional[SubscriptionPlan] = Relationship()
+    subscription_status: str = Field(default="active")  # active, suspended, cancelled
+    subscription_start: Optional[datetime.date] = None
+    subscription_end: Optional[datetime.date] = None
+    
+    # 메타
+    is_active: bool = True
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    settings_json: Optional[str] = None  # 업종별 맞춤 설정 (JSON)
+    
+    # Relationships
+    users: List["User"] = Relationship(back_populates="business")
+    staff_members: List["Staff"] = Relationship(back_populates="business")
+    vendors: List["Vendor"] = Relationship(back_populates="business")
+
 # --- Financials ---
 
 class Vendor(SQLModel, table=True):
@@ -18,6 +59,8 @@ class Vendor(SQLModel, table=True):
     business_reg_number: Optional[str] = None  # 사업자등록번호
     
     created_by_upload_id: Optional[int] = Field(default=None) # No FK constraint for simplicity or nullable FK
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    business: Optional[Business] = Relationship(back_populates="vendors")
     
     products: List["Product"] = Relationship(back_populates="vendor")
     expenses: List["Expense"] = Relationship(back_populates="vendor")
@@ -57,11 +100,13 @@ class Revenue(SQLModel, table=True):
     channel: str # Store, Coupang, Baemin
     amount: int
     description: Optional[str] = None
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 class CompanyHoliday(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     date: datetime.date = Field(index=True, unique=True)
     description: Optional[str] = None
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 # --- Operations (Inventory) ---
 
@@ -140,6 +185,8 @@ class Staff(SQLModel, table=True):
     documents: List["StaffDocument"] = Relationship(back_populates="staff")
     contracts: List["ElectronicContract"] = Relationship(back_populates="staff")
     user: Optional["User"] = Relationship(back_populates="staff")
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    business: Optional[Business] = Relationship(back_populates="staff_members")
 
 # --- Finance (Card Sales) ---
 
@@ -170,7 +217,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
     hashed_password: Optional[str] = None # Optional for social logins
-    role: str = Field(default="staff") # admin, staff
+    role: str = Field(default="staff") # superadmin, admin, staff
     grade: str = Field(default="normal") # normal, vip, vvip, admin
     
     # Social Login Fields
@@ -182,6 +229,10 @@ class User(SQLModel, table=True):
     
     staff_id: Optional[int] = Field(default=None, foreign_key="staff.id")
     staff: Optional[Staff] = Relationship(back_populates="user")
+    
+    # Multi-tenant
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    business: Optional[Business] = Relationship(back_populates="users")
 
 class ElectronicContract(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -394,6 +445,8 @@ class Announcement(SQLModel, table=True):
     content: str = ""
     pinned: bool = Field(default=False)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    is_global: bool = Field(default=False)  # SuperAdmin 전체 공지
 
 
 class Suggestion(SQLModel, table=True):

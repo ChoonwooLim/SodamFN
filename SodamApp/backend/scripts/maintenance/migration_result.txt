@@ -1,0 +1,33 @@
+﻿============================================================
+  Multi-Tenant Migration
+============================================================
+
+[1/5] Creating new tables...
+  OK: subscriptionplan, business tables created
+
+[2/5] Adding business_id columns...
+  + vendor.business_id added
+  + staff.business_id added
+  + revenue.business_id added
+  + companyholiday.business_id added
+  + announcement.business_id added
+  + user.business_id added
+  + announcement.is_global added
+
+[3/5] Seeding default subscription plans...
+  OK: Free / Basic / Premium plans created
+
+[4/5] Creating default business...
+  OK: Default business created (ID=1)
+
+[5/5] Assigning existing data to default business...
+  + staff: assigned
+  + vendor: assigned
+  + revenue: assigned
+  + user: assigned
+  + announcement: assigned
+  + Promoted 'admin' to superadmin
+
+============================================================
+  Migration complete!
+============================================================

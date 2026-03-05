@@ -23,6 +23,7 @@ const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
 const RecipeBook = React.lazy(() => import('./pages/RecipeBook'));
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const PlatformLanding = React.lazy(() => import('./pages/PlatformLanding'));
 const StaffAppPreview = React.lazy(() => import('./pages/StaffAppPreview'));
 const PurchaseRequests = React.lazy(() => import('./pages/PurchaseRequests'));
 const EmergencyContactsAdmin = React.lazy(() => import('./pages/EmergencyContacts'));
@@ -34,6 +35,7 @@ const UserManual = React.lazy(() => import('./pages/UserManual'));
 const OpenChecklistPage = React.lazy(() => import('./pages/OpenChecklistPage'));
 const InventoryCheckAdmin = React.lazy(() => import('./pages/InventoryCheckAdmin'));
 const DevelopmentRoadmap = React.lazy(() => import('./pages/DevelopmentRoadmap'));
+const SuperAdminDashboard = React.lazy(() => import('./pages/SuperAdminDashboard'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -48,10 +50,18 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 
   if (!token) return <Navigate to="/" replace />;
 
-  if (adminOnly && role !== 'admin') {
+  if (adminOnly && role !== 'admin' && role !== 'superadmin') {
     return <Navigate to="/staff-dashboard" replace />;
   }
 
+  return children;
+};
+
+const SuperAdminRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('user_role');
+  if (!token) return <Navigate to="/" replace />;
+  if (role !== 'superadmin') return <Navigate to="/dashboard" replace />;
   return children;
 };
 
@@ -60,8 +70,8 @@ const Layout = ({ children }) => {
   // eslint-disable-next-line no-unused-vars
   const location = useLocation();
   const role = localStorage.getItem('user_role');
-  const isAdmin = role === 'admin';
-  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/';
+  const isAdmin = role === 'admin' || role === 'superadmin';
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/' || location.pathname === '/store';
 
   if (isAuthPage) {
     return <div className="min-h-screen bg-slate-50">{children}</div>;
@@ -97,7 +107,8 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
 
-              <Route path="/" element={<LandingPage />} />
+              <Route path="/" element={<PlatformLanding />} />
+              <Route path="/store" element={<LandingPage />} />
               <Route path="/dashboard" element={<ProtectedRoute adminOnly><Dashboard /></ProtectedRoute>} />
 
               {/* SPLIT INPUT ROUTES */}
@@ -117,6 +128,7 @@ export default function App() {
               <Route path="/open-checklist" element={<ProtectedRoute adminOnly><OpenChecklistPage /></ProtectedRoute>} />
               <Route path="/inventory-check-admin" element={<ProtectedRoute adminOnly><InventoryCheckAdmin /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute adminOnly><DevelopmentRoadmap /></ProtectedRoute>} />
+              <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
 
               {/* BACKWARD COMPATIBILITY */}
               <Route path="/camera" element={<ProtectedRoute adminOnly><DataInputPage mode="expense" /></ProtectedRoute>} />

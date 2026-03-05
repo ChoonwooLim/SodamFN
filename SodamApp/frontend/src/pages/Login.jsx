@@ -67,7 +67,9 @@ export default function LoginPage() {
 
             setLoading(false); // Reset loading BEFORE navigate
 
-            if (payload.role === 'admin') {
+            if (payload.role === 'superadmin') {
+                navigate('/superadmin');
+            } else if (payload.role === 'admin') {
                 navigate('/dashboard');
             } else {
                 navigate('/staff-dashboard');
