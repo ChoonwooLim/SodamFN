@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Lock, User, LogIn, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, User, LogIn, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import './Login.css';
 
@@ -14,6 +14,7 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         // Handle social login callback token
@@ -167,13 +168,23 @@ export default function LoginPage() {
                         <div className="input-wrapper">
                             <Lock className="input-icon" size={18} />
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="login-input"
                                 placeholder="비밀번호를 입력하세요"
                                 required
+                                style={{ paddingRight: '44px' }}
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="password-toggle-btn"
+                                tabIndex={-1}
+                                aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
                         </div>
                     </div>
 

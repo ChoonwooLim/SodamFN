@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from pydantic import BaseModel
 import httpx
 from sqlmodel import select
@@ -27,7 +27,7 @@ if SECRET_KEY == _DEFAULT_SECRET:
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 1 day
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# Password hashing using bcrypt directly (passlib has version compatibility issues)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 router = APIRouter()
@@ -51,10 +51,17 @@ class UserCreate(BaseModel):
 
 def verify_password(plain_password, hashed_password):
     if not hashed_password: return False
-    return pwd_context.verify(plain_password, hashed_password)
+    # Support both bcrypt ($2b$) and legacy pbkdf2_sha256 ($pbkdf2-sha256$) hashes
+    if hashed_password.startswith('$2b$') or hashed_password.startswith('$2a$'):
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    elif hashed_password.startswith('$pbkdf2'):
+        # Legacy pbkdf2_sha256 format - use passlib for backward compatibility
+        from passlib.hash import pbkdf2_sha256
+        return pbkdf2_sha256.verify(plain_password, hashed_password)
+    return False
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
