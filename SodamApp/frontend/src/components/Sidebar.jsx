@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { API_BASE } from '../api';
 
 export default function Sidebar() {
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [boardOpen, setBoardOpen] = useState(false);
+    const [businessName, setBusinessName] = useState('셈하나');
 
     // Close drawer on route change
     useEffect(() => {
@@ -31,12 +34,27 @@ export default function Sidebar() {
                 role: payload.role,
                 real_name: payload.real_name || payload.sub,
                 grade: payload.grade || 'normal',
-                profile_image: payload.profile_image
+                profile_image: payload.profile_image,
+                business_id: payload.business_id
             };
         } catch (e) {
             console.error("Failed to decode token", e);
         }
     }
+
+    // Fetch dynamic business name on mount
+    useEffect(() => {
+        const bid = user.business_id || localStorage.getItem('business_id');
+        if (bid) {
+            axios.get(`${API_BASE}/api/auth/business-info?bid=${bid}`)
+                .then(res => {
+                    if (res.data && res.data.business_name) {
+                        setBusinessName(res.data.business_name);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch business info for sidebar', err));
+        }
+    }, [user.business_id]);
 
     const mainMenuItems = user.role === 'admin'
         ? [
@@ -197,11 +215,11 @@ export default function Sidebar() {
                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group"
                 >
                     <Home size={20} className="text-slate-400 group-hover:text-white transition-colors" />
-                    <span className="font-bold text-sm tracking-tight flex items-center">
-                        <span className="text-white">셈</span><span className="text-blue-500">하나</span>
-                        <span className="text-slate-600 font-light mx-1.5">|</span>
+                    <h1 className="text-lg font-black tracking-tight flex items-center justify-center">
+                        <span className="text-white">{businessName}</span>
+                        <span className="text-slate-600 font-light mx-2">|</span>
                         <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
-                    </span>
+                    </h1>
                 </Link>
                 <button
                     onClick={handleLogout}
