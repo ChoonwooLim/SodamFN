@@ -171,7 +171,7 @@ def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(
 def get_vendors_list(year: Optional[int] = None, month: Optional[int] = None, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         with DatabaseService() as service:
-            data = service.get_vendors(year=year, month=month)
+            data = service.get_vendors(year=year, month=month, bid=bid)
             return {"status": "success", "data": data}
     except Exception as e:
         return {"status": "error", "message": str(e)}

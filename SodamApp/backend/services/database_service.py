@@ -75,7 +75,7 @@ class DatabaseService:
         results = self.session.exec(stmt).all()
         return [{"vendor": r[0], "amount": r[1], "item": r[2]} for r in results]
 
-    def get_vendors(self, year: int = None, month: int = None):
+    def get_vendors(self, year: int = None, month: int = None, bid: int = None):
         # Join Vendor with DailyExpense to get stats
         # We need to use left join and group by Vendor.id
         
@@ -98,6 +98,10 @@ class DatabaseService:
             func.count(DailyExpense.id).label("transaction_count"),
             func.sum(DailyExpense.amount).label("total_transaction_amount")
         ).outerjoin(DailyExpense, join_condition).group_by(Vendor.id)
+        
+        # Filter by business_id
+        if bid:
+            stmt = stmt.where(Vendor.business_id == bid)
         
         results = self.session.exec(stmt).all()
         
@@ -148,6 +152,9 @@ class DatabaseService:
                     Revenue.date >= start_date,
                     Revenue.date <= end_date,
                 )
+            
+            if bid:
+                rev_query = rev_query.where(Revenue.business_id == bid)
 
             rev_results = self.session.exec(rev_query).all()
 
