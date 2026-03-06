@@ -11,7 +11,7 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const [businessName, setBusinessName] = useState('소담'); // Default fallback
+    const [businessName, setBusinessName] = useState('소담김밥'); // Default fallback
 
     // Get business_id from URL params (e.g., ?bid=2) or fallback to the deployed environment variable
     const queryBid = new URLSearchParams(window.location.search).get('bid');
@@ -22,7 +22,9 @@ export default function Login() {
             axios.get(`${API_BASE}/api/auth/business-info?bid=${bid}`)
                 .then(res => {
                     if (res.data && res.data.business_name) {
-                        setBusinessName(res.data.business_name);
+                        let bName = res.data.business_name;
+                        if (bName.toLowerCase() === 'sodam gimbap') bName = '소담김밥';
+                        setBusinessName(bName);
                     }
                 })
                 .catch(err => console.error('Failed to fetch business info', err));
@@ -87,7 +89,7 @@ export default function Login() {
                     <div className="login-logo-icon">
                         <Store size={36} color="white" />
                     </div>
-                    <h1>{businessName} Staff</h1>
+                    <h1 style={{ whiteSpace: 'nowrap', wordBreak: 'keep-all' }}>{businessName} Staff</h1>
                     <p>직원 전용 모바일 앱</p>
                 </div>
 

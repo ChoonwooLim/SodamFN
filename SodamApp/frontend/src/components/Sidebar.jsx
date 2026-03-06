@@ -126,7 +126,7 @@ export default function Sidebar() {
             <div className="p-6 border-b border-slate-800/50">
                 <div className="flex items-center gap-3 mb-4">
                     {logoUrl ? (
-                        <img src={logoUrl} alt="Store Logo" className="w-10 h-10 rounded-full border-2 border-slate-700 object-cover bg-white" />
+                        <img src={logoUrl} alt="Store Logo" className="w-16 h-16 rounded-full object-cover" />
                     ) : user.profile_image ? (
                         <img src={user.profile_image} alt="Profile" className="w-10 h-10 rounded-full border border-slate-700 object-cover" />
                     ) : (
@@ -135,12 +135,12 @@ export default function Sidebar() {
                         </div>
                     )}
                     <div>
-                        <h2 className="text-sm font-bold text-white leading-tight">{user.real_name}</h2>
+                        <h2 className="text-xl font-bold text-white leading-tight">{user.real_name}</h2>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-medium uppercase tracking-wider">
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold uppercase tracking-wider">
                                 {user.grade}
                             </span>
-                            <span className="text-[10px] text-slate-500">
+                            <span className="text-xs text-slate-500 font-medium">
                                 {user.role === 'admin' ? '관리자' : '직원'}
                             </span>
                         </div>
