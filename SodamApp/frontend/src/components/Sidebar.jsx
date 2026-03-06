@@ -138,11 +138,10 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <h1 className="text-lg font-black tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                    셈<span className="text-blue-500">하나</span> <span className="text-slate-600 font-light">|</span> SEM<span className="text-blue-500">HANA</span>
+                <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2">
+                    <span className="text-white drop-shadow-sm">{businessName}</span>
                 </h1>
             </div>
-
             <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
                 {mainMenuItems.map(renderMenuItem)}
 
@@ -213,14 +212,12 @@ export default function Sidebar() {
                 )}
                 <Link
                     to="/"
-                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group"
+                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all group"
                 >
-                    <Home size={20} className="text-slate-400 group-hover:text-white transition-colors" />
-                    <h1 className="text-lg font-black tracking-tight flex items-center justify-center">
-                        <span className="text-white">{businessName}</span>
-                        <span className="text-slate-600 font-light mx-2">|</span>
-                        <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
-                    </h1>
+                    <Home size={20} className="text-amber-400" />
+                    <span className="font-bold text-sm tracking-tight flex items-center">
+                        <span className="text-amber-400">셈하나 홈</span>
+                    </span>
                 </Link>
                 <button
                     onClick={handleLogout}
