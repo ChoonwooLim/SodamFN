@@ -88,9 +88,18 @@ def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(
             names_q = apply_bid_filter(select(Staff.name), Staff, bid)
             staff_names = session.exec(names_q.where(Staff.status == "재직").limit(5)).all()
 
+            # --- Business Name ---
+            from models import Business
+            business_name = "소담김밥"
+            if bid:
+                b = session.get(Business, bid)
+                if b and b.name:
+                    business_name = b.name
+
             return {
                 "status": "success",
                 "data": {
+                    "business_name": business_name,
                     "year": year,
                     "month": f"{month}월",
                     "revenue": current["revenue"],

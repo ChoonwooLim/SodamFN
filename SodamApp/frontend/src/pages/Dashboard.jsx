@@ -18,8 +18,6 @@ export default function Dashboard() {
     // Live Clock State
     const [currentTime, setCurrentTime] = useState(new Date());
 
-    const businessName = localStorage.getItem('business_name') || '소담김밥';
-
     useEffect(() => {
         fetchData(selectedYear, selectedMonth);
     }, [selectedYear, selectedMonth]);
@@ -78,6 +76,7 @@ export default function Dashboard() {
     const monthlyTrend = dashData?.monthly_trend || [];
     const staffCount = dashData?.staff_count || 0;
     const staffNames = dashData?.staff_names || [];
+    const businessName = dashData?.business_name || '소담김밥';
 
     // Formatting date helper
     const formatDate = (date) => {
