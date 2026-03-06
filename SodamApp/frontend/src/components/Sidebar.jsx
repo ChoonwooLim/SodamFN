@@ -51,7 +51,9 @@ export default function Sidebar() {
             axios.get(`${API_URL}/api/auth/business-info?bid=${bid}`)
                 .then(res => {
                     if (res.data && res.data.business_name) {
-                        setBusinessName(res.data.business_name);
+                        let bName = res.data.business_name;
+                        if (bName.toLowerCase() === 'sodam gimbap') bName = '소담김밥';
+                        setBusinessName(bName);
                     }
                     if (res.data && res.data.logo_url) {
                         setLogoUrl(`${API_URL}${res.data.logo_url}`);
@@ -146,9 +148,9 @@ export default function Sidebar() {
                 </div>
                 <div className="mt-6 -mx-2 mb-2">
                     <div className="bg-[#202c27] border-t border-[#33423b] border-b-4 border-b-[#141b18] rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all">
-                        <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2.5 px-3">
-                            <span className="text-orange-500 drop-shadow-sm">{businessName}</span>
-                            <span className="text-slate-600 font-light mx-2">|</span>
+                        <h1 className="text-xl font-black tracking-tight flex flex-nowrap items-center justify-center py-2.5 px-3 whitespace-nowrap break-keep">
+                            <span className="text-orange-500 drop-shadow-sm whitespace-nowrap break-keep shrink-0">{businessName}</span>
+                            <span className="text-slate-600 font-light mx-2 shrink-0">|</span>
                             <span className="text-white">셈</span><span className="text-blue-500">하나</span>
                         </h1>
                     </div>
