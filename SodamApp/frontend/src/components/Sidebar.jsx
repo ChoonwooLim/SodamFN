@@ -139,7 +139,7 @@ export default function Sidebar() {
                     </div>
                 </div>
                 <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2">
-                    <span className="text-white drop-shadow-sm">{businessName}</span>
+                    <span className="text-orange-500 drop-shadow-sm">{businessName}</span>
                     <span className="text-slate-600 font-light mx-2">|</span>
                     <span className="text-white">셈</span><span className="text-blue-500">하나</span>
                 </h1>
