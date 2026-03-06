@@ -16,8 +16,8 @@ export default function Profile() {
     }, [navigate]);
 
     const handleLogout = () => {
-        localStorage.clear();
-        window.location.href = '/login';
+        localStorage.removeItem('token');
+        navigate('/login', { replace: true });
     };
 
     if (!user) return null;

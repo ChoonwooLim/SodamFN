@@ -107,7 +107,6 @@ export default function Home() {
 
     const today = new Date().toLocaleDateString('ko-KR', { weekday: 'long', month: 'long', day: 'numeric' });
     const canCheckin = !status.checked_in;
-    const canCheckout = status.checked_in && !status.checked_out;
     const allDone = status.checked_in && status.checked_out;
 
     return (
@@ -126,7 +125,7 @@ export default function Home() {
                     <p className="text-sm text-muted" style={{ marginTop: '4px' }}>{today}</p>
                 </div>
                 <button
-                    onClick={() => { localStorage.clear(); window.location.href = '/login'; }}
+                    onClick={() => { localStorage.removeItem('token'); navigate('/login', { replace: true }); }}
                     style={{
                         padding: '8px 12px', color: 'var(--text-muted)', marginTop: '4px',
                         background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
