@@ -27,7 +27,7 @@ export default function Home() {
         const init = async () => {
             try {
                 const token = localStorage.getItem('token');
-                if (!token) { navigate('/login'); return; }
+                if (!token) { navigate(`/login${window.location.search}`); return; }
 
                 const payload = JSON.parse(atob(token.split('.')[1]));
                 setUser(payload);
@@ -125,7 +125,7 @@ export default function Home() {
                     <p className="text-sm text-muted" style={{ marginTop: '4px' }}>{today}</p>
                 </div>
                 <button
-                    onClick={() => { localStorage.removeItem('token'); navigate('/login', { replace: true }); }}
+                    onClick={() => { localStorage.removeItem('token'); navigate(`/login${window.location.search}`, { replace: true }); }}
                     style={{
                         padding: '8px 12px', color: 'var(--text-muted)', marginTop: '4px',
                         background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',

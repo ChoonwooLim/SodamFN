@@ -36,7 +36,7 @@ export default function Attendance() {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token) { navigate('/login'); return; }
+        if (!token) { navigate(`/login${window.location.search}`); return; }
         const payload = JSON.parse(atob(token.split('.')[1]));
         setStaffId(payload.staff_id);
         if (payload.staff_id) {

@@ -18,7 +18,7 @@ export default function Contracts() {
                 }
             } catch (err) {
                 console.error('Error fetching contracts:', err);
-                if (err.response?.status === 401) navigate('/login');
+                if (err.response?.status === 401) navigate(`/login${window.location.search}`);
             } finally {
                 setLoading(false);
             }

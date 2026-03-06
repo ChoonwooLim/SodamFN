@@ -21,7 +21,7 @@ export default function Payslip() {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token) { navigate('/login'); return; }
+        if (!token) { navigate(`/login${window.location.search}`); return; }
         const payload = JSON.parse(atob(token.split('.')[1]));
         setStaffId(payload.staff_id);
         setUserName(payload.real_name || '');

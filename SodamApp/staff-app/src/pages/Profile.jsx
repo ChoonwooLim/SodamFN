@@ -10,14 +10,14 @@ export default function Profile() {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (!token) { navigate('/login'); return; }
+        if (!token) { navigate(`/login${window.location.search}`); return; }
         const payload = JSON.parse(atob(token.split('.')[1]));
         setUser(payload);
     }, [navigate]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        navigate('/login', { replace: true });
+        navigate(`/login${window.location.search}`, { replace: true });
     };
 
     if (!user) return null;

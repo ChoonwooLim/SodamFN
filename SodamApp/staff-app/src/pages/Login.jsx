@@ -15,7 +15,7 @@ export default function Login() {
 
     // Get business_id from URL params (e.g., ?bid=2) or fallback to the deployed environment variable
     const queryBid = new URLSearchParams(window.location.search).get('bid');
-    const bid = queryBid || import.meta.env.VITE_BUSINESS_ID;
+    const bid = queryBid || localStorage.getItem('bid') || import.meta.env.VITE_BUSINESS_ID;
 
     useEffect(() => {
         if (bid) {
