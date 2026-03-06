@@ -119,8 +119,10 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <h1 className="text-lg font-black tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                    셈<span className="text-blue-500">하나</span> <span className="text-slate-600 font-light">|</span> SEM<span className="text-blue-500">HANA</span>
+                <h1 className="text-lg font-black tracking-tight flex items-center justify-center">
+                    <span className="text-white">셈</span><span className="text-blue-500">하나</span>
+                    <span className="text-slate-600 font-light mx-2">|</span>
+                    <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
                 </h1>
             </div>
 
