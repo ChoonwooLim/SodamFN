@@ -343,7 +343,7 @@ def list_all_users(
     """전체 사용자 목록 (매장별 그룹화)"""
     with Session(engine) as s:
         businesses = s.exec(select(Business).where(Business.is_active == True)).all()
-        stmt = select(User)
+        stmt = select(User).where(User.role != "staff")
         if business_id:
             stmt = stmt.where(User.business_id == business_id)
         users = s.exec(stmt).all()

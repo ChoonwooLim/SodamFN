@@ -193,7 +193,7 @@ export default function SuperAdminDashboard() {
         }
     };
 
-    
+
     const handleCreateAdmin = async () => {
         if (!createAdminForm.username || !createAdminForm.password) {
             alert('아이디와 비밀번호를 입력해 주세요.');
@@ -543,7 +543,6 @@ export default function SuperAdminDashboard() {
                                                                             >
                                                                                 <option value="superadmin">SuperAdmin</option>
                                                                                 <option value="admin">Admin</option>
-                                                                                <option value="staff">Staff</option>
                                                                                 <option value="guest">Guest</option>
                                                                             </select>
                                                                         </td>
@@ -604,40 +603,40 @@ export default function SuperAdminDashboard() {
                             </div>
                         )}
 
-                        
-                                {/* Create Admin Modal */}
-                                {createAdminModal && (
-                                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
-                                            <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
-                                                <UserPlus size={18} className="text-amber-400" />
-                                                매장 관리자 생성
-                                            </h3>
-                                            <p className="text-sm text-slate-400 mb-5">
-                                                <Building2 size={14} className="inline mr-1" />
-                                                {createAdminModal.business_name}
-                                            </p>
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <label className="text-xs text-slate-400 block mb-1">관리자 아이디 <span className="text-red-400">*</span></label>
-                                                    <input value={createAdminForm.username} onChange={e => setCreateAdminForm(p => ({ ...p, username: e.target.value }))} placeholder="예: jangin_admin" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs text-slate-400 block mb-1">비밀번호 <span className="text-red-400">*</span></label>
-                                                    <input type="password" value={createAdminForm.password} onChange={e => setCreateAdminForm(p => ({ ...p, password: e.target.value }))} placeholder="최소 4자 이상" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs text-slate-400 block mb-1">담당자 이름 <span className="text-slate-600">(선택)</span></label>
-                                                    <input value={createAdminForm.real_name} onChange={e => setCreateAdminForm(p => ({ ...p, real_name: e.target.value }))} placeholder="예: 홍길동" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-3 mt-6">
-                                                <button onClick={() => { setCreateAdminModal(null); setCreateAdminForm({ username: '', password: '', real_name: '' }); }} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
-                                                <button onClick={handleCreateAdmin} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg flex items-center justify-center gap-2"><UserPlus size={16} /> 생성</button>
-                                            </div>
+
+                        {/* Create Admin Modal */}
+                        {createAdminModal && (
+                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                    <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                                        <UserPlus size={18} className="text-amber-400" />
+                                        매장 관리자 생성
+                                    </h3>
+                                    <p className="text-sm text-slate-400 mb-5">
+                                        <Building2 size={14} className="inline mr-1" />
+                                        {createAdminModal.business_name}
+                                    </p>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">관리자 아이디 <span className="text-red-400">*</span></label>
+                                            <input value={createAdminForm.username} onChange={e => setCreateAdminForm(p => ({ ...p, username: e.target.value }))} placeholder="예: jangin_admin" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">비밀번호 <span className="text-red-400">*</span></label>
+                                            <input type="password" value={createAdminForm.password} onChange={e => setCreateAdminForm(p => ({ ...p, password: e.target.value }))} placeholder="최소 4자 이상" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">담당자 이름 <span className="text-slate-600">(선택)</span></label>
+                                            <input value={createAdminForm.real_name} onChange={e => setCreateAdminForm(p => ({ ...p, real_name: e.target.value }))} placeholder="예: 홍길동" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
                                         </div>
                                     </div>
-                                )}
+                                    <div className="flex gap-3 mt-6">
+                                        <button onClick={() => { setCreateAdminModal(null); setCreateAdminForm({ username: '', password: '', real_name: '' }); }} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                        <button onClick={handleCreateAdmin} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg flex items-center justify-center gap-2"><UserPlus size={16} /> 생성</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* =========== 5. ANNOUNCEMENTS =========== */}
                         {activeTab === 'announcements' && (
