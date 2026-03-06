@@ -59,7 +59,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
     with Session(engine) as session:
         # Get all revenue vendors
         revenue_vendors = session.exec(
-            select(Vendor).where(Vendor.vendor_type == "revenue")
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == "revenue")
         ).all()
         vendor_map = {v.id: v for v in revenue_vendors}
         vendor_ids = list(vendor_map.keys())
@@ -69,7 +69,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
 
         # Get DailyExpense records for these vendors in the date range
         expenses = session.exec(
-            select(DailyExpense)
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid)
             .where(
                 DailyExpense.vendor_id.in_(vendor_ids),
                 DailyExpense.date >= start_date,
@@ -133,7 +133,7 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
     with Session(engine) as session:
         # Get revenue vendor IDs
         revenue_vendors = session.exec(
-            select(Vendor).where(Vendor.vendor_type == "revenue")
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == "revenue")
         ).all()
         vendor_map = {v.id: v for v in revenue_vendors}
         vendor_ids = list(vendor_map.keys())
@@ -149,7 +149,7 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
 
         # Total by category
         expenses = session.exec(
-            select(DailyExpense)
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid)
             .where(
                 DailyExpense.vendor_id.in_(vendor_ids),
                 DailyExpense.date >= start_date,
@@ -491,7 +491,7 @@ def delete_delivery_revenue_month(year: int, month: int, _admin: AuthUser = Depe
             end_date = date(year, month + 1, 1)
 
         rev_records = session.exec(
-            select(Revenue)
+            apply_bid_filter(select(Revenue), Revenue, bid)
             .where(Revenue.date >= start_date, Revenue.date < end_date)
         ).all()
         rev_count = len(rev_records)

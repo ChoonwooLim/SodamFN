@@ -42,22 +42,21 @@ def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(
     try:
         with Session(engine) as session:
             # --- Current month P/L ---
-            record = session.exec(
-                select(MonthlyProfitLoss).where(
-                    MonthlyProfitLoss.year == year,
-                    MonthlyProfitLoss.month == month
-                )
-            ).first()
+            q = apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
+            record = session.exec(q.where(
+                MonthlyProfitLoss.year == year,
+                MonthlyProfitLoss.month == month
+            )).first()
             current = _pl_totals(record)
 
             # --- Previous month for growth ---
             prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
-            prev_record = session.exec(
-                select(MonthlyProfitLoss).where(
-                    MonthlyProfitLoss.year == prev_y,
-                    MonthlyProfitLoss.month == prev_m
-                )
-            ).first()
+            prev_record = session.exec(apply_bid_filter(
+                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+            ).where(
+                MonthlyProfitLoss.year == prev_y,
+                MonthlyProfitLoss.month == prev_m
+            )).first()
             prev = _pl_totals(prev_record)
             growth = round(((current["revenue"] - prev["revenue"]) / prev["revenue"] * 100), 1) if prev["revenue"] > 0 else 0
 
@@ -74,22 +73,20 @@ def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(
             trend_months.reverse()
 
             for y, m in trend_months:
-                rec = session.exec(
-                    select(MonthlyProfitLoss).where(
-                        MonthlyProfitLoss.year == y,
-                        MonthlyProfitLoss.month == m
-                    )
-                ).first()
+                rec = session.exec(apply_bid_filter(
+                    select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+                ).where(
+                    MonthlyProfitLoss.year == y,
+                    MonthlyProfitLoss.month == m
+                )).first()
                 t = _pl_totals(rec)
                 monthly_trend.append({"month": f"{m}월", **t})
 
             # --- Staff count ---
-            staff_count = session.exec(
-                select(func.count(Staff.id)).where(Staff.status == "재직")
-            ).one() or 0
-            staff_names = session.exec(
-                select(Staff.name).where(Staff.status == "재직").limit(5)
-            ).all()
+            staff_q = apply_bid_filter(select(func.count(Staff.id)), Staff, bid)
+            staff_count = session.exec(staff_q.where(Staff.status == "재직")).one() or 0
+            names_q = apply_bid_filter(select(Staff.name), Staff, bid)
+            staff_names = session.exec(names_q.where(Staff.status == "재직").limit(5)).all()
 
             return {
                 "status": "success",
@@ -114,12 +111,12 @@ def get_revenue_breakdown(year: int = 2026, month: int = 1, _admin: User = Depen
     """Return revenue breakdown from MonthlyProfitLoss for pie chart."""
     try:
         with Session(engine) as session:
-            record = session.exec(
-                select(MonthlyProfitLoss).where(
-                    MonthlyProfitLoss.year == year,
-                    MonthlyProfitLoss.month == month
-                )
-            ).first()
+            record = session.exec(apply_bid_filter(
+                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+            ).where(
+                MonthlyProfitLoss.year == year,
+                MonthlyProfitLoss.month == month
+            )).first()
 
             LABELS = {
                 "revenue_store": "매장매출",
@@ -162,6 +159,8 @@ def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(
                 .order_by(func.sum(DailyExpense.amount).desc())
                 .limit(5)
             )
+            if bid is not None:
+                stmt = stmt.where(DailyExpense.business_id == bid)
             results = session.exec(stmt).all()
             data = [{"vendor": r[0], "amount": r[1], "item": r[2] or "기타"} for r in results]
             return {"status": "success", "data": data}
@@ -290,7 +289,7 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
             with Session(engine) as sync_session:
                 # Find all expenses linked to this vendor
                 expenses = sync_session.exec(
-                    select(DailyExpense).where(DailyExpense.vendor_id == vendor_id)
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == vendor_id)
                 ).all()
                 
                 # ─── 매입 내역(DailyExpense) 카테고리도 동기화 ───
@@ -370,7 +369,7 @@ def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = De
                 
                 # 3. Update all DailyExpense records
                 expenses = session.exec(
-                    select(DailyExpense).where(DailyExpense.vendor_id == source_id)
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == source_id)
                 ).all()
                 
                 for expense in expenses:
@@ -438,7 +437,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
             # 1. Find or create target vendor
             # Check if target vendor exists by name
             target_vendor = session.exec(
-                select(Vendor).where(Vendor.name == payload.target_name)
+                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == payload.target_name)
             ).first()
             
             if not target_vendor:
@@ -482,7 +481,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
                 )
                     
                 expenses = session.exec(
-                    select(DailyExpense).where(DailyExpense.vendor_name == src_name)
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_name == src_name)
                 ).all()
                 
                 for expense in expenses:
@@ -498,7 +497,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
                     continue
                     
                 source_vendors = session.exec(
-                    select(Vendor).where(Vendor.name == src_name)
+                    apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == src_name)
                 ).all()
                 
                 for sv in source_vendors:
@@ -506,7 +505,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
 
             # Also update expenses for target_name itself if they have no ID
             target_expenses = session.exec(
-                select(DailyExpense).where(
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                     DailyExpense.vendor_name == payload.target_name,
                     DailyExpense.vendor_id == None
                 )
@@ -522,7 +521,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
             # We need to sync months where target_vendor has expenses.
             # (Fetching again to cover freshly updated/merged ones)
             all_target_expenses = session.exec(
-                select(DailyExpense).where(DailyExpense.vendor_id == target_vendor.id)
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == target_vendor.id)
             ).all()
             affected_months = set((e.date.year, e.date.month) for e in all_target_expenses)
             

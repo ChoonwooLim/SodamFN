@@ -89,9 +89,9 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
     service = DatabaseService()
     try:
         stmt = select(Staff)
-        # Tenant filter
-        if hasattr(current_user, "business_id") and current_user.business_id and current_user.role != "superadmin":
-            stmt = stmt.where(Staff.business_id == current_user.business_id)
+        # Tenant filter - scope to admin's business
+        if _admin.role != "superadmin" and _admin.business_id:
+            stmt = stmt.where(Staff.business_id == _admin.business_id)
         
         # Apply Status Filter if Provided
         if status:
@@ -111,6 +111,8 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
 
 @router.post("/staff")
 def create_staff(staff: StaffCreate, _admin: AuthUser = Depends(get_admin_user)):
+    # Auto-assign business_id from admin
+    staff_business_id = _admin.business_id if _admin.role != "superadmin" else None
     service = DatabaseService()
     try:
         new_staff = Staff(
@@ -120,7 +122,8 @@ def create_staff(staff: StaffCreate, _admin: AuthUser = Depends(get_admin_user))
             bank_account=staff.bank_account,
             start_date=staff.start_date,
             nationality=staff.nationality,
-            visa_type=staff.visa_type
+            visa_type=staff.visa_type,
+            business_id=staff_business_id or _admin.business_id
         )
         service.session.add(new_staff)
         service.session.commit()
@@ -371,10 +374,10 @@ def delete_staff_document(
         service.close()
 
 from routers.auth import get_current_user, get_tenant_bid
-from tenant_filter import get_bid_from_token, apply_bid_filter as get_current_user_dep
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 @router.post("/attendance")
-def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_current_user_dep)):
+def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_current_user)):
     service = DatabaseService()
     try:
         today = date.today()
@@ -444,7 +447,7 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
         service.close()
 
 @router.get("/attendance/status/{staff_id}")
-def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_user_dep)):
+def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_user)):
     service = DatabaseService()
     try:
         today = date.today()
@@ -471,7 +474,7 @@ def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_u
         service.close()
 
 @router.get("/attendance/history/{staff_id}")
-def get_attendance_history(staff_id: int, _user: AuthUser = Depends(get_current_user_dep)):
+def get_attendance_history(staff_id: int, _user: AuthUser = Depends(get_current_user)):
     service = DatabaseService()
     try:
         # Get last 5 records
@@ -590,7 +593,7 @@ def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin
 # --- 월간 근무 요약 ---
 
 @router.get("/attendance/monthly-summary/{staff_id}/{month}")
-def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = Depends(get_current_user_dep)):
+def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = Depends(get_current_user)):
     """
     월간 출퇴근 요약 (근무일수, 총 근무시간, GPS 검증율, 예상 급여)
     month = "YYYY-MM"

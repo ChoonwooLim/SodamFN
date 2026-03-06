@@ -385,7 +385,7 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
             "holiday_details": holiday_details
         }, ensure_ascii=False)
         
-        existing = service.session.exec(select(Payroll).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
+        existing = service.session.exec(apply_bid_filter(select(Payroll), Payroll, bid).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
         # bid filter applied via select stmt above
         if not existing:
             existing = Payroll(staff_id=req.staff_id, month=req.month)
@@ -620,7 +620,7 @@ def calc_insurance_base_salary(staff_id: int, year: int = None, admin: User = De
         
         # 전년도 급여 데이터 조회
         payrolls = service.session.exec(
-            select(Payroll).where(
+            apply_bid_filter(select(Payroll), Payroll, bid).where(
                 Payroll.staff_id == staff_id,
                 Payroll.month >= f"{prev_year}-01",
                 Payroll.month <= f"{prev_year}-12"
@@ -670,7 +670,7 @@ def calc_insurance_base_salary(staff_id: int, year: int = None, admin: User = De
                 # 시급제: 시급 × 주당 예상시간 × 52.14 / 12
                 # 주당 시간 추정: 올해 데이터 사용 가능하면 평균, 아니면 40시간 기본
                 current_payrolls = service.session.exec(
-                    select(Payroll).where(
+                    apply_bid_filter(select(Payroll), Payroll, bid).where(
                         Payroll.staff_id == staff_id,
                         Payroll.month >= f"{year}-01",
                         Payroll.month <= f"{year}-12"

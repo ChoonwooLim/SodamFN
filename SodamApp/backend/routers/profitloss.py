@@ -146,7 +146,7 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
 def get_monthly_profitloss_single(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Get a specific month's P/L record"""
     result = session.exec(
-        select(MonthlyProfitLoss)
+        apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
         .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
     ).first()
     if not result:
@@ -157,7 +157,7 @@ def get_monthly_profitloss_single(year: int, month: int, session: Session = Depe
 def create_monthly_profitloss(data: MonthlyPLCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Create or update a monthly P/L record"""
     existing = session.exec(
-        select(MonthlyProfitLoss)
+        apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
         .where(MonthlyProfitLoss.year == data.year, MonthlyProfitLoss.month == data.month)
     ).first()
     
@@ -247,7 +247,7 @@ def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(ge
     # Auto-link to Vendor by vendor_name
     if data.vendor_name:
         vendor = session.exec(
-            select(Vendor).where(Vendor.name == data.vendor_name)
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == data.vendor_name)
         ).first()
         if not vendor:
             raise HTTPException(
@@ -282,7 +282,7 @@ def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = D
     # Auto-link to Vendor by vendor_name
     if data.vendor_name:
         vendor = session.exec(
-            select(Vendor).where(Vendor.name == data.vendor_name)
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == data.vendor_name)
         ).first()
         if not vendor:
             raise HTTPException(
@@ -324,12 +324,8 @@ def get_delivery_revenue(channel: str, year: int, session: Session = Depends(get
     start_date = datetime.date(year, 1, 1)
     end_date = datetime.date(year + 1, 1, 1)
     
-    results = session.exec(
-        select(Revenue)
-        .where(Revenue.channel == channel)
-        .where(Revenue.date >= start_date, Revenue.date < end_date)
-        .order_by(Revenue.date)
-    ).all()
+    _rq = select(Revenue).where(Revenue.channel == channel).where(Revenue.date >= start_date, Revenue.date < end_date).order_by(Revenue.date)
+    results = session.exec(apply_bid_filter(_rq, Revenue, bid)).all()
     return results
 
 @router.get("/delivery/{channel}/{year}/{month}")
@@ -341,12 +337,8 @@ def get_delivery_revenue_monthly(channel: str, year: int, month: int, session: S
     else:
         end_date = datetime.date(year, month + 1, 1)
     
-    results = session.exec(
-        select(Revenue)
-        .where(Revenue.channel == channel)
-        .where(Revenue.date >= start_date, Revenue.date < end_date)
-        .order_by(Revenue.date)
-    ).all()
+    _rq = select(Revenue).where(Revenue.channel == channel).where(Revenue.date >= start_date, Revenue.date < end_date).order_by(Revenue.date)
+    results = session.exec(apply_bid_filter(_rq, Revenue, bid)).all()
     return results
 
 @router.post("/delivery")

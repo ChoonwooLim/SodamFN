@@ -88,7 +88,7 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session),
         
         # Count existing products for this vendor to determine sequence
         existing_count = len(session.exec(
-            select(Product).where(Product.vendor_id == data.vendor_id)
+            apply_bid_filter(select(Product), Product, bid).where(Product.vendor_id == data.vendor_id)
         ).all())
         sequence = str(existing_count + 1).zfill(2)
         product_code = f"{initials}{sequence}"
