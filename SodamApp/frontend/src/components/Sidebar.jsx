@@ -138,7 +138,7 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <div className="px-2 mt-2">
+                <div className="mt-6 -mx-2 mb-2">
                     <div className="bg-slate-800/80 border-t border-slate-700 border-b-4 border-b-slate-900 rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all">
                         <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2.5 px-3">
                             <span className="text-orange-500 drop-shadow-sm">{businessName}</span>
