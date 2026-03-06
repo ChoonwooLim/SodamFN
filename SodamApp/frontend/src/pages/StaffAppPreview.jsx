@@ -17,10 +17,15 @@ export default function StaffAppPreview() {
     const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
 
+    // Get business_id from admin JWT for staff app isolation
+    const token = localStorage.getItem('token');
+    const adminBid = token ? (() => { try { return JSON.parse(atob(token.split('.')[1])).business_id; } catch { return null; } })() : null;
+    const staffUrl = adminBid ? `${STAFF_APP_URL}?bid=${adminBid}` : STAFF_APP_URL;
+
     const currentDevice = DEVICE_PRESETS.find(d => d.id === device);
 
     const handleRefresh = () => setIframeKey(prev => prev + 1);
-    const handleOpenExternal = () => window.open(STAFF_APP_URL, '_blank');
+    const handleOpenExternal = () => window.open(staffUrl, '_blank');
 
     return (
         <div className="staff-preview-page">
@@ -63,7 +68,7 @@ export default function StaffAppPreview() {
                     <div className="desktop-frame">
                         <iframe
                             key={iframeKey}
-                            src={`${STAFF_APP_URL}?_t=${Date.now()}`}
+                            src={`${staffUrl}&_t=${iframeKey}`}
                             title="직원용 앱"
                             className="desktop-iframe"
                             allow="geolocation; notifications"
@@ -89,7 +94,7 @@ export default function StaffAppPreview() {
                         {/* App content */}
                         <iframe
                             key={iframeKey}
-                            src={`${STAFF_APP_URL}?_t=${Date.now()}`}
+                            src={`${staffUrl}&_t=${iframeKey}`}
                             title="직원용 앱"
                             className="phone-iframe"
                             allow="geolocation; notifications"

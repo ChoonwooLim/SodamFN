@@ -10,6 +10,7 @@ from sqlmodel import Session, select, func, desc
 from database import engine
 from models import Vendor, DailyExpense, UploadHistory, User
 from routers.auth import get_admin_user
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ class PurchaseUpdate(BaseModel):
 # ─── GET daily purchase list ───
 
 @router.get("/api/purchase/daily")
-def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_user)):
+def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Returns all DailyExpense records for expense vendors in the given month.
     Enriched with vendor info and grouped for frontend display.
@@ -48,13 +49,13 @@ def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_
     with Session(engine) as session:
         # Get all expense vendors
         vendors = session.exec(
-            select(Vendor).where(Vendor.vendor_type == "expense")
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == "expense")
         ).all()
         vendor_map = {v.id: v for v in vendors}
         
         # Get all DailyExpense for the month with expense vendors
         expenses = session.exec(
-            select(DailyExpense).where(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
             ).order_by(desc(DailyExpense.date))
@@ -88,7 +89,7 @@ def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_
 # ─── GET summary stats ───
 
 @router.get("/api/purchase/summary")
-def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin_user)):
+def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Aggregated purchase stats: by category, by day, by card company (from note).
     """
@@ -101,12 +102,12 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
     with Session(engine) as session:
         # Get expense vendor IDs
         vendors = session.exec(
-            select(Vendor).where(Vendor.vendor_type == "expense")
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == "expense")
         ).all()
         expense_vendor_ids = set(v.id for v in vendors)
         
         expenses = session.exec(
-            select(DailyExpense).where(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
             )
@@ -188,7 +189,7 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
 # ─── POST upload card company Excel ───
 
 @router.post("/api/purchase/upload")
-async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Upload a card company or bank Excel file.
     Auto-detects format and parses into DailyExpense records.
@@ -219,7 +220,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         
         # ─── AI 자동 분류 적용 ───
         from services.smart_classifier import apply_rules
-        auto_classified_count = apply_rules(records)
+        auto_classified_count = apply_rules(records, bid)
         
         card_company = records[0].get('card_company', '알수없음')
         
@@ -229,7 +230,8 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
                 filename=filename,
                 upload_type="purchase",
                 record_count=0,
-                status="active"
+                status="active",
+                business_id=bid
             )
             session.add(upload_history)
             session.commit()
@@ -243,7 +245,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         
         with Session(engine) as session:
             # Build vendor lookup
-            vendors = session.exec(select(Vendor)).all()
+            vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
             vendor_by_name = {v.name: v for v in vendors}
             
             for rec in records:
@@ -263,6 +265,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
                         category=category,
                         vendor_type="expense",
                         created_by_upload_id=upload_id,
+                        business_id=bid
                     )
                     session.add(vendor)
                     session.flush()
@@ -271,7 +274,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
                 
                 # Duplicate check: same date + vendor + amount
                 existing = session.exec(
-                    select(DailyExpense).where(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                         DailyExpense.date == date_obj,
                         DailyExpense.vendor_id == vendor.id,
                         DailyExpense.amount == amount,
@@ -299,6 +302,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
                     category=category,
                     note=", ".join(note_parts) if note_parts else None,
                     upload_id=upload_id,
+                    business_id=bid
                 )
                 session.add(expense)
                 inserted_count += 1
@@ -317,7 +321,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
             try:
                 with Session(engine) as sync_session:
                     for (year, month) in processed_months:
-                        sync_all_expenses(year, month, sync_session)
+                        sync_all_expenses(year, month, sync_session, bid)
                     sync_session.commit()
             except Exception as e:
                 print(f"Purchase Upload P/L Sync error: {e}")
@@ -402,7 +406,7 @@ def _find_similar_vendors(vendor_name: str, existing_vendors: list, min_overlap:
 
 
 @router.post("/api/purchase/upload/preview")
-async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Step 1: Parse file, auto-exclude card payments/salary, find similar vendors.
     Returns parsed records + vendor review data for user confirmation.
@@ -429,7 +433,7 @@ async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = D
             return {"status": "error", "message": "파싱된 매입 데이터가 없습니다. 파일 형식을 확인해주세요."}
 
         # Apply AI classification
-        auto_classified_count = apply_rules(records)
+        auto_classified_count = apply_rules(records, bid)
         card_company = records[0].get('card_company', '알수없음')
 
         # Serialize records (dates to string)
@@ -445,7 +449,7 @@ async def upload_purchase_preview(file: UploadFile = File(...), _admin: User = D
         # Load existing vendors for similarity check
         with Session(engine) as session:
             existing_vendors = session.exec(
-                select(Vendor).where(Vendor.vendor_type == "expense")
+                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == "expense")
             ).all()
 
             # Build vendor review list
@@ -496,7 +500,7 @@ class ConfirmUploadPayload(BaseModel):
 
 
 @router.post("/api/purchase/upload/confirm")
-async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = Depends(get_admin_user)):
+async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Step 2: Save records with user's vendor decisions applied.
     """
@@ -518,7 +522,8 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
                 filename=payload.original_filename or f"confirmed_{card_company}.xlsx",
                 upload_type="purchase",
                 record_count=0,
-                status="active"
+                status="active",
+                business_id=bid
             )
             session.add(upload_history)
             session.commit()
@@ -532,7 +537,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
 
         with Session(engine) as session:
             # Build vendor lookup
-            vendors = session.exec(select(Vendor)).all()
+            vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
             vendor_by_name = {v.name: v for v in vendors}
             vendor_by_id = {v.id: v for v in vendors}
 
@@ -571,6 +576,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
                         category=category,
                         vendor_type="expense",
                         created_by_upload_id=upload_id,
+                        business_id=bid
                     )
                     session.add(vendor)
                     session.flush()
@@ -580,7 +586,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
 
                 # Duplicate check
                 existing = session.exec(
-                    select(DailyExpense).where(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                         DailyExpense.date == date_obj,
                         DailyExpense.vendor_id == vendor.id,
                         DailyExpense.amount == amount,
@@ -605,6 +611,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
                     category=category,
                     note=", ".join(note_parts) if note_parts else None,
                     upload_id=upload_id,
+                    business_id=bid
                 )
                 session.add(expense)
                 inserted_count += 1
@@ -622,7 +629,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
             try:
                 with Session(engine) as sync_session:
                     for (year, month) in processed_months:
-                        sync_all_expenses(year, month, sync_session)
+                        sync_all_expenses(year, month, sync_session, bid)
                     sync_session.commit()
             except Exception as e:
                 print(f"Purchase Confirm P/L Sync error: {e}")
@@ -646,7 +653,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
 # ─── POST create single purchase ───
 
 @router.post("/api/purchase")
-def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_user)):
+def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Create a single purchase entry manually."""
     from services.profit_loss_service import sync_all_expenses
     
@@ -655,7 +662,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
         
         # Find or create vendor
         vendor = session.exec(
-            select(Vendor).where(Vendor.name == payload.vendor_name)
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == payload.vendor_name)
         ).first()
         
         if not vendor:
@@ -663,6 +670,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
                 name=payload.vendor_name,
                 category=payload.category,
                 vendor_type="expense",
+                business_id=bid
             )
             session.add(vendor)
             session.flush()
@@ -674,6 +682,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
             amount=payload.amount,
             category=payload.category,
             note=payload.note,
+            business_id=bid
         )
         session.add(expense)
         session.commit()
@@ -681,7 +690,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
         
         # Sync P/L
         try:
-            sync_all_expenses(date_obj.year, date_obj.month, session)
+            sync_all_expenses(date_obj.year, date_obj.month, session, bid)
             session.commit()
         except Exception:
             pass
@@ -692,7 +701,7 @@ def create_purchase(payload: PurchaseCreate, _admin: User = Depends(get_admin_us
 # ─── PUT update purchase ───
 
 @router.put("/api/purchase/{expense_id}")
-def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Depends(get_admin_user)):
+def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Update a purchase entry."""
     from services.profit_loss_service import sync_all_expenses
     from services.smart_classifier import learn_rule
@@ -718,7 +727,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
             expense.vendor_name = payload.vendor_name
             # Update vendor link
             vendor = session.exec(
-                select(Vendor).where(Vendor.name == payload.vendor_name)
+                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == payload.vendor_name)
             ).first()
             if vendor:
                 expense.vendor_id = vendor.id
@@ -736,6 +745,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
             source = "toggle_personal" if payload.category == "개인생활비" or old_category == "개인생활비" else "category_change"
             learn_rule(
                 original_name=original_vendor_name,
+                bid=bid,
                 category=payload.category,
                 source=source,
                 session=session,
@@ -743,7 +753,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
             
             # 동일 업체명의 다른 매입 내역도 모두 같은 카테고리로 변경
             same_vendor_expenses = session.exec(
-                select(DailyExpense).where(
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                     DailyExpense.vendor_name == original_vendor_name,
                     DailyExpense.id != expense_id,
                     DailyExpense.category != payload.category,
@@ -762,7 +772,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
                 linked_vendor = session.get(Vendor, expense.vendor_id)
             if not linked_vendor:
                 linked_vendor = session.exec(
-                    select(Vendor).where(Vendor.name == original_vendor_name)
+                    apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == original_vendor_name)
                 ).first()
             if linked_vendor and linked_vendor.category != payload.category:
                 linked_vendor.category = payload.category
@@ -773,7 +783,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
         # Sync P/L for all affected months
         try:
             for y, m in affected_months:
-                sync_all_expenses(y, m, session)
+                sync_all_expenses(y, m, session, bid)
             session.commit()
         except Exception:
             pass
@@ -788,7 +798,7 @@ def update_purchase(expense_id: int, payload: PurchaseUpdate, _admin: User = Dep
 # ─── DELETE purchase ───
 
 @router.delete("/api/purchase/{expense_id}")
-def delete_purchase(expense_id: int, _admin: User = Depends(get_admin_user)):
+def delete_purchase(expense_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Delete a purchase entry."""
     from services.profit_loss_service import sync_all_expenses
     
@@ -803,7 +813,7 @@ def delete_purchase(expense_id: int, _admin: User = Depends(get_admin_user)):
         
         # Sync P/L
         try:
-            sync_all_expenses(year, month, session)
+            sync_all_expenses(year, month, session, bid)
             session.commit()
         except Exception:
             pass
@@ -814,18 +824,18 @@ def delete_purchase(expense_id: int, _admin: User = Depends(get_admin_user)):
 # ─── Rules API (AI 학습 규칙 관리) ───
 
 @router.get("/api/purchase/rules")
-def get_classification_rules(_admin: User = Depends(get_admin_user)):
+def get_classification_rules(_admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """학습된 자동 분류 규칙 목록 조회"""
     from services.smart_classifier import get_rules
-    rules = get_rules()
+    rules = get_rules(bid)
     return {"status": "success", "rules": rules, "count": len(rules)}
 
 
 @router.delete("/api/purchase/rules/{rule_id}")
-def delete_classification_rule(rule_id: int, _admin: User = Depends(get_admin_user)):
+def delete_classification_rule(rule_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """학습된 규칙 삭제"""
     from services.smart_classifier import delete_rule
-    success = delete_rule(rule_id)
+    success = delete_rule(rule_id, bid)
     if success:
         return {"status": "success"}
     raise HTTPException(status_code=404, detail="규칙을 찾을 수 없습니다.")

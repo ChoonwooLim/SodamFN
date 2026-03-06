@@ -93,11 +93,12 @@ def update_request_status(
     request_id: int,
     status: str = Body(..., embed=True),
     admin_note: str = Body(None, embed=True),
-    _user: AuthUser = Depends(get_current_user)
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        req = service.session.get(PurchaseRequest, request_id)
+        req = service.session.exec(apply_bid_filter(select(PurchaseRequest), PurchaseRequest, bid).where(PurchaseRequest.id == request_id)).first()
         if not req:
             raise HTTPException(status_code=404, detail="Request not found")
         req.status = status

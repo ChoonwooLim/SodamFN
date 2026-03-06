@@ -258,9 +258,12 @@ def update_staff_account_grade(
         service.close()
 
 @router.get("/staff/{staff_id}/documents")
-def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_user)):
+def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
         documents = service.session.exec(
             select(StaffDocument).where(StaffDocument.staff_id == staff_id)
         ).all()
@@ -286,11 +289,12 @@ def upload_staff_document(
     staff_id: int, 
     doc_type: str = Form(...), 
     file: UploadFile = File(...),
-    _user: AuthUser = Depends(get_current_user)
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        staff = service.session.get(Staff, staff_id)
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
         if not staff:
             raise HTTPException(status_code=404, detail="Staff not found")
             
@@ -387,7 +391,7 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
         # --- GPS Geofence 검증 ---
         gps_result = None
         if payload.latitude is not None and payload.longitude is not None:
-            gps_result = verify_location(payload.latitude, payload.longitude, service.session)
+            gps_result = verify_location(payload.latitude, payload.longitude, service.session, _user.business_id)
             if not gps_result["verified"]:
                 return {
                     "status": "error",
@@ -449,9 +453,12 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
         service.close()
 
 @router.get("/attendance/status/{staff_id}")
-def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_user)):
+def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
         today = date.today()
         stmt = select(Attendance).where(Attendance.staff_id == staff_id, Attendance.date == today)
         record = service.session.exec(stmt).first()
@@ -476,9 +483,12 @@ def get_attendance_status(staff_id: int, _user: AuthUser = Depends(get_current_u
         service.close()
 
 @router.get("/attendance/history/{staff_id}")
-def get_attendance_history(staff_id: int, _user: AuthUser = Depends(get_current_user)):
+def get_attendance_history(staff_id: int, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+        if not staff:
+            raise HTTPException(status_code=404, detail="Staff not found")
         # Get last 5 records
         stmt = select(Attendance).where(Attendance.staff_id == staff_id).order_by(Attendance.date.desc()).limit(5)
         records = service.session.exec(stmt).all()
@@ -487,10 +497,10 @@ def get_attendance_history(staff_id: int, _user: AuthUser = Depends(get_current_
         service.close()
 
 @router.delete("/staff/{staff_id}")
-def delete_staff(staff_id: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_staff(staff_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        staff = service.session.get(Staff, staff_id)
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
         if not staff:
             raise HTTPException(status_code=404, detail="Staff not found")
             
@@ -541,11 +551,11 @@ class LocationUpdate(BaseModel):
     radius_meters: int = 100
 
 @router.get("/location")
-def get_work_location(_admin: AuthUser = Depends(get_admin_user)):
+def get_work_location(_admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """현재 매장 위치 설정 조회"""
     service = DatabaseService()
     try:
-        stmt = select(WorkLocation).where(WorkLocation.is_active == True)
+        stmt = apply_bid_filter(select(WorkLocation), WorkLocation, bid).where(WorkLocation.is_active == True)
         location = service.session.exec(stmt).first()
         if not location:
             return {"status": "success", "data": None, "message": "매장 위치가 설정되지 않았습니다."}
@@ -564,11 +574,11 @@ def get_work_location(_admin: AuthUser = Depends(get_admin_user)):
         service.close()
 
 @router.post("/location")
-def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin_user)):
+def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """매장 위치 설정 (생성 또는 업데이트)"""
     service = DatabaseService()
     try:
-        stmt = select(WorkLocation).where(WorkLocation.is_active == True)
+        stmt = apply_bid_filter(select(WorkLocation), WorkLocation, bid).where(WorkLocation.is_active == True)
         existing = service.session.exec(stmt).first()
         
         if existing:
@@ -584,6 +594,7 @@ def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin
                 latitude=data.latitude,
                 longitude=data.longitude,
                 radius_meters=data.radius_meters,
+                business_id=bid
             )
             service.session.add(new_loc)
         
@@ -595,14 +606,14 @@ def set_work_location(data: LocationUpdate, _admin: AuthUser = Depends(get_admin
 # --- 월간 근무 요약 ---
 
 @router.get("/attendance/monthly-summary/{staff_id}/{month}")
-def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = Depends(get_current_user)):
+def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     """
     월간 출퇴근 요약 (근무일수, 총 근무시간, GPS 검증율, 예상 급여)
     month = "YYYY-MM"
     """
     service = DatabaseService()
     try:
-        staff = service.session.get(Staff, staff_id)
+        staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
         if not staff:
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
         

@@ -8,11 +8,12 @@ from services.database_service import DatabaseService
 from services.financial_parser import parse_sales_approval, parse_payment_history
 from routers.auth import get_current_user
 from sqlalchemy import text
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
 @router.post("/upload/sales")
-async def upload_sales_approval(file: UploadFile = File(...), current_user = Depends(get_current_user)):
+async def upload_sales_approval(file: UploadFile = File(...), current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         data = parse_sales_approval(file)
@@ -22,13 +23,14 @@ async def upload_sales_approval(file: UploadFile = File(...), current_user = Dep
         count = 0
         for item in data:
             existing = service.session.exec(
-                select(CardSalesApproval).where(
+                apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
                     CardSalesApproval.approval_number == item["approval_number"],
                     CardSalesApproval.approval_date == item["approval_date"]
                 )
             ).first()
             
             if not existing:
+                item['business_id'] = bid
                 new_sales = CardSalesApproval(**item)
                 service.session.add(new_sales)
                 count += 1
@@ -41,7 +43,7 @@ async def upload_sales_approval(file: UploadFile = File(...), current_user = Dep
         service.close()
 
 @router.post("/upload/payment")
-async def upload_card_payment(file: UploadFile = File(...), current_user = Depends(get_current_user)):
+async def upload_card_payment(file: UploadFile = File(...), current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         data = parse_payment_history(file)
@@ -51,7 +53,7 @@ async def upload_card_payment(file: UploadFile = File(...), current_user = Depen
         count = 0
         for item in data:
             existing = service.session.exec(
-                select(CardPayment).where(
+                apply_bid_filter(select(CardPayment), CardPayment, bid).where(
                     CardPayment.payment_date == item["payment_date"],
                     CardPayment.card_corp == item["card_corp"],
                     CardPayment.net_deposit == item["net_deposit"]
@@ -59,6 +61,7 @@ async def upload_card_payment(file: UploadFile = File(...), current_user = Depen
             ).first()
             
             if not existing:
+                item['business_id'] = bid
                 new_payment = CardPayment(**item)
                 service.session.add(new_payment)
                 count += 1
@@ -100,7 +103,7 @@ def _extract_card_corp(vendor_name: str) -> Optional[str]:
 
 
 @router.get("/stats/sales")
-def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get_current_user)):
+def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     """
     Get card sales stats from DailyExpense records linked to revenue-type vendors.
     Uses Vendor.vendor_type='revenue' to find card revenue entries.
@@ -110,14 +113,14 @@ def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get
     with Session(engine) as session:
         # Get all revenue-type vendor IDs
         revenue_vendors = session.exec(
-            select(Vendor).where(Vendor.vendor_type == 'revenue')
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == 'revenue')
         ).all()
         revenue_vendor_ids = {v.id for v in revenue_vendors}
         vendor_id_to_name = {v.id: v.name for v in revenue_vendors}
         
         # Get DailyExpense entries linked to revenue vendors in date range
         expenses = session.exec(
-            select(DailyExpense).where(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
             )
@@ -181,7 +184,7 @@ def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get
 
 
 @router.get("/stats/payment")
-def get_payment_stats(start_date: date, end_date: date, current_user = Depends(get_current_user)):
+def get_payment_stats(start_date: date, end_date: date, current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     """
     Get card payment stats. First tries CardPayment table,
     then falls back to DailyExpense card revenue data.
@@ -189,7 +192,7 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
     with Session(engine) as session:
         # Try CardPayment table first
         payments = session.exec(
-            select(CardPayment)
+            apply_bid_filter(select(CardPayment), CardPayment, bid)
             .where(CardPayment.payment_date >= start_date)
             .where(CardPayment.payment_date <= end_date)
             .order_by(CardPayment.payment_date)
@@ -200,7 +203,7 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
         
         # Fallback: synthesize from DailyExpense card revenue
         card_revenue = session.exec(
-            select(DailyExpense).where(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
                 DailyExpense.amount > 0,

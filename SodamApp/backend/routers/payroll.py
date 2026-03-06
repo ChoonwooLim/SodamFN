@@ -411,7 +411,7 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         
         # Auto-sync to MonthlyProfitLoss.expense_labor
         from routers.profitloss import sync_labor_cost
-        sync_labor_cost(target_year, target_month, service.session)
+        sync_labor_cost(target_year, target_month, service.session, bid)
         
         print(f"DEBUG: Calculated Payroll: Base={total_base_pay}, Bonus={total_holiday_pay}, Total={net_pay}")
         

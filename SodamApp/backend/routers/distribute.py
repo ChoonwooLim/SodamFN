@@ -49,9 +49,11 @@ def get_distributable_staff(
     _admin: AuthUser = Depends(get_admin_user),
 ):
     """Get list of active staff with phone numbers for distribution"""
-    staff_list = session.exec(
-        select(Staff).where(Staff.status == "재직")
-    ).all()
+    stmt = select(Staff).where(Staff.status == "재직")
+    # Tenant filter - scope to admin's business
+    if _admin.role != "superadmin" and _admin.business_id:
+        stmt = stmt.where(Staff.business_id == _admin.business_id)
+    staff_list = session.exec(stmt).all()
 
     result = []
     for s in staff_list:
@@ -94,6 +96,8 @@ def send_install_links(
         staff = session.get(Staff, staff_id)
         if not staff:
             continue
+        if _admin.role != "superadmin" and staff.business_id != _admin.business_id:
+            continue
 
         history_id_counter += 1
         record = {
@@ -106,6 +110,7 @@ def send_install_links(
             "method": req.method,
             "sent_at": datetime.datetime.now().isoformat(),
             "status": "sent" if req.method == "link" else "pending",
+            "business_id": _admin.business_id,
         }
 
         # TODO: When SMS API is integrated, actually send SMS here
@@ -131,6 +136,9 @@ def get_distribution_history(
 ):
     """Get distribution history"""
     records = distribution_history
+    if _admin.role != "superadmin" and _admin.business_id:
+        records = [r for r in records if r.get("business_id") == _admin.business_id]
+        
     if app_type:
         records = [r for r in records if r["app_type"] == app_type]
 

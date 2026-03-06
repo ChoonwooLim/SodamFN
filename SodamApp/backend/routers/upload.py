@@ -5,6 +5,7 @@ from models import Expense, Revenue, Session, create_engine, SQLModel, User
 from database import engine 
 from sqlmodel import Session
 from routers.auth import get_admin_user
+from tenant_filter import get_bid_from_token, apply_bid_filter
 import datetime
 
 router = APIRouter()
@@ -25,7 +26,7 @@ async def upload_expense_image(file: UploadFile = File(...), _admin: User = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/image/purchase")
-async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Processes a receipt image for purchase management.
     OCR → extract vendor/amount/date → save to DB.
@@ -60,7 +61,8 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
                 filename=file.filename or "receipt_photo.jpg",
                 upload_type="purchase",
                 record_count=0,
-                status="active"
+                status="active",
+                business_id=bid
             )
             session.add(upload_history)
             session.commit()
@@ -71,7 +73,7 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
         with Session(engine) as session:
             # Find or create vendor
             vendor = session.exec(
-                select(Vendor).where(Vendor.name == vendor_name)
+                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == vendor_name)
             ).first()
             
             if not vendor:
@@ -79,7 +81,8 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
                     name=vendor_name,
                     category=category,
                     vendor_type="expense",
-                    created_by_upload_id=upload_id
+                    created_by_upload_id=upload_id,
+                    business_id=bid
                 )
                 session.add(vendor)
                 session.flush()
@@ -94,6 +97,7 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
                 note=f"📸 영수증 촬영 업로드",
                 upload_id=upload_id,
                 card_company="영수증",
+                business_id=bid
             )
             session.add(expense)
             
@@ -108,7 +112,7 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
         # Sync P/L
         try:
             with Session(engine) as sync_session:
-                sync_all_expenses(date_obj.year, date_obj.month, sync_session)
+                sync_all_expenses(date_obj.year, date_obj.month, sync_session, bid)
                 sync_session.commit()
         except Exception:
             pass
@@ -131,7 +135,7 @@ async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: Us
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/expense")
-async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
+async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Processes an excel upload and bulk inserts to DailyExpense.
     Also auto-creates/links vendors and syncs P/L.
@@ -158,7 +162,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                 filename=file.filename or "uploaded_file.xlsx",
                 upload_type="expense",
                 record_count=0,
-                status="active"
+                status="active",
+                business_id=bid
             )
             session.add(upload_history)
             session.commit()
@@ -187,7 +192,7 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                     
                     # Find or create vendor
                     vendor = session.exec(
-                        select(Vendor).where(Vendor.name == item_name)
+                        apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == item_name)
                     ).first()
                     
                     if not vendor:
@@ -195,7 +200,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                             name=item_name,
                             category=category,
                             vendor_type="expense",
-                            created_by_upload_id=upload_id # Track creation source
+                            created_by_upload_id=upload_id, # Track creation source
+                            business_id=bid
                         )
                         session.add(vendor)
                         session.flush()  # Get the ID
@@ -209,7 +215,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                         amount=item['amount'],
                         category=category,
                         note=None,
-                        upload_id=upload_id # Track source
+                        upload_id=upload_id, # Track source
+                        business_id=bid
                     )
                     session.add(daily_expense)
                     inserted_count += 1
@@ -230,7 +237,7 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
             with Session(engine) as sync_session:
                 for (year, month) in processed_months:
                     try:
-                        sync_all_expenses(year, month, sync_session)
+                        sync_all_expenses(year, month, sync_session, bid)
                     except Exception as sync_err:
                         print(f"P/L Sync error for {year}-{month}: {sync_err}")
                 sync_session.commit()
@@ -251,19 +258,19 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
 # --- HISTORY & ROLLBACK ENDPOINTS ---
 
 @router.get("/uploads/history")
-def get_upload_history(type: str = None, _admin: User = Depends(get_admin_user)):
+def get_upload_history(type: str = None, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     from models import UploadHistory
     from sqlmodel import select, desc
     
     with Session(engine) as session:
-        statement = select(UploadHistory).order_by(desc(UploadHistory.created_at)).limit(20)
+        statement = apply_bid_filter(select(UploadHistory), UploadHistory, bid).order_by(desc(UploadHistory.created_at)).limit(20)
         if type:
             statement = statement.where(UploadHistory.upload_type == type)
         results = session.exec(statement).all()
         return results
 
 @router.delete("/uploads/{upload_id}")
-def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
+def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Rollback an upload by ID.
     Deletes all expenses created by this upload.
@@ -275,7 +282,7 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
     from services.profit_loss_service import sync_all_expenses
     
     with Session(engine) as session:
-        history = session.get(UploadHistory, upload_id)
+        history = session.exec(apply_bid_filter(select(UploadHistory), UploadHistory, bid).where(UploadHistory.id == upload_id)).first()
         if not history:
             raise HTTPException(status_code=404, detail="Upload not found")
         
@@ -283,7 +290,7 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
              raise HTTPException(status_code=400, detail="Already rolled back")
 
         # 1. Select Expenses to Delete
-        expenses = session.exec(select(DailyExpense).where(DailyExpense.upload_id == upload_id)).all()
+        expenses = session.exec(apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.upload_id == upload_id)).all()
         expense_count = len(expenses)
         
         # Track months for re-sync
@@ -297,7 +304,7 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
         # Actually simplest is to just delete if created_by_upload_id matches.
         # But if user manually added expenses to this vendor later, we shouldn't delete the vendor?
         # Let's verify if vendor has other expenses.
-        vendors_created = session.exec(select(Vendor).where(Vendor.created_by_upload_id == upload_id)).all()
+        vendors_created = session.exec(apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.created_by_upload_id == upload_id)).all()
         vendor_delete_count = 0
         
         for vendor in vendors_created:
@@ -311,7 +318,7 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
             session.flush() # Ensure expenses are marked deleted
             
             remaining_expenses_count = session.exec(
-                select(DailyExpense).where(DailyExpense.vendor_id == vendor.id)
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == vendor.id)
             ).all() # .count() is deprecated/tricky in some versions, len(all) is safe for small sets
             
             if len(remaining_expenses_count) == 0:
@@ -330,8 +337,8 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user)):
             with Session(engine) as sync_session:
                 from services.profit_loss_service import sync_revenue_to_pl
                 for (year, month) in sync_months:
-                    sync_all_expenses(year, month, sync_session)
-                    sync_revenue_to_pl(year, month, sync_session)
+                    sync_all_expenses(year, month, sync_session, bid)
+                    sync_revenue_to_pl(year, month, sync_session, bid)
                 sync_session.commit()
         except Exception as e:
             print(f"Rollback Sync Error: {e}")
@@ -370,7 +377,7 @@ async def upload_revenue_image(file: UploadFile = File(...), _admin: User = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/revenue")
-async def upload_revenue_excel(file: UploadFile = File(...), password: str = Form(None), _admin: User = Depends(get_admin_user)):
+async def upload_revenue_excel(file: UploadFile = File(...), password: str = Form(None), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Smart revenue Excel upload.
     Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약, 배달앱 정산
@@ -405,7 +412,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                 filename=file.filename or "revenue_upload.xlsx",
                 upload_type="revenue",
                 record_count=0,
-                status="active"
+                status="active",
+                business_id=bid
             )
             session.add(upload_history)
             session.commit()
@@ -421,7 +429,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         
         with Session(engine) as session:
             # Build vendor lookup
-            vendors = session.exec(select(Vendor)).all()
+            vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
             vendor_by_name = {v.name: v for v in vendors}
             
             # --- Smart Card Sales Deduplication ---
@@ -440,7 +448,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                 
                 # Check what card data already exists in DB for this period
                 existing_card_expenses = session.exec(
-                    select(DailyExpense).where(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                         DailyExpense.date >= min_date,
                         DailyExpense.date <= max_date,
                         DailyExpense.payment_method == 'Card',
@@ -507,6 +515,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                         item=f'소담김밥 건대매장:{payment_type}',
                         vendor_type='revenue',
                         created_by_upload_id=upload_id,
+                        business_id=bid
                     )
                     session.add(vendor)
                     session.flush()
@@ -515,7 +524,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                 
                 # Duplicate check: same date + vendor
                 existing = session.exec(
-                    select(DailyExpense).where(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                         DailyExpense.date == date_obj,
                         DailyExpense.vendor_id == vendor.id,
                     )
@@ -543,6 +552,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                     note=item.get('note', ''),
                     upload_id=upload_id,
                     payment_method=payment_method,
+                    business_id=bid
                 )
                 session.add(expense)
                 inserted_count += 1
@@ -579,7 +589,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                     with Session(engine) as dr_session:
                         # Upsert: check if record already exists
                         existing_dr = dr_session.exec(
-                            select(DeliveryRevenue).where(
+                            apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
                                 DeliveryRevenue.channel == dr_channel,
                                 DeliveryRevenue.year == dr_year,
                                 DeliveryRevenue.month == dr_month,
@@ -601,6 +611,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                                 total_fees=summary.get("total_fees", 0),
                                 settlement_amount=summary.get("total_amount", 0),
                                 order_count=summary.get("order_count", 0),
+                                business_id=bid
                             )
                             dr_session.add(dr_record)
                         dr_session.commit()
@@ -612,8 +623,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
             try:
                 with Session(engine) as sync_session:
                     for (year, month) in processed_months:
-                        sync_all_expenses(year, month, sync_session)
-                        sync_revenue_to_pl(year, month, sync_session)
+                        sync_all_expenses(year, month, sync_session, bid)
+                        sync_revenue_to_pl(year, month, sync_session, bid)
                     sync_session.commit()
             except Exception as e:
                 print(f"Revenue Upload P/L Sync error: {e}")

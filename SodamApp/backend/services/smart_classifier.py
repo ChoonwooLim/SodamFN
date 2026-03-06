@@ -10,10 +10,12 @@ from typing import List, Dict, Optional
 from sqlmodel import Session, select
 from database import engine
 from models import VendorRule
+from tenant_filter import apply_bid_filter
 
 
 def learn_rule(
     original_name: str,
+    bid: int,
     category: Optional[str] = None,
     mapped_vendor_name: Optional[str] = None,
     source: str = "manual",
@@ -37,7 +39,7 @@ def learn_rule(
     try:
         # 기존 규칙 검색
         existing = session.exec(
-            select(VendorRule).where(VendorRule.original_name == original_name)
+            apply_bid_filter(select(VendorRule), VendorRule, bid).where(VendorRule.original_name == original_name)
         ).first()
         
         if existing:
@@ -58,6 +60,7 @@ def learn_rule(
                 mapped_vendor_name=mapped_vendor_name,
                 source=source,
                 confidence=1,
+                business_id=bid
             )
             session.add(rule)
         
@@ -74,7 +77,7 @@ def learn_rule(
             session.close()
 
 
-def apply_rules(records: List[Dict], session: Optional[Session] = None) -> int:
+def apply_rules(records: List[Dict], bid: int, session: Optional[Session] = None) -> int:
     """
     파싱된 레코드 목록에 학습된 규칙을 일괄 적용합니다.
     
@@ -87,7 +90,7 @@ def apply_rules(records: List[Dict], session: Optional[Session] = None) -> int:
     try:
         # 모든 규칙 로드 (confidence 높은 순)
         rules = session.exec(
-            select(VendorRule).order_by(VendorRule.confidence.desc())
+            apply_bid_filter(select(VendorRule), VendorRule, bid).order_by(VendorRule.confidence.desc())
         ).all()
         
         if not rules:
@@ -135,7 +138,7 @@ def apply_rules(records: List[Dict], session: Optional[Session] = None) -> int:
             session.close()
 
 
-def get_rules(session: Optional[Session] = None) -> List[Dict]:
+def get_rules(bid: int, session: Optional[Session] = None) -> List[Dict]:
     """학습된 규칙 목록을 반환합니다."""
     own_session = session is None
     if own_session:
@@ -143,7 +146,7 @@ def get_rules(session: Optional[Session] = None) -> List[Dict]:
     
     try:
         rules = session.exec(
-            select(VendorRule).order_by(VendorRule.confidence.desc())
+            apply_bid_filter(select(VendorRule), VendorRule, bid).order_by(VendorRule.confidence.desc())
         ).all()
         
         return [
@@ -164,14 +167,16 @@ def get_rules(session: Optional[Session] = None) -> List[Dict]:
             session.close()
 
 
-def delete_rule(rule_id: int, session: Optional[Session] = None) -> bool:
+def delete_rule(rule_id: int, bid: int, session: Optional[Session] = None) -> bool:
     """규칙을 삭제합니다."""
     own_session = session is None
     if own_session:
         session = Session(engine)
     
     try:
-        rule = session.get(VendorRule, rule_id)
+        rule = session.exec(
+            apply_bid_filter(select(VendorRule), VendorRule, bid).where(VendorRule.id == rule_id)
+        ).first()
         if rule:
             session.delete(rule)
             if own_session:

@@ -6,6 +6,7 @@ import math
 from sqlmodel import Session, select
 from models import WorkLocation
 from database import engine
+from tenant_filter import apply_bid_filter
 
 
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -26,14 +27,14 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return R * c  # 거리 (미터)
 
 
-def get_active_location(session: Session) -> WorkLocation | None:
+def get_active_location(session: Session, bid: int) -> WorkLocation | None:
     """활성 매장 위치를 조회합니다."""
     return session.exec(
-        select(WorkLocation).where(WorkLocation.is_active == True)
+        apply_bid_filter(select(WorkLocation), WorkLocation, bid).where(WorkLocation.is_active == True)
     ).first()
 
 
-def verify_location(lat: float, lng: float, session: Session = None) -> dict:
+def verify_location(lat: float, lng: float, session: Session, bid: int) -> dict:
     """
     직원의 GPS 좌표가 매장 반경 내에 있는지 확인합니다.
     
@@ -45,13 +46,12 @@ def verify_location(lat: float, lng: float, session: Session = None) -> dict:
             "location_name": str
         }
     """
-    close_session = False
     if session is None:
         session = Session(engine)
         close_session = True
 
     try:
-        location = get_active_location(session)
+        location = get_active_location(session, bid)
         
         if not location:
             # 매장 위치가 설정되지 않은 경우 → GPS 검증 건너뜀 (허용)

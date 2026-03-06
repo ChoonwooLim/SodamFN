@@ -57,11 +57,12 @@ def update_contact(
     store_id: str = Body(None, embed=True),
     note: str = Body(None, embed=True),
     display_order: int = Body(None, embed=True),
-    _admin: AuthUser = Depends(get_admin_user)
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        contact = service.session.get(EmergencyContact, contact_id)
+        contact = service.session.exec(apply_bid_filter(select(EmergencyContact), EmergencyContact, bid).where(EmergencyContact.id == contact_id)).first()
         if not contact:
             raise HTTPException(status_code=404, detail="Contact not found")
         if name is not None: contact.name = name
@@ -78,10 +79,10 @@ def update_contact(
 
 
 @router.delete("/{contact_id}")
-def delete_contact(contact_id: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_contact(contact_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        contact = service.session.get(EmergencyContact, contact_id)
+        contact = service.session.exec(apply_bid_filter(select(EmergencyContact), EmergencyContact, bid).where(EmergencyContact.id == contact_id)).first()
         if not contact:
             raise HTTPException(status_code=404, detail="Contact not found")
         service.session.delete(contact)

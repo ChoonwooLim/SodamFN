@@ -60,11 +60,12 @@ def update_suggestion(
     suggestion_id: int,
     status: str = Body(None, embed=True),
     admin_reply: str = Body(None, embed=True),
-    _admin: AuthUser = Depends(get_admin_user)
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        s = service.session.get(Suggestion, suggestion_id)
+        s = service.session.exec(apply_bid_filter(select(Suggestion), Suggestion, bid).where(Suggestion.id == suggestion_id)).first()
         if not s:
             raise HTTPException(status_code=404, detail="Not found")
         if status is not None: s.status = status
@@ -77,10 +78,10 @@ def update_suggestion(
 
 
 @router.delete("/{suggestion_id}")
-def delete_suggestion(suggestion_id: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_suggestion(suggestion_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        s = service.session.get(Suggestion, suggestion_id)
+        s = service.session.exec(apply_bid_filter(select(Suggestion), Suggestion, bid).where(Suggestion.id == suggestion_id)).first()
         if not s:
             raise HTTPException(status_code=404, detail="Not found")
         service.session.delete(s)

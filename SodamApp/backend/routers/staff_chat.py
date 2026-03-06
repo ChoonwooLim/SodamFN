@@ -64,10 +64,10 @@ def send_message(
 
 
 @router.delete("/{message_id}")
-def delete_message(message_id: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_message(message_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        msg = service.session.get(StaffChatMessage, message_id)
+        msg = service.session.exec(apply_bid_filter(select(StaffChatMessage), StaffChatMessage, bid).where(StaffChatMessage.id == message_id)).first()
         if not msg:
             raise HTTPException(status_code=404, detail="Not found")
         service.session.delete(msg)

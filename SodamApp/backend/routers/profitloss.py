@@ -89,7 +89,7 @@ def sync_labor_cost_endpoint(year: int, month: int, session: Session = Depends(g
     Manually sync labor costs from Payroll table to MonthlyProfitLoss.
     Useful for backfilling existing payroll data.
     """
-    total_labor = sync_labor_cost(year, month, session)
+    total_labor = sync_labor_cost(year, month, session, bid)
     return {
         "status": "success", 
         "message": f"{year}년 {month}월 인건비 {total_labor:,}원이 손익계산서에 반영되었습니다.",
@@ -102,7 +102,7 @@ def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get
     Sync all expenses from DailyExpense by vendor category to MonthlyProfitLoss.
     Aggregates expenses based on vendor.category mapping to P/L fields.
     """
-    category_totals = sync_all_expenses(year, month, session)
+    category_totals = sync_all_expenses(year, month, session, bid)
     return {
         "status": "success", 
         "message": f"{year}년 {month}월 비용이 카테고리별로 동기화되었습니다.",
@@ -268,7 +268,7 @@ def create_daily_expense(data: DailyExpenseCreate, session: Session = Depends(ge
     session.refresh(new_expense)
     
     # Trigger sync to P/L summary
-    sync_all_expenses(data.date.year, data.date.month, session)
+    sync_all_expenses(data.date.year, data.date.month, session, bid)
     
     return new_expense
 
@@ -302,7 +302,7 @@ def update_daily_expense(id: int, data: DailyExpenseCreate, session: Session = D
     session.refresh(record)
     
     # Trigger sync to P/L summary
-    sync_all_expenses(data.date.year, data.date.month, session)
+    sync_all_expenses(data.date.year, data.date.month, session, bid)
     
     return record
 
@@ -312,8 +312,14 @@ def delete_daily_expense(id: int, session: Session = Depends(get_session), _admi
     record = session.get(DailyExpense, id)
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
+    record_year = record.date.year
+    record_month = record.date.month
     session.delete(record)
     session.commit()
+    
+    # Trigger sync to P/L summary
+    sync_all_expenses(record_year, record_month, session, bid)
+    
     return {"message": "Deleted successfully"}
 
 # --- Delivery App Revenue Endpoints (쿠팡/배민/요기요/땡겨요) ---
@@ -350,7 +356,7 @@ def create_delivery_revenue(data: DeliveryRevenueCreate, session: Session = Depe
     session.refresh(new_revenue)
 
     # Sync to MonthlyProfitLoss
-    sync_delivery_revenue_to_pl(new_revenue.date.year, new_revenue.date.month, session)
+    sync_delivery_revenue_to_pl(new_revenue.date.year, new_revenue.date.month, session, bid)
 
     return new_revenue
 
@@ -369,7 +375,7 @@ def update_delivery_revenue(id: int, data: DeliveryRevenueCreate, session: Sessi
     session.refresh(record)
 
     # Sync to MonthlyProfitLoss
-    sync_delivery_revenue_to_pl(record.date.year, record.date.month, session)
+    sync_delivery_revenue_to_pl(record.date.year, record.date.month, session, bid)
 
     return record
 
@@ -385,7 +391,7 @@ def delete_delivery_revenue(id: int, session: Session = Depends(get_session), _a
     session.commit()
 
     # Sync to MonthlyProfitLoss
-    sync_delivery_revenue_to_pl(record_year, record_month, session)
+    sync_delivery_revenue_to_pl(record_year, record_month, session, bid)
 
     return {"message": "Deleted successfully"}
 

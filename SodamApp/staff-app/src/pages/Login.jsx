@@ -29,11 +29,13 @@ export default function Login() {
             const formData = new URLSearchParams();
             formData.append('username', username);
             formData.append('password', password);
-            if (bid) {
-                formData.append('business_id', bid);
-            }
 
-            const response = await axios.post(`${API_BASE}/api/auth/login`, formData, {
+            // Send business_id as query parameter for business isolation
+            const loginUrl = bid
+                ? `${API_BASE}/api/auth/login?business_id=${bid}`
+                : `${API_BASE}/api/auth/login`;
+
+            const response = await axios.post(loginUrl, formData, {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             });
 

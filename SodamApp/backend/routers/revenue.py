@@ -242,7 +242,7 @@ def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_
         session.refresh(expense)
 
         # Sync to MonthlyProfitLoss
-        sync_revenue_to_pl(date_obj.year, date_obj.month, session)
+        sync_revenue_to_pl(date_obj.year, date_obj.month, session, bid)
 
         return {
             "status": "success",
@@ -284,7 +284,7 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUs
         session.commit()
 
         # Sync to MonthlyProfitLoss
-        sync_revenue_to_pl(expense.date.year, expense.date.month, session)
+        sync_revenue_to_pl(expense.date.year, expense.date.month, session, bid)
 
         return {"status": "success", "message": "매출 내역이 수정되었습니다."}
 
@@ -305,7 +305,7 @@ def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_u
         session.commit()
 
         # Sync to MonthlyProfitLoss
-        sync_revenue_to_pl(expense_year, expense_month, session)
+        sync_revenue_to_pl(expense_year, expense_month, session, bid)
 
         return {"status": "success", "message": "매출 내역이 삭제되었습니다."}
 
@@ -501,7 +501,7 @@ def delete_delivery_revenue_month(year: int, month: int, _admin: AuthUser = Depe
         session.commit()
 
         # 3. Re-sync P/L
-        sync_revenue_to_pl(year, month, session)
+        sync_revenue_to_pl(year, month, session, bid)
 
         return {
             "status": "success",

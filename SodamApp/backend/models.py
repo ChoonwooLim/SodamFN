@@ -194,6 +194,7 @@ class Staff(SQLModel, table=True):
 
 class CardSalesApproval(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     approval_date: datetime.date = Field(index=True) # 승인일자
     approval_time: Optional[str] = None # 승인시간
     card_corp: str = Field(index=True) # 카드사명 (User-entered or parsed)
@@ -207,6 +208,7 @@ class CardSalesApproval(SQLModel, table=True):
 
 class CardPayment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     payment_date: datetime.date = Field(index=True) # 입금일자
     card_corp: str = Field(index=True) # 카드사명
     sales_amount: int = 0 # 매출금액 (승인금액 합계)
@@ -270,6 +272,7 @@ class StaffDocument(SQLModel, table=True):
 class WorkLocation(SQLModel, table=True):
     """매장 위치 및 Geofence 설정"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     name: str = "소담김밥"
     latitude: float = 0.0
     longitude: float = 0.0
@@ -409,6 +412,7 @@ class DailyExpense(SQLModel, table=True):
 
 class UploadHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     filename: str
     upload_type: str  # 'expense', 'revenue'
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
@@ -421,6 +425,7 @@ class UploadHistory(SQLModel, table=True):
 class VendorRule(SQLModel, table=True):
     """사용자 행동으로부터 학습된 매입 분류 규칙"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     original_name: str = Field(index=True)  # 카드 명세서 원본 가맹점명
     mapped_vendor_name: Optional[str] = None  # 사용자가 매핑한 거래처명 (병합 시)
     category: Optional[str] = None  # 학습된 카테고리

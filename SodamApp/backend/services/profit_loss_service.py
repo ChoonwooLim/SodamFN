@@ -33,7 +33,7 @@ CATEGORY_TO_PL_FIELD = {
     "other": "expense_other",
 }
 
-def sync_all_expenses(year: int, month: int, session: Session):
+def sync_all_expenses(year: int, month: int, session: Session, business_id: int = None):
     """
     Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
     Uses vendor.category to determine which P/L field to update.
@@ -46,17 +46,20 @@ def sync_all_expenses(year: int, month: int, session: Session):
         end_date = datetime.date(year, month + 1, 1)
     
     # Get all revenue vendor IDs to exclude from expense aggregation
+    rev_vendor_stmt = select(Vendor).where(Vendor.vendor_type == "revenue")
+    if business_id is not None:
+        rev_vendor_stmt = rev_vendor_stmt.where(Vendor.business_id == business_id)
+        
     revenue_vendor_ids = set(
-        v.id for v in session.exec(
-            select(Vendor).where(Vendor.vendor_type == "revenue")
-        ).all()
+        v.id for v in session.exec(rev_vendor_stmt).all()
     )
 
     # Get all daily expenses for the month with their vendor info
-    expenses = session.exec(
-        select(DailyExpense)
-        .where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
-    ).all()
+    exp_stmt = select(DailyExpense).where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
+    if business_id is not None:
+        exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
+
+    expenses = session.exec(exp_stmt).all()
     
     # Filter out revenue vendor expenses
     expenses = [e for e in expenses if e.vendor_id not in revenue_vendor_ids]
@@ -65,7 +68,10 @@ def sync_all_expenses(year: int, month: int, session: Session):
     vendor_ids = [e.vendor_id for e in expenses if e.vendor_id]
     vendor_category_map = {}
     if vendor_ids:
-        vendors = session.exec(select(Vendor).where(Vendor.id.in_(vendor_ids))).all()
+        vend_stmt = select(Vendor).where(Vendor.id.in_(vendor_ids))
+        if business_id is not None:
+            vend_stmt = vend_stmt.where(Vendor.business_id == business_id)
+        vendors = session.exec(vend_stmt).all()
         vendor_category_map = {v.id: v.category for v in vendors}
     
     # Aggregate by category
@@ -85,37 +91,13 @@ def sync_all_expenses(year: int, month: int, session: Session):
                 category_totals[pl_field] = category_totals.get(pl_field, 0) + expense.amount
     
     # Find or create P/L record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
+    pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        
+    pl_record = session.exec(pl_stmt).first()
     
     if pl_record:
-        # Update fields from aggregated totals
-        # Reset mapped fields first to ensure removed categories are cleared?
-        # Ideally yes, but current logic just overwrites. If a category total becomes 0, it won't be in dict?
-        # Current logic: 
-        # for field, total in category_totals.items(): setattr...
-        
-        # IMPROVEMENT: We should reset all expense fields before setting new totals
-        # to handle cases where all expenses of a certain category were removed or re-categorized.
-        for field in CATEGORY_TO_PL_FIELD.values():
-            # Don't reset fields not managed by this sync if any? 
-            # All fields in map are managed here.
-            # But wait, sync_labor_cost manages expense_labor.
-            # sync_summary_material_cost manages expense_material.
-            # This function syncs ALL mapped expenses.
-            # expense_labor is NOT in CATEGORY_TO_PL_FIELD map normally?
-            # Let's check map: '인건비' is not in map.
-            # Wait, user added '인건비' in frontend ProfitLoss.jsx map, but 
-            # in backend CATEGORY_TO_PL_FIELD (lines 65-76), '인건비' is NOT there.
-            # If '인건비' is not there, this function won't touch expense_labor.
-            pass
-
-        # We should iterate through all possible PL fields this function is responsible for and set them.
-        # But for now, let's stick to existing logic to minimize risk, 
-        # but ADD logic to update fields to 0 if they are not in category_totals but ARE in CATEGORY_TO_PL_FIELD values.
-        
         # Get all fields that SHOULD be updated by this function
         managed_fields = set(CATEGORY_TO_PL_FIELD.values())
         # expense_labor, expense_retirement, expense_insurance, expense_insurance_employee, expense_tax_employee는 별도 관리 (sync_labor_cost)
@@ -131,7 +113,7 @@ def sync_all_expenses(year: int, month: int, session: Session):
         session.add(pl_record)
     else:
         # Create new record with aggregated values
-        pl_record = MonthlyProfitLoss(year=year, month=month, **category_totals)
+        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id, **category_totals)
         session.add(pl_record)
     
     session.commit()
@@ -162,13 +144,13 @@ def _match_delivery_pl_field(vendor_name: str) -> str:
     return "revenue_store"
 
 
-def sync_revenue_to_pl(year: int, month: int, session: Session):
+def sync_revenue_to_pl(year: int, month: int, session: Session, business_id: int = None):
     """
     Unified revenue P/L sync: updates both store and delivery revenue fields.
     Calls sync_delivery_revenue_to_pl internally for delivery channels.
     """
     # sync_delivery_revenue_to_pl handles both delivery fields AND revenue_store
-    result = sync_delivery_revenue_to_pl(year, month, session)
+    result = sync_delivery_revenue_to_pl(year, month, session, business_id)
     return result
 
 
@@ -181,7 +163,7 @@ CHANNEL_TO_PL_FIELD = {
 }
 
 
-def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
+def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, business_id: int = None):
     """
     Aggregate DailyExpense (delivery category) by vendor keyword
     and update MonthlyProfitLoss delivery revenue fields.
@@ -205,14 +187,15 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     }
 
     # Get all delivery DailyExpense for this month
-    records = session.exec(
-        select(DailyExpense)
-        .where(
-            DailyExpense.category == "delivery",
-            DailyExpense.date >= start_date,
-            DailyExpense.date < end_date,
-        )
-    ).all()
+    exp_stmt = select(DailyExpense).where(
+        DailyExpense.category == "delivery",
+        DailyExpense.date >= start_date,
+        DailyExpense.date < end_date,
+    )
+    if business_id is not None:
+        exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
+        
+    records = session.exec(exp_stmt).all()
 
     # Aggregate by P/L field
     delivery_totals = {}
@@ -225,29 +208,27 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
         if field:
             delivery_totals[field] = delivery_totals.get(field, 0) + (r.amount or 0)
 
-    # NOTE: DeliveryRevenue fallback REMOVED — DailyExpense is single source of truth
-    # If no delivery DailyExpense found → delivery revenue = 0 (correct behavior)
-
     # Also sync revenue_store from store category
-    # FIX: Use vendor_id to identify store revenue, not just category label
-    # This ensures we catch all records from store vendors even if category is missing/mismatched on the record
-    store_vendors = session.exec(
-        select(Vendor).where(
-            Vendor.vendor_type == "revenue", 
-            Vendor.category == "store"
-        )
-    ).all()
+    vend_stmt = select(Vendor).where(
+        Vendor.vendor_type == "revenue", 
+        Vendor.category == "store"
+    )
+    if business_id is not None:
+        vend_stmt = vend_stmt.where(Vendor.business_id == business_id)
+        
+    store_vendors = session.exec(vend_stmt).all()
     store_vendor_ids = [v.id for v in store_vendors]
 
     if store_vendor_ids:
-        store_records = session.exec(
-            select(DailyExpense)
-            .where(
-                DailyExpense.vendor_id.in_(store_vendor_ids),
-                DailyExpense.date >= start_date,
-                DailyExpense.date < end_date,
-            )
-        ).all()
+        store_exp_stmt = select(DailyExpense).where(
+            DailyExpense.vendor_id.in_(store_vendor_ids),
+            DailyExpense.date >= start_date,
+            DailyExpense.date < end_date,
+        )
+        if business_id is not None:
+            store_exp_stmt = store_exp_stmt.where(DailyExpense.business_id == business_id)
+            
+        store_records = session.exec(store_exp_stmt).all()
         store_total = sum(r.amount or 0 for r in store_records)
     else:
         store_total = 0
@@ -256,10 +237,11 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
 
     # Find or create P/L record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
+    pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        
+    pl_record = session.exec(pl_stmt).first()
 
     if pl_record:
         for field in managed_fields:
@@ -267,7 +249,7 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
         pl_record.revenue_store = store_total
         session.add(pl_record)
     else:
-        pl_record = MonthlyProfitLoss(year=year, month=month, revenue_store=store_total)
+        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id, revenue_store=store_total)
         for field, val in delivery_totals.items():
             setattr(pl_record, field, val)
         session.add(pl_record)
@@ -277,7 +259,7 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session):
     return delivery_totals
 
 
-def sync_summary_material_cost(year: int, month: int, session: Session):
+def sync_summary_material_cost(year: int, month: int, session: Session, business_id: int = None):
     """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
     start_date = datetime.date(year, month, 1)
     if month == 12:
@@ -286,20 +268,22 @@ def sync_summary_material_cost(year: int, month: int, session: Session):
         end_date = datetime.date(year, month + 1, 1)
     
     # Calculate sum of material expenses from DailyExpense
-    total_material = session.exec(
-        select(func.sum(DailyExpense.amount))
-        .where(
-            DailyExpense.date >= start_date, 
-            DailyExpense.date < end_date,
-            DailyExpense.category == "재료비"
-        )
-    ).one() or 0
+    exp_stmt = select(func.sum(DailyExpense.amount)).where(
+        DailyExpense.date >= start_date, 
+        DailyExpense.date < end_date,
+        DailyExpense.category == "재료비"
+    )
+    if business_id is not None:
+        exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
+        
+    total_material = session.exec(exp_stmt).one() or 0
     
     # Find or create summary record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
+    pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        
+    pl_record = session.exec(pl_stmt).first()
     
     if pl_record:
         pl_record.expense_material = int(total_material)
@@ -309,8 +293,7 @@ def sync_summary_material_cost(year: int, month: int, session: Session):
     
     session.commit()
 
-
-def sync_labor_cost(year: int, month: int, session: Session):
+def sync_labor_cost(year: int, month: int, session: Session, business_id: int = None):
     """
     Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
     Also calculates:
@@ -321,9 +304,11 @@ def sync_labor_cost(year: int, month: int, session: Session):
     month_str = f"{year}-{month:02d}"
     
     # Fetch all payroll records for the month
-    payrolls = session.exec(
-        select(Payroll).where(Payroll.month == month_str)
-    ).all()
+    pay_stmt = select(Payroll).where(Payroll.month == month_str)
+    if business_id is not None:
+        pay_stmt = pay_stmt.where(Payroll.business_id == business_id)
+        
+    payrolls = session.exec(pay_stmt).all()
     
     # Calculate employee-side 4대보험 deductions
     employee_insurance = sum(
@@ -354,10 +339,11 @@ def sync_labor_cost(year: int, month: int, session: Session):
     employer_insurance = employee_insurance
     
     # Find or create MonthlyProfitLoss record
-    pl_record = session.exec(
-        select(MonthlyProfitLoss)
-        .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    ).first()
+    pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        
+    pl_record = session.exec(pl_stmt).first()
     
     if pl_record:
         pl_record.expense_labor = total_labor_net
@@ -370,6 +356,7 @@ def sync_labor_cost(year: int, month: int, session: Session):
         pl_record = MonthlyProfitLoss(
             year=year,
             month=month,
+            business_id=business_id,
             expense_labor=total_labor_net,
             expense_retirement=retirement_fund,
             expense_insurance=employer_insurance,
