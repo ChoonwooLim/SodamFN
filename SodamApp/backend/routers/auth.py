@@ -231,11 +231,18 @@ async def login_for_access_token(
         
         # Business isolation: if business_id is provided (from staff app), verify the user belongs to that business
         if business_id is not None:
-            if user.business_id and user.business_id != business_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="이 매장에 등록되지 않은 계정입니다.",
-                )
+            if user.role == 'staff':
+                if user.business_id != business_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="이 매장에 등록되지 않은 계정입니다.",
+                    )
+            elif user.role == 'admin':
+                if user.business_id and user.business_id != business_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="이 매장의 관리자가 아닙니다.",
+                    )
         
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
