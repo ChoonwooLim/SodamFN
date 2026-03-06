@@ -655,3 +655,59 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         print(f"Revenue Excel Upload Error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
 
+
+# --- Business Logo Upload ---
+@router.post("/upload/image/business-logo")
+async def upload_business_logo(
+    file: UploadFile = File(...), 
+    _admin: User = Depends(get_admin_user),
+    bid: int = Depends(get_bid_from_token)
+):
+    try:
+        from models import Business
+        from services.database_service import DatabaseService
+        import os
+        import shutil
+        from datetime import datetime
+        
+        # Validate file
+        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP, SVG만 가능)")
+            
+        # Create directory
+        base_dir = "uploads/logos"
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Generate unique filename
+        timestamp = int(datetime.now().timestamp() * 1000)
+        ext = os.path.splitext(file.filename or "logo.jpg")[1]
+        filename = f"business_{bid}_{timestamp}{ext}"
+        file_path = os.path.join(base_dir, filename)
+        
+        # Save file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        url_path = f"/uploads/logos/{filename}"
+        
+        # Update DB
+        service = DatabaseService()
+        try:
+            business = service.session.get(Business, bid)
+            if not business:
+                raise HTTPException(status_code=404, detail="Business not found")
+            business.logo_url = url_path
+            service.session.add(business)
+            service.session.commit()
+        finally:
+            service.close()
+            
+        return {"status": "success", "url": url_path}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n{traceback.format_exc()}"
+        print(f"Business Logo Upload Error: {error_detail}")
+        raise HTTPException(status_code=500, detail="로고 업로드 중 오류가 발생했습니다.")

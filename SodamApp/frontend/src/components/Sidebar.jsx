@@ -10,6 +10,7 @@ export default function Sidebar() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [boardOpen, setBoardOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
+    const [logoUrl, setLogoUrl] = useState(null);
 
     // Close drawer on route change
     useEffect(() => {
@@ -51,6 +52,9 @@ export default function Sidebar() {
                 .then(res => {
                     if (res.data && res.data.business_name) {
                         setBusinessName(res.data.business_name);
+                    }
+                    if (res.data && res.data.logo_url) {
+                        setLogoUrl(`${API_URL}${res.data.logo_url}`);
                     }
                 })
                 .catch(err => console.error('Failed to fetch business info for sidebar', err));
@@ -119,7 +123,9 @@ export default function Sidebar() {
         <>
             <div className="p-6 border-b border-slate-800/50">
                 <div className="flex items-center gap-3 mb-4">
-                    {user.profile_image ? (
+                    {logoUrl ? (
+                        <img src={logoUrl} alt="Store Logo" className="w-10 h-10 rounded-full border-2 border-slate-700 object-cover bg-white" />
+                    ) : user.profile_image ? (
                         <img src={user.profile_image} alt="Profile" className="w-10 h-10 rounded-full border border-slate-700 object-cover" />
                     ) : (
                         <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">

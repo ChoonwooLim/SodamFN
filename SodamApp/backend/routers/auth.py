@@ -408,7 +408,7 @@ def get_business_info(bid: int):
         business = service.session.get(Business, bid)
         if not business:
             raise HTTPException(status_code=404, detail="Business not found")
-        return {"business_name": business.name}
+        return {"business_name": business.name, "logo_url": business.logo_url}
     finally:
         service.close()
 

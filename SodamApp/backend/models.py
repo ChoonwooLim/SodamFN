@@ -38,6 +38,7 @@ class Business(SQLModel, table=True):
     is_active: bool = True
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     settings_json: Optional[str] = None  # 업종별 맞춤 설정 (JSON)
+    logo_url: Optional[str] = None  # 회사 로고 이미지 URL
     
     # Relationships
     users: List["User"] = Relationship(back_populates="business")

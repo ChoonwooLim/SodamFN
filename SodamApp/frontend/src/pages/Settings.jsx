@@ -17,10 +17,66 @@ export default function Settings() {
     const [locMessage, setLocMessage] = useState('');
     const [gettingGps, setGettingGps] = useState(false);
 
+    // Common API URL
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+    // Logo State
+    const [logoFile, setLogoFile] = useState(null);
+    const [logoPreview, setLogoPreview] = useState(null);
+    const [logoSaving, setLogoSaving] = useState(false);
+    const [logoMessage, setLogoMessage] = useState('');
+
     useEffect(() => {
         if (activeTab === 'payment') fetchBizAccount();
         if (activeTab === 'location') fetchLocation();
+        if (activeTab === 'logo') fetchBusinessInfo();
     }, [activeTab]);
+
+    const fetchBusinessInfo = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const bid = payload.business_id || localStorage.getItem('business_id');
+            const res = await api.get(`/auth/business-info?bid=${bid}`);
+            if (res.data?.logo_url) {
+                setLogoPreview(`${API_URL}${res.data.logo_url}`);
+            }
+        } catch (e) { console.error('Error fetching business info:', e); }
+    };
+
+    const handleLogoFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setLogoFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setLogoPreview(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSaveLogo = async () => {
+        if (!logoFile) return;
+        setLogoSaving(true);
+        setLogoMessage('');
+        const formData = new FormData();
+        formData.append('file', logoFile);
+
+        try {
+            await api.post('/upload/image/business-logo', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            setLogoMessage('회사 로고가 성공적으로 업데이트되었습니다.');
+            setLogoFile(null);
+            setTimeout(() => window.location.reload(), 1000);
+        } catch (error) {
+            setLogoMessage('저장 중 오류가 발생했습니다.');
+        } finally {
+            setLogoSaving(false);
+        }
+    };
 
     const fetchBizAccount = async () => {
         try {
@@ -140,6 +196,15 @@ export default function Settings() {
                 >
                     📍 매장 위치 관리
                 </button>
+                <button
+                    onClick={() => setActiveTab('logo')}
+                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'logo'
+                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
+                        : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                >
+                    🎨 회사 로고 관리
+                </button>
             </div>
 
             {/* Content Area */}
@@ -208,7 +273,7 @@ export default function Settings() {
                         </button>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'payment' ? (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-xl">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-3 bg-indigo-100 rounded-xl">
@@ -268,7 +333,61 @@ export default function Settings() {
                         </button>
                     </div>
                 </div>
-            )}
+            ) : activeTab === 'logo' ? (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-xl">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-3 bg-pink-100 rounded-xl">
+                            <Building2 className="w-6 h-6 text-pink-600" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-800">회사 로고 설정</h2>
+                            <p className="text-sm text-slate-500">사이드바 좌측 상단에 표시될 매장의 로고 이미지를 업로드합니다.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center">
+                            {logoPreview ? (
+                                <img src={logoPreview} alt="Logo Preview" className="w-24 h-24 rounded-full object-cover bg-white shadow-md mb-4" />
+                            ) : (
+                                <div className="w-24 h-24 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mb-4">
+                                    <span className="text-slate-400 font-bold">로고 없음</span>
+                                </div>
+                            )}
+
+                            <input
+                                type="file"
+                                id="logoUpload"
+                                className="hidden"
+                                accept="image/jpeg, image/png, image/gif, image/webp"
+                                onChange={handleLogoFileChange}
+                            />
+                            <label
+                                htmlFor="logoUpload"
+                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg cursor-pointer transition-colors"
+                            >
+                                이미지 선택
+                            </label>
+                            <p className="text-xs text-slate-400 mt-3">권장 사이즈: 100x100 픽셀 이상 (정사각형)<br />지원 형식: JPG, PNG, GIF, WEBP</p>
+                        </div>
+
+                        {logoMessage && (
+                            <div className={`text-sm font-medium p-3 rounded-lg ${logoMessage.includes('오류') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                {logoMessage}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSaveLogo}
+                            disabled={logoSaving || !logoFile}
+                            className="w-full flex items-center justify-center gap-2 bg-pink-600 text-white py-3 rounded-lg font-bold hover:bg-pink-700 transition-colors disabled:opacity-50"
+                        >
+                            <Save size={18} />
+                            {logoSaving ? '저장 중...' : '로고 저장 및 변경'}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
