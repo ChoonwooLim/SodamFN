@@ -138,19 +138,15 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2">
-                    <span
-                        className="text-orange-500"
-                        style={{
-                            WebkitTextStroke: '1px #334155',
-                            textShadow: '2px 3px 0px #020617, 0px 4px 6px rgba(0,0,0,0.6)'
-                        }}
-                    >
-                        {businessName}
-                    </span>
-                    <span className="text-slate-600 font-light mx-2">|</span>
-                    <span className="text-white">셈</span><span className="text-blue-500">하나</span>
-                </h1>
+                <div className="px-2 mt-2">
+                    <div className="bg-slate-800/80 border-t border-slate-700 border-b-4 border-b-slate-900 rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all">
+                        <h1 className="text-xl font-black tracking-tight flex items-center justify-center py-2.5 px-3">
+                            <span className="text-orange-500 drop-shadow-sm">{businessName}</span>
+                            <span className="text-slate-600 font-light mx-2">|</span>
+                            <span className="text-white">셈</span><span className="text-blue-500">하나</span>
+                        </h1>
+                    </div>
+                </div>
             </div>
             <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
                 {mainMenuItems.map(renderMenuItem)}
