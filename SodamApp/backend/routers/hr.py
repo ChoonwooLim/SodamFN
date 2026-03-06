@@ -10,6 +10,7 @@ from datetime import date, datetime
 import shutil
 import os
 from sqlmodel import select, col
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
