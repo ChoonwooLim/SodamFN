@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package } from 'lucide-react';
-import { API_BASE } from '../api';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function Sidebar() {
     const location = useLocation();
@@ -46,7 +47,7 @@ export default function Sidebar() {
     useEffect(() => {
         const bid = user.business_id || localStorage.getItem('business_id');
         if (bid) {
-            axios.get(`${API_BASE}/api/auth/business-info?bid=${bid}`)
+            axios.get(`${API_URL}/api/auth/business-info?bid=${bid}`)
                 .then(res => {
                     if (res.data && res.data.business_name) {
                         setBusinessName(res.data.business_name);
