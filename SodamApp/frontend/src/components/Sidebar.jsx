@@ -215,7 +215,7 @@ export default function Sidebar() {
                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group"
                 >
                     <Home size={20} className="text-slate-400 group-hover:text-white transition-colors" />
-                    <span className="font-bold text-sm tracking-tight flex items-center">
+                    <span className="font-bold text-base tracking-tight flex items-center">
                         <span className="text-white">셈</span><span className="text-blue-500">하나</span>
                         <span className="text-slate-600 font-light mx-1.5">|</span>
                         <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
