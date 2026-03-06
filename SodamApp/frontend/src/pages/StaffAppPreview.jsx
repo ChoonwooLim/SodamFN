@@ -17,9 +17,8 @@ export default function StaffAppPreview() {
     const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
 
-    // Get business_id from admin JWT for staff app isolation
-    const token = localStorage.getItem('token');
-    const adminBid = token ? (() => { try { return JSON.parse(atob(token.split('.')[1])).business_id; } catch { return null; } })() : null;
+    // Get business_id from localStorage for staff app isolation
+    const adminBid = localStorage.getItem('business_id');
     const staffUrl = adminBid ? `${STAFF_APP_URL}?bid=${adminBid}` : STAFF_APP_URL;
 
     const currentDevice = DEVICE_PRESETS.find(d => d.id === device);
