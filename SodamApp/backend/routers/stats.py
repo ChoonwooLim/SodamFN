@@ -320,6 +320,7 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
                 for vname in vendor_names:
                     learn_rule(
                         original_name=vname,
+                        bid=bid,
                         category=payload.category,
                         source="vendor_patch",
                         session=sync_session,
@@ -392,6 +393,7 @@ def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = De
                 from services.smart_classifier import learn_rule
                 learn_rule(
                     original_name=source.name,
+                    bid=bid,
                     mapped_vendor_name=target.name,
                     category=target.category,
                     source="vendor_merge",
@@ -484,6 +486,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
                 from services.smart_classifier import learn_rule
                 learn_rule(
                     original_name=src_name,
+                    bid=bid,
                     mapped_vendor_name=target_vendor.name,
                     category=payload.category,
                     source="vendor_merge",
