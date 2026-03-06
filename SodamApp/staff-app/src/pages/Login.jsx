@@ -12,6 +12,9 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
+    // Get business_id from URL params (e.g., ?bid=2)
+    const bid = new URLSearchParams(window.location.search).get('bid');
+
     const handleLogin = async (e) => {
         e.preventDefault();
         if (!username || !password) {
@@ -26,6 +29,9 @@ export default function Login() {
             const formData = new URLSearchParams();
             formData.append('username', username);
             formData.append('password', password);
+            if (bid) {
+                formData.append('business_id', bid);
+            }
 
             const response = await axios.post(`${API_BASE}/api/auth/login`, formData, {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -39,11 +45,14 @@ export default function Login() {
             localStorage.setItem('user_role', payload.role);
             localStorage.setItem('user_name', payload.real_name || payload.sub);
             localStorage.setItem('staff_id', payload.staff_id || '');
+            if (bid) localStorage.setItem('bid', bid);
 
             navigate('/');
         } catch (err) {
             if (err.response?.status === 401) {
                 setError('아이디 또는 비밀번호가 올바르지 않습니다.');
+            } else if (err.response?.status === 403) {
+                setError(err.response.data?.detail || '이 매장에 등록되지 않은 계정입니다.');
             } else if (err.response?.data?.detail) {
                 const detail = err.response.data.detail;
                 setError(typeof detail === 'string' ? detail : '로그인에 실패했습니다.');

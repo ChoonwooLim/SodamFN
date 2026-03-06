@@ -214,7 +214,7 @@ async def signup(user_data: UserCreate):
 # --- Standard Login Endpoint ---
 
 @router.post("/login", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), request: Request = None):
     service = DatabaseService()
     try:
         stmt = select(User).where(User.username == form_data.username)
@@ -225,6 +225,19 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
                 detail="Incorrect username or password",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        
+        # Business isolation: if business_id is provided (from staff app), verify the user belongs to that business
+        if request:
+            body = await request.form()
+            req_bid = body.get("business_id")
+            if req_bid:
+                req_bid = int(req_bid)
+                if user.business_id and user.business_id != req_bid:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="이 매장에 등록되지 않은 계정입니다.",
+                    )
+        
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={

@@ -7,11 +7,13 @@ import {
     ChevronDown, ChevronUp, Clock, Link2, Share2
 } from 'lucide-react';
 
+const STAFF_BASE_URL = 'https://sodam-staff.pages.dev';
+
 const APP_INFO = {
     staff: {
         name: '직원용 앱',
         desc: 'PWA · sodam-staff',
-        url: 'https://sodam-staff.pages.dev',
+        url: STAFF_BASE_URL,
         gradient: 'from-emerald-400 to-teal-500',
         bgGradient: 'from-emerald-500/10 to-teal-500/10',
         borderColor: 'border-emerald-500/30',
@@ -40,6 +42,14 @@ export default function DeployManagement() {
     const [showHistory, setShowHistory] = useState(false);
     const [toast, setToast] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Get business_id from JWT for staff app URL scoping
+    const token = localStorage.getItem('token');
+    const adminBid = token ? (() => { try { return JSON.parse(atob(token.split('.')[1])).business_id; } catch { return null; } })() : null;
+
+    // Build business-scoped staff app URL
+    const getStaffUrl = () => adminBid ? `${STAFF_BASE_URL}?bid=${adminBid}` : STAFF_BASE_URL;
+    const getAppUrl = () => activeApp === 'staff' ? getStaffUrl() : APP_INFO.admin.url;
 
     const showToast = (msg, type = 'success') => {
         setToast({ msg, type });
@@ -223,14 +233,14 @@ export default function DeployManagement() {
                     {/* URL Bar */}
                     <div className="flex items-center gap-2 mb-5 p-3.5 bg-black/30 rounded-xl border border-white/8">
                         <Globe size={15} className={info.accentText} />
-                        <a href={info.url} target="_blank" rel="noreferrer" className={`text-sm font-medium ${info.accentText} hover:underline truncate`}>
-                            {info.url}
+                        <a href={getAppUrl()} target="_blank" rel="noreferrer" className={`text-sm font-medium ${info.accentText} hover:underline truncate`}>
+                            {getAppUrl()}
                         </a>
                         <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-                            <button onClick={() => copyLink(info.url)} className="p-2 hover:bg-white/10 rounded-lg transition-all" title="링크 복사">
+                            <button onClick={() => copyLink(getAppUrl())} className="p-2 hover:bg-white/10 rounded-lg transition-all" title="링크 복사">
                                 <Copy size={15} className="text-slate-300" />
                             </button>
-                            <a href={info.url} target="_blank" rel="noreferrer" className="p-2 hover:bg-white/10 rounded-lg transition-all" title="새 탭에서 열기">
+                            <a href={getAppUrl()} target="_blank" rel="noreferrer" className="p-2 hover:bg-white/10 rounded-lg transition-all" title="새 탭에서 열기">
                                 <ExternalLink size={15} className="text-slate-300" />
                             </a>
                         </div>
@@ -239,9 +249,9 @@ export default function DeployManagement() {
                     {/* Action Buttons */}
                     <div className="grid grid-cols-3 gap-3">
                         {[
-                            { icon: Link2, label: '링크 복사', onClick: () => copyLink(info.url), active: false },
+                            { icon: Link2, label: '링크 복사', onClick: () => copyLink(getAppUrl()), active: false },
                             { icon: QrCode, label: 'QR 코드', onClick: () => setShowQR(showQR === activeApp ? null : activeApp), active: showQR === activeApp },
-                            { icon: Share2, label: '공유하기', onClick: () => shareLink(info.url, info.name), active: false },
+                            { icon: Share2, label: '공유하기', onClick: () => shareLink(getAppUrl(), info.name), active: false },
                         ].map((btn, i) => (
                             <button
                                 key={i}
@@ -273,7 +283,7 @@ export default function DeployManagement() {
                         >
                             <div className="p-4 bg-white rounded-2xl shadow-lg">
                                 <QRCodeSVG
-                                    value={info.url}
+                                    value={getAppUrl()}
                                     size={200}
                                     level="H"
                                     includeMargin={false}
