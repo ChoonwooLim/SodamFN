@@ -191,16 +191,21 @@ class DatabaseService:
         return False
 
     def update_vendor_full(self, name: str, item: str = None, category: str = None, 
-                           vendor_type: str = "expense", order_index: int = 0):
-        stmt = select(Vendor).where(Vendor.name == name)
+                           vendor_type: str = "expense", order_index: int = 0, bid: int = None):
+        from tenant_filter import apply_bid_filter
+        
+        stmt = apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == name)
         vendor = self.session.exec(stmt).first()
+        
+        category_changed = False
         
         if vendor:
             # Update existing vendor
             if item is not None:
                 vendor.item = item
-            if category is not None:
+            if category is not None and vendor.category != category:
                 vendor.category = category
+                category_changed = True
             vendor.vendor_type = vendor_type
             vendor.order_index = order_index
         else:
@@ -210,11 +215,46 @@ class DatabaseService:
                 item=item,
                 category=category,
                 vendor_type=vendor_type,
-                order_index=order_index
+                order_index=order_index,
+                business_id=bid
             )
+            category_changed = True # Sync for new vendors too, to link missing expenses
         
         self.session.add(vendor)
         self.session.commit()
+        
+        if category_changed and category is not None:
+            # Trigger P/L sync for the updated/created vendor
+            try:
+                from services.profit_loss_service import sync_all_expenses
+                from models import DailyExpense
+                
+                # Update DailyExpense categories
+                exp_stmt = apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_name == name)
+                expenses = self.session.exec(exp_stmt).all()
+                
+                affected_months = set()
+                
+                for exp in expenses:
+                    if exp.vendor_id is None:
+                        exp.vendor_id = vendor.id
+                    if exp.category != category:
+                        exp.category = category
+                    self.session.add(exp)
+                    affected_months.add((exp.date.year, exp.date.month))
+                
+                if expenses:
+                    self.session.commit()
+                    
+                    print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to category change for {name}")
+                    for y, m in affected_months:
+                        sync_all_expenses(y, m, self.session)
+                    self.session.commit()
+
+            except Exception as e:
+                print(f"[Vendor Sync Error]: {e}")
+                self.session.rollback()
+
         return True
 
     def delete_vendor(self, vendor_name: str):

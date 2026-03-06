@@ -71,7 +71,7 @@ export default function Sidebar() {
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
             { icon: Users, label: '직원 관리', path: '/staff' },
-            { icon: BookOpen, label: '소담 레시피', path: '/recipes' },
+            { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
         ]
         : [
             { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },

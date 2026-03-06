@@ -139,7 +139,7 @@ export default function RecipeBook() {
                     <button className="recipe-back-btn" onClick={() => navigate(-1)}>
                         <ChevronLeft size={20} />
                     </button>
-                    <h1>📖 소담 레시피</h1>
+                    <h1>📖 레시피 관리</h1>
                 </div>
                 <p className="recipe-subtitle">총 {RECIPES.length}개</p>
             </div>

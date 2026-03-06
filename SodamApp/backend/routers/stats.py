@@ -201,7 +201,8 @@ def update_vendor(payload: VendorUpdate, _admin: User = Depends(get_admin_user),
                 item=payload.item,
                 category=payload.category,
                 vendor_type=payload.vendor_type,
-                order_index=payload.order_index
+                order_index=payload.order_index,
+                bid=bid
             )
             if success:
                 return {"status": "success"}
