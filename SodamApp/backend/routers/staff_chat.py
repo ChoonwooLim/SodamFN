@@ -3,6 +3,7 @@ from routers.auth import get_current_user, get_admin_user
 from models import User as AuthUser, StaffChatMessage
 from services.database_service import DatabaseService
 from sqlmodel import select, col
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/staff-chat", tags=["Staff Chat"])
 
@@ -10,15 +11,14 @@ router = APIRouter(prefix="/staff-chat", tags=["Staff Chat"])
 @router.get("")
 def get_messages(
     limit: int = Query(50, le=200),
-    _user: AuthUser = Depends(get_current_user)
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        items = service.session.exec(
-            select(StaffChatMessage)
-            .order_by(col(StaffChatMessage.created_at).desc())
-            .limit(limit)
-        ).all()
+        stmt = select(StaffChatMessage).order_by(col(StaffChatMessage.created_at).desc()).limit(limit)
+        stmt = apply_bid_filter(stmt, StaffChatMessage, bid)
+        items = service.session.exec(stmt).all()
         return {
             "status": "success",
             "data": [
@@ -37,14 +37,16 @@ def get_messages(
 @router.post("")
 def send_message(
     message: str = Body(..., embed=True),
-    user: AuthUser = Depends(get_current_user)
+    user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
         msg = StaffChatMessage(
             staff_id=user.staff_id,
             staff_name=user.real_name or user.username,
-            message=message
+            message=message,
+            business_id=bid
         )
         service.session.add(msg)
         service.session.commit()

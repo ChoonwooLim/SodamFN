@@ -219,7 +219,8 @@ def create_staff_account(
             role="staff",
             grade=grade,
             staff_id=staff_id,
-            real_name=staff.name if staff else None
+            real_name=staff.name if staff else None,
+            business_id=staff.business_id if staff else _admin.business_id
         )
         service.session.add(new_user)
         service.session.commit()
@@ -410,6 +411,7 @@ def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_curr
                 check_in_lng=payload.longitude,
                 check_in_verified=gps_result["verified"] if gps_result else False,
                 check_in_distance=gps_result["distance"] if gps_result else None,
+                business_id=_user.business_id,
             )
             service.session.add(new_record)
         

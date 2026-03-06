@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
 from routers.auth import get_current_user
-from models import User as AuthUser, PurchaseRequest
+from models import User as AuthUser, PurchaseRequest, GlobalSetting
 from services.database_service import DatabaseService
 from sqlmodel import select
+from tenant_filter import get_bid_from_token, apply_bid_filter
 import json
 
 router = APIRouter(prefix="/purchase-requests", tags=["Purchase Requests"])
@@ -13,7 +14,8 @@ def create_purchase_request(
     staff_id: int = Body(..., embed=True),
     staff_name: str = Body("", embed=True),
     items: list = Body(..., embed=True),
-    _user: AuthUser = Depends(get_current_user)
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
@@ -21,7 +23,8 @@ def create_purchase_request(
             staff_id=staff_id,
             staff_name=staff_name,
             items_json=json.dumps(items, ensure_ascii=False),
-            status="pending"
+            status="pending",
+            business_id=bid
         )
         service.session.add(req)
         service.session.commit()
@@ -30,7 +33,6 @@ def create_purchase_request(
         # Send Kakao notification to admin
         try:
             from services.notification_service import NotificationService
-            from models import GlobalSetting
             admin_phone_setting = service.session.exec(
                 select(GlobalSetting).where(GlobalSetting.key == "admin_phone")
             ).first()
@@ -57,11 +59,13 @@ def create_purchase_request(
 @router.get("")
 def get_purchase_requests(
     staff_id: int = None,
-    _user: AuthUser = Depends(get_current_user)
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
         query = select(PurchaseRequest).order_by(PurchaseRequest.created_at.desc())
+        query = apply_bid_filter(query, PurchaseRequest, bid)
         if staff_id:
             query = query.where(PurchaseRequest.staff_id == staff_id)
         results = service.session.exec(query.limit(20)).all()

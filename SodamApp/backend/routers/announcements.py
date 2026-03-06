@@ -3,17 +3,22 @@ from routers.auth import get_current_user, get_admin_user
 from models import User as AuthUser, Announcement
 from services.database_service import DatabaseService
 from sqlmodel import select, col
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/announcements", tags=["Announcements"])
 
 
 @router.get("")
-def get_announcements(_user: AuthUser = Depends(get_current_user)):
+def get_announcements(_user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        items = service.session.exec(
-            select(Announcement).order_by(col(Announcement.pinned).desc(), col(Announcement.created_at).desc())
-        ).all()
+        stmt = select(Announcement).order_by(col(Announcement.pinned).desc(), col(Announcement.created_at).desc())
+        # Show business-specific announcements + global announcements
+        if bid is not None:
+            stmt = stmt.where(
+                (Announcement.business_id == bid) | (Announcement.is_global == True)
+            )
+        items = service.session.exec(stmt).all()
         return {
             "status": "success",
             "data": [
@@ -31,11 +36,12 @@ def create_announcement(
     title: str = Body(..., embed=True),
     content: str = Body("", embed=True),
     pinned: bool = Body(False, embed=True),
-    _admin: AuthUser = Depends(get_admin_user)
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        ann = Announcement(title=title, content=content, pinned=pinned)
+        ann = Announcement(title=title, content=content, pinned=pinned, business_id=bid)
         service.session.add(ann)
         service.session.commit()
         service.session.refresh(ann)

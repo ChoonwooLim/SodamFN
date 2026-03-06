@@ -254,6 +254,7 @@ class ElectronicContract(SQLModel, table=True):
     
     staff_id: int = Field(foreign_key="staff.id")
     staff: Optional[Staff] = Relationship(back_populates="contracts")
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class StaffDocument(SQLModel, table=True):
@@ -295,6 +296,7 @@ class Attendance(SQLModel, table=True):
     
     staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)
     staff: Optional[Staff] = Relationship(back_populates="attendances")
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 class Payroll(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -437,6 +439,7 @@ class PurchaseRequest(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, completed, rejected
     admin_note: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class EmergencyContact(SQLModel, table=True):
@@ -448,6 +451,7 @@ class EmergencyContact(SQLModel, table=True):
     store_id: str = ""  # 매장 아이디
     note: str = ""  # 비고
     display_order: int = Field(default=0)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class Announcement(SQLModel, table=True):
@@ -471,6 +475,7 @@ class Suggestion(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, reviewed, resolved
     admin_reply: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class StaffChatMessage(SQLModel, table=True):
@@ -480,6 +485,7 @@ class StaffChatMessage(SQLModel, table=True):
     staff_name: str = ""
     message: str
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class InventoryItem(SQLModel, table=True):
@@ -492,6 +498,7 @@ class InventoryItem(SQLModel, table=True):
     display_order: int = 0          # 표시 순서
     is_active: bool = True          # 활성 여부
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class InventoryCheck(SQLModel, table=True):
@@ -516,6 +523,7 @@ class InventoryCheck(SQLModel, table=True):
 
     note: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
 class StoreApplication(SQLModel, table=True):

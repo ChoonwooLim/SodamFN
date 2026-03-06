@@ -3,17 +3,18 @@ from routers.auth import get_current_user, get_admin_user
 from models import User as AuthUser, Suggestion
 from services.database_service import DatabaseService
 from sqlmodel import select, col
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/suggestions", tags=["Suggestions"])
 
 
 @router.get("")
-def get_suggestions(_user: AuthUser = Depends(get_current_user)):
+def get_suggestions(_user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        items = service.session.exec(
-            select(Suggestion).order_by(col(Suggestion.created_at).desc())
-        ).all()
+        stmt = select(Suggestion).order_by(col(Suggestion.created_at).desc())
+        stmt = apply_bid_filter(stmt, Suggestion, bid)
+        items = service.session.exec(stmt).all()
         return {
             "status": "success",
             "data": [
@@ -34,7 +35,8 @@ def get_suggestions(_user: AuthUser = Depends(get_current_user)):
 def create_suggestion(
     title: str = Body(..., embed=True),
     content: str = Body("", embed=True),
-    user: AuthUser = Depends(get_current_user)
+    user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
@@ -42,7 +44,8 @@ def create_suggestion(
             staff_id=user.staff_id,
             staff_name=user.real_name or user.username,
             title=title,
-            content=content
+            content=content,
+            business_id=bid
         )
         service.session.add(s)
         service.session.commit()

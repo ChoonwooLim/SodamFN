@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional, Dict
@@ -7,6 +7,7 @@ import json
 
 from models import InventoryCheck, InventoryItem
 from database import engine
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(tags=["inventory-check"])
 
@@ -33,20 +34,20 @@ class InventoryItemUpdate(BaseModel):
 
 
 @router.get("/inventory-items")
-def get_inventory_items():
+def get_inventory_items(bid = Depends(get_bid_from_token)):
     """모든 재고 체크 항목 목록"""
     with Session(engine) as session:
-        items = session.exec(
-            select(InventoryItem).order_by(InventoryItem.display_order, InventoryItem.id)
-        ).all()
+        stmt = select(InventoryItem).order_by(InventoryItem.display_order, InventoryItem.id)
+        stmt = apply_bid_filter(stmt, InventoryItem, bid)
+        items = session.exec(stmt).all()
         return {"status": "success", "data": [item.dict() for item in items]}
 
 
 @router.post("/inventory-items")
-def create_inventory_item(data: InventoryItemCreate):
+def create_inventory_item(data: InventoryItemCreate, bid = Depends(get_bid_from_token)):
     """재고 체크 항목 추가"""
     with Session(engine) as session:
-        item = InventoryItem(**data.dict())
+        item = InventoryItem(**data.dict(), business_id=bid)
         session.add(item)
         session.commit()
         session.refresh(item)
@@ -82,7 +83,7 @@ def delete_inventory_item(item_id: int):
 
 
 @router.post("/inventory-items/seed")
-def seed_default_items():
+def seed_default_items(bid = Depends(get_bid_from_token)):
     """기본 항목 초기 데이터 생성 (항목이 없을 때)"""
     defaults = [
         {"name": "어묵", "emoji": "🐟", "unit": "개", "category": "기본", "display_order": 1},
@@ -95,11 +96,13 @@ def seed_default_items():
         {"name": "햄치즈", "emoji": "🧀", "unit": "개", "category": "주먹밥", "display_order": 8},
     ]
     with Session(engine) as session:
-        existing = session.exec(select(InventoryItem)).first()
+        stmt = select(InventoryItem)
+        stmt = apply_bid_filter(stmt, InventoryItem, bid)
+        existing = session.exec(stmt).first()
         if existing:
             return {"status": "info", "message": "이미 항목이 존재합니다."}
         for d in defaults:
-            session.add(InventoryItem(**d))
+            session.add(InventoryItem(**d, business_id=bid))
         session.commit()
         return {"status": "success", "message": f"{len(defaults)}개 기본 항목이 생성되었습니다."}
 
@@ -114,7 +117,7 @@ class InventoryCheckCreate(BaseModel):
 
 
 @router.post("/inventory-check")
-def create_inventory_check(data: InventoryCheckCreate, staff_id: int = 0, staff_name: str = ""):
+def create_inventory_check(data: InventoryCheckCreate, staff_id: int = 0, staff_name: str = "", bid = Depends(get_bid_from_token)):
     """직원이 오픈 재고 체크를 등록"""
     today = datetime.date.today()
     # staff_id=0 means unknown/admin — set to None to avoid FK violation
@@ -146,7 +149,8 @@ def create_inventory_check(data: InventoryCheckCreate, staff_id: int = 0, staff_
             staff_id=db_staff_id,
             staff_name=staff_name,
             items_json=items_str,
-            note=data.note
+            note=data.note,
+            business_id=bid
         )
         session.add(record)
         session.commit()
@@ -167,26 +171,24 @@ def _enrich_record(r):
 
 
 @router.get("/inventory-check/today")
-def get_today_inventory():
+def get_today_inventory(bid = Depends(get_bid_from_token)):
     """오늘의 재고 체크 목록"""
     today = datetime.date.today()
     with Session(engine) as session:
-        records = session.exec(
-            select(InventoryCheck).where(InventoryCheck.date == today)
-            .order_by(InventoryCheck.created_at.desc())
-        ).all()
+        stmt = select(InventoryCheck).where(InventoryCheck.date == today).order_by(InventoryCheck.created_at.desc())
+        stmt = apply_bid_filter(stmt, InventoryCheck, bid)
+        records = session.exec(stmt).all()
         return {"status": "success", "data": [_enrich_record(r) for r in records]}
 
 
 @router.get("/inventory-check/history")
-def get_inventory_history(days: int = 7):
+def get_inventory_history(days: int = 7, bid = Depends(get_bid_from_token)):
     """최근 N일 재고 체크 이력"""
     since = datetime.date.today() - datetime.timedelta(days=days)
     with Session(engine) as session:
-        records = session.exec(
-            select(InventoryCheck).where(InventoryCheck.date >= since)
-            .order_by(InventoryCheck.date.desc(), InventoryCheck.created_at.desc())
-        ).all()
+        stmt = select(InventoryCheck).where(InventoryCheck.date >= since).order_by(InventoryCheck.date.desc(), InventoryCheck.created_at.desc())
+        stmt = apply_bid_filter(stmt, InventoryCheck, bid)
+        records = session.exec(stmt).all()
 
         grouped = {}
         for r in records:
@@ -199,7 +201,7 @@ def get_inventory_history(days: int = 7):
 
 
 @router.get("/inventory-check/date/{date_str}")
-def get_inventory_by_date(date_str: str):
+def get_inventory_by_date(date_str: str, bid = Depends(get_bid_from_token)):
     """특정 날짜의 재고 체크"""
     try:
         target_date = datetime.date.fromisoformat(date_str)
@@ -207,8 +209,7 @@ def get_inventory_by_date(date_str: str):
         raise HTTPException(status_code=400, detail="잘못된 날짜 형식입니다. YYYY-MM-DD 형식을 사용하세요.")
 
     with Session(engine) as session:
-        records = session.exec(
-            select(InventoryCheck).where(InventoryCheck.date == target_date)
-            .order_by(InventoryCheck.created_at.desc())
-        ).all()
+        stmt = select(InventoryCheck).where(InventoryCheck.date == target_date).order_by(InventoryCheck.created_at.desc())
+        stmt = apply_bid_filter(stmt, InventoryCheck, bid)
+        records = session.exec(stmt).all()
         return {"status": "success", "data": [_enrich_record(r) for r in records]}

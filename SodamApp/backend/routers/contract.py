@@ -8,6 +8,7 @@ from services.database_service import DatabaseService
 from services.notification_service import NotificationService
 from routers.auth import get_current_user, get_admin_user
 from config import FRONTEND_URL
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
@@ -23,13 +24,14 @@ class ContractSign(BaseModel):
     phone: Optional[str] = None
 
 @router.post("/")
-def create_contract(contract: ContractCreate, admin: User = Depends(get_admin_user)):
+def create_contract(contract: ContractCreate, admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         new_contract = ElectronicContract(
             staff_id=contract.staff_id,
             title=contract.title,
-            content=contract.content
+            content=contract.content,
+            business_id=bid
         )
         service.session.add(new_contract)
         service.session.commit()
@@ -114,6 +116,7 @@ def get_staff_contracts(staff_id: int, admin: User = Depends(get_admin_user)):
         return {"status": "success", "data": contracts}
     finally:
         service.close()
+
 class ContractUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
@@ -168,8 +171,6 @@ def send_contract_alimtalk(contract_id: int, admin: User = Depends(get_admin_use
             raise HTTPException(status_code=400, detail="Staff phone number is missing")
 
         # Generate Link
-        # URL format should match the frontend route for signing contracts
-        # e.g., http://localhost:5173/contract/sign/1
         link = f"{FRONTEND_URL}/contract/sign/{contract_id}"
         
         result = NotificationService.send_contract_link(

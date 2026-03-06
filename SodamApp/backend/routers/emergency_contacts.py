@@ -3,17 +3,18 @@ from routers.auth import get_current_user, get_admin_user
 from models import User as AuthUser, EmergencyContact
 from services.database_service import DatabaseService
 from sqlmodel import select
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/emergency-contacts", tags=["Emergency Contacts"])
 
 
 @router.get("")
-def get_contacts(_user: AuthUser = Depends(get_current_user)):
+def get_contacts(_user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        contacts = service.session.exec(
-            select(EmergencyContact).order_by(EmergencyContact.display_order, EmergencyContact.id)
-        ).all()
+        stmt = select(EmergencyContact).order_by(EmergencyContact.display_order, EmergencyContact.id)
+        stmt = apply_bid_filter(stmt, EmergencyContact, bid)
+        contacts = service.session.exec(stmt).all()
         return {
             "status": "success",
             "data": [
@@ -33,11 +34,12 @@ def create_contact(
     store_id: str = Body("", embed=True),
     note: str = Body("", embed=True),
     display_order: int = Body(0, embed=True),
-    _admin: AuthUser = Depends(get_admin_user)
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token)
 ):
     service = DatabaseService()
     try:
-        contact = EmergencyContact(name=name, phone=phone, category=category, store_id=store_id, note=note, display_order=display_order)
+        contact = EmergencyContact(name=name, phone=phone, category=category, store_id=store_id, note=note, display_order=display_order, business_id=bid)
         service.session.add(contact)
         service.session.commit()
         service.session.refresh(contact)
