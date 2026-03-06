@@ -30,7 +30,32 @@ function PageLoader() {
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
-  if (!token) return <Navigate to="/login" replace />;
+  const urlParams = new URLSearchParams(window.location.search);
+  const targetBid = urlParams.get('bid');
+
+  // If there is a token but the URL specifies a different business, clear it
+  let shouldClearParams = false;
+  if (token && targetBid) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      // Note: payload.business_id could be null for superadmin, but for staff it exists
+      if (payload.business_id && payload.business_id.toString() !== targetBid) {
+        localStorage.removeItem('token');
+        shouldClearParams = true;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (shouldClearParams) {
+    return <Navigate to={`/login?bid=${targetBid}`} replace />;
+  }
+
+  // Check token again in case it was removed above
+  if (!localStorage.getItem('token')) {
+    return <Navigate to={`/login${window.location.search}`} replace />;
+  }
   return children;
 }
 
