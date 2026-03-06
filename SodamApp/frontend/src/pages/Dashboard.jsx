@@ -18,6 +18,8 @@ export default function Dashboard() {
     // Live Clock State
     const [currentTime, setCurrentTime] = useState(new Date());
 
+    const businessName = localStorage.getItem('business_name') || '소담김밥';
+
     useEffect(() => {
         fetchData(selectedYear, selectedMonth);
     }, [selectedYear, selectedMonth]);
@@ -108,7 +110,7 @@ export default function Dashboard() {
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 tracking-tight">대시보드</h1>
                     <div className="flex flex-col mt-1 space-y-1">
-                        <p className="text-slate-500">소담김밥 매장의 실시간 현황입니다.</p>
+                        <p className="text-slate-500">{businessName} 매장의 실시간 현황입니다.</p>
                         <p className="text-indigo-600 font-medium text-sm">
                             {formatDate(currentTime)} <span className="ml-1 font-bold">{formatTime(currentTime)}</span>
                         </p>

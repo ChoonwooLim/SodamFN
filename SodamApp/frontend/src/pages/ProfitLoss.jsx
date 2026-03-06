@@ -75,6 +75,7 @@ export default function ProfitLoss() {
     const [editValue, setEditValue] = useState('');
     const [year, setYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('dashboard');
+    const businessName = localStorage.getItem('business_name') || '소담김밥';
 
     // Dropdown group state
     const [openDropdown, setOpenDropdown] = useState(null); // 'monthly'
@@ -891,7 +892,7 @@ export default function ProfitLoss() {
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colSpan="2">소담김밥 월별손익계산서_{year} 하반기</th>
+                            <th colSpan="2">{businessName} 월별손익계산서_{year} 하반기</th>
                             {MONTHS.map(m => <th key={m}>{m}월</th>)}
                             <th>합계</th>
                             <th>월평균</th>

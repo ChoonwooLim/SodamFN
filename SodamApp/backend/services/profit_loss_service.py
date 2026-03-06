@@ -165,9 +165,9 @@ CHANNEL_TO_PL_FIELD = {
 
 def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, business_id: int = None):
     """
-    Aggregate DailyExpense (delivery category) by vendor keyword
-    and update MonthlyProfitLoss delivery revenue fields.
-    Source of truth: DailyExpense table (same as grid view).
+    Aggregate Revenue from DailyExpense using Vendor lookup.
+    Updates MonthlyProfitLoss delivery and store revenue fields.
+    Source of truth: DailyExpense table via Vendor.vendor_type == "revenue".
     """
     import datetime as dt
 
@@ -186,52 +186,48 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
         "땡겨요": "revenue_ddangyo",
     }
 
-    # Get all delivery DailyExpense for this month
-    exp_stmt = select(DailyExpense).where(
-        DailyExpense.category == "delivery",
-        DailyExpense.date >= start_date,
-        DailyExpense.date < end_date,
-    )
-    if business_id is not None:
-        exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
-        
-    records = session.exec(exp_stmt).all()
-
-    # Aggregate by P/L field
-    delivery_totals = {}
-    for r in records:
-        field = None
-        for keyword, f in keyword_field_map.items():
-            if keyword in (r.vendor_name or ""):
-                field = f
-                break
-        if field:
-            delivery_totals[field] = delivery_totals.get(field, 0) + (r.amount or 0)
-
-    # Also sync revenue_store from store category
-    vend_stmt = select(Vendor).where(
-        Vendor.vendor_type == "revenue", 
-        Vendor.category == "store"
-    )
+    # 1. Get all revenue vendors
+    vend_stmt = select(Vendor).where(Vendor.vendor_type == "revenue")
     if business_id is not None:
         vend_stmt = vend_stmt.where(Vendor.business_id == business_id)
         
-    store_vendors = session.exec(vend_stmt).all()
-    store_vendor_ids = [v.id for v in store_vendors]
+    revenue_vendors = session.exec(vend_stmt).all()
+    vendor_map = {v.id: v for v in revenue_vendors}
+    vendor_ids = list(vendor_map.keys())
 
-    if store_vendor_ids:
-        store_exp_stmt = select(DailyExpense).where(
-            DailyExpense.vendor_id.in_(store_vendor_ids),
+    delivery_totals = {}
+    store_total = 0
+
+    if vendor_ids:
+        # 2. Get all DailyExpense records for these vendors
+        exp_stmt = select(DailyExpense).where(
+            DailyExpense.vendor_id.in_(vendor_ids),
             DailyExpense.date >= start_date,
             DailyExpense.date < end_date,
         )
         if business_id is not None:
-            store_exp_stmt = store_exp_stmt.where(DailyExpense.business_id == business_id)
+            exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
             
-        store_records = session.exec(store_exp_stmt).all()
-        store_total = sum(r.amount or 0 for r in store_records)
-    else:
-        store_total = 0
+        records = session.exec(exp_stmt).all()
+
+        for r in records:
+            v = vendor_map.get(r.vendor_id)
+            cat = v.category if v else (r.category or "store")
+            
+            if cat == "delivery":
+                field = None
+                for keyword, f in keyword_field_map.items():
+                    if keyword in (v.name or "") or keyword in (r.vendor_name or ""):
+                        field = f
+                        break
+                if field:
+                    delivery_totals[field] = delivery_totals.get(field, 0) + (r.amount or 0)
+                else:
+                    # Fallback to store revenue if unmapped delivery
+                    store_total += (r.amount or 0)
+            else:
+                # store category or others
+                store_total += (r.amount or 0)
 
     # All managed fields
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
@@ -250,8 +246,8 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
         session.add(pl_record)
     else:
         pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id, revenue_store=store_total)
-        for field, val in delivery_totals.items():
-            setattr(pl_record, field, val)
+        for field in managed_fields:
+            setattr(pl_record, field, delivery_totals.get(field, 0))
         session.add(pl_record)
 
     session.commit()
