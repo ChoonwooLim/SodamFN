@@ -400,6 +400,18 @@ async def kakao_callback(code: str):
 
 # --- User Info & Dependency ---
 
+@router.get("/business-info")
+def get_business_info(bid: int):
+    from models import Business
+    service = DatabaseService()
+    try:
+        business = service.session.get(Business, bid)
+        if not business:
+            raise HTTPException(status_code=404, detail="Business not found")
+        return {"business_name": business.name}
+    finally:
+        service.close()
+
 @router.get("/me")
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return {

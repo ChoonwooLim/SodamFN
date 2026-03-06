@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Store, Eye, EyeOff } from 'lucide-react';
@@ -11,9 +11,23 @@ export default function Login() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [businessName, setBusinessName] = useState('소담'); // Default fallback
 
-    // Get business_id from URL params (e.g., ?bid=2)
-    const bid = new URLSearchParams(window.location.search).get('bid');
+    // Get business_id from URL params (e.g., ?bid=2) or fallback to the deployed environment variable
+    const queryBid = new URLSearchParams(window.location.search).get('bid');
+    const bid = queryBid || import.meta.env.VITE_BUSINESS_ID;
+
+    useEffect(() => {
+        if (bid) {
+            axios.get(`${API_BASE}/api/auth/business-info?bid=${bid}`)
+                .then(res => {
+                    if (res.data && res.data.business_name) {
+                        setBusinessName(res.data.business_name);
+                    }
+                })
+                .catch(err => console.error('Failed to fetch business info', err));
+        }
+    }, [bid]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -73,7 +87,7 @@ export default function Login() {
                     <div className="login-logo-icon">
                         <Store size={36} color="white" />
                     </div>
-                    <h1>소담 Staff</h1>
+                    <h1>{businessName} Staff</h1>
                     <p>직원 전용 모바일 앱</p>
                 </div>
 
