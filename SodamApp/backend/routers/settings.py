@@ -4,6 +4,7 @@ from models import GlobalSetting, User
 from services.database_service import DatabaseService
 from pydantic import BaseModel
 from routers.auth import get_admin_user
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(
     prefix="/api/settings",
@@ -14,7 +15,7 @@ class SettingUpdate(BaseModel):
     value: str
 
 @router.get("/{key}")
-def get_setting(key: str, _admin: User = Depends(get_admin_user)):
+def get_setting(key: str, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         setting = service.session.get(GlobalSetting, key)
@@ -25,7 +26,7 @@ def get_setting(key: str, _admin: User = Depends(get_admin_user)):
         service.close()
 
 @router.put("/{key}")
-def update_setting(key: str, data: SettingUpdate, _admin: User = Depends(get_admin_user)):
+def update_setting(key: str, data: SettingUpdate, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         setting = service.session.get(GlobalSetting, key)

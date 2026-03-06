@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from services.excel_service import ExcelService
 from routers.auth import get_admin_user
 from models import User
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
@@ -13,7 +14,7 @@ class ExpenseItem(BaseModel):
     category: str = "기타"
 
 @router.post("/expense")
-def add_expense(item: ExpenseItem, _admin: User = Depends(get_admin_user)):
+def add_expense(item: ExpenseItem, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         service = ExcelService()
         result = service.add_expense(item.date, item.item, item.amount, item.category)

@@ -11,6 +11,7 @@ from sqlmodel import Session, select, func, col
 from database import engine
 from models import DailyExpense, Vendor, Revenue, DeliveryRevenue
 from services.profit_loss_service import sync_revenue_to_pl
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 # Channel name (in Revenue table) → keyword to match delivery vendor names
 CHANNEL_KEYWORDS = {
@@ -44,7 +45,7 @@ class RevenueUpdate(BaseModel):
 # ─── GET daily revenue list ───
 
 @router.get("/daily")
-def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
+def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Returns all DailyExpense records for revenue vendors in the given month.
     Each record is enriched with vendor name/category/item.
@@ -118,7 +119,7 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
 # ─── GET summary stats ───
 
 @router.get("/summary")
-def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
+def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Returns aggregated revenue by category and by day.
     Categories: cash, card, delivery
@@ -215,7 +216,7 @@ def get_revenue_summary(year: int, month: int, _admin: AuthUser = Depends(get_ad
 # ─── POST create revenue entry ───
 
 @router.post("/daily")
-def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_admin_user)):
+def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Create a single revenue DailyExpense record."""
     with Session(engine) as session:
         vendor = session.get(Vendor, payload.vendor_id)
@@ -253,7 +254,7 @@ def create_daily_revenue(payload: RevenueCreate, _admin: AuthUser = Depends(get_
 # ─── PUT update revenue entry ───
 
 @router.put("/daily/{expense_id}")
-def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUser = Depends(get_admin_user)):
+def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Update a revenue DailyExpense record."""
     with Session(engine) as session:
         expense = session.get(DailyExpense, expense_id)
@@ -291,7 +292,7 @@ def update_daily_revenue(expense_id: int, payload: RevenueUpdate, _admin: AuthUs
 # ─── DELETE revenue entry ───
 
 @router.delete("/daily/{expense_id}")
-def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Delete a revenue DailyExpense record."""
     with Session(engine) as session:
         expense = session.get(DailyExpense, expense_id)
@@ -312,7 +313,7 @@ def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_u
 # ─── GET delivery revenue summary ───
 
 @router.get("/delivery-summary")
-def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user)):
+def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Returns delivery app revenue summary.
     Sources: DailyExpense (primary, single source of truth) + DeliveryRevenue (legacy detail).
@@ -467,7 +468,7 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
 # ─── DELETE delivery revenue by month ───
 
 @router.delete("/delivery-summary/{year}/{month}")
-def delete_delivery_revenue_month(year: int, month: int, _admin: AuthUser = Depends(get_admin_user)):
+def delete_delivery_revenue_month(year: int, month: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     Delete all delivery revenue data for a specific year/month.
     Clears both DeliveryRevenue and Revenue tables, then re-syncs P/L.

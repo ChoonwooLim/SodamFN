@@ -340,25 +340,54 @@ def list_all_users(
     business_id: Optional[int] = None,
     admin: User = Depends(get_superadmin_user)
 ):
-    """전체 사용자 목록 (매장별 필터 가능)"""
+    """전체 사용자 목록 (매장별 그룹화)"""
     with Session(engine) as s:
+        businesses = s.exec(select(Business).where(Business.is_active == True)).all()
         stmt = select(User)
         if business_id:
             stmt = stmt.where(User.business_id == business_id)
         users = s.exec(stmt).all()
         
+        def user_dict(u):
+            return {
+                "id": u.id, "username": u.username, "role": u.role,
+                "grade": u.grade, "email": u.email, "real_name": u.real_name,
+                "business_id": u.business_id, "subscription_type": u.subscription_type,
+            }
+        
+        user_map = {}
+        unassigned = []
+        for u in users:
+            if u.business_id:
+                user_map.setdefault(u.business_id, []).append(user_dict(u))
+            else:
+                unassigned.append(user_dict(u))
+        
+        groups = []
+        for biz in businesses:
+            groups.append({
+                "business_id": biz.id, "business_name": biz.name,
+                "owner_name": biz.owner_name, "business_type": biz.business_type,
+                "is_active": biz.is_active,
+                "users": user_map.get(biz.id, []),
+                "user_count": len(user_map.get(biz.id, [])),
+            })
+        groups.sort(key=lambda g: (-g["user_count"], g["business_name"]))
+        
+        if unassigned and not business_id:
+            groups.append({
+                "business_id": None, "business_name": "미배정",
+                "owner_name": None, "business_type": None, "is_active": True,
+                "users": unassigned, "user_count": len(unassigned),
+            })
+        
+        all_users = [user_dict(u) for u in users]
         return {
-            "status": "success",
-            "data": [{
-                "id": u.id,
-                "username": u.username,
-                "role": u.role,
-                "grade": u.grade,
-                "email": u.email,
-                "real_name": u.real_name,
-                "business_id": u.business_id,
-            } for u in users]
+            "status": "success", "data": all_users,
+            "groups": groups, "total_users": len(all_users),
+            "total_businesses": len(businesses),
         }
+
 
 
 @router.put("/users/{user_id}/role")
@@ -605,6 +634,52 @@ def get_analytics(
                 "by_region": region_stats,
                 "total_businesses": len(businesses),
             }
+        }
+
+
+
+@router.post("/businesses/{business_id}/create-admin")
+def create_business_admin(
+    business_id: int,
+    username: str = Body(..., embed=True),
+    password: str = Body(..., embed=True),
+    real_name: str = Body(None, embed=True),
+    admin: User = Depends(get_superadmin_user)
+):
+    """기존 매장에 관리자(Admin) 계정 생성"""
+    from routers.auth import get_password_hash
+    
+    with Session(engine) as s:
+        biz = s.get(Business, business_id)
+        if not biz:
+            raise HTTPException(status_code=404, detail="매장을 찾을 수 없습니다.")
+        
+        existing = s.exec(select(User).where(User.username == username)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"'{username}' 아이디가 이미 존재합니다.")
+        
+        new_user = User(
+            username=username,
+            hashed_password=get_password_hash(password),
+            role="admin",
+            grade="admin",
+            business_id=business_id,
+            real_name=real_name or biz.owner_name,
+            subscription_type=None,
+        )
+        s.add(new_user)
+        s.commit()
+        s.refresh(new_user)
+        
+        return {
+            "status": "success",
+            "data": {
+                "user_id": new_user.id,
+                "username": new_user.username,
+                "business_id": business_id,
+                "business_name": biz.name,
+            },
+            "message": f"'{biz.name}' 매장 관리자 '{username}'이(가) 생성되었습니다."
         }
 
 

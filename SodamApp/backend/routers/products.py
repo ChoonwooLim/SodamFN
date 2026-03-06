@@ -12,6 +12,7 @@ from typing import Optional, List
 import os
 import shutil
 from datetime import datetime
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -39,12 +40,14 @@ class ProductUpdate(BaseModel):
 
 # Get all products for a vendor
 @router.get("")
-def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
+def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         if vendor_id:
             stmt = select(Product).where(Product.vendor_id == vendor_id)
+            stmt = apply_bid_filter(stmt, Product, bid)
         else:
             stmt = select(Product)
+            stmt = apply_bid_filter(stmt, Product, bid)
         
         products = session.exec(stmt).all()
         return {
@@ -68,7 +71,7 @@ def get_products(vendor_id: Optional[int] = None, session: Session = Depends(get
 
 # Create a new product
 @router.post("")
-def create_product(data: ProductCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
+def create_product(data: ProductCreate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         # Verify vendor exists
         vendor = session.get(Vendor, data.vendor_id)
@@ -114,7 +117,7 @@ def create_product(data: ProductCreate, session: Session = Depends(get_session),
 
 # Update a product
 @router.put("/{product_id}")
-def update_product(product_id: int, data: ProductUpdate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
+def update_product(product_id: int, data: ProductUpdate, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         product = session.get(Product, product_id)
         if not product:
@@ -148,7 +151,7 @@ def update_product(product_id: int, data: ProductUpdate, session: Session = Depe
 
 # Delete a product
 @router.delete("/{product_id}")
-def delete_product(product_id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user)):
+def delete_product(product_id: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         product = session.get(Product, product_id)
         if not product:

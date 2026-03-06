@@ -68,6 +68,7 @@ class Vendor(SQLModel, table=True):
 
 class Product(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     product_code: Optional[str] = None  # 업체별 제품코드 (예: MRS01, KST02)
     name: str
     category: Optional[str] = None
@@ -85,6 +86,7 @@ class Product(SQLModel, table=True):
 
 class Expense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     date: datetime.date
     amount: int
     category: str  # e.g., "식자재", "월세"
@@ -296,6 +298,7 @@ class Attendance(SQLModel, table=True):
 
 class Payroll(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     month: str # YYYY-MM
     base_pay: int = 0
     bonus: int = 0
@@ -340,6 +343,7 @@ class GlobalSetting(SQLModel, table=True):
 
 class MonthlyProfitLoss(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     year: int = Field(index=True)
     month: int = Field(index=True)
     
@@ -388,6 +392,7 @@ class DeliveryRevenue(SQLModel, table=True):
 
 class DailyExpense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     date: datetime.date = Field(index=True)
     vendor_name: str              # 거래처명
     amount: int                   # 금액

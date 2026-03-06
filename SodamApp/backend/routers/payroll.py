@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import Depends, APIRouter, HTTPException, Body
 from services.database_service import DatabaseService
 from models import Staff, Attendance, Payroll, CompanyHoliday
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ from config import FRONTEND_URL
 from routers.auth import get_admin_user
 from models import User
 from fastapi import APIRouter, HTTPException, Body, Depends
+from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ class InsuranceBaseImport(BaseModel):
     staff_id: Optional[int] = None  # 직접 ID 지정 (선택)
 
 @router.get("/attendance/{staff_id}/{month}")
-def get_monthly_attendance(staff_id: int, month: str):
+def get_monthly_attendance(staff_id: int, month: str, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         # Get start and end dates of the month
@@ -58,7 +59,7 @@ def get_monthly_attendance(staff_id: int, month: str):
         service.close()
 
 @router.post("/attendance")
-def save_monthly_attendance(req: AttendanceSaveRequest):
+def save_monthly_attendance(req: AttendanceSaveRequest, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         for dh in req.daily_hours:
@@ -83,7 +84,7 @@ class HolidayCreate(BaseModel):
     description: Optional[str] = None
 
 @router.get("/holidays/{month}")
-def get_company_holidays(month: str):
+def get_company_holidays(month: str, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         start_date = datetime.strptime(f"{month}-01", "%Y-%m-%d").date()
@@ -98,7 +99,7 @@ def get_company_holidays(month: str):
         service.close()
 
 @router.post("/holidays")
-def add_company_holiday(req: HolidayCreate):
+def add_company_holiday(req: HolidayCreate, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         d = datetime.strptime(req.date, "%Y-%m-%d").date()
@@ -114,7 +115,7 @@ def add_company_holiday(req: HolidayCreate):
         service.close()
 
 @router.delete("/holidays/{date_str}")
-def delete_company_holiday(date_str: str):
+def delete_company_holiday(date_str: str, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         d = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -131,7 +132,7 @@ def get_sunday_of_week(d: date):
     return d + timedelta(days=(7 - d.isoweekday()))
 
 @router.post("/calculate")
-def calculate_payroll(req: PayrollCalculateRequest):
+def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         staff = service.session.get(Staff, req.staff_id)
@@ -385,6 +386,7 @@ def calculate_payroll(req: PayrollCalculateRequest):
         }, ensure_ascii=False)
         
         existing = service.session.exec(select(Payroll).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
+        # bid filter applied via select stmt above
         if not existing:
             existing = Payroll(staff_id=req.staff_id, month=req.month)
             
@@ -421,7 +423,8 @@ def calculate_payroll(req: PayrollCalculateRequest):
 @router.post("/import-insurance-base")
 def import_insurance_base(
     entries: List[InsuranceBaseImport] = Body(...),
-    admin: User = Depends(get_admin_user)
+    admin: User = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
 ):
     """
     직장가입자 보수총액 통보서 기반 보수월액 일괄 설정.
@@ -436,6 +439,7 @@ def import_insurance_base(
                 staff = service.session.get(Staff, entry.staff_id)
             else:
                 stmt = select(Staff).where(Staff.name == entry.staff_name)
+                stmt = apply_bid_filter(stmt, Staff, bid)
                 staff = service.session.exec(stmt).first()
             
             if not staff:
@@ -477,11 +481,12 @@ def import_insurance_base(
         service.close()
 
 @router.get("/staff/{staff_id}/{month}")
-def get_staff_payroll(staff_id: int, month: str):
+def get_staff_payroll(staff_id: int, month: str, bid = Depends(get_bid_from_token)):
     """Staff-accessible payroll data for a specific month"""
     service = DatabaseService()
     try:
         stmt = select(Payroll).where(Payroll.staff_id == staff_id, Payroll.month == month)
+        stmt = apply_bid_filter(stmt, Payroll, bid)
         payroll = service.session.exec(stmt).first()
         if not payroll:
             return {"status": "not_found"}
@@ -526,7 +531,7 @@ def get_staff_payroll(staff_id: int, month: str):
         service.close()
 
 @router.post("/send-attendance-request")
-def send_attendance_request(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+def send_attendance_request(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         staff = service.session.get(Staff, staff_id)
@@ -547,7 +552,7 @@ def send_attendance_request(staff_id: int = Body(..., embed=True), month: str = 
         service.close()
 
 @router.post("/send-statement")
-def send_payroll_statement(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+def send_payroll_statement(staff_id: int = Body(..., embed=True), month: str = Body(..., embed=True), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
         staff = service.session.get(Staff, staff_id)
@@ -568,11 +573,11 @@ def send_payroll_statement(staff_id: int = Body(..., embed=True), month: str = B
         service.close()
 
 @router.get("/transfer/biz-account")
-def get_biz_account(admin: User = Depends(get_admin_user)):
+def get_biz_account(admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     return {"status": "success", "data": BankingService.get_biz_account()}
 
 @router.put("/transfer/biz-account")
-def update_biz_account(data: dict = Body(...), admin: User = Depends(get_admin_user)):
+def update_biz_account(data: dict = Body(...), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     success = BankingService.update_biz_account(
         bank=data.get("bank", ""),
         number=data.get("number", ""),
@@ -583,19 +588,19 @@ def update_biz_account(data: dict = Body(...), admin: User = Depends(get_admin_u
     raise HTTPException(status_code=500, detail="Failed to update business account")
 
 @router.post("/transfer/{payroll_id}")
-def execute_transfer(payroll_id: int, admin: User = Depends(get_admin_user)):
+def execute_transfer(payroll_id: int, admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     result = BankingService.execute_payroll_transfer(payroll_id)
     if result["status"] == "error":
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
 @router.post("/transfer/bulk-data")
-def get_bulk_transfer_data(payroll_ids: List[int] = Body(..., embed=True), admin: User = Depends(get_admin_user)):
+def get_bulk_transfer_data(payroll_ids: List[int] = Body(..., embed=True), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     data = BankingService.get_bulk_transfer_data(payroll_ids)
     return {"status": "success", "data": data}
 
 @router.get("/calc-insurance-base/{staff_id}")
-def calc_insurance_base_salary(staff_id: int, year: int = None, admin: User = Depends(get_admin_user)):
+def calc_insurance_base_salary(staff_id: int, year: int = None, admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """
     보수월액 자동 산출 (건강보험·국민연금 정기결정 방식)
     

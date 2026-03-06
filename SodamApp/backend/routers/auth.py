@@ -63,6 +63,18 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
+
+# --- Tenant Isolation Helper ---
+def get_tenant_bid(user):
+    """
+    Returns the business_id for tenant-scoped queries.
+    SuperAdmin -> None (sees all data)
+    Admin/Staff -> their business_id (scoped to their store)
+    """
+    if user.role == 'superadmin':
+        return None  # No filtering - sees everything
+    return user.business_id
+
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

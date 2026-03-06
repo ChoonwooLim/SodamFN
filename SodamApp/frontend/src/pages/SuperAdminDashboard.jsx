@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ChevronLeft, Building2, Users, CreditCard, Bell, BarChart3,
+    ChevronLeft, ChevronDown, Building2, Users, CreditCard, Bell, BarChart3,
     Plus, Edit2, Trash2, Eye, TrendingUp, TrendingDown,
     Globe, Shield, Settings, RefreshCw, Search, Filter,
     FileText, CheckCircle2, XCircle, Clock3, UserPlus
@@ -39,6 +39,10 @@ export default function SuperAdminDashboard() {
 
     // Users
     const [users, setUsers] = useState([]);
+    const [userGroups, setUserGroups] = useState([]);
+    const [expandedGroups, setExpandedGroups] = useState({});
+    const [createAdminModal, setCreateAdminModal] = useState(null); // { business_id, business_name }
+    const [createAdminForm, setCreateAdminForm] = useState({ username: '', password: '', real_name: '' });
     const [editingUser, setEditingUser] = useState(null);
     const [editForm, setEditForm] = useState({ username: '', real_name: '', email: '' });
     const [newPassword, setNewPassword] = useState('');
@@ -86,6 +90,13 @@ export default function SuperAdminDashboard() {
                 case 'users': {
                     const res = await api.get('/superadmin/users');
                     setUsers(res.data.data || []);
+                    setUserGroups(res.data.groups || []);
+                    // Auto-expand groups with users
+                    const autoExpand = {};
+                    (res.data.groups || []).forEach(g => {
+                        if (g.user_count > 0) autoExpand[g.business_id || 'unassigned'] = true;
+                    });
+                    setExpandedGroups(autoExpand);
                     break;
                 }
                 case 'announcements': {
@@ -179,6 +190,31 @@ export default function SuperAdminDashboard() {
             fetchData('users');
         } catch (err) {
             alert(err.response?.data?.detail || '삭제 오류');
+        }
+    };
+
+    
+    const handleCreateAdmin = async () => {
+        if (!createAdminForm.username || !createAdminForm.password) {
+            alert('아이디와 비밀번호를 입력해 주세요.');
+            return;
+        }
+        if (createAdminForm.password.length < 4) {
+            alert('비밀번호는 최소 4자 이상이어야 합니다.');
+            return;
+        }
+        try {
+            await api.post(`/superadmin/businesses/${createAdminModal.business_id}/create-admin`, {
+                username: createAdminForm.username,
+                password: createAdminForm.password,
+                real_name: createAdminForm.real_name || null,
+            });
+            alert(`'${createAdminModal.business_name}' 매장 관리자가 생성되었습니다.`);
+            setCreateAdminModal(null);
+            setCreateAdminForm({ username: '', password: '', real_name: '' });
+            fetchData('users');
+        } catch (err) {
+            alert(err.response?.data?.detail || '관리자 생성에 실패했습니다.');
         }
     };
 
@@ -429,60 +465,108 @@ export default function SuperAdminDashboard() {
 
                         {activeTab === 'users' && (
                             <div className="space-y-4">
-                                <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
-                                    <div className="p-4 border-b border-white/10">
-                                        <h3 className="font-bold">전체 사용자 ({users.length})</h3>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead>
-                                                <tr className="text-slate-400 border-b border-white/5">
-                                                    <th className="text-left p-3">ID</th>
-                                                    <th className="text-left p-3">아이디</th>
-                                                    <th className="text-left p-3">이름</th>
-                                                    <th className="text-center p-3">권한</th>
-                                                    <th className="text-center p-3">매장</th>
-                                                    <th className="text-center p-3">관리</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {users.map(u => (
-                                                    <tr key={u.id} className="border-b border-white/5 hover:bg-white/5">
-                                                        <td className="p-3 text-slate-400">{u.id}</td>
-                                                        <td className="p-3 font-bold">{u.username}</td>
-                                                        <td className="p-3">{u.real_name || '-'}</td>
-                                                        <td className="p-3 text-center">
-                                                            <select
-                                                                value={u.role}
-                                                                onChange={e => handleRoleChange(u.id, e.target.value)}
-                                                                className={`text-xs font-bold px-2 py-1 rounded-lg bg-transparent border outline-none cursor-pointer ${u.role === 'superadmin' ? 'border-amber-500 text-amber-400' :
-                                                                    u.role === 'admin' ? 'border-blue-500 text-blue-400' :
-                                                                        'border-slate-500 text-slate-400'
-                                                                    }`}
-                                                            >
-                                                                <option value="superadmin">SuperAdmin</option>
-                                                                <option value="admin">Admin</option>
-                                                                <option value="staff">Staff</option>
-                                                                <option value="guest">Guest</option>
-                                                            </select>
-                                                        </td>
-                                                        <td className="p-3 text-center text-slate-400">{u.business_id || '-'}</td>
-                                                        <td className="p-3 text-center">
-                                                            <div className="flex items-center justify-center gap-1">
-                                                                <button onClick={() => handleEditUser(u)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30" title="수정">
-                                                                    <Edit2 size={13} />
-                                                                </button>
-                                                                <button onClick={() => handleDeleteUser(u.id, u.username)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30" title="삭제">
-                                                                    <Trash2 size={13} />
-                                                                </button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                {/* Summary Bar */}
+                                <div className="flex items-center gap-4 text-sm">
+                                    <span className="text-slate-400">전체 <strong className="text-white">{users.length}</strong>명</span>
+                                    <span className="text-slate-400">매장 <strong className="text-amber-400">{userGroups.filter(g => g.business_id !== null).length}</strong>개</span>
                                 </div>
+
+                                {/* Business Groups */}
+                                {userGroups.map(group => {
+                                    const groupKey = group.business_id || 'unassigned';
+                                    const isExpanded = expandedGroups[groupKey];
+                                    const isUnassigned = group.business_id === null;
+                                    return (
+                                        <div key={groupKey} className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+                                            {/* Group Header */}
+                                            <button
+                                                onClick={() => setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))}
+                                                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnassigned ? 'bg-slate-600/50' : 'bg-amber-500/20'}`}>
+                                                        {isUnassigned ? <Users size={18} className="text-slate-400" /> : <Building2 size={18} className="text-amber-400" />}
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <div className="font-bold flex items-center gap-2">
+                                                            {group.business_name}
+                                                            {group.business_type && <span className="text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{group.business_type}</span>}
+                                                        </div>
+                                                        {group.owner_name && <div className="text-xs text-slate-400">대표: {group.owner_name}</div>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${group.user_count > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-slate-500'}`}>
+                                                        {group.user_count}명
+                                                    </span>
+                                                    {group.business_id && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setCreateAdminModal({ business_id: group.business_id, business_name: group.business_name }); }}
+                                                            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                                                            title="매장 관리자 추가"
+                                                        >
+                                                            <UserPlus size={12} /> 관리자 추가
+                                                        </button>
+                                                    )}
+                                                    <ChevronDown size={16} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                                </div>
+                                            </button>
+
+                                            {/* Group Users */}
+                                            {isExpanded && (
+                                                <div className="border-t border-white/5">
+                                                    {group.users.length === 0 ? (
+                                                        <div className="p-6 text-center text-slate-500 text-sm">등록된 사용자가 없습니다</div>
+                                                    ) : (
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="text-slate-400 border-b border-white/5 text-xs">
+                                                                    <th className="text-left p-3 pl-5">아이디</th>
+                                                                    <th className="text-left p-3">이름</th>
+                                                                    <th className="text-center p-3">권한</th>
+                                                                    <th className="text-center p-3">관리</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {group.users.map(u => (
+                                                                    <tr key={u.id} className="border-b border-white/5 hover:bg-white/5">
+                                                                        <td className="p-3 pl-5 font-bold">{u.username}</td>
+                                                                        <td className="p-3">{u.real_name || '-'}</td>
+                                                                        <td className="p-3 text-center">
+                                                                            <select
+                                                                                value={u.role}
+                                                                                onChange={e => handleRoleChange(u.id, e.target.value)}
+                                                                                className={`text-xs font-bold px-2 py-1 rounded-lg bg-transparent border outline-none cursor-pointer ${u.role === 'superadmin' ? 'border-amber-500 text-amber-400' :
+                                                                                    u.role === 'admin' ? 'border-blue-500 text-blue-400' :
+                                                                                        'border-slate-500 text-slate-400'
+                                                                                    }`}
+                                                                            >
+                                                                                <option value="superadmin">SuperAdmin</option>
+                                                                                <option value="admin">Admin</option>
+                                                                                <option value="staff">Staff</option>
+                                                                                <option value="guest">Guest</option>
+                                                                            </select>
+                                                                        </td>
+                                                                        <td className="p-3 text-center">
+                                                                            <div className="flex items-center justify-center gap-1">
+                                                                                <button onClick={() => handleEditUser(u)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30" title="수정">
+                                                                                    <Edit2 size={13} />
+                                                                                </button>
+                                                                                <button onClick={() => handleDeleteUser(u.id, u.username)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30" title="삭제">
+                                                                                    <Trash2 size={13} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
 
                                 {/* User Edit Modal */}
                                 {editingUser && (
@@ -519,6 +603,41 @@ export default function SuperAdminDashboard() {
                                 )}
                             </div>
                         )}
+
+                        
+                                {/* Create Admin Modal */}
+                                {createAdminModal && (
+                                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                            <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                                                <UserPlus size={18} className="text-amber-400" />
+                                                매장 관리자 생성
+                                            </h3>
+                                            <p className="text-sm text-slate-400 mb-5">
+                                                <Building2 size={14} className="inline mr-1" />
+                                                {createAdminModal.business_name}
+                                            </p>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">관리자 아이디 <span className="text-red-400">*</span></label>
+                                                    <input value={createAdminForm.username} onChange={e => setCreateAdminForm(p => ({ ...p, username: e.target.value }))} placeholder="예: jangin_admin" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">비밀번호 <span className="text-red-400">*</span></label>
+                                                    <input type="password" value={createAdminForm.password} onChange={e => setCreateAdminForm(p => ({ ...p, password: e.target.value }))} placeholder="최소 4자 이상" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">담당자 이름 <span className="text-slate-600">(선택)</span></label>
+                                                    <input value={createAdminForm.real_name} onChange={e => setCreateAdminForm(p => ({ ...p, real_name: e.target.value }))} placeholder="예: 홍길동" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3 mt-6">
+                                                <button onClick={() => { setCreateAdminModal(null); setCreateAdminForm({ username: '', password: '', real_name: '' }); }} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={handleCreateAdmin} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg flex items-center justify-center gap-2"><UserPlus size={16} /> 생성</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                         {/* =========== 5. ANNOUNCEMENTS =========== */}
                         {activeTab === 'announcements' && (

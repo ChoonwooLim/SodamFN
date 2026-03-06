@@ -89,6 +89,9 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
     service = DatabaseService()
     try:
         stmt = select(Staff)
+        # Tenant filter
+        if hasattr(current_user, "business_id") and current_user.business_id and current_user.role != "superadmin":
+            stmt = stmt.where(Staff.business_id == current_user.business_id)
         
         # Apply Status Filter if Provided
         if status:
@@ -367,7 +370,8 @@ def delete_staff_document(
     finally:
         service.close()
 
-from routers.auth import get_current_user as get_current_user_dep
+from routers.auth import get_current_user, get_tenant_bid
+from tenant_filter import get_bid_from_token, apply_bid_filter as get_current_user_dep
 
 @router.post("/attendance")
 def log_attendance(payload: AttendanceAction, _user: AuthUser = Depends(get_current_user_dep)):
