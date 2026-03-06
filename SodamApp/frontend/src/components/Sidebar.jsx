@@ -197,7 +197,7 @@ export default function Sidebar() {
                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all"
                 >
                     <Home size={20} />
-                    <span className="font-medium text-sm">소담김밥 홈</span>
+                    <span className="font-medium text-sm">셈하나 홈</span>
                 </Link>
                 <button
                     onClick={handleLogout}
