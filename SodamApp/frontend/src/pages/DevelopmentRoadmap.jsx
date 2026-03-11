@@ -280,19 +280,19 @@ export default function DevelopmentRoadmap() {
     const [expandedPhase, setExpandedPhase] = useState(1);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8 pb-24">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 pb-24">
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <header className="mb-8">
                     <div className="flex items-center gap-4 mb-4">
-                        <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-sm text-slate-600 hover:bg-slate-100">
+                        <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full text-white hover:bg-white/20">
                             <ChevronLeft size={24} />
                         </button>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-900">
-                                셈<span className="text-blue-600">하나</span> 개발 로드맵
+                            <h1 className="text-2xl md:text-3xl font-black text-white">
+                                셈<span className="text-amber-400">하나</span> 개발 로드맵
                             </h1>
-                            <p className="text-slate-500 text-sm mt-1">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
+                            <p className="text-slate-400 text-sm mt-1">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
                         </div>
                     </div>
 
@@ -328,7 +328,7 @@ export default function DevelopmentRoadmap() {
                         const progress = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
 
                         return (
-                            <div key={phase.id} className={`bg-white rounded-2xl shadow-sm border ${phase.borderColor} overflow-hidden transition-all`}>
+                            <div key={phase.id} className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 overflow-hidden transition-all`}>
                                 {/* Phase Header */}
                                 <button
                                     className="w-full text-left p-5 md:p-6"
@@ -340,16 +340,16 @@ export default function DevelopmentRoadmap() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="text-lg font-bold text-slate-900">{phase.title}</h3>
+                                                <h3 className="text-lg font-bold text-white">{phase.title}</h3>
                                                 {phase.status === 'active' && (
-                                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold animate-pulse">진행중</span>
+                                                    <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-[10px] font-bold animate-pulse">진행중</span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-slate-400 mt-0.5">{phase.subtitle}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">{phase.subtitle}</p>
                                         </div>
                                         <div className="text-right hidden sm:block">
-                                            <div className="text-sm font-bold text-slate-700">{progress}%</div>
-                                            <div className="w-20 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                                            <div className="text-sm font-bold text-white">{progress}%</div>
+                                            <div className="w-20 h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
                                                 <div className={`h-full rounded-full bg-gradient-to-r ${phase.color}`} style={{ width: `${progress}%` }} />
                                             </div>
                                         </div>
@@ -359,11 +359,11 @@ export default function DevelopmentRoadmap() {
 
                                 {/* Phase Content */}
                                 {isExpanded && (
-                                    <div className={`px-5 md:px-6 pb-6 ${phase.bgColor} border-t ${phase.borderColor}`}>
-                                        <p className="text-sm text-slate-600 py-4">{phase.description}</p>
+                                    <div className={`px-5 md:px-6 pb-6 bg-white/5 border-t border-white/10`}>
+                                        <p className="text-sm text-slate-400 py-4">{phase.description}</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {phase.modules.map((mod, mi) => (
-                                                <div key={mi} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                                                <div key={mi} className="bg-white/5 rounded-xl p-4 border border-white/10">
                                                     <div className="flex items-center gap-2 mb-3">
                                                         {mod.status === 'done' ? (
                                                             <CheckCircle size={16} className="text-emerald-500" />
@@ -372,7 +372,7 @@ export default function DevelopmentRoadmap() {
                                                         ) : (
                                                             <Lock size={16} className="text-slate-300" />
                                                         )}
-                                                        <h4 className="font-bold text-sm text-slate-800">{mod.name}</h4>
+                                                        <h4 className="font-bold text-sm text-white">{mod.name}</h4>
                                                     </div>
                                                     <ul className="space-y-1.5">
                                                         {mod.items.map((item, ii) => (
@@ -382,7 +382,7 @@ export default function DevelopmentRoadmap() {
                                                                 ) : (
                                                                     <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-200 shrink-0 mt-0.5" />
                                                                 )}
-                                                                <span className={item.done ? 'text-slate-500 line-through' : 'text-slate-700'}>{item.text}</span>
+                                                                <span className={item.done ? 'text-slate-500 line-through' : 'text-slate-300'}>{item.text}</span>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -397,17 +397,17 @@ export default function DevelopmentRoadmap() {
                 </div>
 
                 {/* Tech Stack */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
-                    <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <Shield size={20} className="text-indigo-500" /> 기술 스택 계획
+                <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-6 mb-8">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Shield size={20} className="text-indigo-400" /> 기술 스택 계획
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {techStack.map((stack) => (
-                            <div key={stack.category} className="bg-slate-50 rounded-xl p-4">
-                                <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-2">{stack.category}</h4>
+                            <div key={stack.category} className="bg-white/5 rounded-xl p-4">
+                                <h4 className="font-bold text-xs text-slate-400 uppercase tracking-wider mb-2">{stack.category}</h4>
                                 <ul className="space-y-1">
                                     {stack.items.map((item, i) => (
-                                        <li key={i} className="text-xs text-slate-700 flex items-center gap-1.5">
+                                        <li key={i} className="text-xs text-slate-300 flex items-center gap-1.5">
                                             <div className="w-1 h-1 rounded-full bg-indigo-400" />
                                             {item}
                                         </li>

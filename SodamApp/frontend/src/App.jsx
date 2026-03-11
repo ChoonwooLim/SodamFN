@@ -36,6 +36,7 @@ const OpenChecklistPage = React.lazy(() => import('./pages/OpenChecklistPage'));
 const InventoryCheckAdmin = React.lazy(() => import('./pages/InventoryCheckAdmin'));
 const DevelopmentRoadmap = React.lazy(() => import('./pages/DevelopmentRoadmap'));
 const SuperAdminDashboard = React.lazy(() => import('./pages/SuperAdminDashboard'));
+const DevWorkLog = React.lazy(() => import('./pages/DevWorkLog'));
 const GuestDashboard = React.lazy(() => import('./pages/GuestDashboard'));
 const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationForm'));
 
@@ -144,6 +145,7 @@ export default function App() {
               <Route path="/inventory-check-admin" element={<ProtectedRoute adminOnly><InventoryCheckAdmin /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute adminOnly><DevelopmentRoadmap /></ProtectedRoute>} />
               <Route path="/superadmin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
+              <Route path="/superadmin/worklog" element={<SuperAdminRoute><DevWorkLog /></SuperAdminRoute>} />
               <Route path="/guest" element={<GuestRoute><GuestDashboard /></GuestRoute>} />
               <Route path="/apply" element={<GuestRoute><StoreApplicationForm /></GuestRoute>} />
 

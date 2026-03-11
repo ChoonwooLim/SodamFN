@@ -3,11 +3,11 @@ from sqlalchemy.pool import StaticPool, NullPool
 import os
 from dotenv import load_dotenv
 
-# Load .env file if exists (for local development)
+# Load .env file (contains DATABASE_URL for Orbitron PostgreSQL)
 load_dotenv()
 
-# Check for DATABASE_URL environment variable (Render provides this)
-# If not found, fall back to local SQLite
+# DATABASE_URL: Orbitron PostgreSQL server
+# Fallback to SQLite only if DATABASE_URL is not set (emergency fallback)
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):

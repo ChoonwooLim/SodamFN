@@ -358,7 +358,7 @@ def list_all_users(
         user_map = {}
         unassigned = []
         for u in users:
-            if u.business_id:
+            if u.business_id and u.role != "guest":
                 user_map.setdefault(u.business_id, []).append(user_dict(u))
             else:
                 unassigned.append(user_dict(u))

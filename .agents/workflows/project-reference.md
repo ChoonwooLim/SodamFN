@@ -1,20 +1,19 @@
 ---
-description: SodamFN 프로젝트 아키텍처 및 핵심 참고사항
+description: 셈하나(SEMHANA) 프로젝트 아키텍처 및 핵심 참고사항
 ---
 
-# SodamFN 프로젝트 구조
+# 셈하나 프로젝트 구조
 
 ## 디렉토리 구조
 
 ```
 c:\WORK\SodamFN\
 ├── SodamApp/
-│   ├── backend/          # FastAPI 백엔드 (Python, SQLite로컬/PostgreSQL배포)
+│   ├── backend/          # FastAPI 백엔드 (Python, PostgreSQL - Orbitron)
 │   ├── frontend/         # 관리자 앱 (React + Vite, port 5173)
 │   └── staff-app/        # 직원 PWA 앱 (React + Vite, port 5174)
-├── Orbitron.yaml          # Orbitron 배포 설정 (3 서비스)
-├── render.yaml            # Render 배포 설정 (레거시)
-└── docs/
+├── Orbitron.yaml          # Orbitron 배포 설정 (3 서비스 통합)
+└── .agents/workflows/     # AI 작업 워크플로우
 ```
 
 ## 핵심 기억사항
@@ -22,8 +21,15 @@ c:\WORK\SodamFN\
 ### 배포
 
 - **반드시 /deployment 워크플로우 참조** — 배포는 Orbitron (Linux) 서버에서 진행
+- Orbitron이 백엔드 + 관리자앱 + 직원앱 3개 서비스 통합 배포
 - Windows에서는 커밋/푸시만 수행
 - 배포 URL: Admin=`sodamfn.twinverse.org`, Staff=`sodam-staff.pages.dev`
+- DB: PostgreSQL (Orbitron 서버 192.168.219.101:5432/sodamfn, 로컬/프로덕션 동일)
+
+### 작업 시작 시
+
+- **반드시 /start 워크플로우 실행** — HEAD 콘텐츠 + 최근 작업일지 자동 확인
+- 작업 완료 후 작업일지에 기록 (DevWorkLog API 또는 DB 직접 삽입)
 
 ### 로그인/라우팅
 

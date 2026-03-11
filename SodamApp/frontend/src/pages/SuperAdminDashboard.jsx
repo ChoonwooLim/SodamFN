@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     ChevronLeft, ChevronDown, Building2, Users, CreditCard, Bell, BarChart3,
     Plus, Edit2, Trash2, Eye, TrendingUp, TrendingDown,
@@ -23,8 +23,17 @@ const REGIONS = ['서울', '경기', '인천', '부산', '대구', '대전', '�
 
 export default function SuperAdminDashboard() {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState('stores');
+    const [searchParams] = useSearchParams();
+    const tabFromUrl = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState(tabFromUrl || 'stores');
     const [loading, setLoading] = useState(false);
+
+    // Sync activeTab with URL query param changes
+    useEffect(() => {
+        if (tabFromUrl && tabFromUrl !== activeTab) {
+            setActiveTab(tabFromUrl);
+        }
+    }, [tabFromUrl]);
 
     // Stores
     const [businesses, setBusinesses] = useState([]);
@@ -538,11 +547,13 @@ export default function SuperAdminDashboard() {
                                                                                 onChange={e => handleRoleChange(u.id, e.target.value)}
                                                                                 className={`text-xs font-bold px-2 py-1 rounded-lg bg-transparent border outline-none cursor-pointer ${u.role === 'superadmin' ? 'border-amber-500 text-amber-400' :
                                                                                     u.role === 'admin' ? 'border-blue-500 text-blue-400' :
+                                                                                        u.role === 'staff' ? 'border-emerald-500 text-emerald-400' :
                                                                                         'border-slate-500 text-slate-400'
                                                                                     }`}
                                                                             >
                                                                                 <option value="superadmin">SuperAdmin</option>
                                                                                 <option value="admin">Admin</option>
+                                                                                <option value="staff">Staff</option>
                                                                                 <option value="guest">Guest</option>
                                                                             </select>
                                                                         </td>

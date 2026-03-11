@@ -105,6 +105,9 @@ app.include_router(inventory_check.router, prefix="/api")
 app.include_router(superadmin.router, prefix="/api/superadmin")
 app.include_router(store_applications.router, prefix="/api/store-applications")
 
+from routers import worklog
+app.include_router(worklog.router, prefix="/api/superadmin")
+
 @app.get("/")
 def read_root():
     return {"message": "SodamFN Backend is running"}

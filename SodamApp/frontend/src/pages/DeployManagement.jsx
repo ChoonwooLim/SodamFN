@@ -138,7 +138,8 @@ export default function DeployManagement() {
     const info = APP_INFO[activeApp];
 
     return (
-        <div className="p-6 max-w-5xl mx-auto rounded-2xl" style={{ fontFamily: "'Pretendard', 'Inter', -apple-system, sans-serif", background: '#0f172a', minHeight: 'calc(100vh - 48px)' }}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" style={{ fontFamily: "'Pretendard', 'Inter', -apple-system, sans-serif" }}>
+        <div className="p-6 max-w-5xl mx-auto pb-24">
             {/* Toast */}
             {toast && (
                 <div
@@ -483,6 +484,7 @@ export default function DeployManagement() {
                     to { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
+        </div>
         </div>
     );
 }

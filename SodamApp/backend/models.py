@@ -562,3 +562,17 @@ class StoreApplication(SQLModel, table=True):
     
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     reviewed_at: Optional[datetime.datetime] = None
+
+
+class DevWorkLog(SQLModel, table=True):
+    """개발 작업일지 (SuperAdmin 전용)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: datetime.date = Field(index=True)  # 작업일
+    title: str  # 작업 제목
+    content: str = ""  # 상세 내용 (마크다운)
+    category: str = Field(default="feature")  # feature, bugfix, refactor, infra, design, other
+    files_changed: Optional[str] = None  # 수정된 파일 목록 (줄바꿈 구분)
+    ai_summary: Optional[str] = None  # AI 요약 / 다음 작업 참고사항
+    status: str = Field(default="completed")  # draft, completed
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

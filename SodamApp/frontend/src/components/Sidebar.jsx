@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -44,8 +44,12 @@ export default function Sidebar() {
         }
     }
 
-    // Fetch dynamic business name on mount
+    // Fetch dynamic business name on mount (skip for superadmin)
     useEffect(() => {
+        if (user.role === 'superadmin') {
+            setBusinessName('소담FN');
+            return;
+        }
         const bid = user.business_id || localStorage.getItem('business_id');
         if (bid) {
             axios.get(`${API_URL}/api/auth/business-info?bid=${bid}`)
@@ -63,7 +67,19 @@ export default function Sidebar() {
         }
     }, [user.business_id]);
 
-    const mainMenuItems = user.role === 'admin'
+    const mainMenuItems = user.role === 'superadmin'
+        ? [
+            { icon: Shield, label: 'SuperAdmin 대시보드', path: '/superadmin' },
+            { icon: Building2, label: '매장 관리', path: '/superadmin?tab=stores' },
+            { icon: FileText, label: '사용신청 관리', path: '/superadmin?tab=applications' },
+            { icon: Users, label: '사용자 관리', path: '/superadmin?tab=users' },
+            { icon: TrendingUp, label: '실시간 모니터링', path: '/superadmin?tab=monitoring' },
+            { icon: CreditCard, label: '요금 정산', path: '/superadmin?tab=billing' },
+            { icon: Bell, label: '공지 배포', path: '/superadmin?tab=announcements' },
+            { icon: BarChart3, label: '통계/벤치마크', path: '/superadmin?tab=analytics' },
+            { icon: FileText, label: '작업일지', path: '/superadmin/worklog' },
+        ]
+        : user.role === 'admin'
         ? [
             { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
             { icon: BarChart3, label: '매출 관리', path: '/revenue' },
@@ -84,7 +100,12 @@ export default function Sidebar() {
         { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-cyan-400' },
     ];
 
-    const bottomMenuItems = user.role === 'admin'
+    const bottomMenuItems = user.role === 'superadmin'
+        ? [
+            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
+            { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
+        ]
+        : user.role === 'admin'
         ? [
             { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
@@ -105,13 +126,20 @@ export default function Sidebar() {
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;
-        const isActive = location.pathname === item.path;
+        const fullPath = item.path;
+        const isActive = fullPath.includes('?')
+            ? location.pathname + location.search === fullPath
+            : location.pathname === fullPath;
+        const isSuperAdmin = user.role === 'superadmin';
+        const activeColor = isSuperAdmin
+            ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
+            : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20';
         return (
             <Link
-                key={item.path}
-                to={item.path}
+                key={fullPath}
+                to={fullPath}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
+                    ? activeColor
                     : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`}
             >
@@ -141,7 +169,7 @@ export default function Sidebar() {
                                 {user.grade}
                             </span>
                             <span className="text-xs text-slate-500 font-medium">
-                                {user.role === 'admin' ? '관리자' : '직원'}
+                                {user.role === 'superadmin' ? '플랫폼 총괄' : user.role === 'admin' ? '관리자' : '직원'}
                             </span>
                         </div>
                     </div>
@@ -160,7 +188,7 @@ export default function Sidebar() {
                 {mainMenuItems.map(renderMenuItem)}
 
                 {/* ═══ 통합게시판관리 (접이식 서브메뉴) ═══ */}
-                {user.role === 'admin' && (
+                {user.role === 'admin' && user.role !== 'superadmin' && (
                     <div>
                         <button
                             onClick={() => setBoardOpen(!boardOpen)}
@@ -204,7 +232,7 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-                {user.role === 'admin' && (
+                {user.role === 'admin' && user.role !== 'superadmin' && (
                     <>
                         <Link
                             to="/staff-app-preview"
