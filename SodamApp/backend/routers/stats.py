@@ -215,7 +215,7 @@ def update_vendor(payload: VendorUpdate, _admin: User = Depends(get_admin_user),
 def delete_vendor(vendor_name: str, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     try:
         with DatabaseService() as service:
-            success = service.delete_vendor(vendor_name)
+            success = service.delete_vendor(vendor_name, bid=bid)
             if success:
                 return {"status": "success"}
             else:
@@ -331,7 +331,7 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
                 print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor category change")
                 for y, m in affected_months:
                     try:
-                        sync_all_expenses(y, m, sync_session)
+                        sync_all_expenses(y, m, sync_session, bid)
                     except Exception as sync_err:
                         print(f"[SYNC P/L] Error for {y}-{m}: {sync_err}")
                 sync_session.commit()
@@ -540,7 +540,7 @@ def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User
             
             print(f"[SYNC P/L MERGE] Syncing {len(affected_months)} months for {target_vendor.name}")
             for y, m in affected_months:
-                sync_all_expenses(y, m, session)
+                sync_all_expenses(y, m, session, bid)
             # ---------------------------------
             
             return {

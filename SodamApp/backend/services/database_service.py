@@ -248,7 +248,7 @@ class DatabaseService:
                     
                     print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to category change for {name}")
                     for y, m in affected_months:
-                        sync_all_expenses(y, m, self.session)
+                        sync_all_expenses(y, m, self.session, bid)
                     self.session.commit()
 
             except Exception as e:
@@ -257,7 +257,7 @@ class DatabaseService:
 
         return True
 
-    def delete_vendor(self, vendor_name: str):
+    def delete_vendor(self, vendor_name: str, bid: int = None):
         from models import DailyExpense
         from services.profit_loss_service import sync_all_expenses
         
@@ -279,7 +279,7 @@ class DatabaseService:
             
             # Sync P/L for affected months
             for y, m in affected_months:
-                sync_all_expenses(y, m, self.session)
+                sync_all_expenses(y, m, self.session, bid)
             
             return True
         return False
