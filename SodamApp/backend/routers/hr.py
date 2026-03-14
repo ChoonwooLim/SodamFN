@@ -357,7 +357,6 @@ def serve_staff_document(staff_id: int, filename: str):
     return FileResponse(
         path=file_path,
         media_type=media_type,
-        filename=decoded_filename
     )
 
 @router.delete("/staff/{staff_id}/document/{doc_id}")
