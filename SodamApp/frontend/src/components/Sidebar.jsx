@@ -111,7 +111,7 @@ export default function Sidebar() {
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
-            { icon: Rocket, label: '배포 관리', path: '/deploy' },
+            { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
         ]
         : [
             { icon: Settings, label: '설정', path: '/settings' },
