@@ -1008,7 +1008,22 @@ export default function StaffDetail() {
                         <div className="space-y-3">
                             {docTypes.map((doc) => {
                                 const uploadedDoc = documents.find(d => d.doc_type === doc.key);
-                                const fileUrl = uploadedDoc ? `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/${uploadedDoc.file_path.replace(/\\/g, '/')}` : '#';
+                                // Build URL: use API endpoint for reliable Korean filename support
+                                let fileUrl = '#';
+                                if (uploadedDoc) {
+                                    const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                                    const fp = uploadedDoc.file_path.replace(/\\/g, '/');
+                                    if (fp.startsWith('api/hr/')) {
+                                        // New format - already an API path
+                                        fileUrl = `${base}/${fp}`;
+                                    } else {
+                                        // Old format: uploads/staff_docs/{id}/{filename}
+                                        const parts = fp.split('/');
+                                        const fname = parts[parts.length - 1];
+                                        const sid = parts[parts.length - 2];
+                                        fileUrl = `${base}/api/hr/staff/doc-file/${sid}/${encodeURIComponent(fname)}`;
+                                    }
+                                }
                                 return (
                                     <div key={doc.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                                         <div className="flex items-center gap-3 overflow-hidden">

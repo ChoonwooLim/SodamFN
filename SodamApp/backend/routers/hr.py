@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body, Depends
+from fastapi.responses import FileResponse
+import urllib.parse
 from routers.auth import get_admin_user, get_current_user
 from models import User as AuthUser
 from services.database_service import DatabaseService
@@ -329,11 +331,34 @@ def upload_staff_document(
             
         service.session.commit()
         
-        # Return URL-friendly path if needed, or just path
-        # Frontend will need to prepend server URL
-        return {"status": "success", "file_path": file_path, "filename": filename}
+        # Return API-based URL path for reliable access (handles Korean filenames)
+        encoded_filename = urllib.parse.quote(filename)
+        api_file_path = f"api/hr/staff/doc-file/{staff_id}/{encoded_filename}"
+        return {"status": "success", "file_path": api_file_path, "filename": filename}
     finally:
         service.close()
+
+@router.get("/staff/doc-file/{staff_id}/{filename:path}")
+def serve_staff_document(staff_id: int, filename: str):
+    """Serve uploaded staff document files (handles Korean filenames)"""
+    import mimetypes
+    # Decode the filename in case it's URL-encoded
+    decoded_filename = urllib.parse.unquote(filename)
+    file_path = os.path.join("uploads", "staff_docs", str(staff_id), decoded_filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine media type
+    media_type, _ = mimetypes.guess_type(file_path)
+    if not media_type:
+        media_type = "application/octet-stream"
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=decoded_filename
+    )
 
 @router.delete("/staff/{staff_id}/document/{doc_id}")
 def delete_staff_document(
