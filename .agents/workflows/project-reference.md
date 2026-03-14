@@ -26,6 +26,14 @@ c:\WORK\SodamFN\
 - 배포 URL: Admin=`sodamfn.twinverse.org`, Staff=`sodam-staff.pages.dev`
 - DB: PostgreSQL (Orbitron 서버 192.168.219.101:5432/sodamfn, 로컬/프로덕션 동일)
 
+### 🚨 파일 스토리지 (매우 중요)
+
+- **DB와 파일은 완전히 분리됨**: DB(PostgreSQL)는 로컬/프로덕션 공유, 파일(`uploads/`)은 각 환경 별도 디스크
+- **로컬에서 업로드한 파일은 프로덕션에 없음** — 반드시 프로덕션에서 직접 업로드해야 함
+- **Docker 재빌드 시 persistent disk 설정(`Orbitron.yaml`의 `disk`) 없으면 파일 유실**
+- 파일 서빙: `/api/hr/staff/doc-file/{id}/{filename}` 엔드포인트 사용 (한글 파일명 지원)
+- 상세 사항은 `/deployment` 워크플로우 참조
+
 ### 작업 시작 시
 
 - **반드시 /start 워크플로우 실행** — HEAD 콘텐츠 + 최근 작업일지 자동 확인
