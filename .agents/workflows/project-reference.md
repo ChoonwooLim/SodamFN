@@ -28,10 +28,11 @@ c:\WORK\SodamFN\
 
 ### 🚨 파일 스토리지 (매우 중요)
 
-- **DB와 파일은 완전히 분리됨**: DB(PostgreSQL)는 로컬/프로덕션 공유, 파일(`uploads/`)은 각 환경 별도 디스크
-- **로컬에서 업로드한 파일은 프로덕션에 없음** — 반드시 프로덕션에서 직접 업로드해야 함
-- **Docker 재빌드 시 persistent disk 설정(`Orbitron.yaml`의 `disk`) 없으면 파일 유실**
-- 파일 서빙: `/api/hr/staff/doc-file/{id}/{filename}` 엔드포인트 사용 (한글 파일명 지원)
+- **모든 파일 업로드는 `services/storage_service.py` → `get_storage()`를 통해 처리**
+- **Cloudflare R2** (primary): R2 환경변수 설정 시 → R2 public URL로 저장
+- **로컬 디스크** (fallback): R2 미설정 시 → `uploads/` 디렉토리에 저장
+- 새 파일 업로드 기능 추가 시 **절대 `shutil.copyfileobj` 직접 사용 금지** → `get_storage()` 사용
+- DB에 파일 경로 저장 시 `storage.upload_file()`이 반환하는 URL을 그대로 저장
 - 상세 사항은 `/deployment` 워크플로우 참조
 
 ### 작업 시작 시
