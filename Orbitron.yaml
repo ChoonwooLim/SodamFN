@@ -30,6 +30,10 @@ services:
     healthCheck:
       path: /api/health
       interval: 30
+    disk:
+      name: sodam-uploads
+      mountPath: /app/uploads
+      sizeGB: 1
 
   # ─────────────────────────────────────────────
   # Admin Frontend (Vite + React)
