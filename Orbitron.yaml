@@ -27,6 +27,16 @@ services:
         value: "https://sodamfn.twinverse.org"
       - key: STAFF_APP_URL
         value: "https://sodam-staff.pages.dev"
+      - key: R2_ACCOUNT_ID
+        value: ""  # Set via Orbitron secrets
+      - key: R2_ACCESS_KEY_ID
+        value: ""  # Set via Orbitron secrets
+      - key: R2_SECRET_ACCESS_KEY
+        value: ""  # Set via Orbitron secrets
+      - key: R2_BUCKET_NAME
+        value: "sodam-uploads"
+      - key: R2_PUBLIC_URL
+        value: ""  # Set after R2 bucket creation
     healthCheck:
       path: /api/health
       interval: 30

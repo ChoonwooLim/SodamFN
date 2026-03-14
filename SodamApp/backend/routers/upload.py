@@ -666,30 +666,25 @@ async def upload_business_logo(
     try:
         from models import Business
         from services.database_service import DatabaseService
-        import os
-        import shutil
+        from services.storage_service import get_storage
         from datetime import datetime
+        import os
+        
+        storage = get_storage()
         
         # Validate file
         allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"]
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP, SVG만 가능)")
-            
-        # Create directory
-        base_dir = "uploads/logos"
-        os.makedirs(base_dir, exist_ok=True)
         
-        # Generate unique filename
+        # Generate storage key
         timestamp = int(datetime.now().timestamp() * 1000)
         ext = os.path.splitext(file.filename or "logo.jpg")[1]
         filename = f"business_{bid}_{timestamp}{ext}"
-        file_path = os.path.join(base_dir, filename)
+        storage_key = f"logos/{filename}"
         
-        # Save file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        url_path = f"/uploads/logos/{filename}"
+        # Upload to R2 (or local disk fallback)
+        file_url = storage.upload_file(file.file, storage_key, file.content_type)
         
         # Update DB
         service = DatabaseService()
@@ -697,13 +692,13 @@ async def upload_business_logo(
             business = service.session.get(Business, bid)
             if not business:
                 raise HTTPException(status_code=404, detail="Business not found")
-            business.logo_url = url_path
+            business.logo_url = file_url
             service.session.add(business)
             service.session.commit()
         finally:
             service.close()
             
-        return {"status": "success", "url": url_path}
+        return {"status": "success", "url": file_url}
     except HTTPException:
         raise
     except Exception as e:

@@ -112,50 +112,5 @@ app.include_router(worklog.router, prefix="/api/superadmin")
 def read_root():
     return {"message": "SodamFN Backend is running"}
 
-@app.get("/api/debug/storage")
-def debug_storage():
-    """Diagnostic endpoint to check file storage status"""
-    import stat
-    cwd = os.getcwd()
-    uploads_abs = os.path.abspath("uploads")
-    uploads_exists = os.path.exists("uploads")
-    uploads_writable = os.access("uploads", os.W_OK) if uploads_exists else False
-    
-    # List files in uploads
-    file_list = []
-    if uploads_exists:
-        for root, dirs, files in os.walk("uploads"):
-            for f in files:
-                fp = os.path.join(root, f)
-                try:
-                    size = os.path.getsize(fp)
-                except:
-                    size = -1
-                file_list.append({"path": fp, "size": size})
-    
-    # Check disk mount points
-    disk_info = {}
-    try:
-        st = os.statvfs(uploads_abs) if uploads_exists else None
-        if st:
-            disk_info = {
-                "total_mb": (st.f_blocks * st.f_frsize) // (1024*1024),
-                "free_mb": (st.f_bavail * st.f_frsize) // (1024*1024),
-            }
-    except:
-        disk_info = {"error": "statvfs not available (Windows?)"}
-    
-    return {
-        "cwd": cwd,
-        "uploads_abs_path": uploads_abs,
-        "uploads_exists": uploads_exists,
-        "uploads_writable": uploads_writable,
-        "uploads_is_symlink": os.path.islink("uploads") if uploads_exists else False,
-        "files_count": len(file_list),
-        "files": file_list[:50],  # limit to 50
-        "disk_info": disk_info,
-        "env_database_url": ("set" if os.environ.get("DATABASE_URL") else "not set"),
-    }
-
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,4 +1,4 @@
-﻿# SodamApp Backend Dependencies
+# SodamApp Backend Dependencies
 # FastAPI & Server
 fastapi==0.109.0
 uvicorn==0.27.0
@@ -36,6 +36,7 @@ passlib[bcrypt]==1.7.4
 python-dateutil==2.9.0.post0
 pytz==2025.2
 Pillow==11.3.0
+boto3>=1.35.0
 
 # CORS
 starlette==0.35.1

@@ -1008,20 +1008,21 @@ export default function StaffDetail() {
                         <div className="space-y-3">
                             {docTypes.map((doc) => {
                                 const uploadedDoc = documents.find(d => d.doc_type === doc.key);
-                                // Build URL: use API endpoint for reliable Korean filename support
+                                // Build URL: supports R2 URLs, API paths, and legacy local paths
                                 let fileUrl = '#';
                                 if (uploadedDoc) {
-                                    const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                                     const fp = uploadedDoc.file_path.replace(/\\/g, '/');
-                                    if (fp.startsWith('api/hr/')) {
-                                        // New format - already an API path
-                                        fileUrl = `${base}/${fp}`;
+                                    if (fp.startsWith('http')) {
+                                        // R2 public URL - use directly
+                                        fileUrl = fp;
                                     } else {
-                                        // Old format: uploads/staff_docs/{id}/{filename}
-                                        const parts = fp.split('/');
-                                        const fname = parts[parts.length - 1];
-                                        const sid = parts[parts.length - 2];
-                                        fileUrl = `${base}/api/hr/staff/doc-file/${sid}/${encodeURIComponent(fname)}`;
+                                        // Local/API path - prepend server URL
+                                        const base = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                                        if (fp.startsWith('/')) {
+                                            fileUrl = `${base}${fp}`;
+                                        } else {
+                                            fileUrl = `${base}/${fp}`;
+                                        }
                                     }
                                 }
                                 return (

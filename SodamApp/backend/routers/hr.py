@@ -295,30 +295,28 @@ def upload_staff_document(
     _user: AuthUser = Depends(get_current_user),
     bid = Depends(get_bid_from_token)
 ):
+    from services.storage_service import get_storage
+    storage = get_storage()
+    
     service = DatabaseService()
     try:
         staff = service.session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
         if not staff:
             raise HTTPException(status_code=404, detail="Staff not found")
-            
-        # Determine Save Path
-        base_dir = "uploads/staff_docs"
-        staff_dir = os.path.join(base_dir, str(staff_id))
-        os.makedirs(staff_dir, exist_ok=True)
         
-        # Save File
+        # Generate storage key
         timestamp = int(datetime.now().timestamp())
         filename = f"{doc_type}_{timestamp}_{file.filename}"
-        file_path = os.path.join(staff_dir, filename)
+        storage_key = f"staff_docs/{staff_id}/{filename}"
         
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Upload to R2 (or local disk fallback)
+        file_url = storage.upload_file(file.file, storage_key, file.content_type)
             
         # Save to DB
         new_doc = StaffDocument(
             staff_id=staff_id,
             doc_type=doc_type,
-            file_path=file_path, # relative path or full? standardizing on relative for portability usually
+            file_path=file_url,  # R2 public URL or local path
             original_filename=file.filename
         )
         service.session.add(new_doc)
@@ -331,10 +329,7 @@ def upload_staff_document(
             
         service.session.commit()
         
-        # Return API-based URL path for reliable access (handles Korean filenames)
-        encoded_filename = urllib.parse.quote(filename)
-        api_file_path = f"api/hr/staff/doc-file/{staff_id}/{encoded_filename}"
-        return {"status": "success", "file_path": api_file_path, "filename": filename}
+        return {"status": "success", "file_path": file_url, "filename": filename}
     finally:
         service.close()
 

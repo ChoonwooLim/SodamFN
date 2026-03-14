@@ -173,28 +173,24 @@ async def upload_product_image(
     _admin: AuthUser = Depends(get_admin_user)
 ):
     try:
+        from services.storage_service import get_storage
+        storage = get_storage()
+        
         # Validate file type
         allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP만 가능)")
 
-        # Create directory
-        base_dir = "uploads/product_images"
-        os.makedirs(base_dir, exist_ok=True)
-
-        # Generate unique filename
+        # Generate storage key
         timestamp = int(datetime.now().timestamp() * 1000)
         ext = os.path.splitext(file.filename or "image.jpg")[1]
         filename = f"product_{timestamp}{ext}"
-        file_path = os.path.join(base_dir, filename)
+        storage_key = f"product_images/{filename}"
 
-        # Save file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # Upload to R2 (or local disk fallback)
+        file_url = storage.upload_file(file.file, storage_key, file.content_type)
 
-        # Return the URL path (served by FastAPI StaticFiles mount)
-        url_path = f"/uploads/product_images/{filename}"
-        return {"status": "success", "url": url_path}
+        return {"status": "success", "url": file_url}
     except HTTPException:
         raise
     except Exception as e:
