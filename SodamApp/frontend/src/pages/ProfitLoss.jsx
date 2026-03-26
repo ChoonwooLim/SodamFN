@@ -1222,16 +1222,16 @@ export default function ProfitLoss() {
                                     <div style={{
                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                                         padding: '8px 12px', borderRadius: 10, marginBottom: 10,
-                                        background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0)',
+                                        background: 'linear-gradient(135deg, #1e293b, #334155)',
                                     }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span style={{ fontSize: 15, fontWeight: 800, color: '#334155' }}>{m.month}월</span>
-                                            <span style={{ fontSize: 11, color: '#94a3b8', transition: 'transform 0.2s', display: 'inline-block', transform: openMonths[m.month] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                                            <span style={{ fontSize: 15, fontWeight: 800, color: '#f1f5f9' }}>{m.month}월</span>
+                                            <span style={{ fontSize: 11, color: '#64748b', transition: 'transform 0.2s', display: 'inline-block', transform: openMonths[m.month] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
                                         </div>
                                         <span style={{
                                             fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                                            background: m.profit >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                            color: m.profit >= 0 ? '#059669' : '#dc2626',
+                                            background: m.profit >= 0 ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)',
+                                            color: m.profit >= 0 ? '#34d399' : '#f87171',
                                         }}>
                                             {m.profit >= 0 ? '흑자' : '적자'} {margin}%
                                         </span>
@@ -1262,7 +1262,7 @@ export default function ProfitLoss() {
                                         {/* Revenue items */}
                                         {mRevItems.length > 0 && (
                                             <div style={{ marginBottom: 8 }}>
-                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', marginBottom: 4, letterSpacing: 0.5 }}>매출 상세</div>
+                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 6, letterSpacing: 0.5, background: '#334155', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>매출 상세</div>
                                                 {mRevItems.map((r, ri) => (
                                                     <div key={ri} style={{
                                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1278,7 +1278,7 @@ export default function ProfitLoss() {
                                         {/* Expense items */}
                                         {mExpItems.length > 0 && (
                                             <div>
-                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', marginBottom: 4, letterSpacing: 0.5 }}>지출 상세</div>
+                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#e2e8f0', marginBottom: 6, letterSpacing: 0.5, background: '#334155', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>지출 상세</div>
                                                 {mExpItems.map((e, ei) => (
                                                     <div key={ei} style={{
                                                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
