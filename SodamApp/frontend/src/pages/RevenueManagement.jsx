@@ -1772,6 +1772,132 @@ export default function RevenueManagement() {
                     </div>
                 </div>
             )}
+
+            {/* ═══ Bank Deposit Classification Modal ═══ */}
+            {classifyData && (
+                <div className="revenue-modal-overlay" onClick={() => setClassifyData(null)}>
+                    <div className="revenue-modal" style={{ maxWidth: 720, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <h3 style={{ marginBottom: 4 }}>🏦 은행 입금내역 분류</h3>
+                        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+                            {classifyData.message || '각 송금자를 카테고리별로 분류해주세요.'}
+                        </p>
+                        
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                            {['카드입금', '페이입금', '배달앱입금', '현금매출', '개인거래', '무시'].map(cat => {
+                                const catColors = {
+                                    '카드입금': '#3b82f6', '페이입금': '#8b5cf6', '배달앱입금': '#f59e0b',
+                                    '현금매출': '#10b981', '개인거래': '#6b7280', '무시': '#d1d5db'
+                                };
+                                return (
+                                    <button key={cat} style={{
+                                        fontSize: 11, padding: '4px 10px', borderRadius: 12,
+                                        border: `1px solid ${catColors[cat]}40`, background: `${catColors[cat]}10`,
+                                        color: catColors[cat], fontWeight: 700, cursor: 'default'
+                                    }}>{cat}</button>
+                                );
+                            })}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {(classifyData.items || []).map((item, idx) => {
+                                const catColors = {
+                                    '카드입금': '#3b82f6', '페이입금': '#8b5cf6', '배달앱입금': '#f59e0b',
+                                    '현금매출': '#10b981', '개인거래': '#6b7280', '무시': '#d1d5db',
+                                    '카드수수료': '#3b82f6', '?': '#ef4444'
+                                };
+                                const defaultCat = item.default_category === '카드수수료' ? '카드입금'
+                                    : item.default_category === '무시' ? '배달앱입금' : '개인거래';
+                                const selected = item._category || defaultCat;
+                                const color = catColors[selected] || '#6b7280';
+
+                                return (
+                                    <div key={idx} style={{
+                                        display: 'flex', alignItems: 'center', gap: 10,
+                                        padding: '8px 12px', borderRadius: 10,
+                                        background: `${color}08`, border: `1px solid ${color}20`,
+                                    }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {item.memo}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: '#64748b' }}>
+                                                {item.count}건 · {Number(item.total_amount).toLocaleString()}원
+                                            </div>
+                                        </div>
+                                        <select
+                                            value={selected}
+                                            onChange={e => {
+                                                const newItems = [...classifyData.items];
+                                                newItems[idx] = { ...newItems[idx], _category: e.target.value };
+                                                setClassifyData({ ...classifyData, items: newItems });
+                                            }}
+                                            style={{
+                                                fontSize: 12, padding: '6px 10px', borderRadius: 8,
+                                                border: `1.5px solid ${color}`, background: `${color}15`,
+                                                color, fontWeight: 700, cursor: 'pointer', minWidth: 110,
+                                            }}
+                                        >
+                                            <option value="카드입금">💳 카드입금</option>
+                                            <option value="페이입금">📱 페이입금</option>
+                                            <option value="배달앱입금">🛵 배달앱입금</option>
+                                            <option value="현금매출">💵 현금매출</option>
+                                            <option value="개인거래">👤 개인거래</option>
+                                            <option value="무시">⛔ 무시</option>
+                                        </select>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        <div className="revenue-modal-actions" style={{ marginTop: 16 }}>
+                            <button className="modal-btn secondary" onClick={() => setClassifyData(null)}>취소</button>
+                            <button className="modal-btn primary" onClick={async () => {
+                                // Build classifications
+                                const classifications = (classifyData.items || []).map(item => {
+                                    const defaultCat = item.default_category === '카드수수료' ? '카드입금'
+                                        : item.default_category === '무시' ? '배달앱입금' : '개인거래';
+                                    return {
+                                        memo: item.memo,
+                                        category: item._category || defaultCat
+                                    };
+                                });
+
+                                // Re-upload with classifications
+                                const savedFile = classifyData.file;
+                                try {
+                                    setClassifyData(null);
+                                    setUploadLoading(true);
+                                    setUploadProgress('분류 적용 중...');
+                                    
+                                    const formData = new FormData();
+                                    formData.append('file', savedFile);
+                                    formData.append('classifications', JSON.stringify(classifications));
+                                    
+                                    const response = await api.post('/upload/excel/revenue', formData, {
+                                        headers: { 'Content-Type': 'multipart/form-data' }
+                                    });
+                                    
+                                    if (response.data.status === 'success') {
+                                        const d = response.data;
+                                        alert(`✅ 은행 입금내역 저장 완료!\n${d.count || 0}건 저장${d.skipped ? `, ${d.skipped}건 중복 스킵` : ''}`);
+                                        fetchData();
+                                    } else {
+                                        alert('처리 실패: ' + (response.data.message || ''));
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                    alert('분류 저장 중 오류가 발생했습니다.');
+                                } finally {
+                                    setUploadLoading(false);
+                                    setUploadProgress('');
+                                }
+                            }}>
+                                ✅ 분류 완료 · 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -617,6 +617,117 @@ async def upload_revenue_excel(
             
             for item in revenue_data:
                 if file_type == "bank_deposit_card":
+                    # Check VendorRule for classification of each memo
+                    memo = item.get('memo', '')
+                    default_cat = item.get('default_category', '?')
+                    
+                    # Look up classification rule
+                    rule = session.exec(
+                        apply_bid_filter(select(VendorRule), VendorRule, bid).where(
+                            VendorRule.original_name == memo,
+                            VendorRule.source == "bank_deposit_revenue"
+                        )
+                    ).first()
+                    
+                    cat = rule.category if rule else None
+                    
+                    if not cat and not classifications:
+                        # Need classification - collect unclassified memos
+                        if not hasattr(session, '_unclassified_memos'):
+                            session._unclassified_memos = {}
+                        if memo not in session._unclassified_memos:
+                            session._unclassified_memos[memo] = {
+                                "memo": memo,
+                                "total_amount": 0,
+                                "count": 0,
+                                "default_category": default_cat,
+                                "sample_dates": []
+                            }
+                        session._unclassified_memos[memo]["total_amount"] += item['amount']
+                        session._unclassified_memos[memo]["count"] += 1
+                        if len(session._unclassified_memos[memo]["sample_dates"]) < 3:
+                            session._unclassified_memos[memo]["sample_dates"].append(item['date'])
+                        continue
+                    
+                    # Apply classification from rules or from current upload classifications
+                    if not cat and classifications:
+                        import json as json_lib
+                        try:
+                            cls_rules = json_lib.loads(classifications) if isinstance(classifications, str) else classifications
+                            for cr in cls_rules:
+                                if cr.get('memo') == memo:
+                                    cat = cr.get('category')
+                                    break
+                        except:
+                            pass
+                    
+                    if not cat or cat == '무시':
+                        continue
+                    
+                    # Process based on category
+                    date_str = item['date']
+                    amount = item['amount']
+                    try:
+                        date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                    except:
+                        continue
+                    
+                    if cat == '카드입금' or cat == '페이입금':
+                        # Card/Pay deposits: track for card fee calculation
+                        payment_method = 'Card'
+                        vendor_name = f"카드입금({memo})" if cat == '카드입금' else f"페이입금({memo})"
+                        item_category = 'store'
+                    elif cat == '현금매출':
+                        payment_method = 'Cash'
+                        vendor_name = f"현금매출({memo})"
+                        item_category = 'store'
+                    elif cat == '배달앱입금':
+                        payment_method = 'BankTransfer'
+                        vendor_name = f"배달앱입금({memo})"
+                        item_category = 'delivery'
+                    elif cat == '개인거래':
+                        payment_method = 'BankTransfer'
+                        vendor_name = f"개인입금({memo})"
+                        item_category = 'store'
+                    else:
+                        continue
+                    
+                    # Find or create vendor
+                    vendor = vendor_by_name.get(vendor_name)
+                    if not vendor:
+                        vendor = Vendor(
+                            name=vendor_name, category=item_category,
+                            item=f'은행입금:{cat}', vendor_type='revenue',
+                            created_by_upload_id=upload_id, business_id=bid
+                        )
+                        session.add(vendor)
+                        session.flush()
+                        vendor_by_name[vendor_name] = vendor
+                        vendor_created_count += 1
+                    
+                    # Duplicate check
+                    existing = session.exec(
+                        apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                            DailyExpense.date == date_obj,
+                            DailyExpense.vendor_id == vendor.id,
+                        )
+                    ).first()
+                    if existing:
+                        if existing.upload_id == upload_id:
+                            existing.amount += amount
+                            session.add(existing)
+                        else:
+                            skipped_count += 1
+                        continue
+                    
+                    expense = DailyExpense(
+                        date=date_obj, vendor_name=vendor.name, vendor_id=vendor.id,
+                        amount=amount, category=item_category, note=f'은행입금: {memo}',
+                        upload_id=upload_id, payment_method=payment_method, business_id=bid
+                    )
+                    session.add(expense)
+                    inserted_count += 1
+                    processed_months.add((date_obj.year, date_obj.month))
                     continue
                 if item['amount'] <= 0:
                     continue
@@ -690,6 +801,28 @@ async def upload_revenue_excel(
                 session.add(expense)
                 inserted_count += 1
                 processed_months.add((date_obj.year, date_obj.month))
+            
+            # Check if there are unclassified bank deposit memos
+            if file_type == "bank_deposit_card" and hasattr(session, '_unclassified_memos') and session._unclassified_memos:
+                # Rollback - don't save anything yet
+                session.rollback()
+                # Delete the upload history record
+                with Session(engine) as cleanup_session:
+                    old_upload = cleanup_session.get(UploadHistory, upload_id)
+                    if old_upload:
+                        cleanup_session.delete(old_upload)
+                        cleanup_session.commit()
+                
+                items = list(session._unclassified_memos.values())
+                # Sort: high amount first
+                items.sort(key=lambda x: -x['total_amount'])
+                return {
+                    "status": "requires_classification",
+                    "message": "은행 입금내역의 송금자를 분류해주세요.",
+                    "items": items,
+                    "file_type": "bank_deposit_card",
+                    "total_records": len(revenue_data),
+                }
             
             # Update upload history
             upload_record = session.get(UploadHistory, upload_id)
