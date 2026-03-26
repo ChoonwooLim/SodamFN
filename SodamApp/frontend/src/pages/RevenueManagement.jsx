@@ -1879,7 +1879,23 @@ export default function RevenueManagement() {
                                     
                                     if (response.data.status === 'success') {
                                         const d = response.data;
-                                        alert(`✅ 은행 입금내역 저장 완료!\n${d.count || 0}건 저장${d.skipped ? `, ${d.skipped}건 중복 스킵` : ''}`);
+                                        if (d.bank_summary) {
+                                            const bs = d.bank_summary;
+                                            let msg = `🏦 은행 입금내역 분석 완료 (${bs.period})\n\n`;
+                                            msg += `💳 카드매출: ${Number(bs.card_sales).toLocaleString()}원\n`;
+                                            msg += `💰 카드입금: ${Number(bs.card_deposit).toLocaleString()}원\n`;
+                                            msg += `📊 카드수수료: ${Number(bs.card_fee).toLocaleString()}원 (${bs.card_fee_rate}%)\n\n`;
+                                            if (bs.categories) {
+                                                msg += `📋 분류 내역:\n`;
+                                                Object.entries(bs.categories).forEach(([k, v]) => {
+                                                    msg += `  ${k}: ${v.count}건 / ${Number(v.amount).toLocaleString()}원\n`;
+                                                });
+                                            }
+                                            msg += `\n⚠️ 매출 중복 방지를 위해 매출로 저장되지 않았습니다.`;
+                                            alert(msg);
+                                        } else {
+                                            alert(`✅ 처리 완료!\n${d.count || 0}건 저장${d.skipped ? `, ${d.skipped}건 중복 스킵` : ''}`);
+                                        }
                                         fetchData();
                                     } else {
                                         alert('처리 실패: ' + (response.data.message || ''));

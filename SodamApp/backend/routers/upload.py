@@ -617,7 +617,7 @@ async def upload_revenue_excel(
             
             for item in revenue_data:
                 if file_type == "bank_deposit_card":
-                    # Check VendorRule for classification of each memo
+                    # Bank deposits are NOT revenue — they're for card fee calculation
                     memo = item.get('memo', '')
                     default_cat = item.get('default_category', '?')
                     
@@ -649,7 +649,7 @@ async def upload_revenue_excel(
                             session._unclassified_memos[memo]["sample_dates"].append(item['date'])
                         continue
                     
-                    # Apply classification from rules or from current upload classifications
+                    # Apply classification from current upload classifications
                     if not cat and classifications:
                         import json as json_lib
                         try:
@@ -661,10 +661,10 @@ async def upload_revenue_excel(
                         except:
                             pass
                     
-                    if not cat or cat == '무시':
+                    if not cat:
                         continue
                     
-                    # Process based on category
+                    # Aggregate by category (DO NOT create revenue entries — just track totals)
                     date_str = item['date']
                     amount = item['amount']
                     try:
@@ -672,61 +672,12 @@ async def upload_revenue_excel(
                     except:
                         continue
                     
-                    if cat == '카드입금' or cat == '페이입금':
-                        # Card/Pay deposits: track for card fee calculation
-                        payment_method = 'Card'
-                        vendor_name = f"카드입금({memo})" if cat == '카드입금' else f"페이입금({memo})"
-                        item_category = 'store'
-                    elif cat == '현금매출':
-                        payment_method = 'Cash'
-                        vendor_name = f"현금매출({memo})"
-                        item_category = 'store'
-                    elif cat == '배달앱입금':
-                        payment_method = 'BankTransfer'
-                        vendor_name = f"배달앱입금({memo})"
-                        item_category = 'delivery'
-                    elif cat == '개인거래':
-                        payment_method = 'BankTransfer'
-                        vendor_name = f"개인입금({memo})"
-                        item_category = 'store'
-                    else:
-                        continue
-                    
-                    # Find or create vendor
-                    vendor = vendor_by_name.get(vendor_name)
-                    if not vendor:
-                        vendor = Vendor(
-                            name=vendor_name, category=item_category,
-                            item=f'은행입금:{cat}', vendor_type='revenue',
-                            created_by_upload_id=upload_id, business_id=bid
-                        )
-                        session.add(vendor)
-                        session.flush()
-                        vendor_by_name[vendor_name] = vendor
-                        vendor_created_count += 1
-                    
-                    # Duplicate check
-                    existing = session.exec(
-                        apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
-                            DailyExpense.date == date_obj,
-                            DailyExpense.vendor_id == vendor.id,
-                        )
-                    ).first()
-                    if existing:
-                        if existing.upload_id == upload_id:
-                            existing.amount += amount
-                            session.add(existing)
-                        else:
-                            skipped_count += 1
-                        continue
-                    
-                    expense = DailyExpense(
-                        date=date_obj, vendor_name=vendor.name, vendor_id=vendor.id,
-                        amount=amount, category=item_category, note=f'은행입금: {memo}',
-                        upload_id=upload_id, payment_method=payment_method, business_id=bid
-                    )
-                    session.add(expense)
-                    inserted_count += 1
+                    if not hasattr(session, '_bank_deposit_totals'):
+                        session._bank_deposit_totals = {}
+                    if cat not in session._bank_deposit_totals:
+                        session._bank_deposit_totals[cat] = {"amount": 0, "count": 0}
+                    session._bank_deposit_totals[cat]["amount"] += amount
+                    session._bank_deposit_totals[cat]["count"] += 1
                     processed_months.add((date_obj.year, date_obj.month))
                     continue
                 if item['amount'] <= 0:
@@ -822,6 +773,57 @@ async def upload_revenue_excel(
                     "items": items,
                     "file_type": "bank_deposit_card",
                     "total_records": len(revenue_data),
+                }
+            # If bank_deposit_card with classifications completed, return summary (NO revenue saved)
+            if file_type == "bank_deposit_card" and hasattr(session, '_bank_deposit_totals'):
+                totals = session._bank_deposit_totals
+                summary_info = result.get("summary", {})
+                
+                # Calculate card fee: compare card sales from DB vs card+pay deposits
+                card_deposit_total = totals.get('카드입금', {}).get('amount', 0) + totals.get('페이입금', {}).get('amount', 0)
+                
+                # Get card sales for the same month from DailyExpense
+                target_year = summary_info.get('year', datetime.datetime.now().year)
+                target_month = summary_info.get('month', datetime.datetime.now().month)
+                import calendar
+                last_day = calendar.monthrange(target_year, target_month)[1]
+                start_d = datetime.date(target_year, target_month, 1)
+                end_d = datetime.date(target_year, target_month, last_day)
+                
+                card_sales = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date >= start_d,
+                        DailyExpense.date <= end_d,
+                        DailyExpense.payment_method == 'Card',
+                        DailyExpense.category == 'store',
+                    )
+                ).all()
+                card_sales_total = sum(e.amount for e in card_sales)
+                card_fee = card_sales_total - card_deposit_total if card_sales_total > 0 else 0
+                
+                # Don't commit any DailyExpense — just classification rules were saved earlier
+                session.rollback()
+                # Cleanup upload history
+                with Session(engine) as cleanup_s:
+                    old_up = cleanup_s.get(UploadHistory, upload_id)
+                    if old_up:
+                        cleanup_s.delete(old_up)
+                        cleanup_s.commit()
+                
+                return {
+                    "status": "success",
+                    "file_type": "bank_deposit_card",
+                    "file_type_label": "🏦 은행 입금내역 분석",
+                    "count": 0,
+                    "message": "은행 입금내역이 분석되었습니다. (매출 중복 방지를 위해 매출로 저장되지 않습니다)",
+                    "bank_summary": {
+                        "card_deposit": card_deposit_total,
+                        "card_sales": card_sales_total,
+                        "card_fee": card_fee,
+                        "card_fee_rate": round(card_fee / card_sales_total * 100, 2) if card_sales_total > 0 else 0,
+                        "categories": {k: v for k, v in totals.items()},
+                        "period": f"{target_year}년 {target_month}월"
+                    }
                 }
             
             # Update upload history
