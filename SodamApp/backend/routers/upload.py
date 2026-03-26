@@ -423,10 +423,42 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         inserted_count = 0
         skipped_count = 0
         dedup_skipped = 0
+        # --- Handle Optional Target Classifications ---
+        if classifications:
+            try:
+                import json
+                rules = json.loads(classifications)
+                with Session(engine) as s:
+                    for rule in rules:
+                        # rule is like { memo: "홍길동", category: "카드수수료" }
+                        existing_rule = s.exec(
+                            apply_bid_filter(select(VendorRule), VendorRule, bid).where(
+                                VendorRule.original_name == rule['memo'],
+                                VendorRule.source == "bank_deposit_revenue"
+                            )
+                        ).first()
+                        if existing_rule:
+                            existing_rule.category = rule['category']
+                            s.add(existing_rule)
+                        else:
+                            new_rule = VendorRule(
+                                original_name=rule['memo'],
+                                category=rule['category'],
+                                source="bank_deposit_revenue",
+                                business_id=bid
+                            )
+                            s.add(new_rule)
+                    s.commit()
+            except Exception as e:
+                print(f"Classification parse error: {e}")
+
         dedup_replaced = 0
+        dedup_skipped = 0
         delivery_initialized = 0
         vendor_created_count = 0
         card_fee_calculated = None
+        cash_sales_calculated = 0
+        personal_income_calculated = 0
         processed_months = set()
         
         with Session(engine) as session:
@@ -647,6 +679,145 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                         dr_session.commit()
             except Exception as e:
                 print(f"DeliveryRevenue save error (non-fatal): {e}")
+
+        # --- Compute and Save Metrics for Bank Deposit Uploads based on AI/User Rules ---
+        if file_type == "bank_deposit_card" and result.get("summary"):
+            try:
+                from models import MonthlyProfitLoss, DailyExpense, VendorRule
+                from sqlmodel import select, func
+                summary = result["summary"]
+                y = summary.get("year")
+                m = summary.get("month")
+                
+                # Check mapping for unmapped elements
+                unmapped_items = []
+                data = result.get("data", [])
+                
+                # Pre-fetch existing rules
+                with Session(engine) as s:
+                    existing_rules = s.exec(
+                        apply_bid_filter(select(VendorRule), VendorRule, bid).where(
+                            VendorRule.source == "bank_deposit_revenue"
+                        )
+                    ).all()
+                    rule_map = {r.original_name: r.category for r in existing_rules}
+                    
+                    total_card_deposit = 0
+                    total_cash_sales = 0
+                    total_personal = 0
+                    
+                    for row in data:
+                        memo = row.get("memo", "")
+                        amount = row.get("amount", 0)
+                        date_str = row.get("date")
+                        row_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                        
+                        mapped_category = rule_map.get(memo)
+                        if not mapped_category:
+                            cat_guess = row.get("default_category", "?")
+                            if cat_guess == "?": # User intervention required!
+                                unmapped_items.append({
+                                    "memo": memo,
+                                    "amount": amount,
+                                    "date": date_str,
+                                    "default_category": cat_guess
+                                })
+                            else:
+                                mapped_category = cat_guess # apply default safe guess silently
+                                
+                        if not mapped_category:
+                            continue
+                            
+                        # Perform actual logic
+                        if mapped_category == "카드수수료":
+                            total_card_deposit += amount
+                        elif mapped_category == "현금매출":
+                            total_cash_sales += amount
+                            cash_sales_calculated += amount
+                            processed_months.add((row_date_obj.year, row_date_obj.month))
+                        elif mapped_category == "개인가계부":
+                            total_personal += amount
+                            personal_income_calculated += amount
+                            processed_months.add((row_date_obj.year, row_date_obj.month))
+
+                # Return requires classification if any
+                if unmapped_items:
+                    # rollback transaction
+                    if upload_record:
+                        with Session(engine) as dbs:
+                            dbs.delete(upload_record)
+                            dbs.commit()
+                    return {
+                        "status": "requires_classification",
+                        "items": unmapped_items,
+                        "file_name": file.filename,
+                        "message": f"확인되지 않은 송금자 {len(unmapped_items)}건의 분류가 필요합니다."
+                    }
+
+                # Save Data if no unmapped!
+                with Session(engine) as dbs:
+                    # Update MonthlyProfitLoss (Card fee calculation)
+                    import calendar
+                    last_day = calendar.monthrange(y, m)[1]
+                    start_d = datetime.date(y, m, 1)
+                    end_d = datetime.date(y, m, last_day)
+
+                    sales_stmt = select(func.sum(DailyExpense.amount)).where(
+                        DailyExpense.date >= start_d,
+                        DailyExpense.date <= end_d,
+                        DailyExpense.payment_method == 'Card',
+                        DailyExpense.category == 'store'
+                    )
+                    sales_stmt = apply_bid_filter(sales_stmt, DailyExpense, bid)
+                    total_card_sales = dbs.exec(sales_stmt).one() or 0
+
+                    card_fee = total_card_sales - total_card_deposit
+                    if card_fee < 0:
+                        card_fee = 0
+                    card_fee_calculated = card_fee
+
+                    pl_stmt = select(MonthlyProfitLoss).where(
+                        MonthlyProfitLoss.year == y,
+                        MonthlyProfitLoss.month == m
+                    )
+                    pl_stmt = apply_bid_filter(pl_stmt, MonthlyProfitLoss, bid)
+                    pl_record = dbs.exec(pl_stmt).first()
+                    
+                    if pl_record:
+                        pl_record.expense_card_fee = card_fee
+                        dbs.add(pl_record)
+                    else:
+                        pl_record = MonthlyProfitLoss(
+                            year=y, month=m, business_id=bid, expense_card_fee=card_fee
+                        )
+                        dbs.add(pl_record)
+                        
+                    # Now insert cash and personal income! We just insert them into DailyExpense.
+                    for row in data:
+                        memo = row.get("memo", "")
+                        amount = row.get("amount", 0)
+                        date_str = row.get("date")
+                        row_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+                        cat = rule_map.get(memo) or row.get("default_category", "?")
+                        
+                        if cat in ["현금매출", "개인가계부"]:
+                            daily_category = "store" if cat == "현금매출" else "개인가계부"
+                            expense = DailyExpense(
+                                date=row_date_obj,
+                                amount=amount,
+                                vendor_name=f"{memo} (입금)",
+                                payment_method="Cash",
+                                category=daily_category,
+                                note="은행입금자동",
+                                upload_id=upload_id,
+                                business_id=bid
+                            )
+                            dbs.add(expense)
+
+                    dbs.commit()
+            except Exception as e:
+                import traceback
+                print(f"Bank deposit rule/P&L mapping error: {traceback.format_exc()}")
         
         # Sync P/L (expenses + revenue)
         if processed_months:
@@ -662,11 +833,18 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         summary = result.get("summary", {})
         dedup_msg = ""
         if dedup_skipped > 0:
-            dedup_msg = f" (카드상세 데이터 존재로 POS 카드매출 {dedup_skipped}건 자동 제외)"
+            dedup_msg += f" (카드매출 {dedup_skipped}건 자동제외)"
         if dedup_replaced > 0:
-            dedup_msg = f" (POS 통합카드매출 {dedup_replaced}건을 카드사별 상세로 대체)"
+            dedup_msg += f" (카드통합 {dedup_replaced}건 대체)"
         if delivery_initialized > 0:
-            dedup_msg += f" (기존 배달매출 데이터 {delivery_initialized}건 초기화 및 덮어쓰기 완료)"
+            dedup_msg += f" (기존 배달매출 데이터 {delivery_initialized}건 덮어쓰기)"
+        if card_fee_calculated is not None:
+            dedup_msg += f" (수수료 {int(card_fee_calculated):,}원 산출"
+            if cash_sales_calculated > 0:
+                dedup_msg += f", 현금매출 {int(cash_sales_calculated):,}원"
+            if personal_income_calculated > 0:
+                dedup_msg += f", 개인소득 {int(personal_income_calculated):,}원"
+            dedup_msg += ")"
         
         return {
             "status": "success",

@@ -1202,6 +1202,7 @@ class ExcelService:
 
         total_card_deposit = 0
         first_date = None
+        data = []
 
         for i in range(header_idx + 1, len(df)):
             dt = df.iloc[i, date_col]
@@ -1210,20 +1211,6 @@ class ExcelService:
 
             if pd.isna(dt) or pd.isna(deposit): continue
 
-            # Card keywords check
-            memo_no_space = memo.replace(' ', '')
-            card_kws = ['카드', '비씨', '케이비', '국민', '삼성', '현대', '롯데', '하나', '농협', 'BC', '우리카드', 'KB', 'SHC', 'NH']
-            non_card_kws = ['서울페이', '배달', '쿠팡', '카카오', '요기요', '배민']
-            
-            is_card = False
-            if any(k in memo_no_space for k in card_kws):
-                is_card = True
-            elif any(memo_no_space.startswith(p) for p in ['현', '우', '국']): # 현850..., 우602..., 국민 etc
-                is_card = True
-                
-            if any(k in memo_no_space for k in non_card_kws):
-                is_card = False
-
             # Parse deposit
             try: amount = int(float(str(deposit).replace(',', '')))
             except: continue
@@ -1231,33 +1218,53 @@ class ExcelService:
             if amount <= 0: continue
             
             # Extract date
-            if first_date is None:
-                try:
-                    if isinstance(dt, datetime.datetime): first_date = dt
-                    else: 
-                        date_str = str(dt).strip()[:10]
-                        # Handle patterns like YYYY.MM.DD
-                        date_str = re.sub(r'[^\d-]', '-', date_str)
-                        first_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                except: pass
+            row_date_obj = None
+            try:
+                if isinstance(dt, datetime.datetime): row_date_obj = dt
+                else: 
+                    date_str = str(dt).strip()[:10]
+                    date_str = re.sub(r'[^\d-]', '-', date_str)
+                    row_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                    if first_date is None: first_date = row_date_obj
+            except: pass
+            
+            if not row_date_obj: continue
 
-            if is_card:
-                total_card_deposit += amount
+            # Default Category Guessing
+            memo_no_space = memo.replace(' ', '')
+            card_kws = ['카드', '비씨', '케이비', '국민', '삼성', '현대', '롯데', '하나', '농협', 'BC', '우리카드', 'KB', 'SHC', 'NH']
+            non_card_kws = ['서울페이', '배달', '쿠팡', '카카오', '요기요', '배민']
+            
+            is_card = False
+            if any(k in memo_no_space for k in card_kws):
+                is_card = True
+            elif any(memo_no_space.startswith(p) for p in ['현', '우', '국']):
+                is_card = True
+                
+            if any(k in memo_no_space for k in non_card_kws):
+                is_card = False
 
-        if first_date is None:
-            return {"status": "error", "message": "날짜 데이터를 인식할 수 없습니다."}
+            default_cat = "카드수수료" if is_card else ("무시" if any(k in memo_no_space for k in non_card_kws) else "?")
+
+            data.append({
+                "date": row_date_obj.strftime("%Y-%m-%d"),
+                "amount": amount,
+                "memo": memo.strip(),
+                "default_category": default_cat
+            })
+
+        if not data:
+            return {"status": "error", "message": "유효한 입금 내역이 없습니다."}
 
         period = f"{first_date.year}년 {first_date.month}월"
 
         return {
             "status": "success",
             "file_type": "bank_deposit_card",
-            "label": "🏦 은행거래내역 (카드입금 자동산출)",
-            # Dummy record to prevent '0 records' errors downstream
-            "data": [{"date": first_date.strftime("%Y-%m-%d"), "amount": 0, "vendor_name": "카드수수료산출용", "note": "산출용 더미"}], 
+            "label": "🏦 은행 입금내역",
+            "data": data, 
             "summary": {
-                "total_deposit": total_card_deposit,
-                "record_count": 0, 
+                "record_count": len(data), 
                 "channel": "은행입금",
                 "period": period,
                 "month": first_date.month,
