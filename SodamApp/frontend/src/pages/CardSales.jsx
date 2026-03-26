@@ -205,6 +205,88 @@ export default function CardSales() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Card Company Fee Breakdown Table */}
+                    {payments.length > 0 && (
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <List size={18} className="text-purple-500" /> 카드사별 수수료 상세
+                            </h3>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                                            <th style={{ textAlign: 'left', padding: '10px 12px', color: '#64748b', fontWeight: 700 }}>카드사</th>
+                                            <th style={{ textAlign: 'right', padding: '10px 12px', color: '#64748b', fontWeight: 700 }}>매출액</th>
+                                            <th style={{ textAlign: 'right', padding: '10px 12px', color: '#64748b', fontWeight: 700 }}>수수료</th>
+                                            <th style={{ textAlign: 'right', padding: '10px 12px', color: '#64748b', fontWeight: 700 }}>실입금</th>
+                                            <th style={{ textAlign: 'center', padding: '10px 12px', color: '#64748b', fontWeight: 700 }}>수수료율</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {payments
+                                            .sort((a, b) => (b.sales_amount || 0) - (a.sales_amount || 0))
+                                            .map((p, idx) => {
+                                                const rate = p.sales_amount > 0 ? (p.fees / p.sales_amount * 100).toFixed(2) : '0.00';
+                                                const rateColor = parseFloat(rate) > 3 ? '#ef4444' : parseFloat(rate) > 2 ? '#f59e0b' : '#10b981';
+                                                return (
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}
+                                                        onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                                        <td style={{ padding: '10px 12px', fontWeight: 700, color: '#1e293b' }}>
+                                                            {p.card_corp}
+                                                        </td>
+                                                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
+                                                            {(p.sales_amount || 0).toLocaleString()}원
+                                                        </td>
+                                                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>
+                                                            {(p.fees || 0).toLocaleString()}원
+                                                        </td>
+                                                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
+                                                            {(p.net_deposit || 0).toLocaleString()}원
+                                                        </td>
+                                                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                            <span style={{
+                                                                display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                                                                background: `${rateColor}15`, color: rateColor,
+                                                                fontWeight: 800, fontSize: 12,
+                                                            }}>
+                                                                {rate}%
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                                            <td style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b' }}>합계</td>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
+                                                {payments.reduce((a, c) => a + (c.sales_amount || 0), 0).toLocaleString()}원
+                                            </td>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
+                                                {payments.reduce((a, c) => a + (c.fees || 0), 0).toLocaleString()}원
+                                            </td>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
+                                                {payments.reduce((a, c) => a + (c.net_deposit || 0), 0).toLocaleString()}원
+                                            </td>
+                                            <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                <span style={{
+                                                    display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+                                                    background: '#3b82f615', color: '#3b82f6',
+                                                    fontWeight: 800, fontSize: 12,
+                                                }}>
+                                                    {payments.reduce((a, c) => a + (c.sales_amount || 0), 0) > 0
+                                                        ? (payments.reduce((a, c) => a + (c.fees || 0), 0) / payments.reduce((a, c) => a + (c.sales_amount || 0), 0) * 100).toFixed(2)
+                                                        : '0.00'}%
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
