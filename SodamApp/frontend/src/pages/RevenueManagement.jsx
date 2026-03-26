@@ -786,42 +786,61 @@ export default function RevenueManagement() {
                 {/* Spacer for non-filter views */}
                 {!(viewMode === 'list' || viewMode === 'grid') && <div />}
                 <div className="view-mode-toggle">
-                    <button
-                        className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
-                        onClick={() => setViewMode('dashboard')}
-                    >
-                        📊 대시보드
-                    </button>
-                    <button
-                        className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-                        onClick={() => setViewMode('list')}
-                    >
-                        📋 리스트
-                    </button>
-                    <button
-                        className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                        onClick={() => setViewMode('grid')}
-                    >
-                        📅 월별 상세 내역
-                    </button>
-                    <button
-                        className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
-                        onClick={() => setViewMode('revenueDetail')}
-                    >
-                        💰 매출요약
-                    </button>
-                    <button
-                        className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
-                        onClick={() => setViewMode('deliveryApp')}
-                    >
-                        🛵 배달앱
-                    </button>
-                    <button
-                        className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
-                        onClick={() => setViewMode('upload')}
-                    >
-                        📤 업로드
-                    </button>
+                    {isMobile ? (
+                        <>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setViewMode('dashboard')}
+                            >
+                                📊 대시보드
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
+                                onClick={() => setViewMode('upload')}
+                            >
+                                📤 업로드
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setViewMode('dashboard')}
+                            >
+                                📊 대시보드
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                📋 리스트
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                📅 월별 상세 내역
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
+                                onClick={() => setViewMode('revenueDetail')}
+                            >
+                                💰 매출요약
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
+                                onClick={() => setViewMode('deliveryApp')}
+                            >
+                                🛵 배달앱
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
+                                onClick={() => setViewMode('upload')}
+                            >
+                                📤 업로드
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
