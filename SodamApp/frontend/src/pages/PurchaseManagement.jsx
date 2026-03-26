@@ -662,7 +662,7 @@ export default function PurchaseManagement() {
                     </div>
 
                     {/* Card + Bank + Delivery Fee — 3 columns */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '3.5fr 2.5fr 4fr', gap: '16px' }}>
                         {/* Card Company Breakdown */}
                         <div className="dashboard-section" style={{ minWidth: 0 }}>
                             <h3>💳 카드사별 매입 현황</h3>
