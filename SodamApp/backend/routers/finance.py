@@ -262,25 +262,36 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
             if pl:
                 total_card_fee += pl.expense_card_fee
         
-        # Get card sales by company from DailyExpense
-        card_revenue = session.exec(
+        # Get card sales by company from DailyExpense (revenue vendors)
+        revenue_vendors = session.exec(
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == 'revenue')
+        ).all()
+        revenue_vendor_ids = {v.id for v in revenue_vendors}
+        
+        all_expenses = session.exec(
             apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
-                DailyExpense.payment_method == 'Card',
-                DailyExpense.category == 'store',
             )
         ).all()
         
         corp_totals = {}
         total_sales = 0
-        for entry in card_revenue:
+        for entry in all_expenses:
             vn = entry.vendor_name or ''
-            corp = _extract_card_corp(vn) or '기타카드'
-            if corp not in corp_totals:
-                corp_totals[corp] = 0
-            corp_totals[corp] += entry.amount
-            total_sales += entry.amount
+            corp = None
+            # Match by vendor_id (linked to revenue vendor)
+            if entry.vendor_id and entry.vendor_id in revenue_vendor_ids:
+                corp = _extract_card_corp(vn)
+            # Match by vendor_name pattern
+            elif '카드매출' in vn or vn == '카드매출(통합)':
+                corp = _extract_card_corp(vn) or '카드매출(통합)'
+            
+            if corp:
+                if corp not in corp_totals:
+                    corp_totals[corp] = 0
+                corp_totals[corp] += entry.amount
+                total_sales += entry.amount
         
         # Distribute card fee proportionally across card companies
         synthetic_data = []
