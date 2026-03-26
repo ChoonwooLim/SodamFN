@@ -54,7 +54,6 @@ const MAIN_TABS = [
     { id: 'dashboard', label: '🏠 대시보드' },
     { id: 'summary', label: '📊 손익계산서' },
     { id: 'expenses', label: '💰 세부지출' },
-    { id: 'analysis', label: '📈 월별분석' },
 ];
 
 // Monthly expense group (1-12)
@@ -77,6 +76,12 @@ export default function ProfitLoss() {
     const [year, setYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('dashboard');
     const businessName = localStorage.getItem('business_name') || '소담김밥';
+
+    // Mobile collapse states
+    const [revOpen, setRevOpen] = useState(false);
+    const [expOpen, setExpOpen] = useState(false);
+    const [openMonths, setOpenMonths] = useState({});
+    const toggleMonth = (m) => setOpenMonths(prev => ({ ...prev, [m]: !prev[m] }));
 
     // Dropdown group state
     const [openDropdown, setOpenDropdown] = useState(null); // 'monthly'
@@ -984,6 +989,329 @@ export default function ProfitLoss() {
         </>
     );
 
+    // ═══════════════════════════════════════════
+    // MOBILE: Single-scroll P/L (no tabs)
+    // ═══════════════════════════════════════════
+    if (isMobile) {
+        const monthSummaries = MONTHS.map(m => {
+            const md = data.find(d => d.month === m) || {};
+            const rev = calcTotalRevenue(md);
+            const exp = calcTotalExpense(md);
+            return { month: m, revenue: rev, expense: exp, profit: rev - exp, data: md };
+        });
+        const yearRev = monthSummaries.reduce((s, m) => s + m.revenue, 0);
+        const yearExp = monthSummaries.reduce((s, m) => s + m.expense, 0);
+        const yearProfit = yearRev - yearExp;
+        const yearMargin = yearRev > 0 ? ((yearProfit / yearRev) * 100).toFixed(1) : '0.0';
+
+        // Revenue breakdown (annual)
+        const revBreakdown = REVENUE_FIELDS.map(f => ({
+            key: f.key, label: f.label,
+            total: data.reduce((s, d) => s + (d[f.key] || 0), 0),
+        })).filter(e => e.total > 0);
+
+        // Expense breakdown (annual)
+        const expBreakdown = EXPENSE_FIELDS.map(f => ({
+            key: f.key, label: f.label,
+            total: data.reduce((s, d) => s + (d[f.key] || 0), 0),
+        })).filter(e => e.total > 0).sort((a, b) => b.total - a.total);
+        const maxExpVal = expBreakdown[0]?.total || 1;
+
+        const REV_ICONS = {
+            'revenue_store': '🏪', 'revenue_coupang': '🟡',
+            'revenue_baemin': '🟢', 'revenue_yogiyo': '🔴', 'revenue_ddangyo': '🟠',
+        };
+        const EXP_ICONS = {
+            'expense_labor': '👷', 'expense_retirement': '🏦',
+            'expense_ingredient': '🥬', 'expense_material': '📦',
+            'expense_utility': '💡', 'expense_rent': '🏠',
+            'expense_repair': '🔧', 'expense_depreciation': '⚙️',
+            'expense_tax': '🏛️', 'expense_insurance': '🛡️',
+            'expense_card_fee': '💳', 'expense_delivery_fee': '🛵',
+            'expense_other': '📋', 'expense_insurance_employee': '🛡️',
+            'expense_tax_employee': '🏛️',
+        };
+        const EXP_COLORS = {
+            'expense_labor': '#ef4444', 'expense_retirement': '#f97316',
+            'expense_ingredient': '#22c55e', 'expense_material': '#10b981',
+            'expense_utility': '#3b82f6', 'expense_rent': '#8b5cf6',
+            'expense_repair': '#ec4899', 'expense_depreciation': '#6366f1',
+            'expense_tax': '#14b8a6', 'expense_insurance': '#f59e0b',
+            'expense_card_fee': '#06b6d4', 'expense_delivery_fee': '#a855f7',
+            'expense_other': '#94a3b8', 'expense_insurance_employee': '#d97706',
+            'expense_tax_employee': '#0d9488',
+        };
+
+        const fmtShort = (v) => {
+            if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
+            if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(0)}만`;
+            return formatNumber(v);
+        };
+
+        return (
+            <div style={{ background: '#f8fafc', minHeight: '100vh', paddingBottom: 100 }}>
+                {/* Header */}
+                <div style={{
+                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                    padding: '44px 20px 24px', borderRadius: '0 0 24px 24px',
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>손익계산서</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button onClick={() => setYear(y => y - 1)} style={{
+                                background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white',
+                                width: 28, height: 28, borderRadius: 8, fontSize: 14, cursor: 'pointer',
+                            }}>◀</button>
+                            <span style={{ fontSize: 16, fontWeight: 700, color: 'white', minWidth: 50, textAlign: 'center' }}>{year}년</span>
+                            <button onClick={() => setYear(y => y + 1)} style={{
+                                background: 'rgba(255,255,255,0.12)', border: 'none', color: 'white',
+                                width: 28, height: 28, borderRadius: 8, fontSize: 14, cursor: 'pointer',
+                            }}>▶</button>
+                        </div>
+                    </div>
+
+                    {/* Hero: 순이익 */}
+                    <div style={{ textAlign: 'center', marginTop: 20 }}>
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, letterSpacing: 1 }}>영업이익</div>
+                        <div className="num-animate" style={{
+                            fontSize: 30, fontWeight: 900, marginTop: 4, letterSpacing: -1,
+                            color: yearProfit >= 0 ? '#34d399' : '#f87171',
+                        }}>
+                            {fmtShort(yearProfit)}<span style={{ fontSize: 14, color: '#94a3b8' }}>원</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>마진율 {yearMargin}%</div>
+                    </div>
+                </div>
+
+                {/* ──── 연간 매출 상세 ──── */}
+                <div style={{ padding: '16px 16px 0' }}>
+                    <div className="card-animate" style={{
+                        background: 'white', borderRadius: 16, padding: '16px',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: 12,
+                    }}>
+                        <div onClick={() => setRevOpen(!revOpen)} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            cursor: 'pointer', padding: '10px 14px', borderRadius: 12,
+                            background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>📈 매출 내역</span>
+                                <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', display: 'inline-block', transform: revOpen ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                            </div>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{formatNumber(yearRev)}원</span>
+                        </div>
+                        {revOpen && (
+                            <div style={{ marginTop: 10 }}>
+                                {revBreakdown.map((r, i) => {
+                                    const pct = yearRev > 0 ? ((r.total / yearRev) * 100).toFixed(1) : '0';
+                                    return (
+                                        <div key={r.key} style={{
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            padding: '8px 0', borderBottom: i < revBreakdown.length - 1 ? '1px solid #f1f5f9' : 'none',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ fontSize: 16 }}>{REV_ICONS[r.key] || '💰'}</span>
+                                                <span style={{ fontSize: 13, fontWeight: 600, color: '#475569' }}>{r.label}</span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{formatNumber(r.total)}원</div>
+                                                <div style={{ fontSize: 10, color: '#94a3b8' }}>{pct}%</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {revBreakdown.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: '#94a3b8', fontSize: 12 }}>매출 데이터 없음</div>}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ──── 연간 지출 상세 ──── */}
+                    <div className="card-animate" style={{
+                        background: 'white', borderRadius: 16, padding: '16px',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: 12,
+                        animationDelay: '0.1s',
+                    }}>
+                        <div onClick={() => setExpOpen(!expOpen)} style={{
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            cursor: 'pointer', padding: '10px 14px', borderRadius: 12,
+                            background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>📤 지출 내역</span>
+                                <span style={{ fontSize: 12, color: '#94a3b8', transition: 'transform 0.2s', display: 'inline-block', transform: expOpen ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                            </div>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#334155' }}>{formatNumber(yearExp)}원</span>
+                        </div>
+                        {expOpen && (
+                            <div style={{ marginTop: 10 }}>
+                                {expBreakdown.map((e) => {
+                                    const pct = yearExp > 0 ? ((e.total / yearExp) * 100).toFixed(1) : '0';
+                                    const color = EXP_COLORS[e.key] || '#94a3b8';
+                                    return (
+                                        <div key={e.key} style={{ marginBottom: 10 }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                                                <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>
+                                                    {EXP_ICONS[e.key] || '📋'} {e.label}
+                                                </span>
+                                                <span style={{ fontSize: 12, fontWeight: 700, color: '#334155' }}>
+                                                    {formatNumber(e.total)} <span style={{ color: '#94a3b8', fontWeight: 500 }}>({pct}%)</span>
+                                                </span>
+                                            </div>
+                                            <div style={{ height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                                                <div style={{
+                                                    height: '100%', borderRadius: 3, background: color,
+                                                    width: `${(e.total / maxExpVal) * 100}%`, transition: 'width 0.5s',
+                                                }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {expBreakdown.length === 0 && <div style={{ textAlign: 'center', padding: 16, color: '#94a3b8', fontSize: 12 }}>지출 데이터 없음</div>}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ──── 연간 손익 요약 ──── */}
+                    <div className="card-animate" style={{
+                        background: 'linear-gradient(135deg, #1e293b, #334155)',
+                        borderRadius: 16, padding: '16px', marginBottom: 20,
+                        animationDelay: '0.15s',
+                    }}>
+                        {[
+                            { label: '총 매출', value: yearRev, color: '#60a5fa' },
+                            { label: '총 지출', value: yearExp, color: '#f97316' },
+                            { label: yearProfit >= 0 ? '영업이익' : '영업손실', value: yearProfit, color: yearProfit >= 0 ? '#34d399' : '#f87171', bold: true },
+                        ].map((row, i) => (
+                            <div key={i} style={{
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                padding: '8px 12px', marginBottom: 4,
+                                background: 'rgba(255,255,255,0.06)', borderRadius: 10,
+                                border: row.bold ? '1px solid rgba(255,255,255,0.15)' : 'none',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: 3, background: row.color }} />
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{row.label}</span>
+                                </div>
+                                <span style={{ fontSize: 13, fontWeight: row.bold ? 800 : 600, color: row.bold ? row.color : '#f1f5f9' }}>
+                                    {formatNumber(row.value)}원
+                                </span>
+                            </div>
+                        ))}
+                        <div style={{ textAlign: 'right', fontSize: 10, color: '#64748b', marginTop: 4 }}>마진율 {yearMargin}%</div>
+                    </div>
+
+                    {/* ──── 월별 상세 ──── */}
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>📅 월별 손익 분석</div>
+                    {monthSummaries.filter(m => m.revenue > 0 || m.expense > 0).map((m, idx) => {
+                        const md = m.data;
+                        const margin = m.revenue > 0 ? ((m.profit / m.revenue) * 100).toFixed(1) : '0.0';
+                        // Revenue items for this month
+                        const mRevItems = REVENUE_FIELDS.map(f => ({ label: f.label, value: md[f.key] || 0, icon: REV_ICONS[f.key] || '💰' })).filter(r => r.value > 0);
+                        // Top expense items
+                        const mExpItems = EXPENSE_FIELDS.map(f => ({ label: f.label, value: md[f.key] || 0, icon: EXP_ICONS[f.key] || '📋' })).filter(e => e.value > 0).sort((a, b) => b.value - a.value);
+
+                        return (
+                            <div key={m.month} className="card-animate" style={{
+                                background: 'white', borderRadius: 16, padding: '16px',
+                                marginBottom: 10, boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+                                animationDelay: `${idx * 0.04}s`,
+                            }}>
+                                {/* Month Header - clickable */}
+                                <div onClick={() => toggleMonth(m.month)} style={{ cursor: 'pointer' }}>
+                                    {/* Month title bar */}
+                                    <div style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        padding: '8px 12px', borderRadius: 10, marginBottom: 10,
+                                        background: 'linear-gradient(135deg, #f1f5f9, #e2e8f0)',
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <span style={{ fontSize: 15, fontWeight: 800, color: '#334155' }}>{m.month}월</span>
+                                            <span style={{ fontSize: 11, color: '#94a3b8', transition: 'transform 0.2s', display: 'inline-block', transform: openMonths[m.month] ? 'rotate(180deg)' : 'rotate(0)' }}>▼</span>
+                                        </div>
+                                        <span style={{
+                                            fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
+                                            background: m.profit >= 0 ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                                            color: m.profit >= 0 ? '#059669' : '#dc2626',
+                                        }}>
+                                            {m.profit >= 0 ? '흑자' : '적자'} {margin}%
+                                        </span>
+                                    </div>
+
+                                    {/* 3-col summary - always visible */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                                        {[
+                                            { label: '매출', value: m.revenue, color: '#475569' },
+                                            { label: '지출', value: m.expense, color: '#475569' },
+                                            { label: '손익', value: m.profit, color: m.profit >= 0 ? '#059669' : '#dc2626' },
+                                        ].map((col, ci) => (
+                                            <div key={ci} style={{
+                                                textAlign: 'center', padding: '8px 4px',
+                                                background: ci === 2 ? (m.profit >= 0 ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)') : '#f8fafc',
+                                                borderRadius: 10,
+                                            }}>
+                                                <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>{col.label}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 800, color: col.color, marginTop: 2 }}>{fmtShort(col.value)}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Collapsible Detail */}
+                                {openMonths[m.month] && (
+                                    <div style={{ marginTop: 12, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                                        {/* Revenue items */}
+                                        {mRevItems.length > 0 && (
+                                            <div style={{ marginBottom: 8 }}>
+                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', marginBottom: 4, letterSpacing: 0.5 }}>매출 상세</div>
+                                                {mRevItems.map((r, ri) => (
+                                                    <div key={ri} style={{
+                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                        padding: '4px 0', fontSize: 12,
+                                                    }}>
+                                                        <span style={{ color: '#64748b' }}>{r.icon} {r.label}</span>
+                                                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{formatNumber(r.value)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Expense items */}
+                                        {mExpItems.length > 0 && (
+                                            <div>
+                                                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', marginBottom: 4, letterSpacing: 0.5 }}>지출 상세</div>
+                                                {mExpItems.map((e, ei) => (
+                                                    <div key={ei} style={{
+                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                        padding: '4px 0', fontSize: 12,
+                                                    }}>
+                                                        <span style={{ color: '#64748b' }}>{e.icon} {e.label}</span>
+                                                        <span style={{ fontWeight: 700, color: '#1e293b' }}>{formatNumber(e.value)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Mini bar */}
+                                <div style={{ display: 'flex', gap: 2, height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 10 }}>
+                                    <div style={{ flex: m.revenue, background: '#3b82f6', borderRadius: 2 }} />
+                                    <div style={{ flex: m.expense, background: '#f59e0b', borderRadius: 2 }} />
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {monthSummaries.filter(m => m.revenue > 0 || m.expense > 0).length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 13 }}>데이터가 없습니다</div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════
+    // DESKTOP LAYOUT (unchanged)
+    // ═══════════════════════════════════════════
     return (
         <div className="profitloss-page">
             <div className="page-header">
@@ -997,7 +1325,6 @@ export default function ProfitLoss() {
 
             {/* Tab Navigation */}
             <div className="tab-navigation">
-                {/* Main Tabs */}
                 {MAIN_TABS.map(tab => (
                     <button
                         key={tab.id}
@@ -1007,221 +1334,15 @@ export default function ProfitLoss() {
                         {tab.label}
                     </button>
                 ))}
-
-
             </div>
 
             {/* Tab Content */}
             <div className="tab-content">
                 {activeTab === 'dashboard' && renderDashboard()}
-                {isMobile && activeTab !== 'dashboard' ? (() => {
-                    // ──── MOBILE P/L VIEW ────
-                    const monthSummaries = MONTHS.map(m => {
-                        const md = data.find(d => d.month === m) || {};
-                        const rev = calcTotalRevenue(md);
-                        const exp = calcTotalExpense(md);
-                        return { month: m, revenue: rev, expense: exp, profit: rev - exp, data: md };
-                    });
-                    const yearRev = monthSummaries.reduce((s, m) => s + m.revenue, 0);
-                    const yearExp = monthSummaries.reduce((s, m) => s + m.expense, 0);
-                    const yearProfit = yearRev - yearExp;
-                    const yearMargin = yearRev > 0 ? ((yearProfit / yearRev) * 100).toFixed(1) : '0.0';
-
-                    // Expense breakdown
-                    const expBreakdown = EXPENSE_FIELDS.map(f => ({
-                        key: f.key, label: f.label,
-                        total: data.reduce((s, d) => s + (d[f.key] || 0), 0),
-                    })).filter(e => e.total > 0).sort((a, b) => b.total - a.total);
-                    const maxExp = expBreakdown[0]?.total || 1;
-
-                    const EXPENSE_COLORS = {
-                        'expense_labor': '#ef4444', 'expense_retirement': '#f97316',
-                        'expense_ingredient': '#22c55e', 'expense_material': '#10b981',
-                        'expense_utility': '#3b82f6', 'expense_rent': '#8b5cf6',
-                        'expense_repair': '#ec4899', 'expense_depreciation': '#6366f1',
-                        'expense_tax': '#14b8a6', 'expense_insurance': '#f59e0b',
-                        'expense_card_fee': '#06b6d4', 'expense_delivery_fee': '#a855f7',
-                        'expense_other': '#94a3b8',
-                        'expense_insurance_employee': '#d97706',
-                        'expense_tax_employee': '#0d9488',
-                    };
-
-                    const ECATS = {
-                        'expense_labor': '👷', 'expense_retirement': '🏦',
-                        'expense_ingredient': '🥬', 'expense_material': '📦',
-                        'expense_utility': '💡', 'expense_rent': '🏠',
-                        'expense_repair': '🔧', 'expense_depreciation': '⚙️',
-                        'expense_tax': '🏛️', 'expense_insurance': '🛡️',
-                        'expense_card_fee': '💳', 'expense_delivery_fee': '🛵',
-                        'expense_other': '📋',
-                        'expense_insurance_employee': '🛡️',
-                        'expense_tax_employee': '🏛️',
-                    };
-
-                    if (activeTab === 'summary') {
-                        return (
-                            <div style={{ padding: '0 16px 100px' }}>
-                                {/* 연간 요약 카드 */}
-                                <div className="card-animate" style={{
-                                    background: 'linear-gradient(135deg, #1e293b, #334155)',
-                                    borderRadius: 20, padding: '20px 18px', marginBottom: 16,
-                                }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#94a3b8', marginBottom: 14 }}>
-                                        📅 {year}년 연간 요약
-                                    </div>
-                                    {[
-                                        { label: '총 매출', value: yearRev, color: '#60a5fa' },
-                                        { label: '총 지출', value: yearExp, color: '#f97316' },
-                                        { label: yearProfit >= 0 ? '순이익' : '순손실', value: yearProfit, color: yearProfit >= 0 ? '#34d399' : '#f87171', bold: true },
-                                    ].map((row, i) => (
-                                        <div key={i} style={{
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            padding: '10px 12px', marginBottom: 6,
-                                            background: 'rgba(255,255,255,0.06)', borderRadius: 12,
-                                            border: row.bold ? '1px solid rgba(255,255,255,0.12)' : 'none',
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <div style={{ width: 6, height: 6, borderRadius: 3, background: row.color }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{row.label}</span>
-                                            </div>
-                                            <span style={{ fontSize: 14, fontWeight: row.bold ? 800 : 600, color: row.bold ? row.color : '#f1f5f9' }}>
-                                                {formatNumber(row.value)}원
-                                            </span>
-                                        </div>
-                                    ))}
-                                    <div style={{ textAlign: 'right', fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                                        마진율 {yearMargin}%
-                                    </div>
-                                </div>
-
-                                {/* 월별 손익 카드 */}
-                                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 10 }}>월별 손익</div>
-                                {monthSummaries.filter(m => m.revenue > 0 || m.expense > 0).map((m, idx) => {
-                                    const margin = m.revenue > 0 ? ((m.profit / m.revenue) * 100).toFixed(1) : '0.0';
-                                    return (
-                                        <div key={m.month} className="card-animate touch-feedback" style={{
-                                            background: 'white', borderRadius: 16, padding: '14px 16px',
-                                            marginBottom: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                                            animationDelay: `${idx * 0.04}s`,
-                                        }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                                                <span style={{ fontSize: 15, fontWeight: 800, color: '#1e293b' }}>{m.month}월</span>
-                                                <span style={{
-                                                    fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                                                    background: m.profit >= 0 ? '#ecfdf5' : '#fef2f2',
-                                                    color: m.profit >= 0 ? '#059669' : '#dc2626',
-                                                }}>
-                                                    {m.profit >= 0 ? '흑자' : '적자'} {margin}%
-                                                </span>
-                                            </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                                                {[
-                                                    { label: '매출', value: m.revenue, color: '#3b82f6' },
-                                                    { label: '지출', value: m.expense, color: '#f59e0b' },
-                                                    { label: '손익', value: m.profit, color: m.profit >= 0 ? '#10b981' : '#ef4444' },
-                                                ].map((col, ci) => (
-                                                    <div key={ci} style={{ textAlign: 'center' }}>
-                                                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>{col.label}</div>
-                                                        <div style={{ fontSize: 13, fontWeight: 700, color: col.color, marginTop: 2 }}>
-                                                            {Math.abs(col.value) >= 10000 ? `${(col.value / 10000).toFixed(0)}만` : formatNumber(col.value)}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            {/* Mini bar */}
-                                            <div style={{ display: 'flex', gap: 2, height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 10 }}>
-                                                <div style={{ flex: m.revenue, background: '#3b82f6', borderRadius: 2 }} />
-                                                <div style={{ flex: m.expense, background: '#f59e0b', borderRadius: 2 }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {monthSummaries.filter(m => m.revenue > 0 || m.expense > 0).length === 0 && (
-                                    <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 13 }}>데이터가 없습니다</div>
-                                )}
-                            </div>
-                        );
-                    }
-
-                    if (activeTab === 'expenses' || activeTab === 'analysis') {
-                        return (
-                            <div style={{ padding: '0 16px 100px' }}>
-                                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', marginBottom: 12 }}>
-                                    💸 지출 항목별 비중 ({year}년)
-                                </div>
-                                {expBreakdown.map((e, idx) => {
-                                    const pct = yearExp > 0 ? ((e.total / yearExp) * 100).toFixed(1) : '0.0';
-                                    const color = EXPENSE_COLORS[e.key] || '#94a3b8';
-                                    const icon = ECATS[e.key] || '📋';
-                                    return (
-                                        <div key={e.key} className="card-animate" style={{ marginBottom: 12, animationDelay: `${idx * 0.03}s` }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>
-                                                    {icon} {e.label}
-                                                </span>
-                                                <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>
-                                                    {formatNumber(e.total)}원 <span style={{ color: '#94a3b8', fontWeight: 500 }}>({pct}%)</span>
-                                                </span>
-                                            </div>
-                                            <div style={{ height: 8, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
-                                                <div style={{
-                                                    height: '100%', borderRadius: 4, background: color,
-                                                    width: `${(e.total / maxExp) * 100}%`,
-                                                    transition: 'width 0.6s ease',
-                                                }} />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                                {expBreakdown.length === 0 && (
-                                    <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 13 }}>지출 데이터가 없습니다</div>
-                                )}
-
-                                {/* 월별 지출 요약 리스트 */}
-                                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', margin: '24px 0 12px' }}>
-                                    📊 월별 지출 내역
-                                </div>
-                                {monthSummaries.filter(m => m.expense > 0).map((m, idx) => {
-                                    const md = m.data;
-                                    const topExpenses = EXPENSE_FIELDS.map(f => ({
-                                        label: f.label, value: md[f.key] || 0,
-                                    })).filter(e => e.value > 0).sort((a, b) => b.value - a.value).slice(0, 3);
-                                    return (
-                                        <div key={m.month} className="card-animate" style={{
-                                            background: 'white', borderRadius: 14, padding: '12px 14px',
-                                            marginBottom: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-                                            animationDelay: `${idx * 0.04}s`,
-                                        }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                                                <span style={{ fontSize: 14, fontWeight: 800, color: '#1e293b' }}>{m.month}월</span>
-                                                <span style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>{formatNumber(m.expense)}원</span>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                                {topExpenses.map((te, ti) => (
-                                                    <span key={ti} style={{
-                                                        fontSize: 10, padding: '3px 8px', borderRadius: 8,
-                                                        background: '#f1f5f9', color: '#475569', fontWeight: 600,
-                                                    }}>
-                                                        {te.label} {formatNumber(te.value)}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        );
-                    }
-
-                    return null;
-                })() : (
-                    <>
-                        {activeTab === 'summary' && renderSummaryTable()}
-                        {activeTab === 'expenses' && renderExpenseDetail()}
-                        {activeTab === 'analysis' && renderAnalysis()}
-                        {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
-                    </>
-                )}
+                {activeTab === 'summary' && renderSummaryTable()}
+                {activeTab === 'expenses' && renderExpenseDetail()}
+                {activeTab === 'analysis' && renderAnalysis()}
+                {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
             </div>
         </div>
     );

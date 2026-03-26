@@ -675,6 +675,12 @@
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .tab-navigation::-webkit-scrollbar {
+        display: none;
     }
 
     .tab-button {
