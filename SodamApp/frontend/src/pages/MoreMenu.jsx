@@ -1,40 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
     BarChart3, ShoppingBag, CreditCard, Receipt, Users, Wallet,
     BookOpen, Settings, ClipboardList, Package, LogOut, ChevronRight,
-    Store, Bell, CheckSquare, FileText, Shield
+    Store, Bell, CheckSquare, FileText
 } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+function parseToken() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return { name: '관리자', grade: 'admin', bid: null };
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return {
+            name: payload.real_name || payload.sub || '관리자',
+            grade: payload.grade || 'admin',
+            bid: payload.business_id || localStorage.getItem('business_id'),
+        };
+    } catch { return { name: '관리자', grade: 'admin', bid: null }; }
+}
+
 export default function MoreMenu() {
+    const tokenInfo = useMemo(() => parseToken(), []);
     const [businessName, setBusinessName] = useState('');
-    const [userName, setUserName] = useState('관리자');
-    const [userGrade, setUserGrade] = useState('admin');
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                setUserName(payload.real_name || payload.sub);
-                setUserGrade(payload.grade || 'admin');
-                const bid = payload.business_id || localStorage.getItem('business_id');
-                if (bid) {
-                    axios.get(`${API_URL}/api/auth/business-info?bid=${bid}`)
-                        .then(res => {
-                            if (res.data?.business_name) {
-                                let n = res.data.business_name;
-                                if (n.toLowerCase() === 'sodam gimbap') n = '소담김밥';
-                                setBusinessName(n);
-                            }
-                        }).catch(() => {});
-                }
-            } catch (e) { console.error(e); }
+        if (tokenInfo.bid) {
+            axios.get(`${API_URL}/api/auth/business-info?bid=${tokenInfo.bid}`)
+                .then(res => {
+                    if (res.data?.business_name) {
+                        let n = res.data.business_name;
+                        if (n.toLowerCase() === 'sodam gimbap') n = '소담김밥';
+                        setBusinessName(n);
+                    }
+                }).catch(() => {});
         }
-    }, []);
+    }, [tokenInfo.bid]);
 
     const handleLogout = () => {
         localStorage.clear();
@@ -98,11 +101,11 @@ export default function MoreMenu() {
                         fontSize: 22, fontWeight: 800, color: 'white',
                         boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
                     }}>
-                        {userName?.[0] || 'A'}
+                        {tokenInfo.name?.[0] || 'A'}
                     </div>
                     <div>
                         <div style={{ color: 'white', fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>
-                            {userName}
+                            {tokenInfo.name}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                             <span style={{
@@ -110,7 +113,7 @@ export default function MoreMenu() {
                                 background: 'rgba(59,130,246,0.25)', color: '#93c5fd',
                                 textTransform: 'uppercase', letterSpacing: 1,
                             }}>
-                                {userGrade}
+                                {tokenInfo.grade}
                             </span>
                             {businessName && (
                                 <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
@@ -125,7 +128,7 @@ export default function MoreMenu() {
             {/* Menu Sections */}
             <div style={{ padding: '16px 16px 0' }}>
                 {menuSections.map((section, si) => (
-                    <div key={si} style={{ marginBottom: 20 }}>
+                    <div key={si} className="card-animate" style={{ marginBottom: 20, animationDelay: `${si * 0.08}s` }}>
                         <div style={{
                             fontSize: 11, fontWeight: 700, color: '#94a3b8',
                             textTransform: 'uppercase', letterSpacing: 1.5,
@@ -145,6 +148,7 @@ export default function MoreMenu() {
                                     <Link
                                         key={ii}
                                         to={item.path}
+                                        className="list-item-press"
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: 14,
                                             padding: '14px 16px',
@@ -177,7 +181,7 @@ export default function MoreMenu() {
                 ))}
 
                 {/* Logout */}
-                <div style={{ marginTop: 8, marginBottom: 24 }}>
+                <div className="card-animate" style={{ marginTop: 8, marginBottom: 24, animationDelay: '0.35s' }}>
                     <button
                         onClick={handleLogout}
                         style={{

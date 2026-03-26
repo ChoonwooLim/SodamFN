@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import ErrorBoundary from './components/ErrorBoundary';
+import './styles/mobile-ux.css';
 
 // Lazy Load Pages
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -84,8 +85,7 @@ const GuestRoute = ({ children }) => {
 };
 
 const Layout = ({ children }) => {
-  // Use location to trigger re-render on route change
-  // eslint-disable-next-line no-unused-vars
+  // Use location for page transition animation key
   const location = useLocation();
   const role = localStorage.getItem('user_role');
   const isAdmin = role === 'admin' || role === 'superadmin';
@@ -102,7 +102,9 @@ const Layout = ({ children }) => {
 
       {/* Main Content Area */}
       <div className={`flex-1 relative md:min-h-screen ${isAdmin ? 'md:ml-64' : ''}`}>
-        {children}
+        <div key={location.pathname} className="mobile-page-enter">
+          {children}
+        </div>
 
         {/* Mobile Bottom Navigation - Only visible on small screens for Admin */}
         {isAdmin && (

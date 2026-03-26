@@ -52,7 +52,7 @@ export default function BottomNav() {
                             }}
                         >
                             {active && (
-                                <div style={{
+                                <div className="bnav-active-bg" style={{
                                     position: 'absolute',
                                     top: 0,
                                     width: 32,

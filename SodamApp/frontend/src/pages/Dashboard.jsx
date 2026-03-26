@@ -40,11 +40,54 @@ export default function Dashboard() {
 
     const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
+    if (loading && isMobile) return (
+        <div style={{ background: '#f8fafc', minHeight: '100vh', paddingBottom: 100 }}>
+            {/* Skeleton Header */}
+            <div style={{ background: 'linear-gradient(135deg, #1e293b, #334155)', padding: '40px 20px 60px', borderRadius: '0 0 24px 24px' }}>
+                <div className="skeleton" style={{ width: 120, height: 20, marginBottom: 8, opacity: 0.2 }} />
+                <div className="skeleton" style={{ width: 180, height: 12, opacity: 0.15 }} />
+                <div style={{ textAlign: 'center', marginTop: 24 }}>
+                    <div className="skeleton" style={{ width: 80, height: 10, margin: '0 auto 8px', opacity: 0.15 }} />
+                    <div className="skeleton" style={{ width: 160, height: 36, margin: '0 auto', opacity: 0.2 }} />
+                </div>
+            </div>
+            {/* Skeleton KPI Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, padding: '16px', marginTop: -24 }}>
+                {[1, 2, 3].map(i => (
+                    <div key={i} className="skeleton-card card-animate" style={{ animationDelay: `${i * 0.05}s` }}>
+                        <div className="skeleton" style={{ width: 32, height: 32, borderRadius: 10, margin: '0 auto 10px' }} />
+                        <div className="skeleton skeleton-text sm" style={{ margin: '0 auto' }} />
+                        <div className="skeleton skeleton-text" style={{ width: '70%', margin: '4px auto 0' }} />
+                    </div>
+                ))}
+            </div>
+            {/* Skeleton Chart */}
+            <div className="skeleton-card card-animate" style={{ margin: '0 16px', animationDelay: '0.2s' }}>
+                <div className="skeleton skeleton-text" style={{ width: '40%' }} />
+                <div className="skeleton" style={{ height: 160, marginTop: 12 }} />
+            </div>
+            {/* Skeleton List */}
+            <div className="skeleton-card card-animate" style={{ margin: '12px 16px', animationDelay: '0.3s' }}>
+                <div className="skeleton skeleton-text" style={{ width: '30%' }} />
+                {[1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' }}>
+                        <div className="skeleton" style={{ width: 24, height: 24, borderRadius: 8, flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                            <div className="skeleton skeleton-text" style={{ width: '50%', marginBottom: 4 }} />
+                            <div className="skeleton skeleton-text sm" />
+                        </div>
+                        <div className="skeleton" style={{ width: 60, height: 14 }} />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+
     if (loading) return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 24, background: '#e2e8f0', margin: '0 auto 16px', animation: 'pulse 2s infinite' }} />
-                <div style={{ width: 120, height: 16, borderRadius: 8, background: '#e2e8f0' }} />
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+            <div className="animate-pulse flex flex-col items-center">
+                <div className="h-12 w-12 bg-slate-200 rounded-full mb-4"></div>
+                <div className="h-4 w-32 bg-slate-200 rounded"></div>
             </div>
         </div>
     );
@@ -119,7 +162,7 @@ export default function Dashboard() {
                     {/* Hero KPI: Revenue */}
                     <div style={{ marginTop: 20, textAlign: 'center' }}>
                         <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, letterSpacing: 1 }}>이번 달 매출</div>
-                        <div style={{ fontSize: 32, fontWeight: 900, color: 'white', letterSpacing: -1, marginTop: 4 }}>
+                        <div className="num-animate" style={{ fontSize: 32, fontWeight: 900, color: 'white', letterSpacing: -1, marginTop: 4 }}>
                             {formatKRW(revenue)}<span style={{ fontSize: 16, color: '#94a3b8' }}>원</span>
                         </div>
                         <div style={{
@@ -142,7 +185,7 @@ export default function Dashboard() {
                         { label: '총지출', value: expense, icon: ShoppingBag, color: '#f59e0b', bg: '#fffbeb', sub: '' },
                         { label: '직원', value: null, icon: Users, color: '#8b5cf6', bg: '#f5f3ff', sub: `${staffCount}명 재직` },
                     ].map((kpi, i) => (
-                        <div key={i} style={{
+                        <div key={i} className="card-animate touch-feedback" style={{
                             background: 'white', borderRadius: 16, padding: '14px 12px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                             textAlign: 'center',
