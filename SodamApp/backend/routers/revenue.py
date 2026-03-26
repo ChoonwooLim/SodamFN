@@ -341,7 +341,7 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
         monthly = {}
 
         # ── 1. Aggregate from DailyExpense (primary source) ──
-        de_query = select(DailyExpense).where(DailyExpense.category == "delivery")
+        de_query = apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.category == "delivery")
         if year > 0:
             start = date(year, 1, 1)
             end = date(year + 1, 1, 1)
@@ -379,7 +379,7 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
                 mm["total_sales"] += total
                 mm["total_settlement"] += total
 
-        # ── 2. Merge DeliveryRevenue (legacy, has fee details) ──
+        # ── 2. Merge DeliveryRevenue (has fee details) ──
         dr_query = select(DeliveryRevenue)
         if year > 0:
             dr_query = dr_query.where(DeliveryRevenue.year == year)
