@@ -1289,27 +1289,33 @@ export default function RevenueManagement() {
                                     <tr>
                                         <th style={{ minWidth: 60, textAlign: 'center' }}>월</th>
                                         {sortedChannels.map(ch => (
-                                            <th key={ch} colSpan={3} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                            <th key={ch} colSpan={4} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
                                                 {CHANNEL_ICONS[ch]} {ch}
                                             </th>
                                         ))}
-                                        <th colSpan={2} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>합계</th>
+                                        <th colSpan={3} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>합계</th>
                                     </tr>
                                     <tr>
                                         <th></th>
                                         {sortedChannels.map(ch => (
                                             <React.Fragment key={ch}>
-                                                <th style={{ fontSize: 10, color: '#94a3b8', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>정산액</th>
-                                                <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료</th>
+                                                <th style={{ fontSize: 10, color: '#60a5fa', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>매출</th>
+                                                <th style={{ fontSize: 10, color: '#22c55e' }}>정산</th>
+                                                <th style={{ fontSize: 10, color: '#ef4444' }}>수수료</th>
                                                 <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
                                             </React.Fragment>
                                         ))}
-                                        <th style={{ fontSize: 10, color: '#94a3b8', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>정산액</th>
+                                        <th style={{ fontSize: 10, color: '#60a5fa', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>매출</th>
+                                        <th style={{ fontSize: 10, color: '#22c55e' }}>정산</th>
                                         <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {monthly.map(m => (
+                                    {monthly.map(m => {
+                                        const rowSales = sortedChannels.reduce((s, ch) => s + (m.channels[ch]?.total_sales || 0), 0);
+                                        const rowSettle = m.total_settlement || 0;
+                                        const rowFeeRate = rowSales > 0 ? ((rowSales - rowSettle) / rowSales * 100).toFixed(1) : 0;
+                                        return (
                                         <tr key={`${m.year}-${m.month}`}>
                                             <td style={{ textAlign: 'center', fontWeight: 600 }}>{m.month}월</td>
                                             {sortedChannels.map(ch => {
@@ -1319,11 +1325,15 @@ export default function RevenueManagement() {
                                                         <td style={{ color: '#475569', textAlign: 'right', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>-</td>
                                                         <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
                                                         <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
+                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
                                                     </React.Fragment>
                                                 );
                                                 return (
                                                     <React.Fragment key={ch}>
-                                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 500, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                        <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 500, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                            {formatNumber(chData.total_sales)}
+                                                        </td>
+                                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 500 }}>
                                                             {formatNumber(chData.settlement_amount)}
                                                         </td>
                                                         <td style={{ textAlign: 'right', color: '#ef4444', fontSize: 11 }}>
@@ -1335,14 +1345,18 @@ export default function RevenueManagement() {
                                                     </React.Fragment>
                                                 );
                                             })}
-                                            <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
-                                                {formatNumber(m.total_settlement)}
+                                            <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                                {formatNumber(rowSales)}
+                                            </td>
+                                            <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700 }}>
+                                                {formatNumber(rowSettle)}
                                             </td>
                                             <td style={{ textAlign: 'right', color: '#94a3b8' }}>
-                                                {m.overall_fee_rate}%
+                                                {rowFeeRate}%
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                     {/* Totals Row */}
                                     <tr className="del-totals-row">
                                         <td style={{ textAlign: 'center' }}><strong>합계</strong></td>
@@ -1350,7 +1364,10 @@ export default function RevenueManagement() {
                                             const ct = channelTotals[ch];
                                             return (
                                                 <React.Fragment key={ch}>
-                                                    <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                    <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                        {formatNumber(ct.total_sales)}
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700 }}>
                                                         {formatNumber(ct.settlement_amount)}
                                                     </td>
                                                     <td style={{ textAlign: 'right', color: '#ef4444' }}>
@@ -1362,7 +1379,10 @@ export default function RevenueManagement() {
                                                 </React.Fragment>
                                             );
                                         })}
-                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                        <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                            {formatNumber(grandSales)}
+                                        </td>
+                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700 }}>
                                             {formatNumber(grandSettle)}
                                         </td>
                                         <td style={{ textAlign: 'right', color: '#94a3b8' }}>
