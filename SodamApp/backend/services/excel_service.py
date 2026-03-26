@@ -640,7 +640,7 @@ class ExcelService:
             # --- Detect file type by scanning first few rows ---
             # Priority 1: Known specific formats (exact keyword match)
             first_rows_text = ''
-            for i in range(min(5, len(df))):
+            for i in range(min(15, len(df))):
                 row_vals = [str(v) for v in df.iloc[i].tolist() if pd.notna(v)]
                 first_rows_text += ' '.join(row_vals) + ' '
             
@@ -680,7 +680,7 @@ class ExcelService:
                     pass
 
             # Priority 1.6.5: Coupang Eats settlement (쿠팡이츠 정산내역)
-            if '쿠팡' in first_rows_text or ('주문정보' in first_rows_text and '정산금액' in first_rows_text) or ('브랜드명' in first_rows_text and '상점명' in first_rows_text and '주문금액' in first_rows_text and '정산금액' in first_rows_text):
+            if ('쿠팡' in first_rows_text and '정산금액' in first_rows_text) or ('주문정보' in first_rows_text and '정산금액' in first_rows_text) or ('브랜드명' in first_rows_text and '상점명' in first_rows_text and '주문금액' in first_rows_text and '정산금액' in first_rows_text):
                 return self._parse_coupang_eats_settlement(df)
 
             # Priority 1.7: 땡겨요 settlement (땡겨요 정산내역)
@@ -692,6 +692,12 @@ class ExcelService:
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
             if len(df.columns) <= 2 and ('기본정산' in first_rows_text or '인출' in first_rows_text):
                 return self._parse_delivery_settlement(df)
+
+            # Priority 1.9: Bank Deposit Statement (은행 입금내역) - Used to compute Card Fees
+            if ('거래일시' in first_rows_text or '거래일자' in first_rows_text) and ('찾으신금액' in first_rows_text or '맡기신금액' in first_rows_text or '입금' in first_rows_text):
+                res = self._parse_bank_deposit_for_card_fee(df)
+                if res.get('status') == 'success':
+                    return res
             
             # Priority 2: Universal pattern-based detection (any POS vendor)
             return self._parse_universal_revenue(df, file_contents)
@@ -1158,6 +1164,104 @@ class ExcelService:
                 "order_count": total_orders,
                 "channel": "쿠팡",
                 "period": period,
+            }
+        }
+
+    def _parse_bank_deposit_for_card_fee(self, df):
+        """
+        Parse 신한은행 등 은행 입금내역 to calculate total card deposits.
+        Extracts 입금액/맡기신금액 and considers valid card companies.
+        """
+        import datetime
+        import re
+        
+        header_idx = -1
+        date_col = None
+        deposit_col = None
+        memo_col = None
+
+        for i in range(min(15, len(df))):
+            row_vals = [str(v).replace(' ', '') for v in df.iloc[i].tolist() if pd.notna(v)]
+            has_date = any('거래일' in v or '일자' in v for v in row_vals)
+            has_deposit = any('입금' in v or '맡기신' in v for v in row_vals)
+            if has_date and has_deposit:
+                header_idx = i
+                break
+
+        if header_idx == -1:
+            return {"status": "error", "message": "은행 거래내역 헤더(거래일시/입금액)를 찾을 수 없습니다."}
+
+        cols = [str(c).replace(' ', '') if pd.notna(c) else '' for c in df.iloc[header_idx].tolist()]
+        for idx, c_str in enumerate(cols):
+            if '일자' in c_str or '일시' in c_str: date_col = idx
+            elif '입금' in c_str or '맡기신' in c_str: deposit_col = idx
+            elif any(k in c_str for k in ['기재내용', '적요', '내용', '보내신분', '거래처', '상호명']): memo_col = idx
+
+        if date_col is None or deposit_col is None:
+            return {"status": "error", "message": "은행 거래내역에서 일자 또는 입금 컬럼을 식별하지 못했습니다."}
+
+        total_card_deposit = 0
+        first_date = None
+
+        for i in range(header_idx + 1, len(df)):
+            dt = df.iloc[i, date_col]
+            deposit = df.iloc[i, deposit_col]
+            memo = str(df.iloc[i, memo_col]) if memo_col is not None and pd.notna(df.iloc[i, memo_col]) else ""
+
+            if pd.isna(dt) or pd.isna(deposit): continue
+
+            # Card keywords check
+            memo_no_space = memo.replace(' ', '')
+            card_kws = ['카드', '비씨', '케이비', '국민', '삼성', '현대', '롯데', '하나', '농협', 'BC', '우리카드', 'KB', 'SHC', 'NH']
+            non_card_kws = ['서울페이', '배달', '쿠팡', '카카오', '요기요', '배민']
+            
+            is_card = False
+            if any(k in memo_no_space for k in card_kws):
+                is_card = True
+            elif any(memo_no_space.startswith(p) for p in ['현', '우', '국']): # 현850..., 우602..., 국민 etc
+                is_card = True
+                
+            if any(k in memo_no_space for k in non_card_kws):
+                is_card = False
+
+            # Parse deposit
+            try: amount = int(float(str(deposit).replace(',', '')))
+            except: continue
+            
+            if amount <= 0: continue
+            
+            # Extract date
+            if first_date is None:
+                try:
+                    if isinstance(dt, datetime.datetime): first_date = dt
+                    else: 
+                        date_str = str(dt).strip()[:10]
+                        # Handle patterns like YYYY.MM.DD
+                        date_str = re.sub(r'[^\d-]', '-', date_str)
+                        first_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                except: pass
+
+            if is_card:
+                total_card_deposit += amount
+
+        if first_date is None:
+            return {"status": "error", "message": "날짜 데이터를 인식할 수 없습니다."}
+
+        period = f"{first_date.year}년 {first_date.month}월"
+
+        return {
+            "status": "success",
+            "file_type": "bank_deposit_card",
+            "label": "🏦 은행거래내역 (카드입금 자동산출)",
+            # Dummy record to prevent '0 records' errors downstream
+            "data": [{"date": first_date.strftime("%Y-%m-%d"), "amount": 0, "vendor_name": "카드수수료산출용", "note": "산출용 더미"}], 
+            "summary": {
+                "total_deposit": total_card_deposit,
+                "record_count": 0, 
+                "channel": "은행입금",
+                "period": period,
+                "month": first_date.month,
+                "year": first_date.year
             }
         }
 

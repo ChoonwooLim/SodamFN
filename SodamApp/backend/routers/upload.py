@@ -426,6 +426,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         dedup_replaced = 0
         delivery_initialized = 0
         vendor_created_count = 0
+        card_fee_calculated = None
         processed_months = set()
         
         with Session(engine) as session:
