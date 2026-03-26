@@ -161,6 +161,13 @@ CHANNEL_TO_PL_FIELD = {
     "Baemin": "revenue_baemin",
     "Yogiyo": "revenue_yogiyo",
     "Ddangyo": "revenue_ddangyo",
+    # Korean variants stored in DB
+    "쿠팡": "revenue_coupang",
+    "쿠팡이츠": "revenue_coupang",
+    "배민": "revenue_baemin",
+    "배달의민족": "revenue_baemin",
+    "요기요": "revenue_yogiyo",
+    "땡겨요": "revenue_ddangyo",
 }
 
 
@@ -233,6 +240,23 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
     # All managed fields
     managed_fields = {"revenue_coupang", "revenue_baemin", "revenue_yogiyo", "revenue_ddangyo"}
 
+    # ── Override delivery revenue with total_sales from DeliveryRevenue ──
+    # DeliveryRevenue stores both total_sales (주문금액) and settlement (정산금).
+    # P/L should show total_sales as revenue, with fees as separate expense.
+    from models import DeliveryRevenue
+    dr_stmt = select(DeliveryRevenue).where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
+    dr_records = session.exec(dr_stmt).all()
+    
+    if dr_records:
+        # Use total_sales (gross revenue) instead of settlement for P/L revenue
+        for dr in dr_records:
+            pl_field = CHANNEL_TO_PL_FIELD.get(dr.channel)
+            if pl_field:
+                delivery_totals[pl_field] = dr.total_sales  # 총매출 (수수료 차감 전)
+    
+    # Also recalculate delivery fee from DeliveryRevenue
+    total_delivery_fees = sum(dr.total_fees for dr in dr_records) if dr_records else 0
+
     # Find or create P/L record
     pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
     if business_id is not None:
@@ -244,9 +268,11 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
         for field in managed_fields:
             setattr(pl_record, field, delivery_totals.get(field, 0))
         pl_record.revenue_store = store_total
+        pl_record.expense_delivery_fee = total_delivery_fees
         session.add(pl_record)
     else:
-        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id, revenue_store=store_total)
+        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id, revenue_store=store_total,
+                                       expense_delivery_fee=total_delivery_fees)
         for field in managed_fields:
             setattr(pl_record, field, delivery_totals.get(field, 0))
         session.add(pl_record)

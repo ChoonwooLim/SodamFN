@@ -7,10 +7,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; // Keep
 
 const REVENUE_FIELDS = [
     { key: 'revenue_store', label: '매장매출', group: 'revenue-store' },
-    { key: 'revenue_coupang', label: '쿠팡 정산금', group: 'revenue-delivery' },
-    { key: 'revenue_baemin', label: '배민 정산금', group: 'revenue-delivery' },
-    { key: 'revenue_yogiyo', label: '요기요 정산금', group: 'revenue-delivery' },
-    { key: 'revenue_ddangyo', label: '땡겨요 정산금', group: 'revenue-delivery' },
+    { key: 'revenue_coupang', label: '쿠팡 매출', group: 'revenue-delivery' },
+    { key: 'revenue_baemin', label: '배민 매출', group: 'revenue-delivery' },
+    { key: 'revenue_yogiyo', label: '요기요 매출', group: 'revenue-delivery' },
+    { key: 'revenue_ddangyo', label: '땡겨요 매출', group: 'revenue-delivery' },
 ];
 
 const EXPENSE_FIELDS = [

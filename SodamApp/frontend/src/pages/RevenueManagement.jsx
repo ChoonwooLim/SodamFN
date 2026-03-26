@@ -12,10 +12,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 // ── PL Revenue (수입상세) ──
 const PL_REVENUE_FIELDS = [
     { key: 'revenue_store', label: '매장매출', icon: '🏪' },
-    { key: 'revenue_coupang', label: '쿠팡 정산금', icon: '🛒' },
-    { key: 'revenue_baemin', label: '배민 정산금', icon: '🏍️' },
-    { key: 'revenue_yogiyo', label: '요기요 정산금', icon: '🍜' },
-    { key: 'revenue_ddangyo', label: '땡겨요 정산금', icon: '📱' },
+    { key: 'revenue_coupang', label: '쿠팡 매출', icon: '🛒' },
+    { key: 'revenue_baemin', label: '배민 매출', icon: '🏍️' },
+    { key: 'revenue_yogiyo', label: '요기요 매출', icon: '🍜' },
+    { key: 'revenue_ddangyo', label: '땡겨요 매출', icon: '📱' },
 ];
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 

@@ -129,10 +129,10 @@ def get_revenue_breakdown(year: int = 2026, month: int = 1, _admin: User = Depen
 
             LABELS = {
                 "revenue_store": "매장매출",
-                "revenue_coupang": "쿠팡 정산금",
-                "revenue_baemin": "배민 정산금",
-                "revenue_yogiyo": "요기요 정산금",
-                "revenue_ddangyo": "땡겨요 정산금",
+                "revenue_coupang": "쿠팡 매출",
+                "revenue_baemin": "배민 매출",
+                "revenue_yogiyo": "요기요 매출",
+                "revenue_ddangyo": "땡겨요 매출",
             }
             data = []
             for key, label in LABELS.items():
