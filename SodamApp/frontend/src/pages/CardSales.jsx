@@ -10,11 +10,14 @@ export default function CardSales() {
     const [payments, setPayments] = useState([]);
     const [dateRange, setDateRange] = useState(() => {
         const now = new Date();
-        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+        const y = now.getFullYear();
+        const m = now.getMonth(); // current month (0-indexed)
+        const prevY = m === 0 ? y - 1 : y;
+        const prevM = m === 0 ? 12 : m;
+        const lastDay = new Date(y, m, 0).getDate(); // last day of prev month
         return {
-            start: prevMonth.toISOString().slice(0, 10),
-            end: lastDay.toISOString().slice(0, 10)
+            start: `${prevY}-${String(prevM).padStart(2,'0')}-01`,
+            end: `${prevY}-${String(prevM).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`
         };
     });
     const [msg, setMsg] = useState("");
