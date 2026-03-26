@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Camera, BookOpen, BarChart3, ShoppingBag } from 'lucide-react';
+import { Home, BarChart3, Camera, Wallet, Menu } from 'lucide-react';
 
 export default function BottomNav() {
     const location = useLocation();
@@ -8,25 +8,58 @@ export default function BottomNav() {
     const navItems = [
         { icon: Home, path: '/dashboard', label: '홈' },
         { icon: BarChart3, path: '/revenue', label: '매출' },
-        null, // Center camera button placeholder
-        { icon: ShoppingBag, path: '/purchase', label: '매입' },
-        { icon: BookOpen, path: '/recipes', label: '레시피' },
+        null, // Center button placeholder
+        { icon: Wallet, path: '/finance/profitloss', label: '재무' },
+        { icon: Menu, path: '/more', label: '더보기' },
     ];
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-            <div className="bg-white/95 backdrop-blur-xl border-t border-slate-200/80 px-2 pt-1 pb-2 flex justify-around items-end">
-                {navItems.map((item, idx) => {
+            <div style={{
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                borderTop: '1px solid rgba(0,0,0,0.06)',
+                display: 'flex',
+                justifyContent: 'space-around',
+                alignItems: 'flex-end',
+                padding: '4px 8px 8px',
+            }}>
+                {navItems.map((item) => {
                     if (!item) {
-                        // Center Camera Button
+                        // Center floating action button
                         return (
-                            <Link key="camera" to="/camera" className="relative -top-5 mx-1">
-                                <div className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white border-4 border-white transition-all active:scale-95 ${isActive('/camera')
-                                    ? 'bg-gradient-to-tr from-indigo-600 to-blue-500 shadow-blue-500/40'
-                                    : 'bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/30'
-                                    }`}>
+                            <Link key="input" to="/camera" style={{
+                                position: 'relative',
+                                top: -18,
+                                margin: '0 4px',
+                                textDecoration: 'none',
+                            }}>
+                                <div style={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: 28,
+                                    background: isActive('/camera')
+                                        ? 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)'
+                                        : 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    boxShadow: '0 4px 20px rgba(59,130,246,0.4)',
+                                    border: '4px solid white',
+                                    transition: 'transform 0.2s, box-shadow 0.2s',
+                                }}>
                                     <Camera size={24} />
                                 </div>
+                                <span style={{
+                                    display: 'block',
+                                    textAlign: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    color: isActive('/camera') ? '#3b82f6' : '#94a3b8',
+                                    marginTop: 2,
+                                }}>입력</span>
                             </Link>
                         );
                     }
@@ -38,13 +71,45 @@ export default function BottomNav() {
                         <Link
                             key={item.path}
                             to={item.path}
-                            className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all duration-200 min-w-[52px] ${active
-                                ? 'text-blue-600'
-                                : 'text-slate-400 hover:text-slate-600'
-                                }`}
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '6px 12px',
+                                borderRadius: 12,
+                                textDecoration: 'none',
+                                minWidth: 52,
+                                transition: 'all 0.2s',
+                            }}
                         >
-                            <Icon size={20} strokeWidth={active ? 2.5 : 1.8} />
-                            <span className={`text-[10px] mt-0.5 font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <div style={{
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}>
+                                {active && (
+                                    <div style={{
+                                        position: 'absolute',
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 12,
+                                        background: 'rgba(59,130,246,0.1)',
+                                    }} />
+                                )}
+                                <Icon
+                                    size={22}
+                                    strokeWidth={active ? 2.5 : 1.8}
+                                    style={{ color: active ? '#3b82f6' : '#94a3b8', position: 'relative', zIndex: 1 }}
+                                />
+                            </div>
+                            <span style={{
+                                fontSize: 10,
+                                marginTop: 2,
+                                fontWeight: active ? 700 : 500,
+                                color: active ? '#3b82f6' : '#94a3b8',
+                            }}>
                                 {item.label}
                             </span>
                         </Link>
@@ -54,4 +119,3 @@ export default function BottomNav() {
         </div>
     );
 }
-
