@@ -622,44 +622,51 @@ async def upload_revenue_excel(
                     default_cat = item.get('default_category', '?')
                     card_co = item.get('card_company')
                     
-                    # 1. Check VendorRule first (previously classified by user)
-                    rule = session.exec(
-                        apply_bid_filter(select(VendorRule), VendorRule, bid).where(
-                            VendorRule.original_name == memo,
-                            VendorRule.source == "bank_deposit_revenue"
-                        )
-                    ).first()
-                    cat = rule.category if rule else None
+                    # 1. Auto-classify known types (always skip modal)
+                    auto_cat = None
+                    if card_co:  # Auto-detected card company
+                        auto_cat = '카드입금'
+                    elif default_cat == '배달앱입금':
+                        auto_cat = '배달앱입금'
+                    elif default_cat == '페이입금':
+                        auto_cat = '페이입금'
+                    elif default_cat == '무시':
+                        auto_cat = '무시'
                     
-                    # 2. If no rule, auto-classify known types (skip modal)
-                    if not cat:
-                        if card_co:  # Auto-detected card company
-                            cat = '카드입금'
-                        elif default_cat == '배달앱입금':
-                            cat = '배달앱입금'
-                        elif default_cat == '페이입금':
-                            cat = '페이입금'
-                        elif default_cat == '무시':
-                            cat = '무시'
-                    
-                    # 3. If still no cat → need user classification (show in modal)
-                    if not cat and not classifications:
-                        if not hasattr(session, '_unclassified_memos'):
-                            session._unclassified_memos = {}
-                        if memo not in session._unclassified_memos:
-                            session._unclassified_memos[memo] = {
-                                "memo": memo,
-                                "total_amount": 0,
-                                "count": 0,
-                                "default_category": default_cat,
-                                "card_company": card_co,
-                                "sample_dates": []
-                            }
-                        session._unclassified_memos[memo]["total_amount"] += item['amount']
-                        session._unclassified_memos[memo]["count"] += 1
-                        if len(session._unclassified_memos[memo]["sample_dates"]) < 3:
-                            session._unclassified_memos[memo]["sample_dates"].append(item['date'])
-                        continue
+                    if auto_cat:
+                        cat = auto_cat
+                    else:
+                        # 2. Not auto-detected → must go through user classification
+                        # Check VendorRule for pre-filling default (but still show in modal)
+                        rule = session.exec(
+                            apply_bid_filter(select(VendorRule), VendorRule, bid).where(
+                                VendorRule.original_name == memo,
+                                VendorRule.source == "bank_deposit_revenue"
+                            )
+                        ).first()
+                        saved_cat = rule.category if rule else None
+                        
+                        if not classifications:
+                            # Show in modal — use saved VendorRule as default if exists
+                            if not hasattr(session, '_unclassified_memos'):
+                                session._unclassified_memos = {}
+                            if memo not in session._unclassified_memos:
+                                session._unclassified_memos[memo] = {
+                                    "memo": memo,
+                                    "total_amount": 0,
+                                    "count": 0,
+                                    "default_category": saved_cat or default_cat,
+                                    "card_company": card_co,
+                                    "sample_dates": []
+                                }
+                            session._unclassified_memos[memo]["total_amount"] += item['amount']
+                            session._unclassified_memos[memo]["count"] += 1
+                            if len(session._unclassified_memos[memo]["sample_dates"]) < 3:
+                                session._unclassified_memos[memo]["sample_dates"].append(item['date'])
+                            continue
+                        
+                        # 3. Classifications provided → apply from user selections
+                        cat = None
                     
                     # Apply classification from current upload classifications
                     if not cat and classifications:
