@@ -56,3 +56,20 @@ c:\WORK\SodamFN\
 
 - 로컬: `http://localhost:8000` (backend .venv에서 uvicorn 실행)
 - 배포: `https://sodamfn.twinverse.org` (Orbitron 관리)
+
+### 📱 모바일 UI 디자인 시스템 (2026-03)
+
+- **디자인 철학**: Mobile-First, 프리미엄 단일 스크롤, 터치 최적화
+- **색상 팔레트 (Slate 기반)**:
+  - 다크 Hero: `#1e293b` → `#334155` (그라디언트)
+  - 섹션 헤더: `#f1f5f9` → `#e2e8f0` (연한 그라디언트)
+  - 다크 서브헤더: `#334155` → `#475569`
+  - 차트 바: Teal 계열 (`#1e3a3a` / `#3d7b7b` / `#7fb5b5`)
+  - 업로드 탭: Blue(`#1e2d3b`), Green(`#1e3a2d`), Slate(`#1e293b`)
+- **공통 패턴**:
+  - `card-animate` 클래스 → `fadeInUp` 순차 등장 (animationDelay 0.05s)
+  - 아코디언: `useState` (`revOpen`, `expOpen`, `openMonths`)
+  - 모바일 탭: `isMobile ? 2탭 : 전체탭` 조건부 렌더링
+  - 금액 포맷: `fmtShort(v)` → 만/억 축약 + `toLocaleString('ko-KR')` 쉼표
+  - 숨김 스크롤바: `.revenue-page::-webkit-scrollbar { display: none }`
+- **적용 페이지**: ProfitLoss.jsx, RevenueManagement.jsx
