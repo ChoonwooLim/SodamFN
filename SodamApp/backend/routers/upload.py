@@ -641,6 +641,7 @@ async def upload_revenue_excel(
                                 "total_amount": 0,
                                 "count": 0,
                                 "default_category": default_cat,
+                                "card_company": item.get('card_company'),
                                 "sample_dates": []
                             }
                         session._unclassified_memos[memo]["total_amount"] += item['amount']
@@ -678,6 +679,17 @@ async def upload_revenue_excel(
                         session._bank_deposit_totals[cat] = {"amount": 0, "count": 0}
                     session._bank_deposit_totals[cat]["amount"] += amount
                     session._bank_deposit_totals[cat]["count"] += 1
+                    
+                    # Track per-card-company deposits
+                    card_co = item.get('card_company')
+                    if card_co and cat == '카드입금':
+                        if not hasattr(session, '_card_company_deposits'):
+                            session._card_company_deposits = {}
+                        if card_co not in session._card_company_deposits:
+                            session._card_company_deposits[card_co] = {"amount": 0, "count": 0}
+                        session._card_company_deposits[card_co]["amount"] += amount
+                        session._card_company_deposits[card_co]["count"] += 1
+                    
                     processed_months.add((date_obj.year, date_obj.month))
                     
                     # 현금매출 → 실제 매출로 저장 (POS에 안 잡힌 현금)
@@ -818,6 +830,7 @@ async def upload_revenue_excel(
             if file_type == "bank_deposit_card" and hasattr(session, '_bank_deposit_totals'):
                 totals = session._bank_deposit_totals
                 summary_info = result.get("summary", {})
+                card_company_deposits = getattr(session, '_card_company_deposits', {})
                 
                 # Calculate card fee: compare card sales from DB vs card+pay deposits
                 card_deposit_total = totals.get('카드입금', {}).get('amount', 0) + totals.get('페이입금', {}).get('amount', 0)
@@ -841,18 +854,53 @@ async def upload_revenue_excel(
                 card_sales_total = sum(e.amount for e in card_sales)
                 card_fee = card_sales_total - card_deposit_total if card_sales_total > 0 else 0
                 
+                # Per-card-company breakdown
+                # Map vendor names in DB to card company names
+                VENDOR_TO_COMPANY = {
+                    '신한': '신한카드', '국민': 'KB국민', 'KB': 'KB국민',
+                    'BC': 'BC카드', '비씨': 'BC카드', '현대': '현대카드',
+                    '하나': '하나카드', '삼성': '삼성카드', '우리': '우리카드',
+                    'NH': 'NH농협', '농협': 'NH농협', '롯데': '롯데카드',
+                }
+                card_sales_by_company = {}
+                for e in card_sales:
+                    vn = e.vendor_name or ''
+                    matched_company = None
+                    for kw, company in VENDOR_TO_COMPANY.items():
+                        if kw in vn:
+                            matched_company = company
+                            break
+                    if matched_company:
+                        if matched_company not in card_sales_by_company:
+                            card_sales_by_company[matched_company] = 0
+                        card_sales_by_company[matched_company] += e.amount
+                
+                # Build per-company fee table
+                all_companies = set(list(card_company_deposits.keys()) + list(card_sales_by_company.keys()))
+                card_company_fees = []
+                for co in sorted(all_companies):
+                    dep = card_company_deposits.get(co, {}).get('amount', 0)
+                    sales = card_sales_by_company.get(co, 0)
+                    fee = sales - dep
+                    rate = round(fee / sales * 100, 2) if sales > 0 else 0
+                    card_company_fees.append({
+                        "company": co,
+                        "deposit": dep,
+                        "sales": sales,
+                        "fee": fee,
+                        "rate": rate,
+                    })
+                
                 cash_count = totals.get('현금매출', {}).get('count', 0)
                 cash_total = totals.get('현금매출', {}).get('amount', 0)
                 
                 if inserted_count > 0:
-                    # 현금매출이 저장됨 → commit
                     upload_record = session.get(UploadHistory, upload_id)
                     if upload_record:
                         upload_record.record_count = inserted_count
                         session.add(upload_record)
                     session.commit()
                 else:
-                    # 저장할 매출 없음 → rollback + cleanup upload history
                     session.rollback()
                     with Session(engine) as cleanup_s:
                         old_up = cleanup_s.get(UploadHistory, upload_id)
@@ -870,6 +918,7 @@ async def upload_revenue_excel(
                         "card_sales": card_sales_total,
                         "card_fee": card_fee,
                         "card_fee_rate": round(card_fee / card_sales_total * 100, 2) if card_sales_total > 0 else 0,
+                        "card_companies": card_company_fees,
                         "cash_sales_count": cash_count,
                         "cash_sales_total": cash_total,
                         "categories": {k: v for k, v in totals.items()},

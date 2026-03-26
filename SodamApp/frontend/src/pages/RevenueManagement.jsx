@@ -1817,8 +1817,13 @@ export default function RevenueManagement() {
                                         background: `${color}08`, border: `1px solid ${color}20`,
                                     }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 6 }}>
                                                 {item.memo}
+                                                {item.card_company && (
+                                                    <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: '#3b82f615', color: '#3b82f6', fontWeight: 700, flexShrink: 0 }}>
+                                                        {item.card_company}
+                                                    </span>
+                                                )}
                                             </div>
                                             <div style={{ fontSize: 11, color: '#64748b' }}>
                                                 {item.count}건 · {Number(item.total_amount).toLocaleString()}원
@@ -1885,17 +1890,23 @@ export default function RevenueManagement() {
                                             msg += `💳 카드매출: ${Number(bs.card_sales).toLocaleString()}원\n`;
                                             msg += `💰 카드입금: ${Number(bs.card_deposit).toLocaleString()}원\n`;
                                             msg += `📊 카드수수료: ${Number(bs.card_fee).toLocaleString()}원 (${bs.card_fee_rate}%)\n\n`;
+                                            if (bs.card_companies && bs.card_companies.length > 0) {
+                                                msg += `\n💳 카드사별 수수료:\n`;
+                                                msg += `${'카드사'.padEnd(8)} ${'매출'.padStart(12)} ${'입금'.padStart(12)} ${'수수료'.padStart(10)} ${'%'.padStart(6)}\n`;
+                                                bs.card_companies.forEach(cc => {
+                                                    msg += `${cc.company.padEnd(8)} ${Number(cc.sales).toLocaleString().padStart(12)} ${Number(cc.deposit).toLocaleString().padStart(12)} ${Number(cc.fee).toLocaleString().padStart(10)} ${cc.rate}%\n`;
+                                                });
+                                            }
                                             if (bs.cash_sales_count > 0) {
-                                                msg += `💵 현금매출: ${bs.cash_sales_count}건 / ${Number(bs.cash_sales_total).toLocaleString()}원 → 매출 저장 ✅\n`;
+                                                msg += `\n💵 현금매출: ${bs.cash_sales_count}건 / ${Number(bs.cash_sales_total).toLocaleString()}원 → 매출 저장 ✅\n`;
                                             }
                                             if (bs.categories) {
                                                 msg += `\n📋 전체 분류:\n`;
                                                 Object.entries(bs.categories).forEach(([k, v]) => {
-                                                    const saved = k === '현금매출' ? ' ✅저장' : ' (집계만)';
+                                                    const saved = k === '현금매출' ? ' ✅저장' : '';
                                                     msg += `  ${k}: ${v.count}건 / ${Number(v.amount).toLocaleString()}원${saved}\n`;
                                                 });
                                             }
-                                            msg += `\nℹ️ 카드/페이/배달앱 입금은 이미 매출에 기록되어 중복 저장하지 않습니다.`;
                                             alert(msg);
                                         } else {
                                             alert(`✅ 처리 완료!\n${d.count || 0}건 저장${d.skipped ? `, ${d.skipped}건 중복 스킵` : ''}`);

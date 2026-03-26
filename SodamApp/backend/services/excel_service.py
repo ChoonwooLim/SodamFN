@@ -1247,30 +1247,71 @@ class ExcelService:
             
             if not row_date_obj: continue
 
-            # Default Category Guessing
+            # Default Category & Card Company Detection
             memo_no_space = memo.replace(' ', '')
-            card_kws = ['카드', '비씨', '케이비', '국민', '삼성', '현대', '롯데', '하나', '농협', 'BC', '우리카드', 'KB', 'SHC', 'NH']
-            pay_kws = ['제로페이', '네이버페이', '애플페이', '삼성페이', '카카오페이', '페이코', 'PAYCO', 'ZEROPAY', 'NAVERPAY', 'KAKAOPAY', 'APPLEPAY', 'SAMSUNGPAY', '간편결제']
-            non_card_kws = ['서울페이', '배달', '쿠팡', '카카오', '요기요', '배민']
             
-            is_card = False
-            if any(k in memo_no_space for k in card_kws):
-                is_card = True
-            elif any(k in memo_no_space for k in pay_kws):
-                is_card = True  # 페이도 카드매출과 동일하게 수수료 차감 후 입금
-            elif any(memo_no_space.startswith(p) for p in ['현', '우', '국']):
-                is_card = True
-                
-            if any(k in memo_no_space for k in non_card_kws):
-                is_card = False
-
-            default_cat = "카드수수료" if is_card else ("무시" if any(k in memo_no_space for k in non_card_kws) else "?")
+            # Card company detection from memo codes
+            CARD_COMPANY_PATTERNS = [
+                (['SHC', '신한카드', '신한'], '신한카드'),
+                (['KB', '국민'], 'KB국민'),
+                (['BC', '비씨', '비시'], 'BC카드'),
+                (['현대카드'], '현대카드'), # exact match first
+                (['하나'], '하나카드'),
+                (['삼성카드'], '삼성카드'), # exact match first
+                (['우리카드'], '우리카드'), # exact
+                (['NH', '농협'], 'NH농협'),
+                (['롯데'], '롯데카드'),
+            ]
+            # Prefix patterns (현=현대, 우=우리, 삼성=삼성, 국=국민)
+            PREFIX_CARD = {'현': '현대카드', '우': '우리카드', '삼성': '삼성카드', '국': 'KB국민'}
+            
+            pay_kws = ['제로페이', '네이버페이', '애플페이', '삼성페이', '카카오페이', '페이코',
+                        'PAYCO', 'ZEROPAY', 'NAVERPAY', 'KAKAOPAY', 'APPLEPAY', 'SAMSUNGPAY', '간편결제']
+            delivery_kws = ['배달', '쿠팡', '요기요', '배민', '땡겨요']
+            other_non_revenue = ['서울페이', '카카오페이정산']
+            
+            card_company = None
+            default_cat = '?'
+            
+            # 1) Check card company patterns
+            for patterns, company in CARD_COMPANY_PATTERNS:
+                if any(p in memo_no_space for p in patterns):
+                    card_company = company
+                    default_cat = '카드입금'
+                    break
+            
+            # 2) Prefix-based detection (현850570073 → 현대카드)
+            if not card_company:
+                for prefix, company in PREFIX_CARD.items():
+                    if memo_no_space.startswith(prefix) and len(memo_no_space) > len(prefix):
+                        # Check if rest is numeric (card deposit code)
+                        rest = memo_no_space[len(prefix):]
+                        if rest[0].isdigit():
+                            card_company = company
+                            default_cat = '카드입금'
+                            break
+            
+            # 3) Check pay services
+            if not card_company:
+                if any(k in memo_no_space for k in pay_kws):
+                    default_cat = '페이입금'
+            
+            # 4) Check delivery apps
+            if default_cat == '?':
+                if any(k in memo_no_space for k in delivery_kws):
+                    default_cat = '배달앱입금'
+            
+            # 5) Check other non-revenue
+            if default_cat == '?':
+                if any(k in memo_no_space for k in other_non_revenue):
+                    default_cat = '무시'
 
             data.append({
                 "date": row_date_obj.strftime("%Y-%m-%d"),
                 "amount": amount,
                 "memo": memo.strip(),
-                "default_category": default_cat
+                "default_category": default_cat,
+                "card_company": card_company,
             })
 
         if not data:
