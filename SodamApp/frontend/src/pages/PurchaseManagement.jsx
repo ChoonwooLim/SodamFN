@@ -644,7 +644,8 @@ export default function PurchaseManagement() {
                                 const amount = catInfo?.amount || 0;
                                 const bizTotal = EXPENSE_CATEGORIES.filter(c => c.id !== '개인가계부').reduce((s, c) => s + (categoryData[c.id]?.amount || 0), 0);
                                 const pct = bizTotal > 0 ? (amount / bizTotal * 100) : 0;
-                                if (amount === 0) return null;
+                                const ALWAYS_SHOW = ['배달앱수수료', '카드수수료'];
+                                if (amount === 0 && !ALWAYS_SHOW.includes(cat.id)) return null;
                                 return (
                                     <div className="category-bar-item" key={cat.id}>
                                         <div className="bar-label">
