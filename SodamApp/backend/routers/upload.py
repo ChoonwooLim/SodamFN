@@ -326,7 +326,23 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user), bid 
                 session.delete(vendor)
                 vendor_delete_count += 1
         
-        # 3. Update History Status
+        # 3. If this was a bank deposit upload, also reset classification rules
+        if history.upload_type == "revenue":
+            # Check if any deleted vendors were bank deposit related
+            bank_vendors = [v for v in vendors_created if v.item and '은행입금' in v.item]
+            if bank_vendors or any('현금매출' in (e.vendor_name or '') for e in expenses):
+                # Delete all bank_deposit_revenue VendorRules for this business
+                from models import VendorRule
+                bank_rules = session.exec(
+                    apply_bid_filter(select(VendorRule), VendorRule, bid).where(
+                        VendorRule.source == "bank_deposit_revenue"
+                    )
+                ).all()
+                for r in bank_rules:
+                    session.delete(r)
+                print(f"Reset {len(bank_rules)} bank deposit classification rules")
+        
+        # 4. Update History Status
         history.status = "rolled_back"
         session.add(history)
         
