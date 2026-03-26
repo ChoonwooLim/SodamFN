@@ -1777,14 +1777,14 @@ export default function RevenueManagement() {
                             display: 'flex', gap: 6, marginBottom: 14,
                         }}>
                             {[
-                                { id: 'camera', label: '📷 촬영/이미지' },
-                                { id: 'excel', label: '📄 문서 업로드' },
-                                { id: 'history', label: '🔄 취소/기록' },
+                                { id: 'camera', label: '📷 촬영/이미지', bg: 'linear-gradient(135deg, #1e2d3b, #2d4a5e)' },
+                                { id: 'excel', label: '📄 문서 업로드', bg: 'linear-gradient(135deg, #1e3a2d, #2d5e4a)' },
+                                { id: 'history', label: '🔄 취소/기록', bg: 'linear-gradient(135deg, #1e293b, #334155)' },
                             ].map(t => (
                                 <button key={t.id} onClick={() => setUploadTab(t.id)} style={{
                                     flex: 1, padding: '10px 6px', borderRadius: 10, border: 'none',
                                     fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                                    background: uploadTab === t.id ? 'linear-gradient(135deg, #1e293b, #334155)' : '#f1f5f9',
+                                    background: uploadTab === t.id ? t.bg : '#f1f5f9',
                                     color: uploadTab === t.id ? '#f1f5f9' : '#64748b',
                                     transition: 'all 0.2s',
                                 }}>
@@ -1837,7 +1837,9 @@ export default function RevenueManagement() {
                                         <>
                                             <div style={{
                                                 width: 56, height: 56, borderRadius: 16, margin: '0 auto 12px',
-                                                background: 'linear-gradient(135deg, #1e293b, #334155)',
+                                                background: uploadTab === 'camera'
+                                                    ? 'linear-gradient(135deg, #1e2d3b, #2d4a5e)'
+                                                    : 'linear-gradient(135deg, #1e3a2d, #2d5e4a)',
                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             }}>
                                                 {uploadTab === 'camera' ? <Camera size={24} color="#f1f5f9" /> : <UploadCloud size={24} color="#f1f5f9" />}
