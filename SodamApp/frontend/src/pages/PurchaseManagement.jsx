@@ -639,10 +639,11 @@ export default function PurchaseManagement() {
                     <div className="dashboard-section">
                         <h3>📂 카테고리별 매입 현황</h3>
                         <div className="category-bars">
-                            {EXPENSE_CATEGORIES.map(cat => {
+                            {EXPENSE_CATEGORIES.filter(cat => cat.id !== '개인가계부').map(cat => {
                                 const catInfo = categoryData[cat.id];
                                 const amount = catInfo?.amount || 0;
-                                const pct = totalAmount > 0 ? (amount / totalAmount * 100) : 0;
+                                const bizTotal = EXPENSE_CATEGORIES.filter(c => c.id !== '개인가계부').reduce((s, c) => s + (categoryData[c.id]?.amount || 0), 0);
+                                const pct = bizTotal > 0 ? (amount / bizTotal * 100) : 0;
                                 if (amount === 0) return null;
                                 return (
                                     <div className="category-bar-item" key={cat.id}>
