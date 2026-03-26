@@ -928,6 +928,27 @@ async def upload_revenue_excel(
                 cash_count = totals.get('현금매출', {}).get('count', 0)
                 cash_total = totals.get('현금매출', {}).get('amount', 0)
                 
+                # Save card fee to MonthlyProfitLoss
+                from models import MonthlyProfitLoss
+                with Session(engine) as pl_session:
+                    pl = pl_session.exec(
+                        apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                            MonthlyProfitLoss.year == target_year,
+                            MonthlyProfitLoss.month == target_month,
+                        )
+                    ).first()
+                    if pl:
+                        pl.expense_card_fee = card_fee
+                        pl_session.add(pl)
+                    else:
+                        pl = MonthlyProfitLoss(
+                            year=target_year, month=target_month,
+                            business_id=bid, expense_card_fee=card_fee
+                        )
+                        pl_session.add(pl)
+                    pl_session.commit()
+                    print(f"Saved card fee {card_fee:,} to {target_year}年{target_month}月 P/L")
+                
                 if inserted_count > 0:
                     upload_record = session.get(UploadHistory, upload_id)
                     if upload_record:
