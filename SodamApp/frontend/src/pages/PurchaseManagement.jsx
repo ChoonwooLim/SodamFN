@@ -599,6 +599,12 @@ export default function PurchaseManagement() {
                         </div>
                     );
                 })}
+                {/* 배달앱 수수료 카드 */}
+                <div className="purchase-summary-card" style={{ borderTop: '3px solid #ef4444' }}>
+                    <div className="card-label">🛵 배달앱 수수료</div>
+                    <div className="card-value" style={{ color: '#ef4444' }}>{formatNumber(summary.total_delivery_fee || 0)}원</div>
+                    <div className="card-sub">{summary.delivery_fees?.length || 0}개 앱</div>
+                </div>
             </div>
 
             {/* ── Tab Bar ── */}
