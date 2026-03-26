@@ -392,7 +392,7 @@ async def upload_revenue_excel(
     """
     import traceback
     from sqlmodel import select
-    from models import Vendor, DailyExpense, UploadHistory
+    from models import Vendor, DailyExpense, UploadHistory, VendorRule
     from services.profit_loss_service import sync_all_expenses, sync_revenue_to_pl
     
     try:
