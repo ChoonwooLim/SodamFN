@@ -30,6 +30,7 @@ const EXPENSE_CATEGORIES = [
     { id: '보험료', label: '보험료', icon: '🛡️', color: '#f97316' },
     { id: '인건비', label: '인건비', icon: '👷', color: '#0d9488' },
     { id: '카드수수료', label: '카드수수료', icon: '💳', color: '#ef4444' },
+    { id: '배달앱수수료', label: '배달앱 수수료', icon: '🛵', color: '#f43f5e' },
     { id: '기타경비', label: '기타경비', icon: '📋', color: '#64748b' },
     { id: '개인가계부', label: '개인가계부', icon: '👤', color: '#f59e0b' },
 ];
@@ -551,7 +552,11 @@ export default function PurchaseManagement() {
     // ─── Summary values ───
     const totalAmount = summary.total || 0;
     const totalCount = summary.count || 0;
-    const categoryData = summary.by_category || {};
+    const categoryData = { ...(summary.by_category || {}) };
+    // Inject delivery app fee as virtual category for chart display
+    if (summary.total_delivery_fee > 0) {
+        categoryData['배달앱수수료'] = { amount: summary.total_delivery_fee, count: summary.delivery_fees?.length || 0 };
+    }
     const cardData = summary.by_card_company || {};
     const bankData = summary.by_bank_transfer || {};
     const topVendors = summary.top_vendors || [];
