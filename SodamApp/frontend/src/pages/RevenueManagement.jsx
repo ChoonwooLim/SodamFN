@@ -1153,12 +1153,12 @@ export default function RevenueManagement() {
                                                 }, 0);
                                                 const feeRate = daySales > 0 ? ((daySales - daySettlement) / daySales * 100) : 0;
                                                 return (
-                                                    <td key={d} className="grid-day-total" style={{ color: feeRate > 0 ? '#ef4444' : '#475569' }}>
+                                                    <td key={d} className="grid-day-total" style={{ color: '#0f172a' }}>
                                                         {daySales > 0 ? `${feeRate.toFixed(1)}%` : '-'}
                                                     </td>
                                                 );
                                             })}
-                                            <td className="grid-grand-total" style={{ color: '#ef4444' }}>
+                                            <td className="grid-grand-total" style={{ color: '#0f172a' }}>
                                                 {(() => {
                                                     const DELIVERY_CATS = REVENUE_CATEGORIES.filter(c => c.id === 'delivery');
                                                     const deliveryVendors = DELIVERY_CATS.flatMap(c => groupedVendorsGrid[c.id] || []);

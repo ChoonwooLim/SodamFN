@@ -968,11 +968,15 @@
 .grid-sales-subtotal .grid-subtotal-cell {
     background: #fef3c7;
     color: #92400e;
+    font-size: 12px !important;
+    font-weight: 800 !important;
 }
 
 .grid-sales-subtotal .grid-subtotal-total {
     background: #fde68a;
     color: #78350f;
+    font-size: 13px !important;
+    font-weight: 900 !important;
 }
 
 /* ── Grand Total ── */
