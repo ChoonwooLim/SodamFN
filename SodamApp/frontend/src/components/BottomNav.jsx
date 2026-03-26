@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Receipt, BarChart3, ShoppingBag, CreditCard, Truck } from 'lucide-react';
+import { Receipt, BarChart3, ShoppingBag, CreditCard, Truck, MoreHorizontal } from 'lucide-react';
 
 export default function BottomNav() {
     const location = useLocation();
@@ -13,8 +13,9 @@ export default function BottomNav() {
         { icon: Receipt, path: '/finance/profitloss', label: '손익' },
         { icon: BarChart3, path: '/revenue', label: '매출' },
         { icon: ShoppingBag, path: '/purchase', label: '매입' },
-        { icon: CreditCard, path: '/finance/card-sales', label: '카드분석' },
+        { icon: CreditCard, path: '/finance/card-sales', label: '카드' },
         { icon: Truck, path: '/revenue?view=delivery', label: '배달앱' },
+        { icon: MoreHorizontal, path: '/more', label: '더보기' },
     ];
 
     return (
@@ -27,7 +28,7 @@ export default function BottomNav() {
                 display: 'flex',
                 justifyContent: 'space-around',
                 alignItems: 'center',
-                padding: '6px 4px 8px',
+                padding: '4px 2px 6px',
             }}>
                 {navItems.map((item) => {
                     const Icon = item.icon;
@@ -42,10 +43,10 @@ export default function BottomNav() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                padding: '4px 6px',
-                                borderRadius: 12,
+                                padding: '4px 4px',
+                                borderRadius: 10,
                                 textDecoration: 'none',
-                                minWidth: 56,
+                                minWidth: 48,
                                 transition: 'all 0.2s',
                                 position: 'relative',
                             }}
@@ -54,9 +55,9 @@ export default function BottomNav() {
                                 <div style={{
                                     position: 'absolute',
                                     top: 0,
-                                    width: 36,
-                                    height: 36,
-                                    borderRadius: 12,
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 10,
                                     background: 'rgba(59,130,246,0.1)',
                                 }} />
                             )}
@@ -70,8 +71,8 @@ export default function BottomNav() {
                                 }}
                             />
                             <span style={{
-                                fontSize: 10,
-                                marginTop: 3,
+                                fontSize: 9,
+                                marginTop: 2,
                                 fontWeight: active ? 700 : 500,
                                 color: active ? '#3b82f6' : '#94a3b8',
                                 letterSpacing: -0.3,
