@@ -1137,15 +1137,55 @@ export default function RevenueManagement() {
                                         </React.Fragment>
                                     ))}
 
-                                    <tr className="grid-grand-total-row">
-                                        <td className="grid-vendor-cell"><strong>총 합계</strong></td>
-                                        {days.map(d => (
-                                            <td key={d} className="grid-day-total">
-                                                {dayTotals[d] > 0 ? formatNumber(dayTotals[d]) : '-'}
+                                    {tab === 'delivery' ? (
+                                        <tr className="grid-grand-total-row">
+                                            <td className="grid-vendor-cell"><strong>수수료율(%)</strong></td>
+                                            {days.map(d => {
+                                                const DELIVERY_CATS = REVENUE_CATEGORIES.filter(c => c.id === 'delivery');
+                                                const deliveryVendors = DELIVERY_CATS.flatMap(c => groupedVendorsGrid[c.id] || []);
+                                                const daySales = deliveryVendors.reduce((sum, v) => sum + (vendorGrid[v.id]?.amounts[d] || 0), 0);
+                                                const VENDOR_CHANNEL_MAP = {'쿠팡': '쿠팡', '쿠팡이츠': '쿠팡', '배달의민족': '배민', '배민': '배민', '요기요': '요기요', '땡겨요': '땡겨요'};
+                                                const daySettlement = deliveryVendors.reduce((sum, v) => {
+                                                    const a = vendorGrid[v.id]?.amounts[d] || 0;
+                                                    const ch = VENDOR_CHANNEL_MAP[v.name];
+                                                    if (!ch || !deliveryRatios[ch]) return sum;
+                                                    return sum + Math.round(a * deliveryRatios[ch].ratio);
+                                                }, 0);
+                                                const feeRate = daySales > 0 ? ((daySales - daySettlement) / daySales * 100) : 0;
+                                                return (
+                                                    <td key={d} className="grid-day-total" style={{ color: feeRate > 0 ? '#ef4444' : '#475569' }}>
+                                                        {daySales > 0 ? `${feeRate.toFixed(1)}%` : '-'}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="grid-grand-total" style={{ color: '#ef4444' }}>
+                                                {(() => {
+                                                    const DELIVERY_CATS = REVENUE_CATEGORIES.filter(c => c.id === 'delivery');
+                                                    const deliveryVendors = DELIVERY_CATS.flatMap(c => groupedVendorsGrid[c.id] || []);
+                                                    const totalSales = deliveryVendors.reduce((sum, v) => sum + (vendorTotals[v.id] || 0), 0);
+                                                    const VENDOR_CHANNEL_MAP = {'쿠팡': '쿠팡', '쿠팡이츠': '쿠팡', '배달의민족': '배민', '배민': '배민', '요기요': '요기요', '땡겨요': '땡겨요'};
+                                                    const totalSettlement = deliveryVendors.reduce((sum, v) => {
+                                                        const amounts = vendorGrid[v.id]?.amounts || {};
+                                                        const ch = VENDOR_CHANNEL_MAP[v.name];
+                                                        if (!ch || !deliveryRatios[ch]) return sum;
+                                                        return sum + Object.values(amounts).reduce((s, a) => s + Math.round(a * deliveryRatios[ch].ratio), 0);
+                                                    }, 0);
+                                                    const rate = totalSales > 0 ? ((totalSales - totalSettlement) / totalSales * 100) : 0;
+                                                    return `${rate.toFixed(1)}%`;
+                                                })()}
                                             </td>
-                                        ))}
-                                        <td className="grid-grand-total">{formatNumber(gridGrandTotal)}</td>
-                                    </tr>
+                                        </tr>
+                                    ) : (
+                                        <tr className="grid-grand-total-row">
+                                            <td className="grid-vendor-cell"><strong>총 합계</strong></td>
+                                            {days.map(d => (
+                                                <td key={d} className="grid-day-total">
+                                                    {dayTotals[d] > 0 ? formatNumber(dayTotals[d]) : '-'}
+                                                </td>
+                                            ))}
+                                            <td className="grid-grand-total">{formatNumber(gridGrandTotal)}</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

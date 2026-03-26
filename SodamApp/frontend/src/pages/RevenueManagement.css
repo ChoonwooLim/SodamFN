@@ -907,20 +907,20 @@
     left: 0;
     z-index: 5;
     background: #f8fafc;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
     white-space: nowrap;
     border-bottom: 2px solid #e2e8f0;
 }
 
 .grid-subtotal-cell {
-    padding: 6px 6px;
+    padding: 8px 6px;
     text-align: right;
-    font-size: 11px;
-    font-weight: 700;
-    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+    color: #0f172a;
     background: #f8fafc;
     border-bottom: 2px solid #e2e8f0;
     font-variant-numeric: tabular-nums;
@@ -930,10 +930,10 @@
     position: sticky;
     right: 0;
     z-index: 5;
-    background: #eef2ff;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 800;
+    background: #dbeafe;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: 900;
     color: #1e40af;
     text-align: right;
     border-bottom: 2px solid #e2e8f0;
@@ -986,11 +986,11 @@
 }
 
 .grid-day-total {
-    padding: 8px 6px;
+    padding: 6px 6px;
     text-align: right;
-    font-size: 12px;
-    font-weight: 800;
-    color: #0f172a;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
     background: #f1f5f9;
     border-top: 2px solid #cbd5e1;
     font-variant-numeric: tabular-nums;
@@ -1000,10 +1000,10 @@
     position: sticky;
     right: 0;
     z-index: 5;
-    background: #dbeafe;
-    padding: 8px 10px;
-    font-size: 13px;
-    font-weight: 900;
+    background: #eef2ff;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 800;
     color: #1e40af;
     text-align: right;
     border-top: 2px solid #cbd5e1;
