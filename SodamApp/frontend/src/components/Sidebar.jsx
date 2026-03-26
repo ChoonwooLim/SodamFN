@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet } from 'lucide-react';
+import api from '../api';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -11,6 +12,9 @@ export default function Sidebar() {
     const [boardOpen, setBoardOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
+    // SuperAdmin view-as state
+    const [businesses, setBusinesses] = useState([]);
+    const [viewAsBid, setViewAsBid] = useState(localStorage.getItem('view_as_business_id') || '');
 
     // Close drawer on route change
     useEffect(() => {
@@ -44,10 +48,26 @@ export default function Sidebar() {
         }
     }
 
-    // Fetch dynamic business name on mount (skip for superadmin)
+    // Fetch businesses for SuperAdmin dropdown
     useEffect(() => {
         if (user.role === 'superadmin') {
-            setBusinessName('소담FN');
+            api.get('/superadmin/businesses/dropdown')
+                .then(res => {
+                    if (res.data?.data) setBusinesses(res.data.data);
+                })
+                .catch(err => console.error('Failed to fetch businesses for dropdown', err));
+        }
+    }, [user.role]);
+
+    // Fetch dynamic business name on mount
+    useEffect(() => {
+        if (user.role === 'superadmin') {
+            if (viewAsBid) {
+                const biz = businesses.find(b => String(b.id) === String(viewAsBid));
+                setBusinessName(biz ? biz.name : '사업장 선택');
+            } else {
+                setBusinessName('소담FN');
+            }
             return;
         }
         const bid = user.business_id || localStorage.getItem('business_id');
@@ -65,31 +85,52 @@ export default function Sidebar() {
                 })
                 .catch(err => console.error('Failed to fetch business info for sidebar', err));
         }
-    }, [user.business_id]);
+    }, [user.business_id, viewAsBid, businesses]);
 
-    const mainMenuItems = user.role === 'superadmin'
-        ? [
-            { icon: Shield, label: 'SuperAdmin 대시보드', path: '/superadmin' },
-            { icon: Building2, label: '매장 관리', path: '/superadmin?tab=stores' },
-            { icon: FileText, label: '사용신청 관리', path: '/superadmin?tab=applications' },
-            { icon: Users, label: '사용자 관리', path: '/superadmin?tab=users' },
-            { icon: TrendingUp, label: '실시간 모니터링', path: '/superadmin?tab=monitoring' },
-            { icon: CreditCard, label: '요금 정산', path: '/superadmin?tab=billing' },
-            { icon: Bell, label: '공지 배포', path: '/superadmin?tab=announcements' },
-            { icon: BarChart3, label: '통계/벤치마크', path: '/superadmin?tab=analytics' },
-            { icon: FileText, label: '작업일지', path: '/superadmin/worklog' },
-        ]
+    // Handle business switch for SuperAdmin
+    const handleViewAsChange = (newBid) => {
+        if (newBid) {
+            localStorage.setItem('view_as_business_id', newBid);
+            localStorage.setItem('business_id', newBid);
+        } else {
+            localStorage.removeItem('view_as_business_id');
+            localStorage.removeItem('business_id');
+        }
+        setViewAsBid(newBid);
+        window.location.reload();
+    };
+
+    const isSuperAdmin = user.role === 'superadmin';
+    const isViewingBusiness = isSuperAdmin && viewAsBid;
+
+    // Admin menu items (shared between admin and superadmin-viewing-business)
+    const adminMenuItems = [
+        { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
+        { icon: BarChart3, label: '매출 관리', path: '/revenue' },
+        { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
+        { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
+        { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
+        { icon: Users, label: '직원 관리', path: '/staff' },
+        { icon: Wallet, label: '퇴직금 관리', path: '/hr/retirement' },
+        { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
+    ];
+
+    const superAdminMenuItems = [
+        { icon: Shield, label: 'SuperAdmin 대시보드', path: '/superadmin' },
+        { icon: Building2, label: '매장 관리', path: '/superadmin?tab=stores' },
+        { icon: FileText, label: '사용신청 관리', path: '/superadmin?tab=applications' },
+        { icon: Users, label: '사용자 관리', path: '/superadmin?tab=users' },
+        { icon: TrendingUp, label: '실시간 모니터링', path: '/superadmin?tab=monitoring' },
+        { icon: CreditCard, label: '요금 정산', path: '/superadmin?tab=billing' },
+        { icon: Bell, label: '공지 배포', path: '/superadmin?tab=announcements' },
+        { icon: BarChart3, label: '통계/벤치마크', path: '/superadmin?tab=analytics' },
+        { icon: FileText, label: '작업일지', path: '/superadmin/worklog' },
+    ];
+
+    const mainMenuItems = isSuperAdmin
+        ? (isViewingBusiness ? adminMenuItems : superAdminMenuItems)
         : user.role === 'admin'
-        ? [
-            { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
-            { icon: BarChart3, label: '매출 관리', path: '/revenue' },
-            { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
-            { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
-            { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
-            { icon: Users, label: '직원 관리', path: '/staff' },
-            { icon: Wallet, label: '퇴직금 관리', path: '/hr/retirement' },
-            { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
-        ]
+        ? adminMenuItems
         : [
             { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
             { icon: FileSignature, label: '내 전자계약', path: '/contracts/my' },
@@ -101,8 +142,12 @@ export default function Sidebar() {
         { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-cyan-400' },
     ];
 
-    const bottomMenuItems = user.role === 'superadmin'
+    const bottomMenuItems = isSuperAdmin
         ? [
+            ...(isViewingBusiness ? [
+                { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
+                { icon: Settings, label: '설정', path: '/settings' },
+            ] : []),
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
             { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
         ]
@@ -131,7 +176,6 @@ export default function Sidebar() {
         const isActive = fullPath.includes('?')
             ? location.pathname + location.search === fullPath
             : location.pathname === fullPath;
-        const isSuperAdmin = user.role === 'superadmin';
         const activeColor = isSuperAdmin
             ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
             : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20';
@@ -159,15 +203,15 @@ export default function Sidebar() {
                     ) : user.profile_image ? (
                         <img src={user.profile_image} alt="Profile" className="w-10 h-10 rounded-full border border-slate-700 object-cover" />
                     ) : (
-                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
+                        <div className={`w-10 h-10 rounded-full ${isSuperAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center font-bold text-white shadow-lg ${isSuperAdmin ? 'shadow-amber-500/20' : 'shadow-blue-500/20'}`}>
                             {user.real_name?.[0] || 'U'}
                         </div>
                     )}
                     <div>
                         <h2 className="text-xl font-bold text-white leading-tight">{user.real_name}</h2>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold uppercase tracking-wider">
-                                {user.grade}
+                            <span className={`text-xs px-2 py-0.5 rounded ${isSuperAdmin ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'} font-bold uppercase tracking-wider`}>
+                                {isSuperAdmin ? 'SUPER' : user.grade}
                             </span>
                             <span className="text-xs text-slate-500 font-medium">
                                 {user.role === 'superadmin' ? '플랫폼 총괄' : user.role === 'admin' ? '관리자' : '직원'}
@@ -175,10 +219,37 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
-                <div className="mt-6 -mx-2 mb-2">
-                    <div className="bg-[#202c27] border-t border-[#33423b] border-b-4 border-b-[#141b18] rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all">
+
+                {/* SuperAdmin 사업장 전환 드롭다운 */}
+                {isSuperAdmin && businesses.length > 0 && (
+                    <div className="mt-3 mb-2">
+                        <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <ArrowLeftRight size={10} />
+                            사업장 전환
+                        </label>
+                        <select
+                            value={viewAsBid}
+                            onChange={(e) => handleViewAsChange(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
+                        >
+                            <option value="">전체 보기 (SuperAdmin)</option>
+                            {businesses.map(b => (
+                                <option key={b.id} value={b.id}>{b.name}</option>
+                            ))}
+                        </select>
+                        {viewAsBid && (
+                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-400">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                현재 {businesses.find(b => String(b.id) === String(viewAsBid))?.name || ''} 관리자 뷰
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="mt-3 -mx-2 mb-2">
+                    <div className={`${isViewingBusiness ? 'bg-[#1a2636] border-t border-[#2a3a4d] border-b-4 border-b-[#0f1923]' : 'bg-[#202c27] border-t border-[#33423b] border-b-4 border-b-[#141b18]'} rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all`}>
                         <h1 className="text-xl font-black tracking-tight flex flex-nowrap items-center justify-center py-2.5 px-3 whitespace-nowrap break-keep">
-                            <span className="text-orange-500 drop-shadow-sm whitespace-nowrap break-keep shrink-0">{businessName}</span>
+                            <span className={`${isViewingBusiness ? 'text-amber-400' : 'text-orange-500'} drop-shadow-sm whitespace-nowrap break-keep shrink-0`}>{businessName}</span>
                             <span className="text-slate-600 font-light mx-2 shrink-0">|</span>
                             <span className="text-white">셈</span><span className="text-blue-500">하나</span>
                         </h1>
@@ -186,10 +257,20 @@ export default function Sidebar() {
                 </div>
             </div>
             <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
+                {/* SuperAdmin: show platform menu link when viewing a business */}
+                {isViewingBusiness && (
+                    <Link
+                        to="/superadmin"
+                        className="flex items-center gap-3 px-4 py-2 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all text-xs font-medium"
+                    >
+                        <Shield size={16} />
+                        <span>← SuperAdmin 대시보드</span>
+                    </Link>
+                )}
                 {mainMenuItems.map(renderMenuItem)}
 
                 {/* ═══ 통합게시판관리 (접이식 서브메뉴) ═══ */}
-                {user.role === 'admin' && user.role !== 'superadmin' && (
+                {(user.role === 'admin' || isViewingBusiness) && (
                     <div>
                         <button
                             onClick={() => setBoardOpen(!boardOpen)}
@@ -233,7 +314,7 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-                {user.role === 'admin' && user.role !== 'superadmin' && (
+                {(user.role === 'admin' || isViewingBusiness) && (
                     <>
                         <Link
                             to="/staff-app-preview"
@@ -253,8 +334,10 @@ export default function Sidebar() {
                         </Link>
                     </>
                 )}
-                <Link
-                    to="/"
+                <a
+                    href="/"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group"
                 >
                     <Home size={20} className="text-slate-400 group-hover:text-white transition-colors" />
@@ -263,7 +346,8 @@ export default function Sidebar() {
                         <span className="text-slate-600 font-light mx-1.5">|</span>
                         <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
                     </span>
-                </Link>
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 font-medium">새 탭</span>
+                </a>
                 <button
                     onClick={handleLogout}
                     className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-white transition-colors"

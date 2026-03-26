@@ -17,6 +17,35 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
+        // ── Auto-login: if a valid token exists, skip login page ──
+        const existingToken = localStorage.getItem('token');
+        if (existingToken && !searchParams.get('token')) {
+            try {
+                const payload = JSON.parse(atob(existingToken.split('.')[1]));
+                // Check token expiration (exp is in seconds)
+                const isExpired = payload.exp && (payload.exp * 1000 < Date.now());
+                if (!isExpired) {
+                    const role = payload.role;
+                    if (role === 'superadmin' || role === 'admin') {
+                        navigate('/dashboard', { replace: true });
+                    } else if (role === 'guest') {
+                        navigate('/guest', { replace: true });
+                    } else {
+                        navigate('/dashboard', { replace: true });
+                    }
+                    return;
+                } else {
+                    // Token expired — clear it
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user_role');
+                }
+            } catch {
+                // Invalid token — clear it
+                localStorage.removeItem('token');
+                localStorage.removeItem('user_role');
+            }
+        }
+
         // Handle social login callback token
         const token = searchParams.get('token');
         if (token) {
@@ -71,7 +100,7 @@ export default function LoginPage() {
             setLoading(false); // Reset loading BEFORE navigate
 
             if (payload.role === 'superadmin') {
-                navigate('/superadmin');
+                navigate('/dashboard');
             } else if (payload.role === 'admin') {
                 navigate('/dashboard');
             } else if (payload.role === 'guest') {

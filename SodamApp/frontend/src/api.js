@@ -8,12 +8,17 @@ const api = axios.create({
     baseURL: `${API_BASE}/api`,
 });
 
-// Request interceptor: attach JWT token
+// Request interceptor: attach JWT token + SuperAdmin view-as header
 api.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
+        }
+        // SuperAdmin "View As" feature: scope all API calls to selected business
+        const viewAsBid = localStorage.getItem('view_as_business_id');
+        if (viewAsBid) {
+            config.headers['X-View-As-Business'] = viewAsBid;
         }
         return config;
     },

@@ -905,3 +905,21 @@ def reject_store_application(
             "status": "success",
             "message": f"'{application.business_name}' 사용신청이 거절되었습니다."
         }
+
+
+# ==========================================
+# 9. SuperAdmin 사업장 전환 (View As)
+# ==========================================
+
+@router.get("/businesses/dropdown")
+def list_businesses_dropdown(admin: User = Depends(get_superadmin_user)):
+    """사업장 전환 드롭다운용 경량 목록"""
+    with Session(engine) as s:
+        businesses = s.exec(
+            select(Business).where(Business.is_active == True).order_by(Business.name)
+        ).all()
+        return {
+            "status": "success",
+            "data": [{"id": b.id, "name": b.name, "business_type": b.business_type} for b in businesses]
+        }
+

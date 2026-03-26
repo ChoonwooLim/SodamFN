@@ -139,8 +139,14 @@ export default function PlatformLandingPage() {
                         {NAV_ITEMS.map(item => (
                             <button key={item.label} onClick={() => scrollTo(item.ref)} className="text-sm text-slate-400 hover:text-white transition-colors">{item.label}</button>
                         ))}
-                        <Link to="/login" className="text-sm text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"><LogIn size={14} /> 로그인</Link>
-                        <Link to="/signup" className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-400 transition-all">무료 시작</Link>
+                        {localStorage.getItem('token') ? (
+                            <Link to="/dashboard" className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-400 transition-all flex items-center gap-1"><LogIn size={14} /> 대시보드</Link>
+                        ) : (
+                            <>
+                                <Link to="/login" className="text-sm text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"><LogIn size={14} /> 로그인</Link>
+                                <Link to="/signup" className="bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-400 transition-all">무료 시작</Link>
+                            </>
+                        )}
                     </div>
                     {/* Mobile */}
                     <button onClick={() => setMobileMenu(!mobileMenu)} className="md:hidden p-2">
@@ -154,8 +160,14 @@ export default function PlatformLandingPage() {
                             <button key={item.label} onClick={() => scrollTo(item.ref)} className="block w-full text-left text-sm text-slate-300 py-2">{item.label}</button>
                         ))}
                         <div className="flex gap-2 pt-2 border-t border-white/10">
-                            <Link to="/login" className="flex-1 text-center py-2.5 bg-white/10 rounded-xl text-sm font-bold">로그인</Link>
-                            <Link to="/signup" className="flex-1 text-center py-2.5 bg-amber-500 text-slate-900 rounded-xl text-sm font-bold">무료 시작</Link>
+                            {localStorage.getItem('token') ? (
+                                <Link to="/dashboard" className="flex-1 text-center py-2.5 bg-amber-500 text-slate-900 rounded-xl text-sm font-bold">대시보드</Link>
+                            ) : (
+                                <>
+                                    <Link to="/login" className="flex-1 text-center py-2.5 bg-white/10 rounded-xl text-sm font-bold">로그인</Link>
+                                    <Link to="/signup" className="flex-1 text-center py-2.5 bg-amber-500 text-slate-900 rounded-xl text-sm font-bold">무료 시작</Link>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

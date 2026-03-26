@@ -13,11 +13,15 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "sodam_fn_dev_only_change_in_production
 ALGORITHM = "HS256"
 
 
-def get_bid_from_token(authorization: Optional[str] = Header(None)) -> Optional[int]:
+def get_bid_from_token(authorization: Optional[str] = Header(None), x_view_as_business: Optional[int] = Header(None)) -> Optional[int]:
     """
     Extract business_id from JWT token in Authorization header.
     Returns None for superadmin (no filtering) or if no token present.
     Returns business_id for admin/staff users.
+    
+    SuperAdmin 'View As' feature:
+      If a superadmin sends the X-View-As-Business header, return that business_id
+      so all data queries are scoped to that business — same view as the admin.
     """
     if not authorization:
         return None
@@ -27,7 +31,10 @@ def get_bid_from_token(authorization: Optional[str] = Header(None)) -> Optional[
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         role = payload.get("role", "")
         if role == "superadmin":
-            return None  # SuperAdmin sees everything
+            # If superadmin is viewing a specific business, use that business_id
+            if x_view_as_business is not None:
+                return x_view_as_business
+            return None  # SuperAdmin sees everything (default)
         return payload.get("business_id")
     except Exception:
         return None
