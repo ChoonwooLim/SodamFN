@@ -740,6 +740,26 @@ export default function PurchaseManagement() {
                                                             <div style={{ fontWeight: 700, color: '#1e293b' }}>{df.order_count}건</div>
                                                         </div>
                                                     </div>
+                                                    {/* Fee Breakdown Detail */}
+                                                    {df.fee_breakdown && Object.keys(df.fee_breakdown).length > 0 && (
+                                                        <div style={{ marginTop: 8, borderTop: `1px solid ${color}20`, paddingTop: 8 }}>
+                                                            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>📋 수수료 항목별 상세</div>
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                                {Object.entries(df.fee_breakdown).map(([key, val]) => (
+                                                                    <div key={key} style={{
+                                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                        fontSize: 10, padding: '2px 0',
+                                                                        borderBottom: '1px solid #f1f5f9',
+                                                                    }}>
+                                                                        <span style={{ color: '#475569' }}>{key}</span>
+                                                                        <span style={{ fontWeight: 700, color: '#ef4444', fontVariantNumeric: 'tabular-nums' }}>
+                                                                            -{formatNumber(val)}원
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}

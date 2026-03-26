@@ -191,6 +191,14 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
         for dr in delivery_records:
             fee_rate = (dr.total_fees / dr.total_sales * 100) if dr.total_sales > 0 else 0
             label = CHANNEL_LABELS.get(dr.channel, dr.channel)
+            # Parse fee_breakdown JSON
+            fee_bd = {}
+            if dr.fee_breakdown:
+                try:
+                    import json as json_lib
+                    fee_bd = json_lib.loads(dr.fee_breakdown)
+                except:
+                    pass
             delivery_fees.append({
                 "channel": dr.channel,
                 "label": label,
@@ -199,6 +207,7 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
                 "settlement": dr.settlement_amount,
                 "fee_rate": round(fee_rate, 1),
                 "order_count": dr.order_count,
+                "fee_breakdown": fee_bd,
             })
             total_delivery_fee += dr.total_fees
         

@@ -734,8 +734,13 @@ async def upload_revenue_excel(
                             existing_dr.total_fees = summary.get("total_fees", 0)
                             existing_dr.settlement_amount = summary.get("total_amount", 0)
                             existing_dr.order_count = summary.get("order_count", 0)
+                            if summary.get("fee_breakdown"):
+                                existing_dr.fee_breakdown = json.dumps(summary["fee_breakdown"], ensure_ascii=False)
                             dr_session.add(existing_dr)
                         else:
+                            fee_bd_json = None
+                            if summary.get("fee_breakdown"):
+                                fee_bd_json = json.dumps(summary["fee_breakdown"], ensure_ascii=False)
                             dr_record = DeliveryRevenue(
                                 channel=dr_channel,
                                 year=dr_year,
@@ -744,6 +749,7 @@ async def upload_revenue_excel(
                                 total_fees=summary.get("total_fees", 0),
                                 settlement_amount=summary.get("total_amount", 0),
                                 order_count=summary.get("order_count", 0),
+                                fee_breakdown=fee_bd_json,
                                 business_id=bid
                             )
                             dr_session.add(dr_record)
