@@ -422,6 +422,35 @@ class UploadHistory(SQLModel, table=True):
     status: str = Field(default="active")  # 'active', 'rolled_back'
 
 
+# --- Retirement Pay Tracking ---
+
+class RetirementPayment(SQLModel, table=True):
+    """퇴직금 실지급 기록"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""              # 직원명 (퇴사 후에도 조회용)
+    
+    start_date: datetime.date = Field(default_factory=datetime.date.today)  # 입사일
+    end_date: datetime.date = Field(default_factory=datetime.date.today)    # 퇴사일
+    work_days: int = 0                # 근속일수
+    
+    accrued_amount: int = 0           # 누적 적립액 (P/L에 이미 반영된 금액)
+    paid_amount: int = 0              # 실제 지급액
+    difference: int = 0              # 차액 (paid - accrued, 양수면 추가비용)
+    
+    payment_date: Optional[datetime.date] = None  # 지급일
+    payment_method: str = "계좌이체"   # 지급방법
+    bank_name: Optional[str] = None   # 입금은행
+    account_number: Optional[str] = None  # 입금계좌
+    note: Optional[str] = None        # 비고
+    
+    status: str = Field(default="대기")  # 대기, 지급완료
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    
+    staff: Optional[Staff] = Relationship()
+
+
 # --- AI Auto-Learning Rules ---
 
 class VendorRule(SQLModel, table=True):

@@ -39,6 +39,7 @@ const SuperAdminDashboard = React.lazy(() => import('./pages/SuperAdminDashboard
 const DevWorkLog = React.lazy(() => import('./pages/DevWorkLog'));
 const GuestDashboard = React.lazy(() => import('./pages/GuestDashboard'));
 const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationForm'));
+const RetirementPay = React.lazy(() => import('./pages/RetirementPay'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -158,6 +159,7 @@ export default function App() {
               <Route path="/manual" element={<ProtectedRoute adminOnly><UserManual /></ProtectedRoute>} />
               <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
               <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
+              <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
 
               {/* STAFF ROUTES */}
               <Route path="/staff-app-preview" element={<ProtectedRoute adminOnly><StaffAppPreview /></ProtectedRoute>} />

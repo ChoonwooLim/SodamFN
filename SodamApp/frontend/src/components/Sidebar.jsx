@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -87,6 +87,7 @@ export default function Sidebar() {
             { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
             { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
             { icon: Users, label: '직원 관리', path: '/staff' },
+            { icon: Wallet, label: '퇴직금 관리', path: '/hr/retirement' },
             { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
         ]
         : [

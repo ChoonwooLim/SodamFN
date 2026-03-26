@@ -695,3 +695,224 @@ def get_monthly_attendance_summary(staff_id: int, month: str, _user: AuthUser = 
         }
     finally:
         service.close()
+
+
+# --- 퇴직금 관리 ---
+
+class RetirementPaymentCreate(BaseModel):
+    staff_id: int
+    end_date: date               # 퇴사일
+    paid_amount: int = 0         # 실제 지급액
+    payment_date: Optional[date] = None
+    payment_method: str = "계좌이체"
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    note: Optional[str] = None
+
+class RetirementPaymentUpdate(BaseModel):
+    paid_amount: Optional[int] = None
+    payment_date: Optional[date] = None
+    payment_method: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    note: Optional[str] = None
+    status: Optional[str] = None
+
+
+def _calc_accrued_retirement(staff, end_date):
+    """퇴직금 적립액 계산 (근속일수 기준)"""
+    from models import Payroll
+    from database import engine as _engine
+    from sqlmodel import Session as _Session
+    
+    start = staff.start_date
+    work_days = (end_date - start).days
+    
+    # 1년 미만 근무 시 퇴직금 없음
+    if work_days < 365:
+        return 0, work_days
+    
+    # 퇴직금 = 평균임금 × 30일 × (근속일수 / 365)
+    # 평균임금 산정: 최근 3개월 급여 평균 / 30
+    with _Session(_engine) as s:
+        payrolls = s.exec(
+            select(Payroll).where(Payroll.staff_id == staff.id).order_by(Payroll.month.desc())
+        ).all()
+    
+    if payrolls:
+        # 최근 3개월 (or available) 총급여 평균
+        recent = payrolls[:3]
+        avg_monthly = sum(p.total_pay for p in recent) / len(recent)
+    else:
+        # 급여 기록 없으면 시급 × 209시간 (월 소정근로시간)
+        if staff.hourly_wage >= 100000:  # 월급제 (시급 칸에 월급 입력된 경우)
+            avg_monthly = staff.hourly_wage
+        else:
+            avg_monthly = staff.hourly_wage * 209
+    
+    daily_wage = avg_monthly / 30
+    accrued = int(daily_wage * 30 * work_days / 365)
+    
+    return accrued, work_days
+
+
+@router.get("/retirement")
+def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """퇴직금 현황 조회 (퇴사자 + 기존 지급 기록)"""
+    from models import RetirementPayment
+    from sqlmodel import Session as _Session
+    from database import engine as _engine
+    
+    with _Session(_engine) as session:
+        # 퇴사자 목록
+        resigned = session.exec(
+            apply_bid_filter(select(Staff), Staff, bid).where(Staff.status == "퇴사")
+        ).all()
+        
+        # 기존 지급 기록
+        payments = session.exec(
+            apply_bid_filter(select(RetirementPayment), RetirementPayment, bid)
+        ).all()
+        payment_by_staff = {p.staff_id: p for p in payments}
+        
+        result = []
+        for staff in resigned:
+            payment = payment_by_staff.get(staff.id)
+            
+            if payment:
+                result.append({
+                    "staff_id": staff.id,
+                    "staff_name": staff.name,
+                    "start_date": str(staff.start_date),
+                    "end_date": str(payment.end_date),
+                    "work_days": payment.work_days,
+                    "accrued_amount": payment.accrued_amount,
+                    "paid_amount": payment.paid_amount,
+                    "difference": payment.difference,
+                    "payment_date": str(payment.payment_date) if payment.payment_date else None,
+                    "status": payment.status,
+                    "payment_id": payment.id,
+                    "note": payment.note,
+                })
+            else:
+                # 아직 지급 기록 없음 → 자동 산정
+                accrued, work_days = _calc_accrued_retirement(staff, date.today())
+                result.append({
+                    "staff_id": staff.id,
+                    "staff_name": staff.name,
+                    "start_date": str(staff.start_date),
+                    "end_date": None,
+                    "work_days": work_days,
+                    "accrued_amount": accrued,
+                    "paid_amount": 0,
+                    "difference": 0,
+                    "payment_date": None,
+                    "status": "미등록",
+                    "payment_id": None,
+                    "note": None,
+                })
+        
+        return {"status": "success", "data": result}
+
+
+@router.post("/retirement")
+def create_retirement_payment(data: RetirementPaymentCreate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """퇴직금 지급 기록 생성"""
+    from models import RetirementPayment
+    from sqlmodel import Session as _Session
+    from database import engine as _engine
+    
+    with _Session(_engine) as session:
+        staff = session.exec(
+            apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == data.staff_id)
+        ).first()
+        if not staff:
+            raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        
+        # 중복 체크
+        existing = session.exec(
+            apply_bid_filter(select(RetirementPayment), RetirementPayment, bid).where(
+                RetirementPayment.staff_id == data.staff_id
+            )
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="이미 퇴직금 지급 기록이 존재합니다.")
+        
+        accrued, work_days = _calc_accrued_retirement(staff, data.end_date)
+        difference = data.paid_amount - accrued
+        
+        payment = RetirementPayment(
+            business_id=bid,
+            staff_id=data.staff_id,
+            staff_name=staff.name,
+            start_date=staff.start_date,
+            end_date=data.end_date,
+            work_days=work_days,
+            accrued_amount=accrued,
+            paid_amount=data.paid_amount,
+            difference=difference,
+            payment_date=data.payment_date,
+            payment_method=data.payment_method,
+            bank_name=data.bank_name or staff.bank_name,
+            account_number=data.account_number or staff.account_number,
+            note=data.note,
+            status="지급완료" if data.payment_date else "대기",
+        )
+        session.add(payment)
+        
+        # 차액이 양수이면 해당 월 P/L에 추가 비용 반영
+        if difference > 0 and data.payment_date:
+            from models import MonthlyProfitLoss
+            target_year = data.payment_date.year
+            target_month = data.payment_date.month
+            pl = session.exec(
+                apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                    MonthlyProfitLoss.year == target_year,
+                    MonthlyProfitLoss.month == target_month,
+                )
+            ).first()
+            if pl:
+                pl.expense_retirement += difference
+                session.add(pl)
+        
+        session.commit()
+        
+        return {
+            "status": "success",
+            "message": f"{staff.name} 퇴직금 기록 완료 (적립: {accrued:,}원, 지급: {data.paid_amount:,}원, 차액: {difference:,}원)",
+            "data": {
+                "accrued": accrued,
+                "paid": data.paid_amount,
+                "difference": difference,
+                "work_days": work_days,
+            }
+        }
+
+
+@router.put("/retirement/{payment_id}")
+def update_retirement_payment(payment_id: int, data: RetirementPaymentUpdate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """퇴직금 지급 기록 수정"""
+    from models import RetirementPayment
+    from sqlmodel import Session as _Session
+    from database import engine as _engine
+    
+    with _Session(_engine) as session:
+        payment = session.exec(
+            apply_bid_filter(select(RetirementPayment), RetirementPayment, bid).where(
+                RetirementPayment.id == payment_id
+            )
+        ).first()
+        if not payment:
+            raise HTTPException(status_code=404, detail="지급 기록을 찾을 수 없습니다.")
+        
+        update_dict = data.dict(exclude_unset=True)
+        for key, value in update_dict.items():
+            setattr(payment, key, value)
+        
+        if 'paid_amount' in update_dict:
+            payment.difference = payment.paid_amount - payment.accrued_amount
+        
+        session.add(payment)
+        session.commit()
+        
+        return {"status": "success", "message": "퇴직금 기록이 수정되었습니다."}
