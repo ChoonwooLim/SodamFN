@@ -686,8 +686,43 @@ async def upload_revenue_excel(
                             )
                             dr_session.add(dr_record)
                         dr_session.commit()
+                        
+                        # --- Auto-sync delivery fees to P/L ---
+                        # Aggregate ALL delivery apps' fees for this month and update P/L
+                        from models import MonthlyProfitLoss
+                        all_dr = dr_session.exec(
+                            apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
+                                DeliveryRevenue.year == dr_year,
+                                DeliveryRevenue.month == dr_month,
+                            )
+                        ).all()
+                        total_delivery_fees = sum(d.total_fees for d in all_dr)
+                        
+                        pl = dr_session.exec(
+                            apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                                MonthlyProfitLoss.year == dr_year,
+                                MonthlyProfitLoss.month == dr_month,
+                            )
+                        ).first()
+                        
+                        if pl:
+                            pl.expense_delivery_fee = total_delivery_fees
+                            dr_session.add(pl)
+                        else:
+                            pl = MonthlyProfitLoss(
+                                business_id=bid,
+                                year=dr_year,
+                                month=dr_month,
+                                expense_delivery_fee=total_delivery_fees
+                            )
+                            dr_session.add(pl)
+                        dr_session.commit()
+                        
+                        print(f"[Delivery Fee] {dr_year}년 {dr_month}월 총 배달앱수수료: {total_delivery_fees:,}원 → P/L 반영 완료")
             except Exception as e:
                 print(f"DeliveryRevenue save error (non-fatal): {e}")
+                import traceback
+                traceback.print_exc()
 
         # --- Compute and Save Metrics for Bank Deposit Uploads based on AI/User Rules ---
         if file_type == "bank_deposit_card" and result.get("summary"):

@@ -19,6 +19,7 @@ CATEGORY_TO_PL_FIELD = {
     "보험료": "expense_insurance",
     # "인건비"는 sync_all_expenses에서 제외 — expense_labor는 급여대장/수동입력으로만 관리
     "카드수수료": "expense_card_fee",
+    "배달앱수수료": "expense_delivery_fee",
     "기타경비": "expense_other",
     # ── 레거시 호환 (기존 DailyExpense 레코드) ──
     "식자재": "expense_ingredient",

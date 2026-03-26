@@ -373,6 +373,7 @@ class MonthlyProfitLoss(SQLModel, table=True):
     expense_insurance_employee: int = 0  # 4대보험료 (직원 부담분)
     expense_tax_employee: int = 0        # 원천세 (직원 소득세+지방소득세)
     expense_card_fee: int = 0     # 카드수수료
+    expense_delivery_fee: int = 0 # 배달앱수수료 (배민+쿠팡+요기요+땡겨요)
     expense_retirement: int = 0   # 퇴직금적립 (인건비 10% 자동)
     expense_other: int = 0        # 기타경비
     expense_personal: int = 0     # 개인가계부 (P/L 미포함)

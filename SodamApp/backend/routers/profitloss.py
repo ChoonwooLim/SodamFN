@@ -36,6 +36,7 @@ class MonthlyPLCreate(BaseModel):
     expense_biz_tax: int = 0
     expense_income_tax: int = 0
     expense_card_fee: int = 0
+    expense_delivery_fee: int = 0
     expense_material: int = 0
     expense_retirement: int = 0
 
@@ -53,6 +54,7 @@ class MonthlyPLUpdate(BaseModel):
     expense_biz_tax: Optional[int] = None
     expense_income_tax: Optional[int] = None
     expense_card_fee: Optional[int] = None
+    expense_delivery_fee: Optional[int] = None
     expense_material: Optional[int] = None
     expense_retirement: Optional[int] = None
 
@@ -129,7 +131,7 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
             'expense_utility', 'expense_rent', 'expense_repair',
             'expense_depreciation', 'expense_tax', 'expense_insurance',
             'expense_insurance_employee', 'expense_tax_employee',
-            'expense_card_fee', 'expense_retirement', 'expense_other',
+            'expense_card_fee', 'expense_delivery_fee', 'expense_retirement', 'expense_other',
         ]
         total_expense = sum(getattr(r, k, 0) or 0 for k in EXPENSE_KEYS)
         profit = total_revenue - total_expense

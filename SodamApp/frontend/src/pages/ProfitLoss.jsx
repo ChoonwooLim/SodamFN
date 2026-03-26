@@ -27,6 +27,7 @@ const EXPENSE_FIELDS = [
     { key: 'expense_depreciation', label: '감가상각비', group: 'expense-facility' },
     { key: 'expense_tax', label: '세금과공과', group: 'expense-tax' },
     { key: 'expense_card_fee', label: '카드수수료', group: 'expense-etc' },
+    { key: 'expense_delivery_fee', label: '배달앱수수료', auto: true, group: 'expense-etc' },
     { key: 'expense_other', label: '기타경비', group: 'expense-etc' },
 ];
 
@@ -313,6 +314,7 @@ export default function ProfitLoss() {
             'expense_tax': '#14b8a6',
             'expense_insurance': '#f59e0b',
             'expense_card_fee': '#06b6d4',
+            'expense_delivery_fee': '#a855f7',
             'expense_other': '#94a3b8',
         };
 
@@ -580,6 +582,7 @@ export default function ProfitLoss() {
             '세금과공과': 'expense_tax',
             '보험료': 'expense_insurance',
             '카드수수료': 'expense_card_fee',
+            '배달앱수수료': 'expense_delivery_fee',
             '기타경비': 'expense_other',
             '퇴직금적립': 'expense_retirement',
             '인건비': 'expense_labor',
