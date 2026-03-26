@@ -131,20 +131,50 @@ def _extract_card_corp(vendor_name: str) -> Optional[str]:
 @router.get("/stats/sales")
 def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     """
-    Get card sales stats from DailyExpense records linked to revenue-type vendors.
-    Uses Vendor.vendor_type='revenue' to find card revenue entries.
+    Get card sales stats. Prioritizes CardSalesApproval data,
+    falls back to DailyExpense revenue entries.
     """
     from models import Vendor
     
     with Session(engine) as session:
-        # Get all revenue-type vendor IDs
+        # Try CardSalesApproval first (real 여신금융협회 data)
+        approvals = session.exec(
+            apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
+                CardSalesApproval.approval_date >= start_date,
+                CardSalesApproval.approval_date <= end_date,
+            )
+        ).all()
+        
+        if approvals:
+            # Group by date
+            daily_map = {}
+            corp_map = {}
+            for a in approvals:
+                d = str(a.approval_date)
+                if d not in daily_map:
+                    daily_map[d] = {'total': 0, 'count': 0}
+                daily_map[d]['total'] += a.amount
+                daily_map[d]['count'] += 1
+                
+                corp = a.card_corp or '기타'
+                corp_map[corp] = corp_map.get(corp, 0) + a.amount
+            
+            daily_trend = [
+                {'date': d, 'total': v['total'], 'count': v['count']}
+                for d, v in sorted(daily_map.items())
+            ]
+            by_corp = [
+                {'name': corp, 'value': amount}
+                for corp, amount in sorted(corp_map.items(), key=lambda x: -x[1])
+            ]
+            return {"status": "success", "daily_trend": daily_trend, "by_corp": by_corp}
+        
+        # Fallback: DailyExpense revenue entries with card company detection
         revenue_vendors = session.exec(
             apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.vendor_type == 'revenue')
         ).all()
         revenue_vendor_ids = {v.id for v in revenue_vendors}
-        vendor_id_to_name = {v.id: v.name for v in revenue_vendors}
         
-        # Get DailyExpense entries linked to revenue vendors in date range
         expenses = session.exec(
             apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
@@ -152,32 +182,18 @@ def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get
             )
         ).all()
         
-        # Filter to revenue entries only (by vendor_id or known vendor_name patterns)
         card_entries = []
         for entry in expenses:
             vn = entry.vendor_name or ''
-            
-            # Match by vendor_id (linked to revenue vendor)
             if entry.vendor_id and entry.vendor_id in revenue_vendor_ids:
                 corp = _extract_card_corp(vn)
                 if corp:
-                    card_entries.append({
-                        'date': entry.date,
-                        'amount': entry.amount,
-                        'card_corp': corp,
-                    })
+                    card_entries.append({'date': entry.date, 'amount': entry.amount, 'card_corp': corp})
                 continue
-            
-            # Match by vendor_name pattern (for unlinked entries)
             if '카드매출' in vn or vn == '카드매출(통합)':
                 corp = _extract_card_corp(vn) or '카드매출(통합)'
-                card_entries.append({
-                    'date': entry.date,
-                    'amount': entry.amount,
-                    'card_corp': corp,
-                })
+                card_entries.append({'date': entry.date, 'amount': entry.amount, 'card_corp': corp})
         
-        # Group by date for daily_trend
         daily_map = {}
         for e in card_entries:
             d = str(e['date'])
@@ -191,29 +207,23 @@ def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get
             for d, v in sorted(daily_map.items())
         ]
         
-        # Group by card corp for pie chart
         corp_map = {}
         for e in card_entries:
-            corp = e['card_corp']
-            corp_map[corp] = corp_map.get(corp, 0) + e['amount']
+            corp_map[e['card_corp']] = corp_map.get(e['card_corp'], 0) + e['amount']
         
         by_corp = [
             {'name': corp, 'value': amount}
             for corp, amount in sorted(corp_map.items(), key=lambda x: -x[1])
         ]
         
-        return {
-            "status": "success",
-            "daily_trend": daily_trend,
-            "by_corp": by_corp,
-        }
+        return {"status": "success", "daily_trend": daily_trend, "by_corp": by_corp}
 
 
 @router.get("/stats/payment")
 def get_payment_stats(start_date: date, end_date: date, current_user = Depends(get_current_user), bid = Depends(get_bid_from_token)):
     """
     Get card payment stats. First tries CardPayment table,
-    then falls back to DailyExpense card revenue data.
+    then falls back to real card fee data from MonthlyProfitLoss (bank deposit analysis).
     """
     with Session(engine) as session:
         # Try CardPayment table first
@@ -227,41 +237,61 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
         if payments:
             return {"status": "success", "data": payments}
         
-        # Fallback: synthesize from DailyExpense card revenue
+        # Fallback: Use real card fees from MonthlyProfitLoss + card sales from DailyExpense
+        from models import MonthlyProfitLoss, Vendor
+        
+        # Get months in date range
+        months_in_range = set()
+        current = start_date.replace(day=1)
+        while current <= end_date:
+            months_in_range.add((current.year, current.month))
+            if current.month == 12:
+                current = current.replace(year=current.year + 1, month=1)
+            else:
+                current = current.replace(month=current.month + 1)
+        
+        # Get real card fees from P/L
+        total_card_fee = 0
+        for (year, month) in months_in_range:
+            pl = session.exec(
+                apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                    MonthlyProfitLoss.year == year,
+                    MonthlyProfitLoss.month == month,
+                )
+            ).first()
+            if pl:
+                total_card_fee += pl.expense_card_fee
+        
+        # Get card sales by company from DailyExpense
         card_revenue = session.exec(
             apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
-                DailyExpense.amount > 0,
+                DailyExpense.payment_method == 'Card',
+                DailyExpense.category == 'store',
             )
         ).all()
         
-        # Group by card corp
         corp_totals = {}
+        total_sales = 0
         for entry in card_revenue:
             vn = entry.vendor_name or ''
-            corp = _extract_card_corp(vn)
-            if not corp:
-                if '카드' in vn or entry.category in ('매장매출',):
-                    corp = vn or '기타'
-                else:
-                    continue
-            
+            corp = _extract_card_corp(vn) or '기타카드'
             if corp not in corp_totals:
-                corp_totals[corp] = {'sales_amount': 0, 'count': 0}
-            corp_totals[corp]['sales_amount'] += entry.amount
-            corp_totals[corp]['count'] += 1
+                corp_totals[corp] = 0
+            corp_totals[corp] += entry.amount
+            total_sales += entry.amount
         
-        # Estimate fees (~2% average for small businesses)
-        FEE_RATE = 0.02
+        # Distribute card fee proportionally across card companies
         synthetic_data = []
-        for corp, totals in sorted(corp_totals.items(), key=lambda x: -x[1]['sales_amount']):
-            fees = int(totals['sales_amount'] * FEE_RATE)
+        for corp, sales in sorted(corp_totals.items(), key=lambda x: -x[1]):
+            ratio = sales / total_sales if total_sales > 0 else 0
+            fees = int(total_card_fee * ratio)
             synthetic_data.append({
                 'card_corp': corp,
-                'sales_amount': totals['sales_amount'],
+                'sales_amount': sales,
                 'fees': fees,
-                'net_deposit': totals['sales_amount'] - fees,
+                'net_deposit': sales - fees,
             })
         
-        return {"status": "success", "data": synthetic_data}
+        return {"status": "success", "data": synthetic_data, "source": "bank_deposit_analysis"}
