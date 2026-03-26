@@ -1805,8 +1805,8 @@ export default function RevenueManagement() {
                                     '현금매출': '#10b981', '개인거래': '#6b7280', '무시': '#d1d5db',
                                     '카드수수료': '#3b82f6', '?': '#ef4444'
                                 };
-                                const defaultCat = item.default_category === '카드수수료' ? '카드입금'
-                                    : item.default_category === '무시' ? '배달앱입금' : '개인거래';
+                                const validCats = ['카드입금', '페이입금', '배달앱입금', '현금매출', '개인거래', '무시'];
+                                const defaultCat = validCats.includes(item.default_category) ? item.default_category : '개인거래';
                                 const selected = item._category || defaultCat;
                                 const color = catColors[selected] || '#6b7280';
 
@@ -1859,8 +1859,8 @@ export default function RevenueManagement() {
                             <button className="modal-btn primary" onClick={async () => {
                                 // Build classifications
                                 const classifications = (classifyData.items || []).map(item => {
-                                    const defaultCat = item.default_category === '카드수수료' ? '카드입금'
-                                        : item.default_category === '무시' ? '배달앱입금' : '개인거래';
+                                    const validCats = ['카드입금', '페이입금', '배달앱입금', '현금매출', '개인거래', '무시'];
+                                    const defaultCat = validCats.includes(item.default_category) ? item.default_category : '개인거래';
                                     return {
                                         memo: item.memo,
                                         category: item._category || defaultCat
