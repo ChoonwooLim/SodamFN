@@ -661,47 +661,50 @@ export default function PurchaseManagement() {
                         </div>
                     </div>
 
-                    {/* Card + Bank + Delivery Fee — 3 columns */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '3.5fr 2.5fr 4fr', gap: '16px' }}>
-                        {/* Card Company Breakdown */}
-                        <div className="dashboard-section" style={{ minWidth: 0 }}>
-                            <h3>💳 카드사별 매입 현황</h3>
-                            <div className="card-company-grid">
-                                {Object.entries(cardData).filter(([k]) => k !== '기타').sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
-                                    const colors = CARD_COLORS[card] || CARD_COLORS['기타'];
-                                    return (
-                                        <div className="card-company-item" key={card} style={{ background: colors.bg, borderColor: colors.border }}>
-                                            <div className="cc-name" style={{ color: colors.text }}>{card}</div>
-                                            <div className="cc-amount">{formatNumber(info.amount)}원</div>
-                                            <div className="cc-count">{info.count}건</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Bank Transfer Breakdown */}
-                        <div className="dashboard-section" style={{ minWidth: 0 }}>
-                            <h3>🏦 계좌이체 현황</h3>
-                            <div className="card-company-grid">
-                                {Object.keys(bankData).length > 0 ? (
-                                    Object.entries(bankData).sort((a, b) => b[1].amount - a[1].amount).map(([bank, info]) => {
-                                        const colors = CARD_COLORS[bank] || { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' };
+                    {/* Card + Bank (left) + Delivery Fee (right) — 2 columns */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '3.5fr 6.5fr', gap: '16px' }}>
+                        {/* LEFT: Card Company + Bank Transfer */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                            {/* Card Company Breakdown */}
+                            <div className="dashboard-section" style={{ minWidth: 0 }}>
+                                <h3>💳 카드사별 매입 현황</h3>
+                                <div className="card-company-grid">
+                                    {Object.entries(cardData).filter(([k]) => k !== '기타').sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
+                                        const colors = CARD_COLORS[card] || CARD_COLORS['기타'];
                                         return (
-                                            <div className="card-company-item" key={bank} style={{ background: colors.bg, borderColor: colors.border }}>
-                                                <div className="cc-name" style={{ color: colors.text }}>{bank}</div>
+                                            <div className="card-company-item" key={card} style={{ background: colors.bg, borderColor: colors.border }}>
+                                                <div className="cc-name" style={{ color: colors.text }}>{card}</div>
                                                 <div className="cc-amount">{formatNumber(info.amount)}원</div>
                                                 <div className="cc-count">{info.count}건</div>
                                             </div>
                                         );
-                                    })
-                                ) : (
-                                    <div style={{ color: '#9ca3af', padding: '20px', textAlign: 'center' }}>계좌이체 내역 없음</div>
-                                )}
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Bank Transfer Breakdown */}
+                            <div className="dashboard-section" style={{ minWidth: 0 }}>
+                                <h3>🏦 계좌이체 현황</h3>
+                                <div className="card-company-grid">
+                                    {Object.keys(bankData).length > 0 ? (
+                                        Object.entries(bankData).sort((a, b) => b[1].amount - a[1].amount).map(([bank, info]) => {
+                                            const colors = CARD_COLORS[bank] || { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' };
+                                            return (
+                                                <div className="card-company-item" key={bank} style={{ background: colors.bg, borderColor: colors.border }}>
+                                                    <div className="cc-name" style={{ color: colors.text }}>{bank}</div>
+                                                    <div className="cc-amount">{formatNumber(info.amount)}원</div>
+                                                    <div className="cc-count">{info.count}건</div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div style={{ color: '#9ca3af', padding: '20px', textAlign: 'center' }}>계좌이체 내역 없음</div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        {/* 🛵 Delivery App Fee Breakdown */}
+                        {/* RIGHT: Delivery App Fee Breakdown */}
                         <div className="dashboard-section" style={{ minWidth: 0 }}>
                             <h3>🛵 배달앱 수수료 상세</h3>
                             {summary.delivery_fees && summary.delivery_fees.length > 0 ? (
