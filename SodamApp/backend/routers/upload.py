@@ -620,19 +620,30 @@ async def upload_revenue_excel(
                     # Bank deposits are NOT revenue — they're for card fee calculation
                     memo = item.get('memo', '')
                     default_cat = item.get('default_category', '?')
+                    card_co = item.get('card_company')
                     
-                    # Look up classification rule
+                    # 1. Check VendorRule first (previously classified by user)
                     rule = session.exec(
                         apply_bid_filter(select(VendorRule), VendorRule, bid).where(
                             VendorRule.original_name == memo,
                             VendorRule.source == "bank_deposit_revenue"
                         )
                     ).first()
-                    
                     cat = rule.category if rule else None
                     
+                    # 2. If no rule, auto-classify known types (skip modal)
+                    if not cat:
+                        if card_co:  # Auto-detected card company
+                            cat = '카드입금'
+                        elif default_cat == '배달앱입금':
+                            cat = '배달앱입금'
+                        elif default_cat == '페이입금':
+                            cat = '페이입금'
+                        elif default_cat == '무시':
+                            cat = '무시'
+                    
+                    # 3. If still no cat → need user classification (show in modal)
                     if not cat and not classifications:
-                        # Need classification - collect unclassified memos
                         if not hasattr(session, '_unclassified_memos'):
                             session._unclassified_memos = {}
                         if memo not in session._unclassified_memos:
@@ -641,7 +652,7 @@ async def upload_revenue_excel(
                                 "total_amount": 0,
                                 "count": 0,
                                 "default_category": default_cat,
-                                "card_company": item.get('card_company'),
+                                "card_company": card_co,
                                 "sample_dates": []
                             }
                         session._unclassified_memos[memo]["total_amount"] += item['amount']
