@@ -703,6 +703,60 @@ export default function PurchaseManagement() {
                             ))}
                         </div>
                     </div>
+
+                    {/* 🛵 Delivery App Fee Breakdown */}
+                    {summary.delivery_fees && summary.delivery_fees.length > 0 && (
+                        <div className="dashboard-section">
+                            <h3>🛵 배달앱 수수료 상세</h3>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 16 }}>
+                                {summary.delivery_fees.map(df => {
+                                    const CHANNEL_COLORS = { '배달의민족': '#2AC1BC', '쿠팡이츠': '#FF6B2C', '요기요': '#FA0050', '땡겨요': '#4A90D9' };
+                                    const color = CHANNEL_COLORS[df.label] || '#6366f1';
+                                    return (
+                                        <div key={df.channel} style={{
+                                            background: `linear-gradient(135deg, ${color}10, ${color}05)`,
+                                            border: `1px solid ${color}30`,
+                                            borderRadius: 14, padding: '16px 18px',
+                                        }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                                <span style={{ fontSize: 15, fontWeight: 800, color: color }}>{df.label}</span>
+                                                <span style={{ fontSize: 11, fontWeight: 700, color, background: `${color}15`, padding: '3px 10px', borderRadius: 20 }}>
+                                                    수수료율 {df.fee_rate}%
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12 }}>
+                                                <div>
+                                                    <div style={{ color: '#94a3b8', fontSize: 11 }}>총 주문금액</div>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b' }}>{formatNumber(df.total_sales)}원</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ color: '#94a3b8', fontSize: 11 }}>수수료</div>
+                                                    <div style={{ fontWeight: 800, color: '#ef4444' }}>-{formatNumber(df.total_fees)}원</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ color: '#94a3b8', fontSize: 11 }}>실제 정산금</div>
+                                                    <div style={{ fontWeight: 700, color: '#059669' }}>{formatNumber(df.settlement)}원</div>
+                                                </div>
+                                                <div>
+                                                    <div style={{ color: '#94a3b8', fontSize: 11 }}>주문 건수</div>
+                                                    <div style={{ fontWeight: 700, color: '#1e293b' }}>{df.order_count}건</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div style={{
+                                background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: 12,
+                                padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                            }}>
+                                <span style={{ color: '#94a3b8', fontSize: 13, fontWeight: 700 }}>📊 배달앱 수수료 합계</span>
+                                <span style={{ color: '#ef4444', fontSize: 18, fontWeight: 800 }}>
+                                    {formatNumber(summary.total_delivery_fee)}원
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

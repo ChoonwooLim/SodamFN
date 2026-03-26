@@ -175,6 +175,33 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
         
         top_vendors = sorted(by_vendor.items(), key=lambda x: -x[1]["amount"])[:10]
         
+        # ── Delivery App Fee Breakdown (from DeliveryRevenue table) ──
+        from models import DeliveryRevenue
+        delivery_records = session.exec(
+            apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
+                DeliveryRevenue.year == year,
+                DeliveryRevenue.month == month,
+            )
+        ).all()
+        
+        CHANNEL_LABELS = {"Coupang": "쿠팡이츠", "Baemin": "배달의민족", "Yogiyo": "요기요", "Ddangyo": "땡겨요",
+                          "쿠팡": "쿠팡이츠", "배민": "배달의민족", "배달의민족": "배달의민족", "요기요": "요기요", "땡겨요": "땡겨요"}
+        delivery_fees = []
+        total_delivery_fee = 0
+        for dr in delivery_records:
+            fee_rate = (dr.total_fees / dr.total_sales * 100) if dr.total_sales > 0 else 0
+            label = CHANNEL_LABELS.get(dr.channel, dr.channel)
+            delivery_fees.append({
+                "channel": dr.channel,
+                "label": label,
+                "total_sales": dr.total_sales,
+                "total_fees": dr.total_fees,
+                "settlement": dr.settlement_amount,
+                "fee_rate": round(fee_rate, 1),
+                "order_count": dr.order_count,
+            })
+            total_delivery_fee += dr.total_fees
+        
         return {
             "total": total,
             "count": count,
@@ -183,6 +210,8 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
             "by_card_company": by_card,
             "by_bank_transfer": by_bank,
             "top_vendors": [{"name": k, **v} for k, v in top_vendors],
+            "delivery_fees": delivery_fees,
+            "total_delivery_fee": total_delivery_fee,
         }
 
 
