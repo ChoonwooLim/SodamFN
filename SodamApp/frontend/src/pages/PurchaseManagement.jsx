@@ -748,18 +748,34 @@ export default function PurchaseManagement() {
                                                         <div style={{ marginTop: 8, borderTop: `1px solid ${color}20`, paddingTop: 8 }}>
                                                             <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>📋 수수료 항목별 상세</div>
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                                {Object.entries(df.fee_breakdown).map(([key, val]) => (
-                                                                    <div key={key} style={{
-                                                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                                        fontSize: 10, padding: '2px 0',
-                                                                        borderBottom: '1px solid #f1f5f9',
-                                                                    }}>
-                                                                        <span style={{ color: '#475569' }}>{key}</span>
-                                                                        <span style={{ fontWeight: 700, color: '#ef4444', fontVariantNumeric: 'tabular-nums' }}>
-                                                                            -{formatNumber(val)}원
-                                                                        </span>
-                                                                    </div>
-                                                                ))}
+                                                                {Object.entries(df.fee_breakdown).map(([key, val]) => {
+                                                                    const isCredit = val < 0;
+                                                                    const absVal = Math.abs(val);
+                                                                    const pct = df.total_sales > 0 ? (absVal / df.total_sales * 100).toFixed(1) : '0.0';
+                                                                    return (
+                                                                        <div key={key} style={{
+                                                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                                            fontSize: 10, padding: '2px 0',
+                                                                            borderBottom: '1px solid #f1f5f9',
+                                                                        }}>
+                                                                            <span style={{ color: '#475569', flex: 1 }}>{key}</span>
+                                                                            <span style={{
+                                                                                fontWeight: 700,
+                                                                                color: isCredit ? '#0f172a' : '#ef4444',
+                                                                                fontVariantNumeric: 'tabular-nums',
+                                                                                minWidth: 90, textAlign: 'right',
+                                                                            }}>
+                                                                                {isCredit ? '+' : '-'}{formatNumber(absVal)}원
+                                                                            </span>
+                                                                            <span style={{
+                                                                                fontSize: 9, color: '#94a3b8', fontWeight: 600,
+                                                                                minWidth: 40, textAlign: 'right', marginLeft: 4,
+                                                                            }}>
+                                                                                {pct}%
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         </div>
                                                     )}
