@@ -67,6 +67,7 @@ export default function RetirementPay() {
     const statusBadge = (status) => {
         const colors = {
             '지급완료': { bg: '#dcfce7', color: '#16a34a' },
+            '환입완료': { bg: '#dbeafe', color: '#2563eb' },
             '대기': { bg: '#fef3c7', color: '#d97706' },
             '미등록': { bg: '#fee2e2', color: '#dc2626' },
         };
@@ -128,7 +129,12 @@ export default function RetirementPay() {
                                     <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                        <td style={{ padding: '12px', fontWeight: 700, color: '#1e293b' }}>{item.staff_name}</td>
+                                        <td style={{ padding: '12px', fontWeight: 700, color: '#1e293b' }}>
+                                            {item.staff_name}
+                                            {item.under_one_year && (
+                                                <span style={{ display: 'block', fontSize: 10, color: '#d97706', fontWeight: 600 }}>⚠️ 1년 미만</span>
+                                            )}
+                                        </td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>{item.start_date}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>{item.end_date || '-'}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#334155' }}>
@@ -137,7 +143,9 @@ export default function RetirementPay() {
                                                 : `${item.work_days}일`}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: '#334155', fontWeight: 600 }}>
-                                            {item.accrued_amount > 0 ? `${item.accrued_amount.toLocaleString()}원` : '-'}
+                                            {item.under_one_year ? (
+                                                <span style={{ color: '#d97706' }}>환입 대상<br/><span style={{fontSize:11}}>({(item.pl_accrued||0).toLocaleString()}원)</span></span>
+                                            ) : item.accrued_amount > 0 ? `${item.accrued_amount.toLocaleString()}원` : '-'}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: item.paid_amount > 0 ? '#16a34a' : '#94a3b8', fontWeight: 700 }}>
                                             {item.paid_amount > 0 ? `${item.paid_amount.toLocaleString()}원` : '-'}
@@ -208,12 +216,19 @@ export default function RetirementPay() {
                             </b></span>
                         </div>
 
-                        {showModal.accrued_amount > 0 && (
-                            <div style={{ padding: '10px 12px', background: '#f0fdf4', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
-                                <span style={{ color: '#16a34a', fontWeight: 700 }}>💰 예상 적립액: {showModal.accrued_amount.toLocaleString()}원</span>
-                                {showModal.work_days < 365 && (
-                                    <div style={{ color: '#d97706', fontSize: 11, marginTop: 4 }}>⚠️ 1년 미만 근무로 퇴직금 해당 없음</div>
+                        {showModal.under_one_year ? (
+                            <div style={{ padding: '10px 12px', background: '#fef3c7', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
+                                <span style={{ color: '#d97706', fontWeight: 700 }}>⚠️ 1년 미만 근무 → 법적 퇴직금 없음</span>
+                                {showModal.pl_accrued > 0 && (
+                                    <div style={{ color: '#1e293b', fontSize: 12, marginTop: 4 }}>
+                                        P/L 적립액: <b>{showModal.pl_accrued.toLocaleString()}원</b> → 등록 시 <b style={{color:'#2563eb'}}>자동 환입</b> 처리
+                                    </div>
                                 )}
+                                <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>실제 지급하는 경우 아래에 금액을 입력하세요 (선택)</div>
+                            </div>
+                        ) : showModal.accrued_amount > 0 && (
+                            <div style={{ padding: '10px 12px', background: '#f0fdf4', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
+                                <span style={{ color: '#16a34a', fontWeight: 700 }}>💰 법적 퇴직금: {showModal.accrued_amount.toLocaleString()}원</span>
                             </div>
                         )}
 

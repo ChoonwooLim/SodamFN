@@ -720,7 +720,7 @@ class RetirementPaymentUpdate(BaseModel):
 
 
 def _calc_accrued_retirement(staff, end_date):
-    """퇴직금 적립액 계산 (근속일수 기준)"""
+    """퇴직금 적립액 계산 + P/L에 이미 반영된 적립액 합산"""
     from models import Payroll
     from database import engine as _engine
     from sqlmodel import Session as _Session
@@ -728,32 +728,37 @@ def _calc_accrued_retirement(staff, end_date):
     start = staff.start_date
     work_days = (end_date - start).days
     
-    # 1년 미만 근무 시 퇴직금 없음
-    if work_days < 365:
-        return 0, work_days
-    
-    # 퇴직금 = 평균임금 × 30일 × (근속일수 / 365)
-    # 평균임금 산정: 최근 3개월 급여 평균 / 30
     with _Session(_engine) as s:
         payrolls = s.exec(
             select(Payroll).where(Payroll.staff_id == staff.id).order_by(Payroll.month.desc())
         ).all()
     
-    if payrolls:
-        # 최근 3개월 (or available) 총급여 평균
+    # P/L에 이미 반영된 적립액 (매월 Payroll에서 expense_retirement로 잡힌 금액)
+    # 퇴직금 적립 = 해당 직원의 총급여 × 약 1/12 (실제 P/L에 반영된 퇴직금 비용)
+    pl_accrued = 0
+    for p in payrolls:
+        # Payroll에 retirement 필드가 있으면 사용, 없으면 total_pay의 약 8.33% 추정
+        if hasattr(p, 'retirement_pay') and p.retirement_pay:
+            pl_accrued += p.retirement_pay
+        else:
+            pl_accrued += int(p.total_pay * 0.0833)  # 1/12
+    
+    # 법적 퇴직금 (1년 이상 시)
+    legal_retirement = 0
+    if work_days >= 365 and payrolls:
         recent = payrolls[:3]
         avg_monthly = sum(p.total_pay for p in recent) / len(recent)
-    else:
-        # 급여 기록 없으면 시급 × 209시간 (월 소정근로시간)
-        if staff.hourly_wage >= 100000:  # 월급제 (시급 칸에 월급 입력된 경우)
+        daily_wage = avg_monthly / 30
+        legal_retirement = int(daily_wage * 30 * work_days / 365)
+    elif work_days >= 365:
+        if staff.hourly_wage >= 100000:
             avg_monthly = staff.hourly_wage
         else:
             avg_monthly = staff.hourly_wage * 209
+        daily_wage = avg_monthly / 30
+        legal_retirement = int(daily_wage * 30 * work_days / 365)
     
-    daily_wage = avg_monthly / 30
-    accrued = int(daily_wage * 30 * work_days / 365)
-    
-    return accrued, work_days
+    return legal_retirement, work_days, pl_accrued
 
 
 @router.get("/retirement")
@@ -793,23 +798,27 @@ def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depend
                     "status": payment.status,
                     "payment_id": payment.id,
                     "note": payment.note,
+                    "pl_accrued": getattr(payment, 'pl_accrued', 0),
+                    "under_one_year": payment.work_days < 365,
                 })
             else:
                 # 아직 지급 기록 없음 → 자동 산정
-                accrued, work_days = _calc_accrued_retirement(staff, date.today())
+                legal, work_days, pl_accrued = _calc_accrued_retirement(staff, date.today())
                 result.append({
                     "staff_id": staff.id,
                     "staff_name": staff.name,
                     "start_date": str(staff.start_date),
                     "end_date": None,
                     "work_days": work_days,
-                    "accrued_amount": accrued,
+                    "accrued_amount": legal,
                     "paid_amount": 0,
                     "difference": 0,
                     "payment_date": None,
                     "status": "미등록",
                     "payment_id": None,
                     "note": None,
+                    "pl_accrued": pl_accrued,
+                    "under_one_year": work_days < 365,
                 })
         
         return {"status": "success", "data": result}
@@ -838,8 +847,22 @@ def create_retirement_payment(data: RetirementPaymentCreate, _admin: AuthUser = 
         if existing:
             raise HTTPException(status_code=400, detail="이미 퇴직금 지급 기록이 존재합니다.")
         
-        accrued, work_days = _calc_accrued_retirement(staff, data.end_date)
-        difference = data.paid_amount - accrued
+        legal, work_days, pl_accrued = _calc_accrued_retirement(staff, data.end_date)
+        difference = data.paid_amount - legal
+        
+        from models import MonthlyProfitLoss
+        
+        # 1년 미만 퇴사: 환입 처리
+        reversal_amount = 0
+        if work_days < 365:
+            # P/L에 적립했던 금액을 환입 (비용 차감)
+            reversal_amount = pl_accrued
+            note_prefix = f"[1년미만 퇴사] 적립 환입: -{reversal_amount:,}원"
+            if data.paid_amount > 0:
+                note_prefix += f" / 실지급: {data.paid_amount:,}원"
+            auto_note = note_prefix + (f" / {data.note}" if data.note else "")
+        else:
+            auto_note = data.note
         
         payment = RetirementPayment(
             business_id=bid,
@@ -848,43 +871,59 @@ def create_retirement_payment(data: RetirementPaymentCreate, _admin: AuthUser = 
             start_date=staff.start_date,
             end_date=data.end_date,
             work_days=work_days,
-            accrued_amount=accrued,
+            accrued_amount=legal if work_days >= 365 else 0,
             paid_amount=data.paid_amount,
-            difference=difference,
-            payment_date=data.payment_date,
+            difference=difference if work_days >= 365 else data.paid_amount,
+            payment_date=data.payment_date or data.end_date,
             payment_method=data.payment_method,
             bank_name=data.bank_name or staff.bank_name,
             account_number=data.account_number or staff.account_number,
-            note=data.note,
-            status="지급완료" if data.payment_date else "대기",
+            note=auto_note,
+            status="환입완료" if work_days < 365 and data.paid_amount == 0 else ("지급완료" if data.payment_date else "대기"),
         )
         session.add(payment)
         
-        # 차액이 양수이면 해당 월 P/L에 추가 비용 반영
-        if difference > 0 and data.payment_date:
-            from models import MonthlyProfitLoss
-            target_year = data.payment_date.year
-            target_month = data.payment_date.month
-            pl = session.exec(
-                apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
-                    MonthlyProfitLoss.year == target_year,
-                    MonthlyProfitLoss.month == target_month,
-                )
-            ).first()
-            if pl:
+        # P/L 조정 - 퇴사월 기준
+        target_date = data.payment_date or data.end_date
+        target_year = target_date.year
+        target_month = target_date.month
+        pl = session.exec(
+            apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                MonthlyProfitLoss.year == target_year,
+                MonthlyProfitLoss.month == target_month,
+            )
+        ).first()
+        
+        if pl:
+            if work_days < 365:
+                # 1년 미만: 적립액 환입 (비용 차감) + 실지급액 추가
+                pl.expense_retirement = max(0, pl.expense_retirement - reversal_amount + data.paid_amount)
+                session.add(pl)
+            elif difference > 0:
+                # 1년 이상: 차액만 추가 비용
                 pl.expense_retirement += difference
                 session.add(pl)
         
         session.commit()
         
+        msg_parts = [f"{staff.name} 퇴직금 기록 완료"]
+        if work_days < 365:
+            msg_parts.append(f"1년 미만 퇴사 → P/L 적립 환입: -{reversal_amount:,}원")
+            if data.paid_amount > 0:
+                msg_parts.append(f"실지급: {data.paid_amount:,}원")
+        else:
+            msg_parts.append(f"법적 퇴직금: {legal:,}원, 지급: {data.paid_amount:,}원, 차액: {difference:,}원")
+        
         return {
             "status": "success",
-            "message": f"{staff.name} 퇴직금 기록 완료 (적립: {accrued:,}원, 지급: {data.paid_amount:,}원, 차액: {difference:,}원)",
+            "message": " / ".join(msg_parts),
             "data": {
-                "accrued": accrued,
+                "legal_retirement": legal,
+                "pl_accrued": pl_accrued,
+                "reversal": reversal_amount,
                 "paid": data.paid_amount,
-                "difference": difference,
                 "work_days": work_days,
+                "under_one_year": work_days < 365,
             }
         }
 
