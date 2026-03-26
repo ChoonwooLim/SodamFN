@@ -67,7 +67,33 @@ async def upload_card_payment(file: UploadFile = File(...), current_user = Depen
                 count += 1
         
         service.session.commit()
-        return {"status": "success", "message": f"{count} payment records imported"}
+        
+        # Sync card fees to MonthlyProfitLoss
+        from models import MonthlyProfitLoss
+        from collections import defaultdict
+        all_payments = service.session.exec(
+            apply_bid_filter(select(CardPayment), CardPayment, bid)
+        ).all()
+        monthly_fees = defaultdict(int)
+        for p in all_payments:
+            monthly_fees[(p.payment_date.year, p.payment_date.month)] += p.fees
+        
+        for (year, month), total_fee in monthly_fees.items():
+            pl = service.session.exec(
+                apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                    MonthlyProfitLoss.year == year,
+                    MonthlyProfitLoss.month == month,
+                )
+            ).first()
+            if pl:
+                pl.expense_card_fee = total_fee
+                service.session.add(pl)
+            else:
+                pl = MonthlyProfitLoss(year=year, month=month, business_id=bid, expense_card_fee=total_fee)
+                service.session.add(pl)
+        service.session.commit()
+        
+        return {"status": "success", "message": f"{count} payment records imported. Card fees synced to P/L."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
