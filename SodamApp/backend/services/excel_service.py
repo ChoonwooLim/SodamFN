@@ -1220,13 +1220,17 @@ class ExcelService:
             # Extract date
             row_date_obj = None
             try:
-                if isinstance(dt, datetime.datetime): row_date_obj = dt
+                if isinstance(dt, datetime.datetime): 
+                    row_date_obj = dt
                 else: 
                     date_str = str(dt).strip()[:10]
                     date_str = re.sub(r'[^\d-]', '-', date_str)
                     row_date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-                    if first_date is None: first_date = row_date_obj
-            except: pass
+                
+                if first_date is None: 
+                    first_date = row_date_obj
+            except Exception as e:
+                pass
             
             if not row_date_obj: continue
 
