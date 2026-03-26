@@ -8,9 +8,14 @@ export default function CardSales() {
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState({ daily_trend: [], by_corp: [] });
     const [payments, setPayments] = useState([]);
-    const [dateRange, setDateRange] = useState({
-        start: new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 10),
-        end: new Date().toISOString().slice(0, 10)
+    const [dateRange, setDateRange] = useState(() => {
+        const now = new Date();
+        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+        return {
+            start: prevMonth.toISOString().slice(0, 10),
+            end: lastDay.toISOString().slice(0, 10)
+        };
     });
     const [msg, setMsg] = useState("");
 
