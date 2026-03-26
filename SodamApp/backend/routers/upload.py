@@ -424,6 +424,7 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
         skipped_count = 0
         dedup_skipped = 0
         dedup_replaced = 0
+        delivery_initialized = 0
         vendor_created_count = 0
         processed_months = set()
         
@@ -483,6 +484,34 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                                 session.delete(exp)
                                 dedup_replaced += 1
                     session.flush()
+
+                if file_type == "delivery_settlement":
+                    import calendar
+                    # Find all unique periods (year, month) and vendors to clear
+                    periods_to_clear = set((d.year, d.month) for d in upload_dates)
+                    vendor_names = set(item['vendor_name'] for item in revenue_data)
+                    
+                    for (y, m) in periods_to_clear:
+                        last_day = calendar.monthrange(y, m)[1]
+                        start_d = datetime.date(y, m, 1)
+                        end_d = datetime.date(y, m, last_day)
+                        for v_name in vendor_names:
+                            v = vendor_by_name.get(v_name)
+                            if v:
+                                old_records = session.exec(
+                                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                                        DailyExpense.date >= start_d,
+                                        DailyExpense.date <= end_d,
+                                        DailyExpense.vendor_id == v.id
+                                    )
+                                ).all()
+                                for old_rec in old_records:
+                                    session.delete(old_rec)
+                                    delivery_initialized += 1
+                    
+                    if delivery_initialized > 0:
+                        session.flush()
+                        print(f"[Dedup] delivery_settlement: initialized {delivery_initialized} old records for vendors {vendor_names}")
             
             for item in revenue_data:
                 if item['amount'] <= 0:
@@ -635,6 +664,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
             dedup_msg = f" (카드상세 데이터 존재로 POS 카드매출 {dedup_skipped}건 자동 제외)"
         if dedup_replaced > 0:
             dedup_msg = f" (POS 통합카드매출 {dedup_replaced}건을 카드사별 상세로 대체)"
+        if delivery_initialized > 0:
+            dedup_msg += f" (기존 배달매출 데이터 {delivery_initialized}건 초기화 및 덮어쓰기 완료)"
         
         return {
             "status": "success",

@@ -669,6 +669,19 @@ class ExcelService:
             # Priority 1.6: Yogiyo settlement (요기요 정산내역)
             if '상호명' in first_rows_text and '주문번호' in first_rows_text and '주문일시' in first_rows_text:
                 return self._parse_yogiyo_settlement(df)
+            elif '정산내역' in first_rows_text and ('주문금액' in first_rows_text or '요타임딜할인' in first_rows_text):
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(io.BytesIO(file_contents))
+                    if '상세 거래내역' in wb.sheetnames:
+                        detail_df = pd.read_excel(io.BytesIO(file_contents), sheet_name='상세 거래내역', header=None)
+                        return self._parse_yogiyo_settlement(detail_df)
+                except Exception:
+                    pass
+
+            # Priority 1.6.5: Coupang Eats settlement (쿠팡이츠 정산내역)
+            if '쿠팡' in first_rows_text or ('주문정보' in first_rows_text and '정산금액' in first_rows_text) or ('브랜드명' in first_rows_text and '상점명' in first_rows_text and '주문금액' in first_rows_text and '정산금액' in first_rows_text):
+                return self._parse_coupang_eats_settlement(df)
 
             # Priority 1.7: 땡겨요 settlement (땡겨요 정산내역)
             # Variants: 2월 format uses (D)차감금액/(E)정산금액, 1월 format uses (B)차감금액/(C)정산금액
@@ -1036,6 +1049,115 @@ class ExcelService:
                 "order_count": total_orders,
                 "channel": "요기요",
                 "period": f"{first_date.year}년 {first_date.month}월",
+            }
+        }
+
+    def _parse_coupang_eats_settlement(self, df):
+        """
+        Parse 쿠팡이츠 정산내역.
+        Supports format with 일자, 주문금액, 정산금액 columns.
+        Aggregates by date, calculates total settlement per day.
+        """
+        import datetime
+        
+        header_idx = -1
+        date_col = None
+        amount_col = None
+        sales_col = None
+        
+        for i in range(min(15, len(df))):
+            row_vals = [str(v).strip() for v in df.iloc[i].tolist() if pd.notna(v)]
+            if '일자' in row_vals and '주문번호' in row_vals:
+                header_idx = i
+                break
+
+        if header_idx == -1: return {"status": "error", "message": "쿠팡이츠 정산 내역의 시작을 찾을 수 없습니다."}
+
+        # Search across multi-row headers
+        for idx in range(len(df.columns)):
+            col_text = ' '.join(str(df.iloc[r, idx]).strip() for r in range(header_idx + 1) if pd.notna(df.iloc[r, idx]))
+            if '일자' in col_text and date_col is None: date_col = idx
+            elif '정산금액' in col_text and amount_col is None: amount_col = idx
+            elif '주문금액' in col_text and sales_col is None: sales_col = idx
+
+        if date_col is None or amount_col is None:
+            # Fallback if specific "정산금액" text wasn't in the matched column, 
+            # maybe "총액" or "산정후" under "정산금액" merged cell. Look at adjacent cells in row 0.
+            for idx in range(len(df.columns)):
+                for r in range(header_idx + 1):
+                    val = str(df.iloc[r, idx]).strip() if pd.notna(df.iloc[r, idx]) else ""
+                    if '정산금액' in val: amount_col = idx
+                    
+            if date_col is None or amount_col is None:
+                return {"status": "error", "message": f"쿠팡이츠 필수 컬럼(일자/정산금액)을 찾을 수 없습니다. (발견된 컬럼: 일자={date_col}, 정산금액={amount_col})"}
+
+        date_totals = {}
+        total_sales = 0
+        total_orders = 0
+        first_date = None
+        
+        for i in range(header_idx + 1, len(df)):
+            dt = df.iloc[i, date_col]
+            amount = df.iloc[i, amount_col]
+            sales = df.iloc[i, sales_col] if sales_col is not None else 0
+            
+            if pd.isna(dt) or pd.isna(amount): continue
+            
+            try:
+                if isinstance(dt, datetime.datetime):
+                    d_str = dt.strftime("%Y-%m-%d")
+                    first_date = dt if first_date is None else first_date
+                else:
+                    d_str = str(dt).strip()[:10]
+                    first_date = datetime.datetime.strptime(d_str, "%Y-%m-%d") if first_date is None else first_date
+            except: continue
+            
+            try: amount = int(float(str(amount).replace(',', '')))
+            except: continue
+            
+            if pd.notna(sales):
+                try: sales = int(float(str(sales).replace(',', '')))
+                except: sales = 0
+            else:
+                sales = 0
+
+            if amount == 0 and sales == 0: continue
+            
+            if d_str not in date_totals: date_totals[d_str] = {"amount": 0, "sales": 0, "orders": 0}
+            date_totals[d_str]["amount"] += amount
+            date_totals[d_str]["sales"] += sales
+            date_totals[d_str]["orders"] += 1
+
+        data = []
+        total_amount = 0
+        
+        for d, dt_data in sorted(date_totals.items()):
+            data.append({
+                "date": d,
+                "amount": dt_data["amount"],
+                "vendor_name": "쿠팡",
+                "note": f"쿠팡이츠 정산 ({dt_data['orders']}건)",
+                "payment_type": "delivery",
+            })
+            total_amount += dt_data["amount"]
+            total_sales += dt_data["sales"]
+            total_orders += dt_data["orders"]
+            
+        period = f"{first_date.year}년 {first_date.month}월" if first_date else "알수없음"
+        
+        return {
+            "status": "success",
+            "file_type": "delivery_settlement",
+            "label": "🛵 배달앱 정산 (쿠팡이츠)",
+            "data": data,
+            "summary": {
+                "total_amount": total_amount,
+                "total_sales": total_sales,
+                "total_fees": total_sales - total_amount if total_sales > 0 else 0,
+                "record_count": len(data),
+                "order_count": total_orders,
+                "channel": "쿠팡",
+                "period": period,
             }
         }
 

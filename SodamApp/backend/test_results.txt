@@ -1,0 +1,24 @@
+==================================================
+File: 배달의민족_2026년 2월 정산명세서.xlsx
+Status: success
+Summary: {"total_amount": 2098468, "total_sales": 3359000, "total_fees": 1260532, "record_count": 16, "channel": "배달의민족", "period": "2026년 2월"}
+Data count: 16
+Data [0]: {'date': '2026-02-02', 'amount': 122791, 'vendor_name': '배달의민족', 'note': '배민 정산', 'payment_type': 'delivery'}
+==================================================
+File: coupang_eats_2026-02.xlsx
+Status: success
+Summary: {"total_amount": 4987503, "total_sales": 11384500, "total_fees": 6396997, "record_count": 23, "order_count": 723, "channel": "쿠팡", "period": "2026년 2월"}
+Data count: 23
+Data [0]: {'date': '2026-02-02', 'amount': 225115, 'vendor_name': '쿠팡', 'note': '쿠팡이츠 정산 (36건)', 'payment_type': 'delivery'}
+==================================================
+File: 땡겨요 정산내역(2월건별).xls
+Status: success
+Summary: {"total_amount": 6615, "total_sales": 7000, "total_fees": 385, "record_count": 1, "order_count": 1, "channel": "땡겨요", "period": "2026년 2월"}
+Data count: 1
+Data [0]: {'date': '2026-02-02', 'amount': 6615, 'vendor_name': '땡겨요', 'note': '땡겨요 정산 (1건)', 'payment_type': 'delivery'}
+==================================================
+File: 요기요_2026년_02월_정산내역_639-12-01514.xlsx
+Status: success
+Summary: {"total_amount": 418624, "total_sales": 655000, "total_fees": 236376, "record_count": 17, "order_count": 33, "channel": "요기요", "period": "2026년 2월"}
+Data count: 17
+Data [0]: {'date': '2026-02-03', 'amount': 26995, 'vendor_name': '요기요', 'note': '요기요 정산 (2건)', 'payment_type': 'delivery'}
