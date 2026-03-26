@@ -724,36 +724,36 @@ export default function PurchaseManagement() {
                                                 <div key={df.channel} style={{
                                                     background: `linear-gradient(135deg, ${color}10, ${color}05)`,
                                                     border: `1px solid ${color}30`,
-                                                    borderRadius: 12, padding: '12px 14px',
+                                                    borderRadius: 12, padding: '14px 16px',
                                                 }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                                        <span style={{ fontSize: 13, fontWeight: 800, color }}>{df.label}</span>
-                                                        <span style={{ fontSize: 10, fontWeight: 700, color, background: `${color}15`, padding: '2px 8px', borderRadius: 20 }}>
+                                                        <span style={{ fontSize: 15, fontWeight: 800, color }}>{df.label}</span>
+                                                        <span style={{ fontSize: 12, fontWeight: 700, color, background: `${color}15`, padding: '3px 10px', borderRadius: 20 }}>
                                                             {df.fee_rate}%
                                                         </span>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 11 }}>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', fontSize: 13 }}>
                                                         <div>
-                                                            <div style={{ color: '#94a3b8', fontSize: 10 }}>매출</div>
+                                                            <div style={{ color: '#94a3b8', fontSize: 11 }}>매출</div>
                                                             <div style={{ fontWeight: 700, color: '#1e293b' }}>{formatNumber(df.total_sales)}원</div>
                                                         </div>
                                                         <div>
-                                                            <div style={{ color: '#94a3b8', fontSize: 10 }}>수수료</div>
+                                                            <div style={{ color: '#94a3b8', fontSize: 11 }}>수수료</div>
                                                             <div style={{ fontWeight: 800, color: '#ef4444' }}>-{formatNumber(df.total_fees)}원</div>
                                                         </div>
                                                         <div>
-                                                            <div style={{ color: '#94a3b8', fontSize: 10 }}>정산금</div>
+                                                            <div style={{ color: '#94a3b8', fontSize: 11 }}>정산금</div>
                                                             <div style={{ fontWeight: 700, color: '#059669' }}>{formatNumber(df.settlement)}원</div>
                                                         </div>
                                                         <div>
-                                                            <div style={{ color: '#94a3b8', fontSize: 10 }}>주문수</div>
+                                                            <div style={{ color: '#94a3b8', fontSize: 11 }}>주문수</div>
                                                             <div style={{ fontWeight: 700, color: '#1e293b' }}>{df.order_count}건</div>
                                                         </div>
                                                     </div>
                                                     {/* Fee Breakdown Detail */}
                                                     {df.fee_breakdown && Object.keys(df.fee_breakdown).length > 0 && (
                                                         <div style={{ marginTop: 8, borderTop: `1px solid ${color}20`, paddingTop: 8 }}>
-                                                            <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>📋 수수료 항목별 상세</div>
+                                                            <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>📋 수수료 항목별 상세</div>
                                                             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                                                 {Object.entries(df.fee_breakdown).map(([key, val]) => {
                                                                     const isCredit = val < 0;
@@ -762,7 +762,7 @@ export default function PurchaseManagement() {
                                                                     return (
                                                                         <div key={key} style={{
                                                                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                                            fontSize: 10, padding: '2px 0',
+                                                                            fontSize: 12, padding: '3px 0',
                                                                             borderBottom: '1px solid #f1f5f9',
                                                                         }}>
                                                                             <span style={{ color: '#475569', flex: 1 }}>{key}</span>
@@ -770,12 +770,12 @@ export default function PurchaseManagement() {
                                                                                 fontWeight: 700,
                                                                                 color: isCredit ? '#0f172a' : '#ef4444',
                                                                                 fontVariantNumeric: 'tabular-nums',
-                                                                                minWidth: 90, textAlign: 'right',
+                                                                                minWidth: 100, textAlign: 'right',
                                                                             }}>
                                                                                 {isCredit ? '+' : '-'}{formatNumber(absVal)}원
                                                                             </span>
                                                                             <span style={{
-                                                                                fontSize: 9, color: '#94a3b8', fontWeight: 600,
+                                                                                fontSize: 11, color: '#94a3b8', fontWeight: 600,
                                                                                 minWidth: 40, textAlign: 'right', marginLeft: 4,
                                                                             }}>
                                                                                 {isCredit ? '' : `${pct}%`}
