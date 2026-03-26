@@ -824,9 +824,11 @@ class ExcelService:
                 # Build data entries
                 for date_str in sorted(date_totals.keys()):
                     dt = date_totals[date_str]
+                    # Use sales (gross) as revenue amount; fallback to settlement if no sales data
+                    revenue_amount = dt["sales"] if dt["sales"] > 0 else dt["settlement"]
                     data.append({
                         "date": date_str,
-                        "amount": dt["settlement"],
+                        "amount": revenue_amount,
                         "vendor_name": "배달의민족",
                         "note": f"배민 정산",
                         "payment_type": "delivery",
@@ -1033,9 +1035,11 @@ class ExcelService:
         
         for date_str in sorted(date_totals.keys()):
             dt = date_totals[date_str]
+            # Use sales (gross) as revenue amount; fallback to settlement if no sales data
+            revenue_amount = int(dt["sales"]) if dt["sales"] > 0 else int(dt["settlement"])
             data.append({
                 "date": date_str,
-                "amount": int(dt["settlement"]),
+                "amount": revenue_amount,
                 "vendor_name": "요기요",
                 "note": f"요기요 정산 ({dt['orders']}건)",
                 "payment_type": "delivery",
@@ -1145,9 +1149,11 @@ class ExcelService:
         total_amount = 0
         
         for d, dt_data in sorted(date_totals.items()):
+            # Use sales (gross) as revenue amount; fallback to settlement if no sales data
+            revenue_amount = dt_data["sales"] if dt_data["sales"] > 0 else dt_data["amount"]
             data.append({
                 "date": d,
-                "amount": dt_data["amount"],
+                "amount": revenue_amount,
                 "vendor_name": "쿠팡",
                 "note": f"쿠팡이츠 정산 ({dt_data['orders']}건)",
                 "payment_type": "delivery",
@@ -1431,9 +1437,11 @@ class ExcelService:
 
         for date_str in sorted(date_totals.keys()):
             dt = date_totals[date_str]
+            # Use sales (gross) as revenue amount; fallback to settlement if no sales data
+            revenue_amount = dt["sales"] if dt["sales"] > 0 else dt["settlement"]
             data.append({
                 "date": date_str,
-                "amount": dt["settlement"],
+                "amount": revenue_amount,
                 "vendor_name": "땡겨요",
                 "note": f"땡겨요 정산 ({dt['orders']}건)",
                 "payment_type": "delivery",
