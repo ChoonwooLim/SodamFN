@@ -1411,12 +1411,12 @@ export default function RevenueManagement() {
 
             {/* Classification Modal */}
             {classifyData && (
-                <div className="modal-overlay">
-                    <div className="modal-content" style={{maxWidth: '600px', width: '95%'}}>
+                <div className="revenue-modal-overlay" onClick={() => setClassifyData(null)}>
+                    <div className="revenue-modal" style={{maxWidth: '620px', width: '95%', maxHeight: '80vh', display: 'flex', flexDirection: 'column'}} onClick={e => e.stopPropagation()}>
                         <h2>🔍 은행 입금내역 자동 분류</h2>
-                        <p style={{fontSize: 13, color: '#94a3b8', marginBottom: 20}}>{classifyData.message}</p>
+                        <p style={{fontSize: 13, color: '#94a3b8', marginBottom: 16, marginTop: 0}}>{classifyData.message}</p>
                         
-                        <div style={{maxHeight:'400px', overflowY:'auto', background:'rgba(0,0,0,0.2)', padding:10, borderRadius:8, marginBottom:20}}>
+                        <div style={{flex: 1, overflowY:'auto', background:'#f8fafc', padding: 12, borderRadius: 12, marginBottom: 16, border: '1px solid #e2e8f0'}}>
                             {classifyData.items.map((item, idx) => {
                                 const handleSelect = (val) => {
                                     const newItems = [...classifyData.items];
@@ -1424,15 +1424,15 @@ export default function RevenueManagement() {
                                     setClassifyData({...classifyData, items: newItems});
                                 };
                                 return (
-                                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
-                                        <div style={{display:'flex', flexDirection:'column'}}>
-                                            <span style={{fontSize: 14, fontWeight: 'bold'}}>{item.memo}</span>
+                                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', borderBottom:'1px solid #e2e8f0', gap: 12}}>
+                                        <div style={{display:'flex', flexDirection:'column', flex: 1, minWidth: 0}}>
+                                            <span style={{fontSize: 14, fontWeight: 700, color: '#1e293b'}}>{item.memo}</span>
                                             <span style={{fontSize: 12, color: '#94a3b8'}}>{item.date} | {formatNumber(item.amount)}원</span>
                                         </div>
                                         <select 
                                             value={item.selected_category || item.default_category || ''} 
                                             onChange={e => handleSelect(e.target.value)}
-                                            style={{padding: '6px 10px', borderRadius: 6, background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', color:'white'}}
+                                            style={{padding: '8px 12px', borderRadius: 8, background: 'white', border: '2px solid #e2e8f0', color: '#1e293b', fontSize: 13, fontWeight: 600, minWidth: 170, cursor: 'pointer'}}
                                         >
                                             <option value="">카테고리 선택...</option>
                                             <option value="카드수수료">💳 카드수수료 정산</option>
@@ -1445,16 +1445,20 @@ export default function RevenueManagement() {
                             })}
                         </div>
                         
-                        <div className="modal-actions">
-                            <button className="btn-cancel" onClick={() => setClassifyData(null)}>취소</button>
-                            <button className="btn-save" onClick={() => {
+                        <div className="revenue-modal-actions">
+                            <button className="modal-btn secondary" onClick={() => setClassifyData(null)}>취소</button>
+                            <button className="modal-btn primary" onClick={() => {
                                 const mappings = classifyData.items.map(i => ({
                                     memo: i.memo,
                                     category: i.selected_category || i.default_category
                                 })).filter(i => i.category && i.category !== '');
+                                if (mappings.length === 0) {
+                                    alert('최소 1개 이상의 항목에 카테고리를 선택해주세요.');
+                                    return;
+                                }
                                 handleClassifySubmit(mappings);
                             }}>
-                                분류 저장 및 업로드 계속
+                                ✅ 분류 저장 및 업로드 계속
                             </button>
                         </div>
                     </div>
