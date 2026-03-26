@@ -661,10 +661,9 @@ async def upload_revenue_excel(
                         except:
                             pass
                     
-                    if not cat:
+                    if not cat or cat == '무시':
                         continue
                     
-                    # Aggregate by category (DO NOT create revenue entries — just track totals)
                     date_str = item['date']
                     amount = item['amount']
                     try:
@@ -672,6 +671,7 @@ async def upload_revenue_excel(
                     except:
                         continue
                     
+                    # Track totals by category for summary
                     if not hasattr(session, '_bank_deposit_totals'):
                         session._bank_deposit_totals = {}
                     if cat not in session._bank_deposit_totals:
@@ -679,6 +679,46 @@ async def upload_revenue_excel(
                     session._bank_deposit_totals[cat]["amount"] += amount
                     session._bank_deposit_totals[cat]["count"] += 1
                     processed_months.add((date_obj.year, date_obj.month))
+                    
+                    # 현금매출 → 실제 매출로 저장 (POS에 안 잡힌 현금)
+                    if cat == '현금매출':
+                        memo = item.get('memo', '')
+                        vendor_name = f"현금매출({memo})"
+                        vendor = vendor_by_name.get(vendor_name)
+                        if not vendor:
+                            vendor = Vendor(
+                                name=vendor_name, category='store',
+                                item='은행입금:현금매출', vendor_type='revenue',
+                                created_by_upload_id=upload_id, business_id=bid
+                            )
+                            session.add(vendor)
+                            session.flush()
+                            vendor_by_name[vendor_name] = vendor
+                            vendor_created_count += 1
+                        
+                        existing = session.exec(
+                            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                                DailyExpense.date == date_obj,
+                                DailyExpense.vendor_id == vendor.id,
+                            )
+                        ).first()
+                        if existing:
+                            if existing.upload_id == upload_id:
+                                existing.amount += amount
+                                session.add(existing)
+                            else:
+                                skipped_count += 1
+                        else:
+                            expense = DailyExpense(
+                                date=date_obj, vendor_name=vendor.name, vendor_id=vendor.id,
+                                amount=amount, category='store', note=f'현금입금: {memo}',
+                                upload_id=upload_id, payment_method='Cash', business_id=bid
+                            )
+                            session.add(expense)
+                            inserted_count += 1
+                            cash_sales_calculated += amount
+                    
+                    # 카드/페이/배달앱/개인 → 집계만 (매출 중복 방지)
                     continue
                 if item['amount'] <= 0:
                     continue
@@ -774,7 +814,7 @@ async def upload_revenue_excel(
                     "file_type": "bank_deposit_card",
                     "total_records": len(revenue_data),
                 }
-            # If bank_deposit_card with classifications completed, return summary (NO revenue saved)
+            # If bank_deposit_card with classifications completed, return summary
             if file_type == "bank_deposit_card" and hasattr(session, '_bank_deposit_totals'):
                 totals = session._bank_deposit_totals
                 summary_info = result.get("summary", {})
@@ -801,26 +841,37 @@ async def upload_revenue_excel(
                 card_sales_total = sum(e.amount for e in card_sales)
                 card_fee = card_sales_total - card_deposit_total if card_sales_total > 0 else 0
                 
-                # Don't commit any DailyExpense — just classification rules were saved earlier
-                session.rollback()
-                # Cleanup upload history
-                with Session(engine) as cleanup_s:
-                    old_up = cleanup_s.get(UploadHistory, upload_id)
-                    if old_up:
-                        cleanup_s.delete(old_up)
-                        cleanup_s.commit()
+                cash_count = totals.get('현금매출', {}).get('count', 0)
+                cash_total = totals.get('현금매출', {}).get('amount', 0)
+                
+                if inserted_count > 0:
+                    # 현금매출이 저장됨 → commit
+                    upload_record = session.get(UploadHistory, upload_id)
+                    if upload_record:
+                        upload_record.record_count = inserted_count
+                        session.add(upload_record)
+                    session.commit()
+                else:
+                    # 저장할 매출 없음 → rollback + cleanup upload history
+                    session.rollback()
+                    with Session(engine) as cleanup_s:
+                        old_up = cleanup_s.get(UploadHistory, upload_id)
+                        if old_up:
+                            cleanup_s.delete(old_up)
+                            cleanup_s.commit()
                 
                 return {
                     "status": "success",
                     "file_type": "bank_deposit_card",
                     "file_type_label": "🏦 은행 입금내역 분석",
-                    "count": 0,
-                    "message": "은행 입금내역이 분석되었습니다. (매출 중복 방지를 위해 매출로 저장되지 않습니다)",
+                    "count": inserted_count,
                     "bank_summary": {
                         "card_deposit": card_deposit_total,
                         "card_sales": card_sales_total,
                         "card_fee": card_fee,
                         "card_fee_rate": round(card_fee / card_sales_total * 100, 2) if card_sales_total > 0 else 0,
+                        "cash_sales_count": cash_count,
+                        "cash_sales_total": cash_total,
                         "categories": {k: v for k, v in totals.items()},
                         "period": f"{target_year}년 {target_month}월"
                     }

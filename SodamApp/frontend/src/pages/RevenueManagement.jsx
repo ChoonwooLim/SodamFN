@@ -1885,13 +1885,17 @@ export default function RevenueManagement() {
                                             msg += `💳 카드매출: ${Number(bs.card_sales).toLocaleString()}원\n`;
                                             msg += `💰 카드입금: ${Number(bs.card_deposit).toLocaleString()}원\n`;
                                             msg += `📊 카드수수료: ${Number(bs.card_fee).toLocaleString()}원 (${bs.card_fee_rate}%)\n\n`;
+                                            if (bs.cash_sales_count > 0) {
+                                                msg += `💵 현금매출: ${bs.cash_sales_count}건 / ${Number(bs.cash_sales_total).toLocaleString()}원 → 매출 저장 ✅\n`;
+                                            }
                                             if (bs.categories) {
-                                                msg += `📋 분류 내역:\n`;
+                                                msg += `\n📋 전체 분류:\n`;
                                                 Object.entries(bs.categories).forEach(([k, v]) => {
-                                                    msg += `  ${k}: ${v.count}건 / ${Number(v.amount).toLocaleString()}원\n`;
+                                                    const saved = k === '현금매출' ? ' ✅저장' : ' (집계만)';
+                                                    msg += `  ${k}: ${v.count}건 / ${Number(v.amount).toLocaleString()}원${saved}\n`;
                                                 });
                                             }
-                                            msg += `\n⚠️ 매출 중복 방지를 위해 매출로 저장되지 않았습니다.`;
+                                            msg += `\nℹ️ 카드/페이/배달앱 입금은 이미 매출에 기록되어 중복 저장하지 않습니다.`;
                                             alert(msg);
                                         } else {
                                             alert(`✅ 처리 완료!\n${d.count || 0}건 저장${d.skipped ? `, ${d.skipped}건 중복 스킵` : ''}`);
