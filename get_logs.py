@@ -11,12 +11,10 @@ try:
     ssh.connect(host, username=user, password=password)
 
     commands = [
-        "ps aux | grep uvicorn",
-        "ps aux | grep sodam",
+        "source ~/.nvm/nvm.sh && pm2 logs orbitron --lines 100 --nostream",
     ]
 
     for cmd in commands:
-        print(f"--- Running: {cmd} ---")
         stdin, stdout, stderr = ssh.exec_command(cmd)
         
         while True:

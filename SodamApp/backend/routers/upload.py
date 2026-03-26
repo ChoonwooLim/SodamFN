@@ -547,6 +547,8 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                         print(f"[Dedup] delivery_settlement: initialized {delivery_initialized} old records for vendors {vendor_names}")
             
             for item in revenue_data:
+                if file_type == "bank_deposit_card":
+                    continue
                 if item['amount'] <= 0:
                     continue
                 
@@ -743,10 +745,12 @@ async def upload_revenue_excel(file: UploadFile = File(...), password: str = For
                 # Return requires classification if any
                 if unmapped_items:
                     # rollback transaction
-                    if upload_record:
+                    if upload_id is not None:
                         with Session(engine) as dbs:
-                            dbs.delete(upload_record)
-                            dbs.commit()
+                            rec = dbs.get(UploadHistory, upload_id)
+                            if rec:
+                                dbs.delete(rec)
+                                dbs.commit()
                     return {
                         "status": "requires_classification",
                         "items": unmapped_items,
