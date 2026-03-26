@@ -96,18 +96,35 @@ export default function RevenueManagement() {
     // ── 배달앱 (Delivery App) ──
     const [deliveryChannel, setDeliveryChannel] = useState('coupang');
     const [deliveryAppData, setDeliveryAppData] = useState({});
+    const [deliveryRatios, setDeliveryRatios] = useState({}); // channel -> {ratio, settlement, sales, fees}
 
     // ─── Fetch ───
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [dailyRes, summaryRes] = await Promise.all([
+            const [dailyRes, summaryRes, deliverySummaryRes] = await Promise.all([
                 api.get('/revenue/daily', { params: { year, month } }),
                 api.get('/revenue/summary', { params: { year, month } }),
+                api.get(`/revenue/delivery-summary?year=${year}`),
             ]);
             setData(dailyRes.data.data || []);
             setVendors(dailyRes.data.vendors || []);
             setSummary(summaryRes.data || { total: 0, by_category: {} });
+            // Build delivery settlement ratio map from delivery-summary
+            const dsData = deliverySummaryRes.data || {};
+            const ratios = {}; // vendor_name -> { ratio: settlement/sales }
+            const monthKey = `${year}-${String(month).padStart(2, '0')}`;
+            const monthEntry = (dsData.monthly || []).find(m => `${m.year}-${String(m.month).padStart(2, '0')}` === monthKey);
+            if (monthEntry?.channels) {
+                Object.entries(monthEntry.channels).forEach(([ch, info]) => {
+                    const s = info.total_sales || 0;
+                    const st = info.settlement_amount || 0;
+                    if (s > 0) {
+                        ratios[ch] = { ratio: st / s, settlement: st, sales: s, fees: info.total_fees || 0 };
+                    }
+                });
+            }
+            setDeliveryRatios(ratios);
         } catch (err) {
             console.error('Revenue fetch error:', err);
         } finally {
@@ -585,16 +602,23 @@ export default function RevenueManagement() {
         const calcGroupDayTotal = (d) => groupVendors.reduce((sum, v) => sum + (vendorGrid[v.id]?.amounts[d] || 0), 0);
         const calcGroupTotal = () => groupVendors.reduce((sum, v) => sum + (vendorTotals[v.id] || 0), 0);
 
-        // For delivery: calculate 매출 totals from notes
-        const calcDeliverySalesTotal = (vendorId) => {
-            const notes = vendorGrid[vendorId]?.notes || {};
-            return Object.values(notes).reduce((sum, note) => sum + (parseSalesFromNote(note) || 0), 0);
+        // For delivery: calculate 정산금 from amount * settlement ratio
+        const VENDOR_CHANNEL_MAP = {'쿠팡': '쿠팡', '쿠팡이츠': '쿠팡', '배달의민족': '배민', '배민': '배민', '요기요': '요기요', '땡겨요': '땡겨요'};
+        const getSettlementAmount = (vendorName, amount) => {
+            const ch = VENDOR_CHANNEL_MAP[vendorName];
+            if (!ch || !deliveryRatios[ch]) return 0;
+            return Math.round(amount * deliveryRatios[ch].ratio);
         };
-        const calcGroupDaySalesTotal = (d) => groupVendors.reduce((sum, v) => {
-            const note = vendorGrid[v.id]?.notes[d];
-            return sum + (parseSalesFromNote(note) || 0);
+        const calcDeliverySettlementTotal = (vendorId) => {
+            const amounts = vendorGrid[vendorId]?.amounts || {};
+            const vName = groupVendors.find(v => v.id === vendorId)?.name || '';
+            return Object.values(amounts).reduce((sum, a) => sum + getSettlementAmount(vName, a), 0);
+        };
+        const calcGroupDaySettlementTotal = (d) => groupVendors.reduce((sum, v) => {
+            const a = vendorGrid[v.id]?.amounts[d] || 0;
+            return sum + getSettlementAmount(v.name, a);
         }, 0);
-        const calcGroupSalesTotal = () => groupVendors.reduce((sum, v) => sum + calcDeliverySalesTotal(v.id), 0);
+        const calcGroupSettlementTotal = () => groupVendors.reduce((sum, v) => sum + calcDeliverySettlementTotal(v.id), 0);
 
         return (
             <>
@@ -603,9 +627,10 @@ export default function RevenueManagement() {
                         {icon} {label} ({groupVendors.length})
                     </td>
                 </tr>
+                {/* 매출 row (정산금 row 위에) */}
                 {groupVendors.map(v => (
                     <React.Fragment key={v.id}>
-                        {/* 정산금 row */}
+                        {/* 매출 row */}
                         <tr>
                             <td className="grid-vendor-cell" rowSpan={isDelivery ? 2 : 1}>
                                 {getDisplayName(v.name, v.item)}
@@ -617,27 +642,28 @@ export default function RevenueManagement() {
                             ))}
                             <td className="grid-row-total">{formatNumber(vendorTotals[v.id])}</td>
                         </tr>
-                        {/* 매출액 row (delivery only) */}
+                        {/* 정산금 row (delivery only) */}
                         {isDelivery && (
                             <tr className="grid-sales-row">
                                 {days.map(d => {
-                                    const sales = parseSalesFromNote(vendorGrid[v.id]?.notes[d]);
+                                    const amount = vendorGrid[v.id]?.amounts[d] || 0;
+                                    const settlement = getSettlementAmount(v.name, amount);
                                     return (
                                         <td key={d} className="grid-amount-cell grid-sales-cell">
-                                            <span className="grid-cell-sales">{sales ? formatNumber(sales) : '-'}</span>
+                                            <span className="grid-cell-sales">{settlement ? formatNumber(settlement) : '-'}</span>
                                         </td>
                                     );
                                 })}
                                 <td className="grid-row-total grid-sales-cell">
-                                    <span className="grid-cell-sales">{formatNumber(calcDeliverySalesTotal(v.id))}</span>
+                                    <span className="grid-cell-sales">{formatNumber(calcDeliverySettlementTotal(v.id))}</span>
                                 </td>
                             </tr>
                         )}
                     </React.Fragment>
                 ))}
-                {/* 정산금 소계 */}
+                {/* 매출 합계 */}
                 <tr className="grid-subtotal-row">
-                    <td className="grid-subtotal-label">↳ {isDelivery ? '정산금 소계' : tab === 'cash' ? '현금매출 소계' : tab === 'card' ? '카드매출 소계' : `${label} 소계`}</td>
+                    <td className="grid-subtotal-label">↳ {isDelivery ? '매출 합계' : tab === 'cash' ? '현금매출 소계' : tab === 'card' ? '카드매출 소계' : `${label} 소계`}</td>
                     {days.map(d => (
                         <td key={d} className="grid-subtotal-cell">
                             {calcGroupDayTotal(d) > 0 ? formatNumber(calcGroupDayTotal(d)) : '-'}
@@ -645,19 +671,38 @@ export default function RevenueManagement() {
                     ))}
                     <td className="grid-subtotal-total">{formatNumber(calcGroupTotal())}</td>
                 </tr>
-                {/* 매출 소계 (delivery only) */}
+                {/* 정산금 합계 (delivery only) */}
                 {isDelivery && (
                     <tr className="grid-subtotal-row grid-sales-subtotal">
-                        <td className="grid-subtotal-label">↳ 매출 소계</td>
+                        <td className="grid-subtotal-label">↳ 정산금 합계</td>
                         {days.map(d => {
-                            const t = calcGroupDaySalesTotal(d);
+                            const t = calcGroupDaySettlementTotal(d);
                             return (
                                 <td key={d} className="grid-subtotal-cell grid-sales-cell">
                                     {t > 0 ? formatNumber(t) : '-'}
                                 </td>
                             );
                         })}
-                        <td className="grid-subtotal-total grid-sales-cell">{formatNumber(calcGroupSalesTotal())}</td>
+                        <td className="grid-subtotal-total grid-sales-cell">{formatNumber(calcGroupSettlementTotal())}</td>
+                    </tr>
+                )}
+                {/* 수수료 합계 (delivery only) */}
+                {isDelivery && (
+                    <tr className="grid-subtotal-row" style={{ background: '#fef2f2' }}>
+                        <td className="grid-subtotal-label" style={{ color: '#ef4444', fontWeight: 800 }}>↳ 수수료 합계</td>
+                        {days.map(d => {
+                            const sales = calcGroupDayTotal(d);
+                            const settlement = calcGroupDaySettlementTotal(d);
+                            const fee = sales - settlement;
+                            return (
+                                <td key={d} className="grid-subtotal-cell" style={{ color: '#ef4444', fontWeight: 700 }}>
+                                    {fee > 0 ? formatNumber(fee) : '-'}
+                                </td>
+                            );
+                        })}
+                        <td className="grid-subtotal-total" style={{ color: '#ef4444', fontWeight: 800 }}>
+                            {formatNumber(calcGroupTotal() - calcGroupSettlementTotal())}
+                        </td>
                     </tr>
                 )}
             </>
