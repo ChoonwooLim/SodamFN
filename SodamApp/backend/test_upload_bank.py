@@ -1,33 +1,16 @@
-"""Test upload with classifications."""
-import requests, json
+"""Full dump of 땡겨요 file structure."""
+import pandas as pd, io
 
-login_resp = requests.post("http://localhost:8000/api/auth/login", data={"username": "admin", "password": "admin1234"})
-token = login_resp.json().get("access_token")
+f_path = r"C:\WORK\SodamFN\2026소득분석\매출\2월\땡겨요 정산내역(2월건별).xls"
 
-bank_file = r"C:\WORK\SodamFN\2026소득분석\매출\2월\신한은행_2월입금내역.xls"
-headers = {"Authorization": f"Bearer {token}"}
+with open(f_path, "rb") as f:
+    content = f.read()
 
-# Step 1: Upload without classifications -> should return requires_classification
-with open(bank_file, "rb") as f:
-    files = {"file": ("신한은행_2월입금내역.xls", f, "application/vnd.ms-excel")}
-    resp1 = requests.post("http://localhost:8000/api/upload/excel/revenue", files=files, headers=headers)
+df = pd.read_excel(io.BytesIO(content), header=None, engine='xlrd')
+print(f"Shape: {df.shape}")
 
-print(f"Step 1 status: {resp1.status_code}")
-body1 = resp1.json()
-print(f"Step 1 response status: {body1.get('status')}")
-print(f"Step 1 items count: {len(body1.get('items', []))}")
-
-# Step 2: Re-upload with classifications
-if body1.get('status') == 'requires_classification':
-    mappings = []
-    for item in body1['items']:
-        mappings.append({"memo": item['memo'], "category": "현금매출"})  # Just classify all as cash for testing
-    
-    with open(bank_file, "rb") as f:
-        files = {"file": ("신한은행_2월입금내역.xls", f, "application/vnd.ms-excel")}
-        data = {"classifications": json.dumps(mappings)}
-        resp2 = requests.post("http://localhost:8000/api/upload/excel/revenue", files=files, data=data, headers=headers)
-    
-    print(f"\nStep 2 status: {resp2.status_code}")
-    body2 = resp2.json()
-    print(f"Step 2 response: {json.dumps(body2, indent=2, ensure_ascii=False)[:2000]}")
+for i in range(len(df)):
+    row_vals = [str(v) if pd.notna(v) else '' for v in df.iloc[i].tolist()]
+    non_empty = [v for v in row_vals if v.strip()]
+    if non_empty:
+        print(f"  [{i}] {' | '.join(non_empty[:8])}")

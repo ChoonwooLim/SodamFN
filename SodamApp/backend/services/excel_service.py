@@ -679,14 +679,14 @@ class ExcelService:
                 except Exception:
                     pass
 
-            # Priority 1.6.5: Coupang Eats settlement (쿠팡이츠 정산내역)
-            if ('쿠팡' in first_rows_text and '정산금액' in first_rows_text) or ('주문정보' in first_rows_text and '정산금액' in first_rows_text) or ('브랜드명' in first_rows_text and '상점명' in first_rows_text and '주문금액' in first_rows_text and '정산금액' in first_rows_text):
-                return self._parse_coupang_eats_settlement(df)
-
-            # Priority 1.7: 땡겨요 settlement (땡겨요 정산내역)
+            # Priority 1.6.5: 땡겨요 settlement (땡겨요 정산내역) — MUST be checked before Coupang Eats
             # Variants: 2월 format uses (D)차감금액/(E)정산금액, 1월 format uses (B)차감금액/(C)정산금액
             if '(A)주문결제' in first_rows_text and ('(D)차감금액' in first_rows_text or '(E)정산금액' in first_rows_text or ('(B)차감금액' in first_rows_text and '정산 내역' in first_rows_text)):
                 return self._parse_ddangyo_settlement(df)
+
+            # Priority 1.6.6: Coupang Eats settlement (쿠팡이츠 정산내역)
+            if ('쿠팡' in first_rows_text and '정산금액' in first_rows_text) or ('주문정보' in first_rows_text and '정산금액' in first_rows_text) or ('브랜드명' in first_rows_text and '상점명' in first_rows_text and '주문금액' in first_rows_text and '정산금액' in first_rows_text):
+                return self._parse_coupang_eats_settlement(df)
 
             # Priority 1.8: Delivery app packed format (쿠팡이츠 등)
             # Single-column format like: "1. 2026.02.27기본정산286,792원724,366원"
