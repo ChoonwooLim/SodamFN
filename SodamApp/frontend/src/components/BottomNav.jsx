@@ -1,69 +1,35 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Camera, Wallet, Menu } from 'lucide-react';
+import { Receipt, BarChart3, ShoppingBag, CreditCard, Truck } from 'lucide-react';
 
 export default function BottomNav() {
     const location = useLocation();
-    const isActive = (path) => location.pathname === path;
+    const fullPath = location.pathname + location.search;
+    const isActive = (path) => {
+        if (path.includes('?')) return fullPath === path;
+        return location.pathname === path;
+    };
 
     const navItems = [
-        { icon: Home, path: '/dashboard', label: '홈' },
+        { icon: Receipt, path: '/finance/profitloss', label: '손익' },
         { icon: BarChart3, path: '/revenue', label: '매출' },
-        null, // Center button placeholder
-        { icon: Wallet, path: '/finance/profitloss', label: '재무' },
-        { icon: Menu, path: '/more', label: '더보기' },
+        { icon: ShoppingBag, path: '/purchase', label: '매입' },
+        { icon: CreditCard, path: '/finance/card-sales', label: '카드분석' },
+        { icon: Truck, path: '/revenue?view=delivery', label: '배달앱' },
     ];
 
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             <div style={{
-                background: 'rgba(255,255,255,0.92)',
+                background: 'rgba(255,255,255,0.95)',
                 backdropFilter: 'blur(20px)',
                 WebkitBackdropFilter: 'blur(20px)',
                 borderTop: '1px solid rgba(0,0,0,0.06)',
                 display: 'flex',
                 justifyContent: 'space-around',
-                alignItems: 'flex-end',
-                padding: '4px 8px 8px',
+                alignItems: 'center',
+                padding: '6px 4px 8px',
             }}>
                 {navItems.map((item) => {
-                    if (!item) {
-                        // Center floating action button
-                        return (
-                            <Link key="input" to="/camera" style={{
-                                position: 'relative',
-                                top: -18,
-                                margin: '0 4px',
-                                textDecoration: 'none',
-                            }}>
-                                <div style={{
-                                    width: 56,
-                                    height: 56,
-                                    borderRadius: 28,
-                                    background: isActive('/camera')
-                                        ? 'linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%)'
-                                        : 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'white',
-                                    boxShadow: '0 4px 20px rgba(59,130,246,0.4)',
-                                    border: '4px solid white',
-                                    transition: 'transform 0.2s, box-shadow 0.2s',
-                                }}>
-                                    <Camera size={24} />
-                                </div>
-                                <span style={{
-                                    display: 'block',
-                                    textAlign: 'center',
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                    color: isActive('/camera') ? '#3b82f6' : '#94a3b8',
-                                    marginTop: 2,
-                                }}>입력</span>
-                            </Link>
-                        );
-                    }
-
                     const Icon = item.icon;
                     const active = isActive(item.path);
 
@@ -76,39 +42,39 @@ export default function BottomNav() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                padding: '6px 12px',
+                                padding: '4px 6px',
                                 borderRadius: 12,
                                 textDecoration: 'none',
-                                minWidth: 52,
+                                minWidth: 56,
                                 transition: 'all 0.2s',
+                                position: 'relative',
                             }}
                         >
-                            <div style={{
-                                position: 'relative',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}>
-                                {active && (
-                                    <div style={{
-                                        position: 'absolute',
-                                        width: 36,
-                                        height: 36,
-                                        borderRadius: 12,
-                                        background: 'rgba(59,130,246,0.1)',
-                                    }} />
-                                )}
-                                <Icon
-                                    size={22}
-                                    strokeWidth={active ? 2.5 : 1.8}
-                                    style={{ color: active ? '#3b82f6' : '#94a3b8', position: 'relative', zIndex: 1 }}
-                                />
-                            </div>
+                            {active && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 12,
+                                    background: 'rgba(59,130,246,0.1)',
+                                }} />
+                            )}
+                            <Icon
+                                size={20}
+                                strokeWidth={active ? 2.5 : 1.8}
+                                style={{
+                                    color: active ? '#3b82f6' : '#94a3b8',
+                                    position: 'relative',
+                                    zIndex: 1,
+                                }}
+                            />
                             <span style={{
                                 fontSize: 10,
-                                marginTop: 2,
+                                marginTop: 3,
                                 fontWeight: active ? 700 : 500,
                                 color: active ? '#3b82f6' : '#94a3b8',
+                                letterSpacing: -0.3,
                             }}>
                                 {item.label}
                             </span>

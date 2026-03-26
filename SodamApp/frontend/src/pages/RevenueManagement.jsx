@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, TrendingUp, Camera, FileSpreadsheet, RotateCcw, UploadCloud } from 'lucide-react';
 import axios from 'axios';
 import api from '../api';
@@ -50,13 +50,15 @@ function getWeekday(dateStr) {
 
 export default function RevenueManagement() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const isMobile = useIsMobile();
     const now = new Date();
     const defaultMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const [year, setYear] = useState(defaultMonth.getFullYear());
     const [month, setMonth] = useState(defaultMonth.getMonth() + 1);
     const [tab, setTab] = useState('all'); // all | store | delivery
-    const [viewMode, setViewMode] = useState('dashboard'); // dashboard | list | grid | revenueDetail | deliveryApp | upload
+    const initialView = searchParams.get('view') === 'delivery' ? 'deliveryApp' : 'dashboard';
+    const [viewMode, setViewMode] = useState(initialView); // dashboard | list | grid | revenueDetail | deliveryApp | upload
     const [data, setData] = useState([]);
     const [vendors, setVendors] = useState([]);
     const [summary, setSummary] = useState({ total: 0, by_category: {} });
