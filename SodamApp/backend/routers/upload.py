@@ -332,14 +332,31 @@ def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user), bid 
         
         session.commit()
         
-        # 4. Re-sync P/L
-        # New session/connection might be safer for complex sync logic if it uses its own session
+        # 4. Re-sync P/L + Clean up DeliveryRevenue if delivery upload
         try:
             with Session(engine) as sync_session:
                 from services.profit_loss_service import sync_revenue_to_pl
                 for (year, month) in sync_months:
                     sync_all_expenses(year, month, sync_session, bid)
                     sync_revenue_to_pl(year, month, sync_session, bid)
+                    
+                    # Recalculate delivery fees from remaining DeliveryRevenue records
+                    from models import DeliveryRevenue, MonthlyProfitLoss
+                    all_dr = sync_session.exec(
+                        apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
+                            DeliveryRevenue.year == year, DeliveryRevenue.month == month,
+                        )
+                    ).all()
+                    total_delivery_fees = sum(d.total_fees for d in all_dr)
+                    pl = sync_session.exec(
+                        apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                            MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month,
+                        )
+                    ).first()
+                    if pl:
+                        pl.expense_delivery_fee = total_delivery_fees
+                        sync_session.add(pl)
+                        
                 sync_session.commit()
         except Exception as e:
             print(f"Rollback Sync Error: {e}")
@@ -527,31 +544,76 @@ async def upload_revenue_excel(
 
                 if file_type == "delivery_settlement":
                     import calendar
-                    # Find all unique periods (year, month) and vendors to clear
+                    # Determine the channel from the summary
+                    summary_info = result.get("summary", {})
+                    channel_name = summary_info.get("channel", "")
+                    
+                    # Map channel to revenue vendor keyword and P/L field
+                    CHANNEL_VENDOR_KW = {
+                        "쿠팡": "쿠팡", "쿠팡이츠": "쿠팡", "Coupang": "쿠팡",
+                        "배민": "배달의민족", "배달의민족": "배달의민족", "Baemin": "배달의민족",
+                        "요기요": "요기요", "Yogiyo": "요기요",
+                        "땡겨요": "땡겨요", "Ddangyo": "땡겨요",
+                    }
+                    channel_kw = CHANNEL_VENDOR_KW.get(channel_name, channel_name)
+                    
+                    # Find all unique periods (year, month) to clear
                     periods_to_clear = set((d.year, d.month) for d in upload_dates)
-                    vendor_names = set(item['vendor_name'] for item in revenue_data)
                     
                     for (y, m) in periods_to_clear:
                         last_day = calendar.monthrange(y, m)[1]
                         start_d = datetime.date(y, m, 1)
                         end_d = datetime.date(y, m, last_day)
-                        for v_name in vendor_names:
-                            v = vendor_by_name.get(v_name)
-                            if v:
-                                old_records = session.exec(
-                                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
-                                        DailyExpense.date >= start_d,
-                                        DailyExpense.date <= end_d,
-                                        DailyExpense.vendor_id == v.id
-                                    )
-                                ).all()
-                                for old_rec in old_records:
-                                    session.delete(old_rec)
-                                    delivery_initialized += 1
+                        
+                        # Delete ALL delivery-category DailyExpense for this channel+month
+                        # by matching vendor_name containing the channel keyword
+                        all_delivery = session.exec(
+                            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                                DailyExpense.date >= start_d,
+                                DailyExpense.date <= end_d,
+                                DailyExpense.category == 'delivery',
+                            )
+                        ).all()
+                        
+                        for old_rec in all_delivery:
+                            if channel_kw and channel_kw in (old_rec.vendor_name or ''):
+                                session.delete(old_rec)
+                                delivery_initialized += 1
+                        
+                        # Also delete from DeliveryRevenue table for this channel+month
+                        from models import DeliveryRevenue
+                        CHANNEL_KEY_MAP = {"쿠팡": "Coupang", "쿠팡이츠": "Coupang", "배달의민족": "Baemin", "배민": "Baemin",
+                                           "요기요": "Yogiyo", "땡겨요": "Ddangyo", "Coupang": "Coupang", "Baemin": "Baemin",
+                                           "Yogiyo": "Yogiyo", "Ddangyo": "Ddangyo"}
+                        dr_channel = CHANNEL_KEY_MAP.get(channel_name, channel_name)
+                        old_dr = session.exec(
+                            apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
+                                DeliveryRevenue.channel == dr_channel,
+                                DeliveryRevenue.year == y,
+                                DeliveryRevenue.month == m,
+                            )
+                        ).first()
+                        if old_dr:
+                            session.delete(old_dr)
+                        
+                        # Reset the corresponding P/L revenue field for this channel
+                        from models import MonthlyProfitLoss
+                        PL_CHANNEL_FIELD = {"Coupang": "revenue_coupang", "Baemin": "revenue_baemin",
+                                            "Yogiyo": "revenue_yogiyo", "Ddangyo": "revenue_ddangyo"}
+                        pl_field = PL_CHANNEL_FIELD.get(dr_channel)
+                        if pl_field:
+                            pl = session.exec(
+                                apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
+                                    MonthlyProfitLoss.year == y, MonthlyProfitLoss.month == m,
+                                )
+                            ).first()
+                            if pl:
+                                setattr(pl, pl_field, 0)
+                                session.add(pl)
                     
                     if delivery_initialized > 0:
                         session.flush()
-                        print(f"[Dedup] delivery_settlement: initialized {delivery_initialized} old records for vendors {vendor_names}")
+                        print(f"[Dedup] delivery_settlement: cleared {delivery_initialized} old records for channel '{channel_kw}'")
             
             for item in revenue_data:
                 if file_type == "bank_deposit_card":
