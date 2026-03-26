@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from typing import Optional
 from services.ocr_service import OCRService
 from services.excel_service import ExcelService
 from models import Expense, Revenue, Session, create_engine, SQLModel, User
@@ -377,7 +378,13 @@ async def upload_revenue_image(file: UploadFile = File(...), _admin: User = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/upload/excel/revenue")
-async def upload_revenue_excel(file: UploadFile = File(...), password: str = Form(None), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+async def upload_revenue_excel(
+    file: UploadFile = File(...),
+    password: Optional[str] = Form(None),
+    classifications: Optional[str] = Form(None),
+    _admin: User = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token)
+):
     """
     Smart revenue Excel upload.
     Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약, 배달앱 정산
