@@ -368,16 +368,15 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
             mm = monthly[month_key]
             if ch not in mm["channels"]:
                 mm["channels"][ch] = {
-                    "total_sales": total,  # settlement = total for uploaded files
+                    "total_sales": total,  # DailyExpense now stores gross sales
                     "total_fees": 0,
-                    "settlement_amount": total,
+                    "settlement_amount": 0,  # Will be filled from DeliveryRevenue
                     "order_count": 0,
                     "fee_rate": 0,
                     "fee_breakdown": {},
                     "source": "daily_expense",
                 }
                 mm["total_sales"] += total
-                mm["total_settlement"] += total
 
         # ── 2. Merge DeliveryRevenue (has fee details) ──
         dr_query = select(DeliveryRevenue)
@@ -402,8 +401,6 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
             except:
                 pass
 
-            # If DailyExpense already has this channel, MERGE fee details from DeliveryRevenue
-            # (DailyExpense is truth for settlement amounts, DeliveryRevenue has fee details)
             LEGACY_CHANNEL_MAP = {"Coupang": "쿠팡", "Baemin": "배민", "Yogiyo": "요기요", "Ddangyo": "땡겨요"}
             ch_name = LEGACY_CHANNEL_MAP.get(r.channel, r.channel)
             
@@ -412,15 +409,14 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
                 existing = mm["channels"][ch_name]
                 existing["total_sales"] = r.total_sales if r.total_sales > 0 else existing["total_sales"]
                 existing["total_fees"] = r.total_fees
+                existing["settlement_amount"] = r.settlement_amount
                 existing["order_count"] = r.order_count
                 existing["fee_rate"] = round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0
                 existing["fee_breakdown"] = fee_bd
-                # Update monthly totals with fee data
+                # Update monthly totals
                 mm["total_fees"] += r.total_fees
+                mm["total_settlement"] += r.settlement_amount
                 mm["total_orders"] += r.order_count
-                if r.total_sales > 0:
-                    mm["total_sales"] = mm["total_sales"] - existing.get("_orig_sales", existing["settlement_amount"]) + r.total_sales
-                    existing["_orig_sales"] = r.total_sales
                 continue
 
             mm["channels"][ch_name] = {
