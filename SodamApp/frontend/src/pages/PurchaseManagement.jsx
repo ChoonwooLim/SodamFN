@@ -771,7 +771,7 @@ export default function PurchaseManagement() {
                                                                                 fontSize: 9, color: '#94a3b8', fontWeight: 600,
                                                                                 minWidth: 40, textAlign: 'right', marginLeft: 4,
                                                                             }}>
-                                                                                {pct}%
+                                                                                {isCredit ? '' : `${pct}%`}
                                                                             </span>
                                                                         </div>
                                                                     );
