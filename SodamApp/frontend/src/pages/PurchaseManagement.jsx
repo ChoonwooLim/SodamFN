@@ -709,8 +709,15 @@ export default function PurchaseManagement() {
                             <h3>🛵 배달앱 수수료 상세</h3>
                             {summary.delivery_fees && summary.delivery_fees.length > 0 ? (
                                 <>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-                                        {summary.delivery_fees.map(df => {
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                                        {(() => {
+                                            const ORDER = ['쿠팡이츠', '배달의민족', '요기요', '땡겨요'];
+                                            const sorted = [...summary.delivery_fees].sort((a, b) => {
+                                                const ai = ORDER.indexOf(a.label);
+                                                const bi = ORDER.indexOf(b.label);
+                                                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                                            });
+                                            return sorted.map(df => {
                                             const CHANNEL_COLORS = { '배달의민족': '#2AC1BC', '쿠팡이츠': '#FF6B2C', '요기요': '#FA0050', '땡겨요': '#4A90D9' };
                                             const color = CHANNEL_COLORS[df.label] || '#6366f1';
                                             return (
@@ -781,7 +788,8 @@ export default function PurchaseManagement() {
                                                     )}
                                                 </div>
                                             );
-                                        })}
+                                            });
+                                        })()}
                                     </div>
                                     <div style={{
                                         background: 'linear-gradient(135deg, #1e293b, #0f172a)', borderRadius: 10,
