@@ -565,6 +565,13 @@ class ExcelService:
         'NH카드': '소담김밥 건대본점 농협카드',
         'NH농협카드': '소담김밥 건대본점 농협카드',
         '카카오페이': '소담김밥 건대본점 카카오페이',
+        # Pay services
+        '제로페이': '소담김밥 건대본점 제로페이',
+        '네이버페이': '소담김밥 건대본점 네이버페이',
+        '애플페이': '소담김밥 건대본점 애플페이',
+        '삼성페이': '소담김밥 건대본점 삼성페이',
+        '페이코': '소담김밥 건대본점 페이코',
+        'PAYCO': '소담김밥 건대본점 페이코',
     }
     CASH_VENDOR_NAME = '소담김밥 건대본점 현금매출'
 
@@ -1237,11 +1244,14 @@ class ExcelService:
             # Default Category Guessing
             memo_no_space = memo.replace(' ', '')
             card_kws = ['카드', '비씨', '케이비', '국민', '삼성', '현대', '롯데', '하나', '농협', 'BC', '우리카드', 'KB', 'SHC', 'NH']
+            pay_kws = ['제로페이', '네이버페이', '애플페이', '삼성페이', '카카오페이', '페이코', 'PAYCO', 'ZEROPAY', 'NAVERPAY', 'KAKAOPAY', 'APPLEPAY', 'SAMSUNGPAY', '간편결제']
             non_card_kws = ['서울페이', '배달', '쿠팡', '카카오', '요기요', '배민']
             
             is_card = False
             if any(k in memo_no_space for k in card_kws):
                 is_card = True
+            elif any(k in memo_no_space for k in pay_kws):
+                is_card = True  # 페이도 카드매출과 동일하게 수수료 차감 후 입금
             elif any(memo_no_space.startswith(p) for p in ['현', '우', '국']):
                 is_card = True
                 
