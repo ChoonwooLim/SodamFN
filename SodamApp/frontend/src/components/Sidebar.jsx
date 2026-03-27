@@ -315,7 +315,19 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-                {(user.role === 'admin' || user.role === 'superadmin' || isViewingBusiness) && (
+                {/* SuperAdmin 전체보기 모드: 수퍼관리자앱만 표시 */}
+                {isSuperAdmin && !isViewingBusiness && (
+                    <Link
+                        to="/admin-app-preview"
+                        className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/admin-app-preview' ? 'bg-amber-500/20 text-amber-300' : 'text-amber-400 hover:bg-amber-500/10'}`}
+                    >
+                        <Shield size={20} />
+                        <span className="font-medium text-sm">수퍼관리자앱</span>
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">SUPER</span>
+                    </Link>
+                )}
+                {/* 사업장 선택 시 또는 일반 admin: 직원용/관리자 앱 표시 */}
+                {(user.role === 'admin' || isViewingBusiness) && (
                     <>
                         <Link
                             to="/staff-app-preview"
