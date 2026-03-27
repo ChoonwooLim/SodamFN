@@ -721,7 +721,7 @@ export default function RevenueManagement() {
                             <ChevronLeft size={18} />
                         </button>
                         <TrendingUp size={22} />
-                        매출 요약
+                        매출관리
                     </h1>
                     {/* Year-only nav for annual views, month nav for monthly views */}
                     {(viewMode === 'revenueDetail' || viewMode === 'deliveryApp') ? (
