@@ -257,12 +257,20 @@
 }
 
 .revenue-table tbody tr {
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
     transition: background 0.15s;
 }
 
-.revenue-table tbody tr:hover {
+.revenue-table tbody tr:nth-child(odd) {
+    background: #ffffff;
+}
+
+.revenue-table tbody tr:nth-child(even) {
     background: #f8fafc;
+}
+
+.revenue-table tbody tr:hover {
+    background: #f1f5f9 !important;
 }
 
 .revenue-table tbody td {
@@ -514,20 +522,13 @@
     border-bottom: 2px solid #e2e8f0;
 }
 
-.day-group-header .day-total {
-    text-align: right;
-    font-weight: 800;
-    color: #0f172a;
-    font-variant-numeric: tabular-nums;
-}
-
-/* ── Cash Row — green tint ── */
+/* ── Cash Row — green text ── */
 .revenue-table .cash-row {
-    background: rgba(34, 197, 94, 0.02);
+    background: transparent;
 }
 
 .revenue-table .cash-row:hover {
-    background: rgba(34, 197, 94, 0.05);
+    background: transparent;
 }
 
 .revenue-table .cash-row .td-amount.cash-amount {
@@ -545,13 +546,13 @@
     color: #059669;
 }
 
-/* ── Card Row — blue tint ── */
+/* ── Card Row — blue text ── */
 .revenue-table .card-row {
-    background: rgba(59, 130, 246, 0.02);
+    background: transparent;
 }
 
 .revenue-table .card-row:hover {
-    background: rgba(59, 130, 246, 0.05);
+    background: transparent;
 }
 
 .revenue-table .card-row .td-vendor {
@@ -560,32 +561,35 @@
 
 /* ── Toggle Summary Row ── */
 .toggle-summary-row td {
-    background: rgba(99, 102, 241, 0.03);
-    border-bottom: 1px solid rgba(99, 102, 241, 0.1);
+    background: transparent !important;
+    border-top: 1px dashed #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
 }
 
 .toggle-summary-row:hover td {
-    background: rgba(99, 102, 241, 0.06);
+    background: transparent;
 }
 
 .toggle-summary-row .td-date {
     font-size: 13px;
-    color: #6366f1;
-    font-weight: 600;
+    color: #475569;
+    font-weight: 700;
 }
 
 .cash-toggle-row td {
-    background: rgba(34, 197, 94, 0.03);
-    border-bottom: 1px solid rgba(34, 197, 94, 0.1);
+    background: transparent !important;
+    border-top: 1px dashed #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
 }
 
 .cash-toggle-row:hover td {
-    background: rgba(34, 197, 94, 0.06);
+    background: transparent;
 }
 
 .delivery-toggle-row td {
-    background: rgba(245, 158, 11, 0.04);
-    border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+    background: transparent !important;
+    border-top: 1px dashed #cbd5e1;
+    border-bottom: 1px solid #cbd5e1;
 }
 
 .delivery-toggle-row:hover td {
@@ -758,7 +762,19 @@
     width: max-content;
     min-width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: 13px;
+}
+
+.revenue-grid-table tbody tr:nth-child(odd) {
+    background: #ffffff !important;
+}
+
+.revenue-grid-table tbody tr:nth-child(even) {
+    background: #f8fafc !important;
+}
+
+.revenue-grid-table tbody tr:hover {
+    background: #f1f5f9 !important;
 }
 
 .revenue-grid-table thead {
@@ -771,52 +787,54 @@
     position: sticky;
     left: 0;
     z-index: 12;
-    background: #f1f5f9 !important;
+    background: #f8fafc !important;
     min-width: 140px;
-    max-width: 160px;
-    padding: 8px 10px;
-    font-size: 11px;
+    max-width: 180px;
+    padding: 12px 14px;
+    font-size: 13px;
     font-weight: 700;
-    color: #64748b;
+    color: #475569;
     text-align: left;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid #cbd5e1;
+    border-right: 2px solid #e2e8f0;
     white-space: nowrap;
 }
 
 .grid-day-header {
-    padding: 8px 4px;
-    font-size: 11px;
+    padding: 12px 6px;
+    font-size: 13px;
     font-weight: 700;
-    color: #64748b;
-    background: #f1f5f9;
+    color: #475569;
+    background: #f8fafc;
     text-align: center;
-    min-width: 60px;
-    border-bottom: 2px solid #e2e8f0;
+    min-width: 65px;
+    border-bottom: 2px solid #cbd5e1;
 }
 
 .grid-total-header {
     position: sticky;
     right: 0;
     z-index: 12;
-    background: #e8f0fe !important;
-    padding: 8px 10px;
-    font-size: 11px;
+    background: #f1f5f9 !important;
+    padding: 12px 14px;
+    font-size: 13px;
     font-weight: 800;
-    color: #1e40af;
+    color: #0f172a;
     text-align: right;
-    min-width: 90px;
-    border-bottom: 2px solid #e2e8f0;
+    min-width: 100px;
+    border-bottom: 2px solid #cbd5e1;
+    border-left: 2px solid #e2e8f0;
 }
 
 /* ── Category Header ── */
 .grid-category-header td,
 .grid-category-cell {
-    background: #f8fafc;
-    padding: 8px 12px;
-    font-size: 12px;
+    background: #ffffff;
+    padding: 14px 14px;
+    font-size: 14px;
     font-weight: 800;
-    color: #334155;
-    border-top: 2px solid #e2e8f0;
+    color: #0f172a;
+    border-top: 2px solid #cbd5e1;
     border-bottom: 1px solid #e2e8f0;
 }
 
@@ -826,70 +844,72 @@
     left: 0;
     z-index: 5;
     background: white;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 600;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
     color: #334155;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 2px solid #e2e8f0;
 }
 
 /* ── Amount Cell ── */
 .grid-amount-cell {
-    padding: 2px 3px;
+    padding: 6px 8px;
     text-align: right;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #e2e8f0;
     vertical-align: middle;
+    background: transparent !important;
 }
 
 /* ── Grid cell values ── */
 .grid-cell-value {
     display: block;
-    padding: 4px 6px;
     cursor: pointer;
-    border-radius: 4px;
     transition: all 0.15s;
     color: #94a3b8;
     text-align: right;
     font-variant-numeric: tabular-nums;
-    min-height: 24px;
-    line-height: 24px;
+    font-size: 13px;
+    min-height: 28px;
+    line-height: 28px;
 }
 
 .grid-cell-value:hover {
-    background: #eff6ff;
-    color: #3b82f6;
+    color: #0f172a;
+    font-weight: 700;
 }
 
 .grid-cell-value.has-value {
-    color: #0f172a;
+    color: #334155;
     font-weight: 600;
 }
 
 .grid-cell-value.delivery-app-value {
-    color: #7c3aed;
+    color: #475569;
     cursor: default;
-    background: rgba(139, 92, 246, 0.06);
+    background: transparent;
 }
 
 .grid-cell-value.delivery-app-value:hover {
-    background: rgba(139, 92, 246, 0.12);
-    color: #6d28d9;
+    background: #f1f5f9;
+    color: #0f172a;
 }
 
 /* ── Grid Edit Input ── */
 .grid-edit-input {
     width: 100%;
-    padding: 3px 6px;
-    border: 2px solid #3b82f6;
+    padding: 4px 6px;
+    border: 2px solid #64748b;
     border-radius: 4px;
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     text-align: right;
     outline: none;
-    background: #eff6ff;
+    background: #ffffff;
     color: #0f172a;
     box-sizing: border-box;
     font-variant-numeric: tabular-nums;
@@ -900,14 +920,14 @@
     position: sticky;
     right: 0;
     z-index: 5;
-    background: #fafbff;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #1e293b;
+    background: #ffffff;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
     text-align: right;
-    border-bottom: 1px solid #f1f5f9;
-    border-left: 2px solid #e8ecf2;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 2px solid #e2e8f0;
     font-variant-numeric: tabular-nums;
 }
 
@@ -921,22 +941,23 @@
     left: 0;
     z-index: 5;
     background: #f8fafc;
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
     white-space: nowrap;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid #cbd5e1;
+    border-right: 2px solid #e2e8f0;
 }
 
 .grid-subtotal-cell {
-    padding: 8px 6px;
+    padding: 12px 6px;
     text-align: right;
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 800;
     color: #0f172a;
     background: #f8fafc;
-    border-bottom: 2px solid #e2e8f0;
+    border-bottom: 2px solid #cbd5e1;
     font-variant-numeric: tabular-nums;
 }
 
@@ -944,26 +965,26 @@
     position: sticky;
     right: 0;
     z-index: 5;
-    background: #dbeafe;
-    padding: 8px 10px;
-    font-size: 13px;
+    background: #f1f5f9;
+    padding: 12px 14px;
+    font-size: 15px;
     font-weight: 900;
-    color: #1e40af;
+    color: #0f172a;
     text-align: right;
-    border-bottom: 2px solid #e2e8f0;
-    border-left: 2px solid #e8ecf2;
+    border-bottom: 2px solid #cbd5e1;
+    border-left: 2px solid #e2e8f0;
     font-variant-numeric: tabular-nums;
 }
 
 /* ── Delivery Sales Row (매출 sub-row) ── */
 .grid-sales-row {
-    background: #fffbeb;
+    background: #ffffff;
 }
 
 .grid-sales-cell {
-    color: #92400e !important;
-    font-size: 10px !important;
-    font-weight: 500 !important;
+    color: #64748b !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
 }
 
 .grid-cell-sales {
@@ -971,46 +992,47 @@
 }
 
 .grid-sales-subtotal {
-    background: #fef3c7;
+    background: #ffffff;
 }
 
 .grid-sales-subtotal .grid-subtotal-label {
-    background: #fef3c7;
-    color: #92400e;
+    background: #ffffff;
+    color: #475569;
 }
 
 .grid-sales-subtotal .grid-subtotal-cell {
-    background: #fef3c7;
-    color: #92400e;
-    font-size: 12px !important;
+    background: #ffffff;
+    color: #475569;
+    font-size: 14px !important;
     font-weight: 800 !important;
 }
 
 .grid-sales-subtotal .grid-subtotal-total {
-    background: #fde68a;
-    color: #78350f;
-    font-size: 13px !important;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 15px !important;
     font-weight: 900 !important;
 }
 
 /* ── Grand Total ── */
 .grid-grand-total-row {
-    background: #f1f5f9;
+    background: #f8fafc;
 }
 
 .grid-grand-total-row .grid-vendor-cell {
-    background: #f1f5f9;
-    border-top: 2px solid #cbd5e1;
+    background: #f8fafc;
+    border-top: 2px solid #94a3b8;
+    border-right: 2px solid #e2e8f0;
 }
 
 .grid-day-total {
-    padding: 6px 6px;
+    padding: 12px 6px;
     text-align: right;
-    font-size: 11px;
-    font-weight: 700;
-    color: #475569;
-    background: #f1f5f9;
-    border-top: 2px solid #cbd5e1;
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    background: #f8fafc;
+    border-top: 2px solid #94a3b8;
     font-variant-numeric: tabular-nums;
 }
 
@@ -1018,14 +1040,14 @@
     position: sticky;
     right: 0;
     z-index: 5;
-    background: #eef2ff;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 800;
-    color: #1e40af;
+    background: #f1f5f9;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-weight: 900;
+    color: #0f172a;
     text-align: right;
-    border-top: 2px solid #cbd5e1;
-    border-left: 2px solid #e8ecf2;
+    border-top: 2px solid #94a3b8;
+    border-left: 2px solid #e2e8f0;
     font-variant-numeric: tabular-nums;
 }
 
