@@ -1171,6 +1171,8 @@ export default function RevenueManagement() {
                                     const cashItemsTotal = cashItems.reduce((s, i) => s + (i.amount || 0), 0);
                                     const cardOnlyTotal = cardOnlyItems.reduce((s, i) => s + (i.amount || 0), 0);
                                     const deliveryTotal = deliveryItems.reduce((s, i) => s + (i.amount || 0), 0);
+                                    
+                                    const isCashCollapsed = collapsedCards[`cash-${dateStr}`] !== false; // default collapsed
                                     const isCardCollapsed = collapsedCards[`card-${dateStr}`] !== false; // default collapsed
                                     const isDeliveryCollapsed = collapsedCards[`delivery-${dateStr}`] !== false; // default collapsed
 
@@ -1232,8 +1234,16 @@ export default function RevenueManagement() {
                                                 {items.length}건
                                             </td>
                                         </tr>,
-                                        /* ── Cash items (shown first, green tint) ── */
-                                        ...cashItems.map(item => renderItemRow(item, '💵', '현금', 'cash', 'cash-row', true)),
+                                        /* ── Cash items collapse toggle ── */
+                                        cashItems.length > 0 && renderToggleRow(
+                                            `cash-toggle-${dateStr}`, '💵', '현금매출',
+                                            cashItems.length, cashItemsTotal,
+                                            isCashCollapsed, `cash-${dateStr}`, 'cash-toggle-row'
+                                        ),
+                                        /* ── Cash items (collapsible, green tint) ── */
+                                        ...(!isCashCollapsed ? cashItems.map(item =>
+                                            renderItemRow(item, '💵', '현금매출', 'cash', 'cash-row', false)
+                                        ) : []),
                                         /* ── Card items collapse toggle ── */
                                         cardOnlyItems.length > 0 && renderToggleRow(
                                             `card-toggle-${dateStr}`, '💳', '카드매출',
