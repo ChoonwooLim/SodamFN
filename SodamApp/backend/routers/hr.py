@@ -88,13 +88,10 @@ class AttendanceAction(BaseModel):
 # --- Endpoints ---
 
 @router.get("/staff")
-def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin: AuthUser = Depends(get_admin_user)):
+def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
-        stmt = select(Staff)
-        # Tenant filter - scope to admin's business
-        if _admin.role != "superadmin" and _admin.business_id:
-            stmt = stmt.where(Staff.business_id == _admin.business_id)
+        stmt = apply_bid_filter(select(Staff), Staff, bid)
         
         # Apply Status Filter if Provided
         if status:

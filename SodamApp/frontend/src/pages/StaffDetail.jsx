@@ -499,6 +499,17 @@ export default function StaffDetail() {
                                         className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                                     />
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-500 mb-1">직책</label>
+                                    <input
+                                        type="text"
+                                        name="role"
+                                        value={formData.role || ''}
+                                        onChange={handleChange}
+                                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                        placeholder="예: 대표이사, 주방장, Staff, 아르바이트"
+                                    />
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-slate-500 mb-1">휴대폰</label>

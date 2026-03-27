@@ -86,7 +86,9 @@ def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(
             staff_q = apply_bid_filter(select(func.count(Staff.id)), Staff, bid)
             staff_count = session.exec(staff_q.where(Staff.status == "재직")).one() or 0
             names_q = apply_bid_filter(select(Staff.name), Staff, bid)
-            staff_names = session.exec(names_q.where(Staff.status == "재직").limit(5)).all()
+            staff_names = session.exec(names_q.where(Staff.status == "재직").order_by(
+                (Staff.role == "대표이사").desc(), Staff.id
+            ).limit(5)).all()
 
             # --- Business Name ---
             from models import Business
