@@ -45,7 +45,7 @@ cd c:\WORK\SodamFN\SodamApp\backend && python -c "import sys; sys.path.insert(0,
 1. `git add -A` → 자동 실행
 // turbo
 2. `git commit -m "커밋메시지"` → 자동 실행
-3. `git push origin main` → **사용자 확인 후 실행** (turbo 아님)
+3. `git push origin main` → 🔒 **반드시 "푸시할까요?" 라고 물어본 후, 사용자가 승인해야만 실행. 절대 자동 실행 금지.**
 
 ### 커밋 메시지 규칙
 - `feat:` 새 기능 / `fix:` 버그 수정 / `style:` UI / `refactor:` 리팩토링 / `docs:` 문서 / `infra:` 인프라
@@ -53,3 +53,4 @@ cd c:\WORK\SodamFN\SodamApp\backend && python -c "import sys; sys.path.insert(0,
 ### 주의사항
 - 작업이 의미 있는 단위로 완료되었을 때 수행
 - 사용자가 "커밋하지 마" 또는 "아직 푸시하지 마"라고 하면 보류
+- git push는 SafeToAutoRun=false로 설정하고, 실행 전 사용자에게 확인 메시지를 보낼 것
