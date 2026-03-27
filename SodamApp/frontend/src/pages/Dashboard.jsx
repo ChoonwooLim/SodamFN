@@ -343,189 +343,142 @@ export default function Dashboard() {
         );
     }
 
-    // ── Desktop Layout (existing) ──
+    // ── Desktop Layout (Premium Dark Theme) ──
+    const CHART_COLORS = ['#14b8a6', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const gCard = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '28px 24px' };
+
     return (
-        <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 pb-32 md:pb-10">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">대시보드</h1>
-                    <div className="flex flex-col mt-1 space-y-1">
-                        <p className="text-slate-500">{businessName} 매장의 실시간 현황입니다.</p>
-                        <p className="text-indigo-600 font-medium text-sm">
-                            {formatDate(currentTime)} <span className="ml-1 font-bold">{formatTime(currentTime)}</span>
-                        </p>
+        <div style={{ background: '#0f172a', minHeight: '100vh', padding: '0 0 40px' }}>
+            <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #134e4a 100%)', padding: '40px 48px 32px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ maxWidth: 1280, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <h1 style={{ fontSize: 28, fontWeight: 900, color: 'white', letterSpacing: -0.5, margin: 0 }}>{businessName}</h1>
+                        <p style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>{formatDate(currentTime)}<span style={{ marginLeft: 8, color: '#64748b' }}>{formatTime(currentTime)}</span></p>
                     </div>
-                </div>
-                <div className="flex items-center gap-3">
-                    <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                        <option value="2024">2024년</option>
-                        <option value="2025">2025년</option>
-                        <option value="2026">2026년</option>
-                    </select>
-                    <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                        className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5">
-                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}월</option>)}
-                    </select>
-                    <div className="bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                        <span className="text-sm font-semibold text-slate-700">영업중</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Wallet size={24} /></div>
-                        <span className={`flex items-center gap-1 text-sm font-bold ${revenueGrowth >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                            {revenueGrowth >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                            {revenueGrowth}%
-                        </span>
-                    </div>
-                    <p className="text-slate-500 text-sm font-medium">이번 달 매출</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{revenue.toLocaleString()}원</h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className={`p-3 rounded-xl ${profit >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}><ShoppingBag size={24} /></div>
-                        <span className="text-sm font-bold text-slate-400">마진율 {marginRate}%</span>
-                    </div>
-                    <p className="text-slate-500 text-sm font-medium">순이익</p>
-                    <h3 className={`text-2xl font-bold mt-1 ${profit >= 0 ? 'text-slate-900' : 'text-red-600'}`}>{profit.toLocaleString()}원</h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-violet-50 text-violet-600 rounded-xl"><Users size={24} /></div>
-                        <span className="px-2 py-1 bg-violet-100 text-violet-700 text-xs font-bold rounded-lg">{staffCount}명 재직</span>
-                    </div>
-                    <p className="text-slate-500 text-sm font-medium">재직 직원</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">
-                        {staffNames.length > 0 ? (staffNames.length === 1 ? staffNames[0] : `${staffNames[0]} 외 ${staffCount - 1}명`) : '직원 없음'}
-                    </h3>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 transition-all hover:shadow-md">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-orange-50 text-orange-600 rounded-xl"><BarChart3 size={24} /></div>
-                    </div>
-                    <p className="text-slate-500 text-sm font-medium">이번 달 총 지출</p>
-                    <h3 className="text-2xl font-bold text-slate-900 mt-1">{expense.toLocaleString()}원</h3>
-                </div>
-            </div>
-
-            {/* Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <h3 className="font-bold text-lg text-slate-800">월별 수익 추이</h3>
-                            <p className="text-sm text-slate-500">최근 6개월간의 순수익 변화</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: 13, borderRadius: 10, padding: '8px 12px', outline: 'none', cursor: 'pointer' }}>
+                            {[2024, 2025, 2026].map(y => <option key={y} value={y} style={{ color: '#1e293b' }}>{y}년</option>)}
+                        </select>
+                        <select value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', color: 'white', fontSize: 13, borderRadius: 10, padding: '8px 12px', outline: 'none', cursor: 'pointer' }}>
+                            {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m} style={{ color: '#1e293b' }}>{m}월</option>)}
+                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 20, padding: '6px 16px' }}>
+                            <div style={{ width: 8, height: 8, borderRadius: 4, background: '#10b981', animation: 'pulse 2s infinite' }} />
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#34d399' }}>영업중</span>
                         </div>
                     </div>
-                    <div className="h-[350px]">
-                        {monthlyTrend && monthlyTrend.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorProfitD" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} />
-                                    <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => formatKRW(v)} />
-                                    <Tooltip formatter={v => [`${v.toLocaleString()}원`, '이익']} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: 12 }} />
-                                    <Area type="monotone" dataKey="profit" stroke="#3B82F6" strokeWidth={3} fillOpacity={1} fill="url(#colorProfitD)" isAnimationActive={false} />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        ) : <div className="h-full flex items-center justify-center text-slate-400">데이터가 없습니다</div>}
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <h3 className="font-bold text-lg text-slate-800 mb-2">매출 채널</h3>
-                    <p className="text-sm text-slate-500 mb-6">플랫폼별 매출 비중</p>
-                    <div className="h-[250px] relative">
-                        {revenueData && revenueData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={revenueData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" isAnimationActive={false}>
-                                        {revenueData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                    </Pie>
-                                    <Tooltip formatter={v => `${v.toLocaleString()}원`} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        ) : <div className="h-full flex items-center justify-center text-slate-400">데이터가 없습니다</div>}
-                        {revenueData && revenueData.length > 0 && (
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <span className="text-sm font-bold text-slate-400">{formatKRW(revenueData.reduce((s, e) => s + e.value, 0))}원</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="mt-4 space-y-3">
-                        {revenueData && revenueData.map((entry, i) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }}></div>
-                                    <span className="text-slate-600">{entry.name}</span>
-                                </div>
-                                <span className="font-bold text-slate-900">{entry.value.toLocaleString()}원</span>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
-
-            {/* Bottom Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-10">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><BarChart3 size={18} /></div>
-                        <div>
-                            <h3 className="font-bold text-slate-800">지출 TOP 5 (거래처)</h3>
-                            <p className="text-xs text-slate-500">가장 많은 지출이 발생한 거래처</p>
+            <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 48px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, paddingTop: 24 }}>
+                    <div style={{ background: 'linear-gradient(135deg, #134e4a, #0d9488)', borderRadius: 20, padding: '24px 20px', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: -20, right: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Wallet size={22} color="white" /></div>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: revenueGrowth >= 0 ? '#a7f3d0' : '#fca5a5' }}>
+                                {revenueGrowth >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}{revenueGrowth >= 0 ? '+' : ''}{revenueGrowth}%
+                            </span>
                         </div>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', margin: 0 }}>이번 달 매출</p>
+                        <h3 style={{ fontSize: 26, fontWeight: 900, color: 'white', margin: '6px 0 0' }}>{revenue.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 500, marginLeft: 2 }}>원</span></h3>
                     </div>
-                    <div className="space-y-4">
-                        {costData.length > 0 ? costData.map((item, idx) => (
-                            <div key={idx} className="flex justify-between items-center">
-                                <div className="flex items-center gap-4">
-                                    <span className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm font-bold ${idx < 3 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
-                                    <div>
-                                        <p className="font-bold text-slate-800 text-sm">{item.vendor}</p>
-                                        <p className="text-xs text-slate-400">{item.item || '기타'}</p>
-                                    </div>
-                                </div>
-                                <span className="font-bold text-slate-900">{item.amount.toLocaleString()}원</span>
-                            </div>
-                        )) : <div className="text-center text-slate-400 py-8">거래 내역이 없습니다</div>}
+                    <div style={gCard}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: profit >= 0 ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShoppingBag size={22} color={profit >= 0 ? '#10b981' : '#ef4444'} /></div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b', background: 'rgba(255,255,255,0.06)', padding: '4px 10px', borderRadius: 8 }}>마진 {marginRate}%</span>
+                        </div>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', margin: 0 }}>순이익</p>
+                        <h3 style={{ fontSize: 26, fontWeight: 900, color: profit >= 0 ? '#34d399' : '#f87171', margin: '6px 0 0' }}>{profit.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 500, marginLeft: 2 }}>원</span></h3>
+                    </div>
+                    <div style={gCard}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Users size={22} color="#8b5cf6" /></div>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', background: 'rgba(139,92,246,0.12)', padding: '4px 10px', borderRadius: 8 }}>{staffCount}명 재직</span>
+                        </div>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', margin: 0 }}>재직 직원</p>
+                        <h3 style={{ fontSize: 22, fontWeight: 900, color: 'white', margin: '6px 0 0' }}>{staffNames.length > 0 ? (staffNames.length === 1 ? staffNames[0] : `${staffNames[0]} 외 ${staffCount - 1}명`) : '직원 없음'}</h3>
+                    </div>
+                    <div style={gCard}>
+                        <div style={{ marginBottom: 16 }}><div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(245,158,11,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BarChart3 size={22} color="#f59e0b" /></div></div>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', margin: 0 }}>이번 달 총 지출</p>
+                        <h3 style={{ fontSize: 26, fontWeight: 900, color: 'white', margin: '6px 0 0' }}>{expense.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 500, marginLeft: 2 }}>원</span></h3>
                     </div>
                 </div>
-
-                <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm relative overflow-hidden">
-                    <div className="relative z-10">
-                        <h3 className="font-bold text-lg mb-2">손익 현황</h3>
-                        <p className="text-slate-400 text-sm mb-6">{selectedYear}년 {selectedMonth}월 요약</p>
-                        <div className="space-y-4">
-                            {[
-                                { label: '총 매출', value: revenue, dot: revenue > 0 ? 'bg-blue-500' : 'bg-slate-500' },
-                                { label: '총 지출', value: expense, dot: expense > 0 ? 'bg-orange-500' : 'bg-slate-500' },
-                                { label: profit >= 0 ? '영업이익' : '영업손실', value: profit, dot: profit >= 0 ? 'bg-emerald-500' : 'bg-red-500', highlight: true },
-                            ].map((row, i) => (
-                                <div key={i} className={`flex gap-3 items-start p-3 bg-white/10 rounded-xl ${row.highlight ? 'border border-white/20' : ''}`}>
-                                    <div className={`w-2 h-2 rounded-full mt-2 ${row.dot}`}></div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between">
-                                            <p className="text-sm font-bold">{row.label}</p>
-                                            <p className={`text-sm font-bold ${row.highlight ? (profit >= 0 ? 'text-emerald-400' : 'text-red-400') : ''}`}>{row.value.toLocaleString()}원</p>
-                                        </div>
-                                        {row.highlight && <p className="text-xs text-slate-400 mt-1">마진율 {marginRate}%</p>}
-                                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginTop: 20 }}>
+                    <div style={gCard}>
+                        <h3 style={{ fontSize: 18, fontWeight: 800, color: 'white', margin: 0 }}>월별 수익 추이</h3>
+                        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 24 }}>최근 6개월간의 순수익 변화</p>
+                        <div style={{ height: 320 }}>
+                            {monthlyTrend && monthlyTrend.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={monthlyTrend} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <defs><linearGradient id="colorProfitD" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0d9488" stopOpacity={0.25} /><stop offset="95%" stopColor="#0d9488" stopOpacity={0} /></linearGradient></defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
+                                        <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} dy={10} />
+                                        <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={v => formatKRW(v)} />
+                                        <Tooltip formatter={v => [`${v.toLocaleString()}원`, '이익']} contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.3)', padding: 14, color: 'white' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#5eead4' }} />
+                                        <Area type="monotone" dataKey="profit" stroke="#14b8a6" strokeWidth={3} fillOpacity={1} fill="url(#colorProfitD)" isAnimationActive={false} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>데이터가 없습니다</div>}
+                        </div>
+                    </div>
+                    <div style={gCard}>
+                        <h3 style={{ fontSize: 18, fontWeight: 800, color: 'white', margin: 0 }}>매출 채널</h3>
+                        <p style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 20 }}>플랫폼별 매출 비중</p>
+                        <div style={{ height: 220, position: 'relative' }}>
+                            {revenueData && revenueData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart><Pie data={revenueData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value" isAnimationActive={false}>{revenueData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % 5]} />)}</Pie>
+                                        <Tooltip formatter={v => `${v.toLocaleString()}원`} contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: 'white' }} /></PieChart>
+                                </ResponsiveContainer>
+                            ) : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569' }}>데이터가 없습니다</div>}
+                            {revenueData && revenueData.length > 0 && (<div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><span style={{ fontSize: 14, fontWeight: 800, color: '#94a3b8' }}>{formatKRW(revenueData.reduce((s, e) => s + e.value, 0))}원</span></div>)}
+                        </div>
+                        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {revenueData && revenueData.map((entry, i) => (
+                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ width: 10, height: 10, borderRadius: 5, background: CHART_COLORS[i % 5] }} /><span style={{ color: '#94a3b8' }}>{entry.name}</span></div>
+                                    <span style={{ fontWeight: 700, color: 'white' }}>{entry.value.toLocaleString()}원</span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+                    <div style={gCard}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+                            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BarChart3 size={20} color="#ef4444" /></div>
+                            <div><h3 style={{ fontSize: 16, fontWeight: 800, color: 'white', margin: 0 }}>지출 TOP 5 (거래처)</h3><p style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>가장 많은 지출이 발생한 거래처</p></div>
+                        </div>
+                        {costData.length > 0 ? costData.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 12px', borderBottom: idx < costData.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                    <span style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, background: idx < 3 ? 'linear-gradient(135deg, #14b8a6, #0d9488)' : 'rgba(255,255,255,0.08)', color: idx < 3 ? 'white' : '#64748b' }}>{idx + 1}</span>
+                                    <div><p style={{ fontSize: 14, fontWeight: 700, color: 'white', margin: 0 }}>{item.vendor}</p><p style={{ fontSize: 11, color: '#64748b', margin: '2px 0 0' }}>{item.item || '기타'}</p></div>
+                                </div>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>{item.amount.toLocaleString()}원</span>
+                            </div>
+                        )) : <div style={{ padding: '40px 0', textAlign: 'center', color: '#475569' }}>거래 내역이 없습니다</div>}
+                    </div>
+                    <div style={{ ...gCard, background: 'linear-gradient(145deg, #1e293b, #0f172a)', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: -60, right: -60, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(20,184,166,0.08), transparent)', pointerEvents: 'none' }} />
+                        <div style={{ position: 'relative', zIndex: 1 }}>
+                            <h3 style={{ fontSize: 18, fontWeight: 800, color: 'white', margin: 0 }}>손익 현황</h3>
+                            <p style={{ fontSize: 13, color: '#64748b', marginTop: 4, marginBottom: 24 }}>{selectedYear}년 {selectedMonth}월 요약</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                {[
+                                    { label: '총 매출', value: revenue, dc: revenue > 0 ? '#3b82f6' : '#475569', vc: 'white' },
+                                    { label: '총 지출', value: expense, dc: expense > 0 ? '#f59e0b' : '#475569', vc: 'white' },
+                                    { label: profit >= 0 ? '영업이익' : '영업손실', value: profit, dc: profit >= 0 ? '#10b981' : '#ef4444', vc: profit >= 0 ? '#34d399' : '#f87171', hl: true },
+                                ].map((row, i) => (
+                                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: row.hl ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', borderRadius: 14, border: row.hl ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 8, height: 8, borderRadius: 4, background: row.dc }} /><span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{row.label}</span></div>
+                                        <span style={{ fontSize: 16, fontWeight: 800, color: row.vc }}>{row.value.toLocaleString()}원</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: 12, color: '#64748b', marginTop: 12, fontWeight: 600 }}>마진율 {marginRate}%</div>
                         </div>
                     </div>
                 </div>
