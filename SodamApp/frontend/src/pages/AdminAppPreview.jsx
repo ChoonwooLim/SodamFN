@@ -12,9 +12,15 @@ const DEVICE_PRESETS = [
 ];
 
 export default function AdminAppPreview() {
+    // Detect SuperAdmin platform mode (no business selected)
+    const userStr = localStorage.getItem('user');
+    const user = userStr ? JSON.parse(userStr) : {};
+    const viewAsBid = localStorage.getItem('view_as_business_id');
+    const isSuperMode = user.role === 'superadmin' && !viewAsBid;
+
     const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
-    const [currentPath, setCurrentPath] = useState('/dashboard');
+    const [currentPath, setCurrentPath] = useState(isSuperMode ? '/superadmin' : '/dashboard');
 
     const currentDevice = DEVICE_PRESETS.find(d => d.id === device);
 
@@ -23,16 +29,29 @@ export default function AdminAppPreview() {
 
     const iframeSrc = `${ADMIN_APP_URL}${currentPath}?_preview=1&_t=${iframeKey}`;
 
-    // Quick nav pages for admin
-    const QUICK_PAGES = [
-        { path: '/dashboard', label: '대시보드' },
-        { path: '/staff', label: '직원관리' },
-        { path: '/finance/profitloss', label: '손익현황' },
-        { path: '/revenue', label: '매출관리' },
-        { path: '/purchase', label: '매입관리' },
-        { path: '/vendor-settings', label: '거래처' },
-        { path: '/settings', label: '설정' },
-    ];
+    // Quick nav pages — different for SuperAdmin vs Admin
+    const QUICK_PAGES = isSuperMode
+        ? [
+            { path: '/superadmin', label: '대시보드' },
+            { path: '/superadmin?tab=stores', label: '매장관리' },
+            { path: '/superadmin?tab=users', label: '사용자' },
+            { path: '/superadmin?tab=monitoring', label: '모니터링' },
+            { path: '/superadmin?tab=billing', label: '요금정산' },
+            { path: '/superadmin?tab=applications', label: '사용신청' },
+        ]
+        : [
+            { path: '/dashboard', label: '대시보드' },
+            { path: '/staff', label: '직원관리' },
+            { path: '/finance/profitloss', label: '손익현황' },
+            { path: '/revenue', label: '매출관리' },
+            { path: '/purchase', label: '매입관리' },
+            { path: '/vendor-settings', label: '거래처' },
+            { path: '/settings', label: '설정' },
+        ];
+
+    const title = isSuperMode ? '수퍼관리자 앱' : '관리자 앱 모니터';
+    const badge = isSuperMode ? 'SUPER' : 'ADMIN';
+    const badgeColor = isSuperMode ? 'admin-badge super' : 'admin-badge';
 
     return (
         <div className="admin-preview-page">
@@ -40,8 +59,8 @@ export default function AdminAppPreview() {
             <div className="admin-preview-toolbar">
                 <div className="admin-toolbar-left">
                     <Shield size={20} className="toolbar-icon" />
-                    <h1>관리자 앱 모니터</h1>
-                    <span className="admin-badge">ADMIN</span>
+                    <h1>{title}</h1>
+                    <span className={badgeColor}>{badge}</span>
                 </div>
                 <div className="admin-toolbar-center">
                     {DEVICE_PRESETS.map(preset => {
