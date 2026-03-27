@@ -97,7 +97,8 @@ export default function Sidebar() {
             localStorage.removeItem('business_id');
         }
         setViewAsBid(newBid);
-        window.location.reload();
+        // Navigate to appropriate page based on selection
+        window.location.href = newBid ? '/dashboard' : '/superadmin';
     };
 
     const isSuperAdmin = user.role === 'superadmin';

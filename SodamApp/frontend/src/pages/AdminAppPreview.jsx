@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Monitor, ExternalLink, RefreshCw, Smartphone, Tablet, Shield, Globe } from 'lucide-react';
+import { ExternalLink, RefreshCw, Smartphone, Tablet, Shield, Globe } from 'lucide-react';
 import './AdminAppPreview.css';
 
 const ADMIN_APP_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -9,11 +9,10 @@ const ADMIN_APP_URL = window.location.hostname === 'localhost' || window.locatio
 const DEVICE_PRESETS = [
     { id: 'phone', label: '스마트폰', icon: Smartphone, width: 390, height: 844 },
     { id: 'tablet', label: '태블릿', icon: Tablet, width: 768, height: 1024 },
-    { id: 'desktop', label: '데스크톱', icon: Monitor, width: '100%', height: '100%' },
 ];
 
 export default function AdminAppPreview() {
-    const [device, setDevice] = useState('desktop');
+    const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
     const [currentPath, setCurrentPath] = useState('/dashboard');
 
@@ -102,43 +101,32 @@ export default function AdminAppPreview() {
 
             {/* Preview Area */}
             <div className="admin-preview-area">
-                {device === 'desktop' ? (
-                    <div className="admin-desktop-frame">
-                        <iframe
-                            key={iframeKey}
-                            src={iframeSrc}
-                            title="관리자 앱"
-                            className="admin-desktop-iframe"
-                        />
-                    </div>
-                ) : (
-                    <div className="admin-phone-frame" style={{
-                        width: currentDevice.width,
-                        height: currentDevice.height,
-                    }}>
-                        {/* Notch */}
-                        {device === 'phone' && <div className="admin-phone-notch" />}
-                        {/* Status bar */}
-                        <div className="admin-phone-statusbar">
-                            <span className="admin-status-time">
-                                {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                            </span>
-                            <div className="admin-status-icons">
-                                <span>📶</span>
-                                <span>🔋</span>
-                            </div>
+                <div className="admin-phone-frame" style={{
+                    width: currentDevice.width,
+                    height: currentDevice.height,
+                }}>
+                    {/* Notch */}
+                    {device === 'phone' && <div className="admin-phone-notch" />}
+                    {/* Status bar */}
+                    <div className="admin-phone-statusbar">
+                        <span className="admin-status-time">
+                            {new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                        </span>
+                        <div className="admin-status-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
                         </div>
-                        {/* App content */}
-                        <iframe
-                            key={iframeKey}
-                            src={iframeSrc}
-                            title="관리자 앱"
-                            className="admin-phone-iframe"
-                        />
-                        {/* Home indicator */}
-                        {device === 'phone' && <div className="admin-phone-home-indicator" />}
                     </div>
-                )}
+                    {/* App content */}
+                    <iframe
+                        key={iframeKey}
+                        src={iframeSrc}
+                        title="관리자 앱"
+                        className="admin-phone-iframe"
+                    />
+                    {/* Home indicator */}
+                    {device === 'phone' && <div className="admin-phone-home-indicator" />}
+                </div>
             </div>
         </div>
     );
