@@ -762,6 +762,88 @@ export default function RevenueManagement() {
                 </div>
             )}
 
+            <div className="revenue-tab-bar">
+                {/* Category filter tabs (only for list/grid views) */}
+                {(viewMode === 'list' || viewMode === 'grid') && (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                        {[
+                            { id: 'all', label: '📊 전체' },
+                            { id: 'cash', label: '💵 현금' },
+                            { id: 'card', label: '💳 카드' },
+                            { id: 'delivery', label: '🛵 배달앱' },
+                        ].map(t => (
+                            <button
+                                key={t.id}
+                                className={`revenue-tab ${tab === t.id ? 'active' : ''}`}
+                                onClick={() => setTab(t.id)}
+                            >
+                                {t.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {/* Spacer for non-filter views */}
+                {!(viewMode === 'list' || viewMode === 'grid') && <div />}
+                <div className="view-mode-toggle">
+                    {isMobile ? (
+                        <>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setViewMode('dashboard')}
+                            >
+                                📊 대시보드
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
+                                onClick={() => setViewMode('upload')}
+                            >
+                                📤 업로드
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
+                                onClick={() => setViewMode('dashboard')}
+                            >
+                                📊 대시보드
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                📋 리스트
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                                onClick={() => setViewMode('grid')}
+                            >
+                                📅 월별 상세 내역
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
+                                onClick={() => setViewMode('revenueDetail')}
+                            >
+                                💰 매출요약
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
+                                onClick={() => setViewMode('deliveryApp')}
+                            >
+                                🛵 배달앱
+                            </button>
+                            <button
+                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
+                                onClick={() => setViewMode('upload')}
+                            >
+                                📤 업로드
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+
             {/* ═══════════════════════════════════════════ */}
             {/* MOBILE DASHBOARD - Premium design */}
             {/* ═══════════════════════════════════════════ */}
@@ -1036,86 +1118,6 @@ export default function RevenueManagement() {
                     </div>
                 );
             })()}
-            <div className="revenue-tab-bar">
-                {/* Category filter tabs (only for list/grid views) */}
-                {(viewMode === 'list' || viewMode === 'grid') && (
-                    <div style={{ display: 'flex', gap: 4 }}>
-                        {[
-                            { id: 'all', label: '📊 전체' },
-                            { id: 'cash', label: '💵 현금' },
-                            { id: 'card', label: '💳 카드' },
-                            { id: 'delivery', label: '🛵 배달앱' },
-                        ].map(t => (
-                            <button
-                                key={t.id}
-                                className={`revenue-tab ${tab === t.id ? 'active' : ''}`}
-                                onClick={() => setTab(t.id)}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-                {/* Spacer for non-filter views */}
-                {!(viewMode === 'list' || viewMode === 'grid') && <div />}
-                <div className="view-mode-toggle">
-                    {isMobile ? (
-                        <>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
-                                onClick={() => setViewMode('dashboard')}
-                            >
-                                📊 대시보드
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
-                                onClick={() => setViewMode('upload')}
-                            >
-                                📤 업로드
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
-                                onClick={() => setViewMode('dashboard')}
-                            >
-                                📊 대시보드
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                📋 리스트
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                                onClick={() => setViewMode('grid')}
-                            >
-                                📅 월별 상세 내역
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
-                                onClick={() => setViewMode('revenueDetail')}
-                            >
-                                💰 매출요약
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
-                                onClick={() => setViewMode('deliveryApp')}
-                            >
-                                🛵 배달앱
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
-                                onClick={() => setViewMode('upload')}
-                            >
-                                📤 업로드
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
 
 
             {/* ═══════════════════════════════════════════ */}

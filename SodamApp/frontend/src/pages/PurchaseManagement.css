@@ -90,7 +90,7 @@
     grid-template-columns: repeat(5, 1fr);
     gap: 12px;
     padding: 0 32px;
-    margin-top: -8px;
+    margin-top: 24px; /* 기존 -8px에서 충분한 상단 여백으로 변경 */
     position: relative;
     z-index: 5;
 }
@@ -132,13 +132,13 @@
     font-weight: 500;
 }
 
-/* Total Card (Green Theme) */
+/* Total Card (Premium Teal Theme - same as Revenue) */
 .purchase-summary-card.total {
-    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    background: linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%);
 }
 
 .purchase-summary-card.total .card-label {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .purchase-summary-card.total .card-value {
@@ -146,17 +146,17 @@
 }
 
 .purchase-summary-card.total .card-sub {
-    color: #bbf7d0;
+    color: #99f6e4;
 }
 
-/* Personal Card (Orange Theme) */
+/* Personal Card (Premium Bronze/Gold Theme) */
 .purchase-summary-card.personal {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    background: linear-gradient(135deg, #78350f 0%, #451a03 100%);
     cursor: pointer;
 }
 
 .purchase-summary-card.personal .card-label {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .purchase-summary-card.personal .card-value {
