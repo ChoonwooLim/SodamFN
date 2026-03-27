@@ -13,10 +13,9 @@ const DEVICE_PRESETS = [
 
 export default function AdminAppPreview() {
     // Detect SuperAdmin platform mode (no business selected)
-    const userStr = localStorage.getItem('user');
-    const user = userStr ? JSON.parse(userStr) : {};
+    const userRole = localStorage.getItem('user_role');
     const viewAsBid = localStorage.getItem('view_as_business_id');
-    const isSuperMode = user.role === 'superadmin' && !viewAsBid;
+    const isSuperMode = userRole === 'superadmin' && !viewAsBid;
 
     const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
