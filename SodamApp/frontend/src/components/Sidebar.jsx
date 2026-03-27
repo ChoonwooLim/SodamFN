@@ -314,7 +314,7 @@ export default function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-slate-800">
-                {(user.role === 'admin' || isViewingBusiness) && (
+                {(user.role === 'admin' || user.role === 'superadmin' || isViewingBusiness) && (
                     <>
                         <Link
                             to="/staff-app-preview"

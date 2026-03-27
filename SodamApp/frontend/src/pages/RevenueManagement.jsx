@@ -789,7 +789,7 @@ export default function RevenueManagement() {
                     <div style={{ padding: '0 16px 80px', marginTop: 16 }}>
                         {/* ── Hero: 총 매출 ── */}
                         <div className="card-animate" style={{
-                            background: 'linear-gradient(135deg, #1e293b, #334155)',
+                            background: 'linear-gradient(135deg, #134e4a, #1e3a3a)',
                             borderRadius: 20, padding: '24px 20px', textAlign: 'center',
                             marginBottom: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
                         }}>
