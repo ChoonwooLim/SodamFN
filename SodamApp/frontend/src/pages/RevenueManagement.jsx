@@ -1551,13 +1551,13 @@ export default function RevenueManagement() {
                             {sortedChannels.map(ch => {
                                 const ct = channelTotals[ch];
                                 return (
-                                    <div key={ch} className="revenue-summary-card" style={{ padding: '14px 16px' }}>
-                                        <div className="card-label">{CHANNEL_ICONS[ch]} {ch}</div>
-                                        <div className="card-value" style={{ fontSize: 18 }}>{formatNumber(ct.settlement_amount)}원</div>
-                                        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                                    <div key={ch} className="revenue-summary-card" style={{ padding: '20px 24px', flex: 1 }}>
+                                        <div className="card-label" style={{ fontSize: '15px', color: '#64748b' }}>{CHANNEL_ICONS[ch]} {ch}</div>
+                                        <div className="card-value" style={{ fontSize: 26, fontWeight: 800, margin: '8px 0', color: '#0f172a' }}>{formatNumber(ct.settlement_amount)}원</div>
+                                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
                                             매출 {formatNumber(ct.total_sales)}원 · 수수료 {ct.fee_rate}%
                                         </div>
-                                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                                        <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>
                                             {ct.order_count.toLocaleString()}건
                                         </div>
                                     </div>
@@ -1567,30 +1567,30 @@ export default function RevenueManagement() {
 
                         {/* Monthly Breakdown Table */}
                         <div className="del-grid-container" style={{ marginBottom: 20 }}>
-                            <table className="del-grid-table" style={{ fontSize: 12 }}>
+                            <table className="del-grid-table" style={{ fontSize: 14 }}>
                                 <thead>
                                     <tr>
-                                        <th style={{ minWidth: 60, textAlign: 'center' }}>월</th>
+                                        <th style={{ minWidth: 80, padding: '16px 8px', textAlign: 'center' }}>월</th>
                                         {sortedChannels.map(ch => (
-                                            <th key={ch} colSpan={4} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                            <th key={ch} colSpan={4} style={{ padding: '16px 8px', textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
                                                 {CHANNEL_ICONS[ch]} {ch}
                                             </th>
                                         ))}
-                                        <th colSpan={3} style={{ textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>합계</th>
+                                        <th colSpan={3} style={{ padding: '16px 8px', textAlign: 'center', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>합계</th>
                                     </tr>
                                     <tr>
                                         <th></th>
                                         {sortedChannels.map(ch => (
                                             <React.Fragment key={ch}>
-                                                <th style={{ fontSize: 10, color: '#60a5fa', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>매출</th>
-                                                <th style={{ fontSize: 10, color: '#22c55e' }}>정산</th>
-                                                <th style={{ fontSize: 10, color: '#ef4444' }}>수수료</th>
-                                                <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
+                                                <th style={{ fontSize: 12, padding: '12px 6px', color: '#93c5fd', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>매출</th>
+                                                <th style={{ fontSize: 12, padding: '12px 6px', color: '#86efac' }}>정산</th>
+                                                <th style={{ fontSize: 12, padding: '12px 6px', color: '#fca5a5' }}>수수료</th>
+                                                <th style={{ fontSize: 12, padding: '12px 6px', color: '#cbd5e1' }}>수수료율</th>
                                             </React.Fragment>
                                         ))}
-                                        <th style={{ fontSize: 10, color: '#60a5fa', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>매출</th>
-                                        <th style={{ fontSize: 10, color: '#22c55e' }}>정산</th>
-                                        <th style={{ fontSize: 10, color: '#94a3b8' }}>수수료율</th>
+                                        <th style={{ fontSize: 12, padding: '12px 6px', color: '#93c5fd', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>매출</th>
+                                        <th style={{ fontSize: 12, padding: '12px 6px', color: '#86efac' }}>정산</th>
+                                        <th style={{ fontSize: 12, padding: '12px 6px', color: '#cbd5e1' }}>수수료율</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1600,41 +1600,41 @@ export default function RevenueManagement() {
                                         const rowFeeRate = rowSales > 0 ? ((rowSales - rowSettle) / rowSales * 100).toFixed(1) : 0;
                                         return (
                                         <tr key={`${m.year}-${m.month}`}>
-                                            <td style={{ textAlign: 'center', fontWeight: 600 }}>{m.month}월</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 600, padding: '12px 8px' }}>{m.month}월</td>
                                             {sortedChannels.map(ch => {
                                                 const chData = m.channels[ch];
                                                 if (!chData) return (
                                                     <React.Fragment key={ch}>
-                                                        <td style={{ color: '#475569', textAlign: 'right', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>-</td>
-                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
-                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
-                                                        <td style={{ color: '#475569', textAlign: 'right' }}>-</td>
+                                                        <td style={{ color: '#94a3b8', textAlign: 'right', padding: '12px 8px', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>-</td>
+                                                        <td style={{ color: '#94a3b8', textAlign: 'right', padding: '12px 8px' }}>-</td>
+                                                        <td style={{ color: '#94a3b8', textAlign: 'right', padding: '12px 8px' }}>-</td>
+                                                        <td style={{ color: '#94a3b8', textAlign: 'right', padding: '12px 8px' }}>-</td>
                                                     </React.Fragment>
                                                 );
                                                 return (
                                                     <React.Fragment key={ch}>
-                                                        <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 500, borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
+                                                        <td style={{ textAlign: 'right', color: '#3b82f6', fontWeight: 600, padding: '12px 8px', borderLeft: '2px solid rgba(255,255,255,0.08)' }}>
                                                             {formatNumber(chData.total_sales)}
                                                         </td>
-                                                        <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 500 }}>
+                                                        <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 600, padding: '12px 8px' }}>
                                                             {formatNumber(chData.settlement_amount)}
                                                         </td>
-                                                        <td style={{ textAlign: 'right', color: '#ef4444', fontSize: 11 }}>
+                                                        <td style={{ textAlign: 'right', color: '#dc2626', fontSize: 12, padding: '12px 8px' }}>
                                                             -{formatNumber(chData.total_fees)}
                                                         </td>
-                                                        <td style={{ textAlign: 'right', color: '#94a3b8', fontSize: 11 }}>
+                                                        <td style={{ textAlign: 'right', color: '#64748b', fontSize: 12, padding: '12px 8px' }}>
                                                             {chData.fee_rate}%
                                                         </td>
                                                     </React.Fragment>
                                                 );
                                             })}
-                                            <td style={{ textAlign: 'right', color: '#60a5fa', fontWeight: 700, borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
+                                            <td style={{ textAlign: 'right', color: '#2563eb', fontWeight: 800, padding: '12px 8px', borderLeft: '2px solid rgba(255,255,255,0.15)' }}>
                                                 {formatNumber(rowSales)}
                                             </td>
-                                            <td style={{ textAlign: 'right', color: '#22c55e', fontWeight: 700 }}>
+                                            <td style={{ textAlign: 'right', color: '#16a34a', fontWeight: 800, padding: '12px 8px' }}>
                                                 {formatNumber(rowSettle)}
                                             </td>
-                                            <td style={{ textAlign: 'right', color: '#94a3b8' }}>
+                                            <td style={{ textAlign: 'right', color: '#475569', fontWeight: 600, padding: '12px 8px' }}>
                                                 {rowFeeRate}%
                                             </td>
                                         </tr>
@@ -1677,29 +1677,29 @@ export default function RevenueManagement() {
                         </div>
 
                         {/* Channel Fee Breakdown Cards */}
-                        <h3 className="del-section-title" style={{ marginTop: 8 }}>📊 채널별 수수료 상세</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 2)}, 1fr)`, gap: 12 }}>
+                        <h3 className="del-section-title" style={{ marginTop: 24, fontSize: '1.25rem' }}>📊 채널별 수수료 상세</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 2)}, 1fr)`, gap: 16 }}>
                             {sortedChannels.map(ch => {
                                 const ct = channelTotals[ch];
                                 // Collect fee breakdowns from latest month
                                 const latestMonth = monthly.find(m => m.channels[ch]);
                                 const feeBreakdown = latestMonth?.channels[ch]?.fee_breakdown || {};
                                 return (
-                                    <div key={ch} className="revenue-summary-card" style={{ padding: '14px 16px' }}>
-                                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
-                                        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 4 }}>
-                                            총매출 대비 수수료율: <span style={{ color: '#ef4444', fontWeight: 600 }}>{ct.fee_rate}%</span>
+                                    <div key={ch} className="revenue-summary-card" style={{ padding: '24px' }}>
+                                        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
+                                        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 6 }}>
+                                            총매출 대비 수수료율: <span style={{ color: '#ef4444', fontWeight: 700 }}>{ct.fee_rate}%</span>
                                         </div>
-                                        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
-                                            총 수수료: <span style={{ color: '#ef4444' }}>{formatNumber(ct.total_fees)}원</span> / 총매출: {formatNumber(ct.total_sales)}원
+                                        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
+                                            총 수수료: <span style={{ color: '#ef4444', fontWeight: 600 }}>{formatNumber(ct.total_fees)}원</span> / 총매출: {formatNumber(ct.total_sales)}원
                                         </div>
                                         {Object.keys(feeBreakdown).length > 0 && (
-                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
-                                                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 4 }}>최근 수수료 내역:</div>
+                                            <div style={{ borderTop: '2px dashed #e2e8f0', paddingTop: 12, marginTop: 12 }}>
+                                                <div style={{ fontSize: 13, color: '#475569', fontWeight: 600, marginBottom: 8 }}>최근 세부 수수료 내역:</div>
                                                 {Object.entries(feeBreakdown).filter(([, v]) => v > 0).map(([k, v]) => (
-                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94a3b8', padding: '2px 0' }}>
+                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#64748b', padding: '4px 0', borderBottom: '1px solid #f1f5f9' }}>
                                                         <span>{k}</span>
-                                                        <span style={{ color: '#ef4444' }}>{formatNumber(v)}원</span>
+                                                        <span style={{ color: '#ef4444', fontWeight: 500 }}>{formatNumber(v)}원</span>
                                                     </div>
                                                 ))}
                                             </div>
