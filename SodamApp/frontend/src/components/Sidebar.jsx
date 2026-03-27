@@ -221,29 +221,13 @@ export default function Sidebar() {
                     </div>
                 </div>
 
-                {/* SuperAdmin 사업장 전환 드롭다운 */}
-                {isSuperAdmin && businesses.length > 0 && (
+                {/* SuperAdmin 사업장 view-as 표시 (전환은 대시보드 매장관리에서) */}
+                {isViewingBusiness && (
                     <div className="mt-3 mb-2">
-                        <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1">
-                            <ArrowLeftRight size={10} />
-                            사업장 전환
-                        </label>
-                        <select
-                            value={viewAsBid}
-                            onChange={(e) => handleViewAsChange(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
-                        >
-                            <option value="">전체 보기 (SuperAdmin)</option>
-                            {businesses.map(b => (
-                                <option key={b.id} value={b.id}>{b.name}</option>
-                            ))}
-                        </select>
-                        {viewAsBid && (
-                            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-amber-400">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                                현재 {businesses.find(b => String(b.id) === String(viewAsBid))?.name || ''} 관리자 뷰
-                            </div>
-                        )}
+                        <div className="flex items-center gap-1 text-[10px] text-amber-400">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                            현재 {businesses.find(b => String(b.id) === String(viewAsBid))?.name || ''} 관리자 뷰
+                        </div>
                     </div>
                 )}
 
@@ -260,13 +244,13 @@ export default function Sidebar() {
             <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
                 {/* SuperAdmin: show platform menu link when viewing a business */}
                 {isViewingBusiness && (
-                    <Link
-                        to="/superadmin"
-                        className="flex items-center gap-3 px-4 py-2 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all text-xs font-medium"
+                    <button
+                        onClick={() => handleViewAsChange('')}
+                        className="flex items-center gap-3 px-4 py-2 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all text-xs font-medium w-full"
                     >
                         <Shield size={16} />
                         <span>← SuperAdmin 대시보드</span>
-                    </Link>
+                    </button>
                 )}
                 {mainMenuItems.map(renderMenuItem)}
 

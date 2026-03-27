@@ -352,7 +352,11 @@ export default function SuperAdminDashboard() {
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button className="flex-1 py-1.5 bg-white/10 rounded-lg text-xs font-bold hover:bg-white/20"><Eye size={12} className="inline mr-1" />상세</button>
+                                                <button onClick={() => {
+                                                    localStorage.setItem('view_as_business_id', biz.id);
+                                                    localStorage.setItem('business_id', biz.id);
+                                                    window.location.href = '/dashboard';
+                                                }} className="flex-1 py-1.5 bg-white/10 rounded-lg text-xs font-bold hover:bg-white/20"><Eye size={12} className="inline mr-1" />상세</button>
                                                 {biz.subscription_status === 'active' && (
                                                     <button onClick={() => handleDeactivateBusiness(biz.id, biz.name)} className="py-1.5 px-3 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30"><Trash2 size={12} /></button>
                                                 )}
