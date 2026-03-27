@@ -740,8 +740,8 @@ export default function RevenueManagement() {
                 </div>
             </div>
 
-            {/* ── Summary Cards (monthly views only) ── */}
-            {!isMobile && (viewMode === 'dashboard' || viewMode === 'list' || viewMode === 'grid' || viewMode === 'upload') && (
+            {/* ── Summary Cards ── */}
+            {!isMobile && (
                 <div className="revenue-summary-row" style={{ marginTop: 20 }}>
                     <div className="revenue-summary-card">
                         <div className="card-label">💵 현금매출</div>
@@ -783,7 +783,7 @@ export default function RevenueManagement() {
                     </div>
                 )}
                 {/* Spacer for non-filter views */}
-                {!(viewMode === 'list' || viewMode === 'grid') && <div />}
+                {!(viewMode === 'list' || viewMode === 'grid') && <div style={{ flex: 1 }} />}
                 <div className="view-mode-toggle">
                     {isMobile ? (
                         <>
