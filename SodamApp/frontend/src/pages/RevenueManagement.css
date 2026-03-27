@@ -1196,8 +1196,8 @@
 .rd-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.82rem;
-    min-width: 1000px;
+    font-size: 0.95rem;
+    min-width: 1200px;
 }
 
 .rd-table thead {
@@ -1206,11 +1206,11 @@
 }
 
 .rd-table th {
-    padding: 10px 6px;
+    padding: 14px 6px;
     text-align: center;
     font-weight: 600;
     white-space: nowrap;
-    font-size: 0.78rem;
+    font-size: 0.95rem;
     border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -1243,7 +1243,7 @@
 }
 
 .rd-item-name {
-    padding: 8px 8px 8px 14px;
+    padding: 12px 8px 12px 14px;
     font-weight: 600;
     color: #334155;
     white-space: nowrap;
@@ -1259,12 +1259,12 @@
 
 .rd-cell-value {
     display: block;
-    padding: 4px 6px;
+    padding: 6px 8px;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
     color: #64748b;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
 }
 
 .rd-cell-value.has-value {
@@ -1279,11 +1279,11 @@
 
 .rd-edit-input {
     width: 100%;
-    padding: 4px 6px;
+    padding: 6px 8px;
     border: 2px solid #0f766e;
     border-radius: 4px;
     text-align: center;
-    font-size: 0.8rem;
+    font-size: 0.95rem;
     outline: none;
     background: #f0fdf4;
 }
@@ -1291,10 +1291,11 @@
 .rd-row-total,
 .rd-row-avg,
 .rd-row-pct {
-    padding: 8px 6px;
+    padding: 12px 6px;
     text-align: center;
     font-weight: 600;
     white-space: nowrap;
+    font-size: 0.95rem;
     border-left: 1px solid #e2e8f0;
 }
 
@@ -1319,8 +1320,9 @@
 }
 
 .rd-grand-total-row td {
-    padding: 10px 6px;
+    padding: 14px 6px;
     text-align: center;
+    font-size: 1.05rem;
 }
 
 .rd-grand-total-row .rd-item-name {
@@ -1335,7 +1337,7 @@
 .rd-grand-total {
     font-weight: 700;
     color: #047857;
-    font-size: 0.88rem;
+    font-size: 1.05rem;
     border-left: 1px solid #e2e8f0;
 }
 
