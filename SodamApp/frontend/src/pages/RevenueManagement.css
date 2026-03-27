@@ -1197,7 +1197,7 @@
 }
 
 .rd-table thead {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     color: white;
 }
 
@@ -1269,19 +1269,19 @@
 }
 
 .rd-cell-value:hover {
-    background: #e0e7ff;
-    color: #3730a3;
+    background: #ccfbf1;
+    color: #0f766e;
 }
 
 .rd-edit-input {
     width: 100%;
     padding: 4px 6px;
-    border: 2px solid #667eea;
+    border: 2px solid #0f766e;
     border-radius: 4px;
     text-align: center;
     font-size: 0.8rem;
     outline: none;
-    background: #eef2ff;
+    background: #f0fdf4;
 }
 
 .rd-row-total,
@@ -1310,7 +1310,7 @@
 }
 
 .rd-grand-total-row {
-    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%) !important;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ccfbf1 100%) !important;
     border-top: 2px solid #059669;
 }
 
@@ -1377,16 +1377,16 @@
 }
 
 .delivery-channel-btn:hover {
-    border-color: #667eea;
-    color: #667eea;
-    background: #eef2ff;
+    border-color: #0f766e;
+    color: #0f766e;
+    background: #f0fdf4;
 }
 
 .delivery-channel-btn.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #134e4a 0%, #0f766e 100%);
     color: white;
     border-color: transparent;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
 }
 
 .del-section-title {
@@ -1456,7 +1456,7 @@
 }
 
 .del-grid-table thead {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
     color: white;
 }
 
@@ -1505,19 +1505,19 @@
 }
 
 .del-cell-value:hover {
-    background: #e0e7ff;
-    color: #3730a3;
+    background: #ccfbf1;
+    color: #0f766e;
 }
 
 .del-edit-input {
     width: 100%;
     padding: 3px 4px;
-    border: 2px solid #667eea;
+    border: 2px solid #0f766e;
     border-radius: 3px;
     text-align: center;
     font-size: 0.76rem;
     outline: none;
-    background: #eef2ff;
+    background: #f0fdf4;
 }
 
 .del-invalid {
@@ -1528,7 +1528,7 @@
 }
 
 .del-totals-row {
-    background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%) !important;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ccfbf1 100%) !important;
     border-top: 2px solid #059669;
 }
 
