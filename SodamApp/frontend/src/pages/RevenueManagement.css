@@ -4,8 +4,10 @@
 
 .revenue-page {
     min-height: 100vh;
-    background: #f1f5f9;
+    background: #475569;
     padding: 0;
+    padding-bottom: 60px; /* margin 병합 방지 및 하단 여유공간 확보 (흰 줄 바닥 제거) */
+    overflow-x: hidden;
 }
 
 /* ── Top Header ── */
@@ -154,8 +156,8 @@
 /* ── View Mode Toggle ── */
 .view-mode-toggle {
     display: flex;
-    gap: 0;
-    background: #e2e8f0;
+    gap: 4px;
+    background: transparent;
     border-radius: 10px;
     padding: 3px;
 }
@@ -164,11 +166,11 @@
     padding: 7px 16px;
     border: none;
     background: transparent;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     border-radius: 8px;
-    color: #64748b;
+    color: #cbd5e1;
     transition: all 0.2s;
     white-space: nowrap;
 }
@@ -180,15 +182,16 @@
 }
 
 .view-mode-btn:hover:not(.active) {
-    color: #334155;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Content Area ── */
 .revenue-content {
-    background: white;
+    background: #f1f5f9;
     margin: 0 32px 32px;
-    border-radius: 0 16px 16px 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
     min-height: 400px;
 }
 
@@ -1454,8 +1457,8 @@
 .del-grid-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.78rem;
-    min-width: 900px;
+    font-size: 0.95rem;
+    min-width: 1000px;
 }
 
 .del-grid-table thead {
@@ -1464,10 +1467,10 @@
 }
 
 .del-grid-table th {
-    padding: 8px 4px;
+    padding: 12px 6px;
     text-align: center;
     font-weight: 600;
-    font-size: 0.76rem;
+    font-size: 0.9rem;
     border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -1476,9 +1479,10 @@
 }
 
 .del-day-label {
-    padding: 4px 6px;
+    padding: 12px 6px;
     text-align: center;
     font-weight: 600;
+    font-size: 0.95rem;
     color: #475569;
     background: #f8fafc;
     border-right: 1px solid #e2e8f0;
@@ -1494,12 +1498,12 @@
 
 .del-cell-value {
     display: block;
-    padding: 3px 4px;
-    border-radius: 3px;
+    padding: 6px 8px;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.15s;
     color: #94a3b8;
-    font-size: 0.76rem;
+    font-size: 0.95rem;
 }
 
 .del-cell-value.has-value {
@@ -1514,11 +1518,11 @@
 
 .del-edit-input {
     width: 100%;
-    padding: 3px 4px;
+    padding: 6px 8px;
     border: 2px solid #0f766e;
-    border-radius: 3px;
+    border-radius: 4px;
     text-align: center;
-    font-size: 0.76rem;
+    font-size: 0.95rem;
     outline: none;
     background: #f0fdf4;
 }
@@ -1527,7 +1531,7 @@
     text-align: center;
     color: #cbd5e1;
     background: #f8fafc;
-    font-size: 0.72rem;
+    font-size: 0.85rem;
 }
 
 .del-totals-row {
@@ -1536,14 +1540,14 @@
 }
 
 .del-totals-row td {
-    padding: 6px 4px;
+    padding: 14px 6px;
     text-align: center;
 }
 
 .del-month-total {
     font-weight: 700;
     color: #047857;
-    font-size: 0.8rem;
+    font-size: 1.05rem;
 }
 
 .del-grid-table tbody tr {

@@ -5,8 +5,10 @@
 
 .purchase-page {
     min-height: 100vh;
-    background: #f1f5f9;
+    background: #475569;
     padding: 0;
+    padding-bottom: 60px; /* 흰 여백 줄 방지 */
+    overflow-x: hidden;
 }
 
 /* ── Top Header ── */
@@ -212,10 +214,10 @@
 /* ── Content Area ── */
 .purchase-content,
 .purchase-dashboard {
-    background: white;
+    background: #f1f5f9;
     margin: 0 32px 32px;
     border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
     min-height: 400px;
 }
 
