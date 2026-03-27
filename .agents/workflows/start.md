@@ -36,3 +36,20 @@ cd c:\WORK\SodamFN\SodamApp\backend && python -c "import sys; sys.path.insert(0,
 - 준비 완료 상태 알림
 
 그 후 사용자의 작업 요청을 수행합니다.
+
+## ⚡ 세션 중 자동 커밋+푸시 규칙
+
+**사용자의 작업 요청 하나를 완료할 때마다** 아래를 수행합니다:
+
+// turbo
+1. `git add -A` → 자동 실행
+// turbo
+2. `git commit -m "커밋메시지"` → 자동 실행
+3. `git push origin main` → **사용자 확인 후 실행** (turbo 아님)
+
+### 커밋 메시지 규칙
+- `feat:` 새 기능 / `fix:` 버그 수정 / `style:` UI / `refactor:` 리팩토링 / `docs:` 문서 / `infra:` 인프라
+
+### 주의사항
+- 작업이 의미 있는 단위로 완료되었을 때 수행
+- 사용자가 "커밋하지 마" 또는 "아직 푸시하지 마"라고 하면 보류

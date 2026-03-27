@@ -71,6 +71,7 @@ with Session(engine) as session:
 미커밋 변경사항이 있으면 스테이징 → 커밋 → 푸시합니다.
 
 ### 4-1. 스테이징
+// turbo
 ```
 cd c:\WORK\SodamFN && git add -A
 ```
@@ -89,6 +90,7 @@ cd c:\WORK\SodamFN && git commit -m "커밋메시지"
 ```
 
 ### 4-3. 푸시
+// turbo
 ```
 cd c:\WORK\SodamFN && git push origin main
 ```

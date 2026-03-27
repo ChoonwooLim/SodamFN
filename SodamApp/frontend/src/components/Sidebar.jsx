@@ -346,7 +346,6 @@ export default function Sidebar() {
                         <span className="text-slate-600 font-light mx-1.5">|</span>
                         <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
                     </span>
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-400 font-medium">새 탭</span>
                 </a>
                 <button
                     onClick={handleLogout}
