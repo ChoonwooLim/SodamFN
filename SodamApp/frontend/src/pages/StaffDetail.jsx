@@ -1268,7 +1268,12 @@ export default function StaffDetail() {
                     staffId={id}
                     staffName={formData.name}
                     month={currentBudgetMonth}
-                    onCalculateSuccess={fetchStaffDetail}
+                    onCalculateSuccess={(newPayrollData) => {
+                        // Immediately set the calculated payroll to show the statement
+                        setSelectedPayroll(newPayrollData);
+                        // Then refresh the payroll list from server in background
+                        fetchStaffDetail();
+                    }}
                 />
 
                 {isAccountModalOpen && (
