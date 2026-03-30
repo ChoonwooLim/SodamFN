@@ -218,7 +218,10 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                     <tr className="h-9 text-[12px]">
                         <td className="w-1/4 bg-slate-100 font-bold border-2 border-slate-800 text-center">급여 수령 계좌</td>
                         <td colSpan="3" className="px-8 border-2 border-slate-800 text-base font-black text-slate-800 tracking-wider">
-                            {staff.bank_account || '기록 없음'}
+                            {staff.bank_name || staff.account_number
+                                ? `${staff.bank_name || ''} ${staff.account_number || ''} ${staff.account_holder || ''}`.trim()
+                                : (staff.bank_account || '기록 없음')
+                            }
                         </td>
                     </tr>
                 </tbody>
