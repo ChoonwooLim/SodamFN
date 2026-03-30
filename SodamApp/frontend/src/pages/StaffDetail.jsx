@@ -130,7 +130,7 @@ export default function StaffDetail() {
         return `${raw.slice(0, 3)}-${raw.slice(3, 7)}-${raw.slice(7, 11)}`;
     };
 
-    const fetchStaffDetail = async (newPayroll = null) => {
+    const fetchStaffDetail = async (autoSelectMonth = null) => {
         try {
             const res = await api.get(`/hr/staff/${id}`);
             if (res.data.status === 'success') {
@@ -141,15 +141,16 @@ export default function StaffDetail() {
                 // Merge with existing formData to preserve fields not in the staff object
                 setFormData(prev => ({ ...prev, ...data }));
 
+                const payrollList = res.data.payrolls || [];
                 setDocuments(res.data.documents || []);
-                setPayrolls(res.data.payrolls || []);
+                setPayrolls(payrollList);
                 setContracts(res.data.contracts || []);
                 setUser(res.data.user || null);
 
-                // If a new payroll was generated, open its statement automatically
-                if (newPayroll) {
-                    // Try to find the actual updated record in the list or use the passed one
-                    setSelectedPayroll(newPayroll);
+                // If a month was specified, auto-select matching payroll from DB list
+                if (autoSelectMonth) {
+                    const match = payrollList.find(p => p.month === autoSelectMonth);
+                    if (match) setSelectedPayroll(match);
                 }
             }
         } catch (error) {
@@ -1268,12 +1269,7 @@ export default function StaffDetail() {
                     staffId={id}
                     staffName={formData.name}
                     month={currentBudgetMonth}
-                    onCalculateSuccess={(newPayrollData) => {
-                        // Immediately set the calculated payroll to show the statement
-                        setSelectedPayroll(newPayrollData);
-                        // Then refresh the payroll list from server in background
-                        fetchStaffDetail();
-                    }}
+                    onCalculateSuccess={() => fetchStaffDetail(currentBudgetMonth)}
                 />
 
                 {isAccountModalOpen && (

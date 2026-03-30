@@ -141,15 +141,16 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                                             const amt = payroll[`holiday_w${w}`];
                                             const calc = details.holiday_details ? details.holiday_details[w.toString()] : null;
                                             const isDeferred = calc && calc.includes('익월정산');
-                                            if (amt > 0 || isDeferred) {
+                                            const isDisqualified = calc && calc.includes('자격미달');
+                                            if (amt > 0 || isDeferred || isDisqualified) {
                                                 return (
-                                                    <tr key={w} className={`border-b border-slate-300 h-8 ${isDeferred ? 'bg-amber-50/50' : ''}`}>
+                                                    <tr key={w} className={`border-b border-slate-300 h-8 ${isDeferred ? 'bg-amber-50/50' : ''} ${isDisqualified ? 'bg-red-50/50' : ''}`}>
                                                         <td className="px-3 border-r border-slate-800">
                                                             <div className="font-bold text-slate-600 text-[11px]">{w}주차</div>
-                                                            {calc && <div className={`text-[9px] font-normal leading-tight ${isDeferred ? 'text-amber-600 font-semibold' : 'text-slate-400'}`}>{calc}</div>}
+                                                            {calc && <div className={`text-[9px] font-normal leading-tight ${isDeferred ? 'text-amber-600 font-semibold' : isDisqualified ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>{calc}</div>}
                                                         </td>
-                                                        <td className={`px-3 text-right font-bold text-[12px] ${isDeferred ? 'text-amber-600 text-[10px]' : ''}`}>
-                                                            {isDeferred ? '익월정산' : safeLocaleString(amt)}
+                                                        <td className={`px-3 text-right font-bold text-[12px] ${isDeferred ? 'text-amber-600 text-[10px]' : ''} ${isDisqualified ? 'text-red-500 text-[10px]' : ''}`}>
+                                                            {isDeferred ? '익월정산' : isDisqualified ? '자격미달' : safeLocaleString(amt)}
                                                         </td>
                                                     </tr>
                                                 );

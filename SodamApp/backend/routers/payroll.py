@@ -336,8 +336,9 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
                     
                 w_hours = effective_hours_sum
                 
-                # Check for Absence
-                has_absence = any(a.status == "Absence" for a in calc_days)
+                # Check for Absence - collect specific dates
+                absence_dates = [a.date for a in calc_days if a.status == "Absence"]
+                has_absence = len(absence_dates) > 0
                 
                 # Build detail string
                 if is_carryover:
@@ -357,8 +358,9 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
                     if week_idx < 6:
                         holiday_per_week[week_idx] = h_amt
                     holiday_details[str(week_idx + 1)] = f"{detail_prefix}{w_hours}시간 / 5일 = {avg_h}시간"
-                elif has_absence and w_hours >= 15:
-                    holiday_details[str(week_idx + 1)] = "결근으로 미지급"
+                elif has_absence:
+                    absence_desc = ", ".join([f"{a.month}월{a.day}일" for a in absence_dates])
+                    holiday_details[str(week_idx + 1)] = f"자격미달 ({absence_desc} 결근)"
                 
                 week_idx += 1
         else:
