@@ -200,32 +200,66 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
             </div>
 
             {/* Summary Footer Section */}
-            <table className="w-full border-4 border-slate-800 border-collapse mb-4">
-                <tbody>
-                    <tr className="h-9 text-[12px]">
-                        <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">지급총액 (A)</td>
-                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-base">{safeLocaleString((payroll.base_pay || 0) + (payroll.bonus || 0))}</td>
-                        <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">공제총액 (B)</td>
-                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-base text-red-600">{safeLocaleString(payroll.deductions)}</td>
-                    </tr>
-                    <tr className="h-14 bg-slate-900 text-white">
-                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[11px] uppercase leading-tight">실 수령액<br />(NET PAY)</td>
-                        <td colSpan="3" className="border-2 border-slate-800 text-center">
-                            <div className="text-xl font-black tracking-widest leading-none mb-0.5">₩ {safeLocaleString(payroll.total_pay)}</div>
-                            <div className="text-[9px] font-medium opacity-60 uppercase tracking-widest">(A - B = 차감 지급액)</div>
-                        </td>
-                    </tr>
-                    <tr className="h-9 text-[12px]">
-                        <td className="w-1/4 bg-slate-100 font-bold border-2 border-slate-800 text-center">급여 수령 계좌</td>
-                        <td colSpan="3" className="px-8 border-2 border-slate-800 text-base font-black text-slate-800 tracking-wider">
-                            {staff.bank_name || staff.account_number
-                                ? `${staff.bank_name || ''} ${staff.account_number || ''} ${staff.account_holder || ''}`.trim()
-                                : (staff.bank_account || '기록 없음')
-                            }
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            {(() => {
+                const taxSupportAmount = payroll.bonus_tax_support || 0;
+                const grossPay = (payroll.base_pay || 0) + (payroll.bonus || 0);
+                const deductions = payroll.deductions || 0;
+                const netAfterDeductions = grossPay - deductions;
+
+                return (
+                    <table className="w-full border-4 border-slate-800 border-collapse mb-4">
+                        <tbody>
+                            <tr className="h-9 text-[12px]">
+                                <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">지급총액 (A)</td>
+                                <td className="w-1/4 border-2 border-slate-800 text-center font-black text-base">{safeLocaleString(grossPay)}</td>
+                                <td className="w-1/4 bg-slate-100 font-black border-2 border-slate-800 text-center">공제총액 (B)</td>
+                                <td className="w-1/4 border-2 border-slate-800 text-center font-black text-base text-red-600">{safeLocaleString(deductions)}</td>
+                            </tr>
+
+                            {taxSupportAmount > 0 ? (
+                                <>
+                                    <tr className="h-9 text-[12px] bg-indigo-50/50">
+                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-slate-800">급여총액 (C)</td>
+                                        <td className="w-1/4 border-2 border-slate-800 text-center font-bold text-[13px] text-slate-700">
+                                            {safeLocaleString(netAfterDeductions)}
+                                            <span className="text-[9px] font-normal block text-slate-500 leading-tight">(A - B)</span>
+                                        </td>
+                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-indigo-700">세금대납액 (D)</td>
+                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-[13px] text-indigo-600">
+                                            +{safeLocaleString(taxSupportAmount)}
+                                            <span className="text-[9px] font-normal block text-indigo-400 leading-tight">(사업주 대납)</span>
+                                        </td>
+                                    </tr>
+                                    <tr className="h-14 bg-slate-900 text-white">
+                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[11px] uppercase leading-tight">실 수령액<br />(NET PAY)</td>
+                                        <td colSpan="3" className="border-2 border-slate-800 text-center">
+                                            <div className="text-xl font-black tracking-widest leading-none mb-0.5">₩ {safeLocaleString(payroll.total_pay)}</div>
+                                            <div className="text-[9px] font-medium opacity-60 uppercase tracking-widest">(C + D = 실 지급액)</div>
+                                        </td>
+                                    </tr>
+                                </>
+                            ) : (
+                                <tr className="h-14 bg-slate-900 text-white">
+                                    <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[11px] uppercase leading-tight">실 수령액<br />(NET PAY)</td>
+                                    <td colSpan="3" className="border-2 border-slate-800 text-center">
+                                        <div className="text-xl font-black tracking-widest leading-none mb-0.5">₩ {safeLocaleString(payroll.total_pay)}</div>
+                                        <div className="text-[9px] font-medium opacity-60 uppercase tracking-widest">(A - B = 차감 지급액)</div>
+                                    </td>
+                                </tr>
+                            )}
+                            <tr className="h-9 text-[12px]">
+                                <td className="w-1/4 bg-slate-100 font-bold border-2 border-slate-800 text-center">급여 수령 계좌</td>
+                                <td colSpan="3" className="px-8 border-2 border-slate-800 text-base font-black text-slate-800 tracking-wider">
+                                    {staff.bank_name || staff.account_number
+                                        ? `${staff.bank_name || ''} ${staff.account_number || ''} ${staff.account_holder || ''}`.trim()
+                                        : (staff.bank_account || '기록 없음')
+                                    }
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                );
+            })()}
 
             {/* Signature Section */}
             <div className="text-center mt-auto border-t-2 border-slate-200 pt-4 pb-2">
