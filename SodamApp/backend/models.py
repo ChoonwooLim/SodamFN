@@ -322,6 +322,7 @@ class Payroll(SQLModel, table=True):
     holiday_w3: int = 0
     holiday_w4: int = 0
     holiday_w5: int = 0
+    holiday_w6: int = 0
     
     # Detailed Deductions
     deduction_np: int = 0 # 국민연금

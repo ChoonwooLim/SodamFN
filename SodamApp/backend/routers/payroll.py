@@ -54,7 +54,36 @@ def get_monthly_attendance(staff_id: int, month: str, bid = Depends(get_bid_from
             Attendance.date <= end_date
         ).order_by(Attendance.date)
         records = service.session.exec(stmt).all()
-        return {"status": "success", "data": records}
+        
+        # --- Carryover: find previous month's trailing incomplete week ---
+        # The first week of this month may start mid-week.
+        # Find the Sunday that starts the first ISO week containing day 1.
+        first_day_dow = start_date.isoweekday()  # Mon=1..Sun=7
+        if first_day_dow == 7:
+            # 1st is Sunday -> first week starts on 1st, no carryover
+            carryover_data = []
+        else:
+            # Find the preceding Sunday (start of the ISO week)
+            prev_sunday = start_date - timedelta(days=first_day_dow)  # go back to Sunday
+            # Fetch attendance from prev_sunday to day before start_date
+            prev_end = start_date - timedelta(days=1)
+            co_stmt = select(Attendance).where(
+                Attendance.staff_id == staff_id,
+                Attendance.date >= prev_sunday,
+                Attendance.date <= prev_end
+            ).order_by(Attendance.date)
+            co_records = service.session.exec(co_stmt).all()
+            carryover_data = [
+                {
+                    "date": str(r.date),
+                    "total_hours": r.total_hours,
+                    "status": r.status or "Normal",
+                    "is_carryover": True
+                }
+                for r in co_records
+            ]
+        
+        return {"status": "success", "data": records, "carryover": carryover_data}
     finally:
         service.close()
 
@@ -218,61 +247,88 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
                     "dates": f"{', '.join(g['dates'])}일"
                 })
 
-        # 2. Weekly Holiday Pay Calculation (Refined)
-        # Rules:
-        # - Only count working hours from days that belong to the target month.
-        # - If a week spans month boundaries and has NO workdays in the target month, skip entirely.
-        # - If a week at the END of the month has its Sunday in the next month
-        #   (trailing incomplete week), mark as "익월정산" (deferred to next month).
+        # 2. Weekly Holiday Pay Calculation
+        # WEEK SYSTEM: Sunday-to-Saturday (일~토)
+        # - Weeks are grouped by their starting Sunday
+        # - If the 1st of the month is NOT Sunday, the first week's Sunday
+        #   falls in the previous month → include carryover workdays from prev month
+        # - If the last week extends past the month end (Saturday in next month)
+        #   and only a few workdays are in the current month → 익월정산
         
         next_month_1st = (target_month_dt + timedelta(days=32)).replace(day=1).date()
         last_day_of_month = next_month_1st - timedelta(days=1)
 
-        weeks = {} # (year, week_num) -> [Attendance]
+        # Group attendance by Sunday-start week
+        def get_week_sunday(d):
+            """Get the Sunday that starts the Sun-Sat week containing date d."""
+            # Python weekday(): Mon=0, Tue=1, ..., Sun=6
+            if d.weekday() == 6:  # Sunday
+                return d
+            return d - timedelta(days=d.weekday() + 1)
+        
+        weeks = {}  # sunday_date -> [Attendance]
         for att in all_attendances:
-            isocal = att.date.isocalendar()
-            key = (isocal[0], isocal[1]) # ISO year, week
-            if key not in weeks: weeks[key] = []
-            weeks[key].append(att)
+            sun = get_week_sunday(att.date)
+            if sun not in weeks:
+                weeks[sun] = []
+            weeks[sun].append(att)
             
         total_holiday_pay = 0
         holiday_details = {}
-        holiday_per_week = [0, 0, 0, 0, 0]
+        holiday_per_week = [0, 0, 0, 0, 0, 0]
         
         if staff.contract_type != "정규직":
             week_idx = 0
-            for key in sorted(weeks.keys()):
-                w_atts = weeks[key]
-                y, w = key
-                sun_date = date.fromisocalendar(y, w, 7)
+            first_of_month = target_month_dt.date()
+            
+            for sun in sorted(weeks.keys()):
+                w_atts = weeks[sun]
+                sat = sun + timedelta(days=6)  # Saturday of this week
                 
-                # Filter workdays belonging to the target month
+                # Classify days
                 month_days = [a for a in w_atts 
                               if a.date.year == target_year and a.date.month == target_month]
+                prev_month_days = [a for a in w_atts 
+                                   if a.date < first_of_month]
                 month_work_days = [a for a in month_days if a.total_hours > 0]
+                prev_work_days = [a for a in prev_month_days if a.total_hours > 0]
                 
-                # Skip weeks with NO workdays in the target month
-                if not month_work_days:
+                # SKIP: Week is entirely before the target month (Saturday < 1st)
+                if sat < first_of_month:
+                    continue
+                    
+                # SKIP: Week starts after the last day of month (no overlap)
+                if sun > last_day_of_month:
                     continue
                 
-                # TRAILING INCOMPLETE WEEK: Sunday falls after the last day of month
-                # This means the week extends into the next month and is incomplete
-                # → Mark as "익월정산" (deferred to next month settlement)
-                if sun_date > last_day_of_month and sun_date > next_month_1st:
-                    if week_idx < 5:
+                # SKIP: No workdays at all
+                if not month_work_days and not prev_work_days:
+                    continue
+                
+                # CASE 1: TRAILING INCOMPLETE WEEK
+                # Sunday is in the target month, Saturday extends into next month,
+                # and the week doesn't have enough days to form a complete work week
+                # → Mark as "익월정산" for next month
+                if sun >= first_of_month and sat > last_day_of_month:
+                    if week_idx < 6:
                         day_count = len(month_work_days)
-                        day_dates = ", ".join([str(a.date.day) for a in month_days])
-                        # Use generic next month name
+                        day_dates = ", ".join([str(a.date.day) for a in month_days if a.total_hours > 0])
                         next_m = next_month_1st.month
                         holiday_details[str(week_idx + 1)] = f"익월정산 ({day_dates}일, {day_count}일근무→{next_m}월 합산)"
                         holiday_per_week[week_idx] = 0
-                        print(f"DEBUG: Week {key} (Sun {sun_date}) -> {week_idx+1}주차: 익월정산 ({day_count} days)")
+                        print(f"DEBUG: Sun-week {sun}~{sat} → {week_idx+1}주차: 익월정산 ({day_count} workdays)")
                     week_idx += 1
                     continue
                 
-                # NORMAL WEEK: Calculate hours from target-month days only
+                # CASE 2: LEADING CARRYOVER WEEK
+                # Sunday is in the previous month, has carryover workdays from prev month
+                is_carryover = sun < first_of_month and len(prev_work_days) > 0
+                
+                # Calculate effective hours: include carryover days if applicable
+                calc_days = w_atts if is_carryover else month_days
+                
                 effective_hours_sum = 0
-                for a in month_days:
+                for a in calc_days:
                     is_company_holiday = a.date in company_holidays
                     is_store_closed = a.status == "Holiday" or is_company_holiday
                     effective_h = 0 if is_store_closed else a.total_hours
@@ -280,19 +336,27 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
                     
                 w_hours = effective_hours_sum
                 
-                # Check for Absence (only among target month days)
-                has_absence = any(a.status == "Absence" for a in month_days)
+                # Check for Absence
+                has_absence = any(a.status == "Absence" for a in calc_days)
                 
-                print(f"DEBUG: Week {key} (Sun {sun_date}) -> {week_idx+1}주차: Hours={w_hours}, Absence={has_absence}")
+                # Build detail string
+                if is_carryover:
+                    prev_h = sum(a.total_hours for a in prev_work_days)
+                    month_h = sum(a.total_hours for a in month_work_days)
+                    detail_prefix = f"전월이월{prev_h}h+당월{month_h}h="
+                    print(f"DEBUG: Sun-week {sun}~{sat} → {week_idx+1}주차(이월): prev={prev_h}h + month={month_h}h = {w_hours}h")
+                else:
+                    detail_prefix = ""
+                    print(f"DEBUG: Sun-week {sun}~{sat} → {week_idx+1}주차: {w_hours}h")
 
                 if w_hours >= 15 and not has_absence:
                     avg_h = round(w_hours / 5, 2)
                     h_amt = int(avg_h * staff.hourly_wage)
                     total_holiday_pay += h_amt
-                    print(f"  -> Holiday Pay: {h_amt}")
-                    if week_idx < 5:
+                    print(f"  → Holiday Pay: {h_amt}")
+                    if week_idx < 6:
                         holiday_per_week[week_idx] = h_amt
-                    holiday_details[str(week_idx + 1)] = f"{w_hours}시간 / 5일 = {avg_h}시간"
+                    holiday_details[str(week_idx + 1)] = f"{detail_prefix}{w_hours}시간 / 5일 = {avg_h}시간"
                 elif has_absence and w_hours >= 15:
                     holiday_details[str(week_idx + 1)] = "결근으로 미지급"
                 
@@ -406,7 +470,7 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         existing.base_pay = total_base_pay
         existing.bonus = total_holiday_pay
         existing.bonus_holiday = total_holiday_pay
-        existing.holiday_w1, existing.holiday_w2, existing.holiday_w3, existing.holiday_w4, existing.holiday_w5 = holiday_per_week
+        existing.holiday_w1, existing.holiday_w2, existing.holiday_w3, existing.holiday_w4, existing.holiday_w5, existing.holiday_w6 = holiday_per_week
         existing.deductions = total_deductions
         existing.deduction_np = d_np
         existing.deduction_hi = d_hi
@@ -521,6 +585,7 @@ def get_staff_payroll(staff_id: int, month: str, bid = Depends(get_bid_from_toke
                 "holiday_w3": payroll.holiday_w3,
                 "holiday_w4": payroll.holiday_w4,
                 "holiday_w5": payroll.holiday_w5,
+                "holiday_w6": payroll.holiday_w6,
                 "gross_pay": (payroll.base_pay or 0) + (payroll.bonus_holiday or 0),
                 "deduction_np": payroll.deduction_np,
                 "deduction_hi": payroll.deduction_hi,

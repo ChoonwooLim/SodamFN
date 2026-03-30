@@ -137,7 +137,7 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                                         <tr className="bg-indigo-50/30 border-b border-slate-800 h-7">
                                             <td colSpan="2" className="px-3 font-black text-[10px] text-indigo-900 border-b border-slate-800 bg-indigo-50/50">주휴수당 (Holiday Pay)</td>
                                         </tr>
-                                        {[1, 2, 3, 4, 5].map(w => {
+                                        {[1, 2, 3, 4, 5, 6].map(w => {
                                             const amt = payroll[`holiday_w${w}`];
                                             const calc = details.holiday_details ? details.holiday_details[w.toString()] : null;
                                             const isDeferred = calc && calc.includes('익월정산');
