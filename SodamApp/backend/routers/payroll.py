@@ -219,12 +219,14 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
                 })
 
         # 2. Weekly Holiday Pay Calculation (Refined)
-        # Cutoff Rule: If Sunday <= 1st of next month, stay in current month.
-        # Else (Tue-Sat crossing), go to next month.
-        # Note: If 1st is Mon, Sun was 31st (stays). If 1st is Sun, Sun is 1st (stays).
-        # If 1st is Sat, Sun is 2nd (goes to next).
+        # Rules:
+        # - Only count working hours from days that belong to the target month.
+        # - If a week spans month boundaries and has NO workdays in the target month, skip entirely.
+        # - If a week at the END of the month has its Sunday in the next month
+        #   (trailing incomplete week), mark as "익월정산" (deferred to next month).
         
         next_month_1st = (target_month_dt + timedelta(days=32)).replace(day=1).date()
+        last_day_of_month = next_month_1st - timedelta(days=1)
 
         weeks = {} # (year, week_num) -> [Attendance]
         for att in all_attendances:
@@ -239,40 +241,51 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         
         if staff.contract_type != "정규직":
             week_idx = 0
-            # Sort keys to process in chronological order
             for key in sorted(weeks.keys()):
                 w_atts = weeks[key]
-                # Get Sunday of this week
                 y, w = key
                 sun_date = date.fromisocalendar(y, w, 7)
                 
-                # REFINED CUTOFF RULE:
-                # "다음달 1일이 (화~토)이면 다음달 포함, 1일이 일요일이면 이번달 포함"
-                # Mathematically: sun_date <= 1st of next month stays in current.
-                if sun_date > next_month_1st or sun_date < target_month_dt.date():
+                # Filter workdays belonging to the target month
+                month_days = [a for a in w_atts 
+                              if a.date.year == target_year and a.date.month == target_month]
+                month_work_days = [a for a in month_days if a.total_hours > 0]
+                
+                # Skip weeks with NO workdays in the target month
+                if not month_work_days:
                     continue
-                    
-                # Treat store-closed days (Holidays) as 0 hours for the weekly sum
-                effective_atts = []
-                for a in w_atts:
+                
+                # TRAILING INCOMPLETE WEEK: Sunday falls after the last day of month
+                # This means the week extends into the next month and is incomplete
+                # → Mark as "익월정산" (deferred to next month settlement)
+                if sun_date > last_day_of_month and sun_date > next_month_1st:
+                    if week_idx < 5:
+                        day_count = len(month_work_days)
+                        day_dates = ", ".join([str(a.date.day) for a in month_days])
+                        # Use generic next month name
+                        next_m = next_month_1st.month
+                        holiday_details[str(week_idx + 1)] = f"익월정산 ({day_dates}일, {day_count}일근무→{next_m}월 합산)"
+                        holiday_per_week[week_idx] = 0
+                        print(f"DEBUG: Week {key} (Sun {sun_date}) -> {week_idx+1}주차: 익월정산 ({day_count} days)")
+                    week_idx += 1
+                    continue
+                
+                # NORMAL WEEK: Calculate hours from target-month days only
+                effective_hours_sum = 0
+                for a in month_days:
                     is_company_holiday = a.date in company_holidays
                     is_store_closed = a.status == "Holiday" or is_company_holiday
-                    
-                    # If store is closed (Sunday/Holiday), hours are 0 for holiday pay calculation
                     effective_h = 0 if is_store_closed else a.total_hours
-                    effective_atts.append(effective_h)
+                    effective_hours_sum += effective_h
                     
-                w_hours = sum(effective_atts)
+                w_hours = effective_hours_sum
                 
-                # Rule 1: Check for Absence
-                # PROTECTION: Company Holidays or 'Holiday' status don't count as absence even if hours=0.
-                # Only status="Absence" triggers the penalty.
-                has_absence = any(a.status == "Absence" for a in w_atts)
+                # Check for Absence (only among target month days)
+                has_absence = any(a.status == "Absence" for a in month_days)
                 
-                print(f"DEBUG: Week {key} (Sun {sun_date}) -> Hours: {w_hours}, Absence: {has_absence}")
+                print(f"DEBUG: Week {key} (Sun {sun_date}) -> {week_idx+1}주차: Hours={w_hours}, Absence={has_absence}")
 
                 if w_hours >= 15 and not has_absence:
-                    # Formula: (Weekly Total / 5) * rate
                     avg_h = round(w_hours / 5, 2)
                     h_amt = int(avg_h * staff.hourly_wage)
                     total_holiday_pay += h_amt

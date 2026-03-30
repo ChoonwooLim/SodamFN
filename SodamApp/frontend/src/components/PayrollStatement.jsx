@@ -140,15 +140,16 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                                         {[1, 2, 3, 4, 5].map(w => {
                                             const amt = payroll[`holiday_w${w}`];
                                             const calc = details.holiday_details ? details.holiday_details[w.toString()] : null;
-                                            if (amt > 0) {
+                                            const isDeferred = calc && calc.includes('익월정산');
+                                            if (amt > 0 || isDeferred) {
                                                 return (
-                                                    <tr key={w} className="border-b border-slate-300 h-8">
+                                                    <tr key={w} className={`border-b border-slate-300 h-8 ${isDeferred ? 'bg-amber-50/50' : ''}`}>
                                                         <td className="px-3 border-r border-slate-800">
                                                             <div className="font-bold text-slate-600 text-[11px]">{w}주차</div>
-                                                            {calc && <div className="text-[9px] text-slate-400 font-normal leading-tight">{calc}</div>}
+                                                            {calc && <div className={`text-[9px] font-normal leading-tight ${isDeferred ? 'text-amber-600 font-semibold' : 'text-slate-400'}`}>{calc}</div>}
                                                         </td>
-                                                        <td className="px-3 text-right font-bold text-[12px]">
-                                                            {safeLocaleString(amt)}
+                                                        <td className={`px-3 text-right font-bold text-[12px] ${isDeferred ? 'text-amber-600 text-[10px]' : ''}`}>
+                                                            {isDeferred ? '익월정산' : safeLocaleString(amt)}
                                                         </td>
                                                     </tr>
                                                 );
