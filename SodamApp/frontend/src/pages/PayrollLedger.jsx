@@ -172,9 +172,9 @@ export default function PayrollLedger() {
   // RENDER
   // =============================================================================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 pb-24">
+    <div className="min-h-screen pb-24" style={{ background: '#475569' }}>
       {/* ═══ HEADER ═══ */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 text-white">
+      <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }} className="text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
@@ -183,7 +183,7 @@ export default function PayrollLedger() {
               </button>
               <div>
                 <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
-                  <Wallet className="text-indigo-400" size={24} />
+                  <Wallet className="text-blue-400" size={24} />
                   급여대장
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-400 mt-0.5">Payroll Ledger — 직원별 급여 관리</p>
@@ -197,11 +197,11 @@ export default function PayrollLedger() {
                   type="month"
                   value={currentMonth}
                   onChange={(e) => setCurrentMonth(e.target.value)}
-                  className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-400 outline-none [color-scheme:dark]"
+                  className="bg-white/10 border border-white/20 text-white rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-blue-400 outline-none [color-scheme:dark]"
                 />
                 <button
                   onClick={() => setIsAttendanceOpen(true)}
-                  className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-indigo-500/30 transition-all"
+                  className="flex items-center gap-1.5 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg transition-all" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
                 >
                   <Calculator size={14} /> 출퇴근/정산
                 </button>
@@ -218,17 +218,17 @@ export default function PayrollLedger() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6" style={{ marginTop: 16 }}>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
           {/* ═══ LEFT PANEL: Staff List ═══ */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden sticky top-4">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+            <div className="bg-white rounded-2xl overflow-hidden sticky top-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+              <div className="p-4" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                 <div className="flex items-center gap-2 mb-3">
-                  <Users size={16} className="text-indigo-500" />
+                  <Users size={16} className="text-blue-500" />
                   <span className="text-sm font-bold text-slate-700">직원 선택</span>
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-bold">{staffList.length}명</span>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold">{staffList.length}명</span>
                 </div>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -237,7 +237,7 @@ export default function PayrollLedger() {
                     placeholder="이름 검색..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div className="flex gap-1 mt-2">
@@ -245,7 +245,8 @@ export default function PayrollLedger() {
                     <button
                       key={s}
                       onClick={() => setStatusFilter(s)}
-                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${statusFilter === s ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${statusFilter === s ? 'text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      style={statusFilter === s ? { background: 'linear-gradient(135deg, #3b82f6, #2563eb)' } : {}}
                     >
                       {s === 'all' ? '전체' : s}
                     </button>
@@ -262,10 +263,10 @@ export default function PayrollLedger() {
                   <button
                     key={s.id}
                     onClick={() => setSelectedStaffId(s.id)}
-                    className={`w-full text-left px-4 py-3 hover:bg-indigo-50/50 transition-all group ${selectedStaffId === s.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : 'border-l-4 border-transparent'}`}
+                    className={`w-full text-left px-4 py-3 hover:bg-blue-50/50 transition-all group ${selectedStaffId === s.id ? 'bg-blue-50 border-l-4 border-blue-500' : 'border-l-4 border-transparent'}`}
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${selectedStaffId === s.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${selectedStaffId === s.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600'}`}>
                         {s.name?.[0]}
                       </div>
                       <div className="min-w-0">
@@ -294,9 +295,9 @@ export default function PayrollLedger() {
           <div className="lg:col-span-9 space-y-5">
             {!selectedStaffId ? (
               /* ─── Empty State ─── */
-              <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 p-12 sm:p-16 text-center">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-indigo-100 to-violet-100 rounded-3xl flex items-center justify-center">
-                  <Wallet size={36} className="text-indigo-400" />
+              <div className="bg-white rounded-2xl p-12 sm:p-16 text-center" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+                <div className="w-20 h-20 mx-auto mb-6 rounded-3xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #dbeafe, #e0e7ff)' }}>
+                  <Wallet size={36} className="text-blue-400" />
                 </div>
                 <h2 className="text-xl font-bold text-slate-700 mb-2">직원을 선택하세요</h2>
                 <p className="text-sm text-slate-400 max-w-sm mx-auto">좌측 목록에서 직원을 선택하면 계약 정보와 급여 대장이 표시됩니다.</p>
@@ -309,8 +310,8 @@ export default function PayrollLedger() {
             ) : staffData && (
               <>
                 {/* ═══ CONTRACT & SALARY INFO CARD ═══ */}
-                <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                  <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 flex items-center justify-between">
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+                  <div style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)' }} className="px-5 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2 text-white">
                       <CreditCard size={18} />
                       <span className="font-bold text-sm">계약 및 급여 — {staffData.name}</span>
@@ -333,12 +334,12 @@ export default function PayrollLedger() {
                       {/* Hourly Wage */}
                       <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <div className="text-[10px] text-slate-400 font-bold mb-1">시급</div>
-                        <div className="text-sm font-black text-indigo-700">{fmt(staffData.hourly_wage)}<span className="text-[10px] text-slate-400 ml-0.5">원</span></div>
+                        <div className="text-sm font-black text-blue-700">{fmt(staffData.hourly_wage)}<span className="text-[10px] text-slate-400 ml-0.5">원</span></div>
                       </div>
                       {/* Monthly Salary */}
                       <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
                         <div className="text-[10px] text-slate-400 font-bold mb-1">월급</div>
-                        <div className="text-sm font-black text-indigo-700">{fmt(staffData.monthly_salary)}<span className="text-[10px] text-slate-400 ml-0.5">원</span></div>
+                        <div className="text-sm font-black text-blue-700">{fmt(staffData.monthly_salary)}<span className="text-[10px] text-slate-400 ml-0.5">원</span></div>
                       </div>
                       {/* Insurance */}
                       <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
@@ -397,10 +398,10 @@ export default function PayrollLedger() {
                 </div>
 
                 {/* ═══ ANNUAL SUMMARY ═══ */}
-                <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+                  <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                     <div className="flex items-center gap-2">
-                      <BarChart3 size={16} className="text-indigo-500" />
+                      <BarChart3 size={16} className="text-blue-500" />
                       <span className="text-sm font-bold text-slate-700">연간 급여 요약</span>
                     </div>
                     <select
@@ -414,21 +415,21 @@ export default function PayrollLedger() {
                     </select>
                   </div>
                   <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="bg-gradient-to-br from-indigo-500 to-violet-500 rounded-xl p-4 text-white">
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
                       <div className="text-[10px] font-bold text-white/70 mb-1">총 기본급</div>
                       <div className="text-lg font-black">{fmt(payrollSummary.totalBase)}</div>
                     </div>
-                    <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl p-4 text-white">
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}>
                       <div className="text-[10px] font-bold text-white/70 mb-1">총 수당</div>
                       <div className="text-lg font-black">{fmt(payrollSummary.totalBonus)}</div>
                     </div>
-                    <div className="bg-gradient-to-br from-red-400 to-rose-500 rounded-xl p-4 text-white">
-                      <div className="text-[10px] font-bold text-white/70 mb-1">총 공제</div>
-                      <div className="text-lg font-black">-{fmt(payrollSummary.totalDeductions)}</div>
+                    <div className="rounded-xl p-4" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <div className="text-[10px] font-bold text-slate-400 mb-1">총 공제</div>
+                      <div className="text-lg font-black text-red-500">-{fmt(payrollSummary.totalDeductions)}</div>
                     </div>
-                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl p-4 text-white">
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)' }}>
                       <div className="text-[10px] font-bold text-white/70 mb-1">총 실수령</div>
-                      <div className="text-lg font-black text-yellow-300">{fmt(payrollSummary.totalNet)}</div>
+                      <div className="text-lg font-black">{fmt(payrollSummary.totalNet)}</div>
                       <div className="text-[10px] mt-1 text-white/50">{payrollSummary.count}건 / 이체완료 {payrollSummary.transferred}건</div>
                     </div>
                   </div>
@@ -444,7 +445,7 @@ export default function PayrollLedger() {
                   />
                   <button
                     onClick={() => setIsAttendanceOpen(true)}
-                    className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold"
+                    className="flex items-center gap-1 text-white px-3 py-2 rounded-lg text-xs font-bold" style={{ background: '#2563eb' }}
                   >
                     <Calculator size={14} /> 정산
                   </button>
@@ -457,10 +458,10 @@ export default function PayrollLedger() {
                 </div>
 
                 {/* ═══ PAYROLL HISTORY TABLE ═══ */}
-                <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+                  <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                     <div className="flex items-center gap-2">
-                      <FileText size={16} className="text-indigo-500" />
+                      <FileText size={16} className="text-blue-500" />
                       <span className="text-sm font-bold text-slate-700">월별 급여 지급 내역</span>
                       <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full font-bold">{payrolls.length}건</span>
                     </div>
@@ -492,7 +493,7 @@ export default function PayrollLedger() {
                                 {staffData.contract_type === '정규직' ? '추가수당' : '주휴수당'}
                               </th>
                               <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-red-400">공제액</th>
-                              <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-indigo-600">실수령액</th>
+                              <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-blue-600">실수령액</th>
                               <th className="px-4 py-3 font-bold border-b border-slate-100 text-center">상태</th>
                               <th className="px-4 py-3 font-bold border-b border-slate-100 text-center">관리</th>
                             </tr>
@@ -506,7 +507,7 @@ export default function PayrollLedger() {
                                   <td className="px-4 py-3 text-sm font-bold text-slate-800 border-b border-slate-50">
                                     <button
                                       onClick={() => setExpandedPayrollId(isExpanded ? null : pay.id)}
-                                      className="flex items-center gap-1.5 hover:text-indigo-600 transition-colors"
+                                      className="flex items-center gap-1.5 hover:text-blue-600 transition-colors"
                                     >
                                       <ChevronDown size={14} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                                       {pay.month}
@@ -515,7 +516,7 @@ export default function PayrollLedger() {
                                   <td className="px-4 py-3 text-sm text-right text-slate-600 font-mono border-b border-slate-50">{fmt(pay.base_pay)}</td>
                                   <td className="px-4 py-3 text-sm text-right text-slate-600 font-mono border-b border-slate-50">{fmt(pay.bonus)}</td>
                                   <td className="px-4 py-3 text-sm text-right text-red-400 font-mono border-b border-slate-50">-{fmt(pay.deductions)}</td>
-                                  <td className="px-4 py-3 text-sm text-right text-indigo-600 font-bold font-mono border-b border-slate-50">{fmt(pay.total_pay)}</td>
+                                  <td className="px-4 py-3 text-sm text-right text-blue-600 font-bold font-mono border-b border-slate-50">{fmt(pay.total_pay)}</td>
                                   <td className="px-4 py-3 text-center border-b border-slate-50">
                                     {pay.transfer_status === '완료' ? (
                                       <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">
@@ -531,7 +532,7 @@ export default function PayrollLedger() {
                                     <div className="flex items-center justify-center gap-1.5">
                                       <button
                                         onClick={() => setSelectedPayroll(pay)}
-                                        className="p-1.5 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 rounded-lg transition-colors"
+                                        className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"
                                         title="명세서 출력"
                                       >
                                         <Printer size={14} />
@@ -564,11 +565,11 @@ export default function PayrollLedger() {
                           if (expandedPayrollId !== pay.id) return null;
                           const expandedDetails = getPayrollDetails(pay);
                           return (
-                            <div key={`detail-${pay.id}`} className="border-t border-indigo-100 bg-indigo-50/30 px-6 py-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                            <div key={`detail-${pay.id}`} className="border-t border-blue-100 bg-blue-50/30 px-6 py-4 animate-in fade-in slide-in-from-top-1 duration-200">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Earnings Breakdown */}
                                 <div>
-                                  <h4 className="text-[11px] font-black text-indigo-800 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                  <h4 className="text-[11px] font-black text-blue-800 uppercase tracking-wider mb-2 flex items-center gap-1">
                                     <TrendingUp size={12} /> 지급 항목 상세
                                   </h4>
                                   <div className="space-y-1.5">
@@ -583,8 +584,8 @@ export default function PayrollLedger() {
                                     ))}
                                     {/* Holiday Pay Breakdown */}
                                     {(pay.bonus_holiday || 0) > 0 && (
-                                      <div className="mt-2 pt-2 border-t border-indigo-100">
-                                        <div className="text-[10px] font-bold text-indigo-700 mb-1">주휴수당 주차별</div>
+                                      <div className="mt-2 pt-2 border-t border-blue-100">
+                                        <div className="text-[10px] font-bold text-blue-700 mb-1">주휴수당 주차별</div>
                                         {[1, 2, 3, 4, 5, 6].map(w => {
                                           const amt = pay[`holiday_w${w}`];
                                           const desc = expandedDetails.holiday_details?.[w.toString()];
@@ -696,15 +697,15 @@ export default function PayrollLedger() {
                                 <span className="text-red-400">공제</span>
                                 <span className="font-bold font-mono text-red-400">-{fmt(pay.deductions)}</span>
                               </div>
-                              <div className="flex justify-between bg-indigo-50 rounded-lg px-3 py-2">
-                                <span className="text-indigo-500">실수령</span>
-                                <span className="font-bold font-mono text-indigo-600">{fmt(pay.total_pay)}</span>
+                              <div className="flex justify-between bg-blue-50 rounded-lg px-3 py-2">
+                                <span className="text-blue-500">실수령</span>
+                                <span className="font-bold font-mono text-blue-600">{fmt(pay.total_pay)}</span>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                               <button
                                 onClick={() => setSelectedPayroll(pay)}
-                                className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-indigo-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-indigo-50"
+                                className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-blue-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-blue-50"
                               >
                                 <Printer size={13} /> 명세서
                               </button>
