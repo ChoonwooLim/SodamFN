@@ -282,7 +282,7 @@ export default function DeliveryAppDashboard() {
                   <th style={{ ...S.th, textAlign: 'center', borderRight: '2px solid #e2e8f0', minWidth: 60 }}>월</th>
                   {CHANNELS.map(ch => (
                     <th key={ch.id} colSpan={3} style={{ ...S.th, borderLeft: '1px solid #e2e8f0' }}>
-                      {ch.icon} {ch.label.slice(0, 2)}
+                      {ch.icon} {ch.label}
                     </th>
                   ))}
                   <th colSpan={3} style={{ ...S.th, borderLeft: '2px solid #cbd5e1', background: '#eef2f7' }}>합계</th>
