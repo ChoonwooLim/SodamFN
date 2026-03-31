@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -11,6 +11,7 @@ export default function Sidebar() {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [boardOpen, setBoardOpen] = useState(false);
     const [hrOpen, setHrOpen] = useState(false);
+    const [plOpen, setPlOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
     // SuperAdmin view-as state
@@ -31,6 +32,10 @@ export default function Sidebar() {
         const hrPaths = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) {
             setHrOpen(true);
+        }
+        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales'];
+        if (plPaths.some(p => location.pathname.startsWith(p))) {
+            setPlOpen(true);
         }
     }, [location.pathname]);
 
@@ -112,11 +117,15 @@ export default function Sidebar() {
     // Admin menu items (shared between admin and superadmin-viewing-business)
     const adminMenuItems = [
         { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
-        { icon: BarChart3, label: '매출 관리', path: '/revenue' },
-        { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
-        { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
-        { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
         { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
+    ];
+
+    const plSubItems = [
+        { icon: Receipt, label: '손익계산서', path: '/finance/profitloss', color: 'text-emerald-400' },
+        { icon: BarChart3, label: '매출관리', path: '/revenue', color: 'text-blue-400' },
+        { icon: ShoppingBag, label: '매입관리', path: '/purchase', color: 'text-orange-400' },
+        { icon: Truck, label: '배달앱관리', path: '/revenue?view=delivery', color: 'text-amber-400' },
+        { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
     ];
 
     const superAdminMenuItems = [
@@ -181,6 +190,7 @@ export default function Sidebar() {
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales'].some(p => location.pathname.startsWith(p));
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;
@@ -264,6 +274,49 @@ export default function Sidebar() {
                     </button>
                 )}
                 {mainMenuItems.map(renderMenuItem)}
+
+                {/* ═══ 손익관리 (접이식 서브메뉴) ═══ */}
+                {(user.role === 'admin' || isViewingBusiness) && (
+                    <div className="mb-0.5">
+                        <button
+                            onClick={() => setPlOpen(!plOpen)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isPLActive
+                                ? 'bg-emerald-600/20 text-emerald-300'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }`}
+                        >
+                            <PieChart size={20} />
+                            <span className="font-medium text-sm flex-1 text-left">손익관리</span>
+                            {plOpen
+                                ? <ChevronUp size={16} className="text-slate-500" />
+                                : <ChevronDown size={16} className="text-slate-500" />
+                            }
+                        </button>
+                        {plOpen && (
+                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
+                                {plSubItems.map(sub => {
+                                    const SubIcon = sub.icon;
+                                    const isSubActive = sub.path.includes('?')
+                                        ? (location.pathname + location.search) === sub.path
+                                        : location.pathname === sub.path || location.pathname.startsWith(sub.path);
+                                    return (
+                                        <Link
+                                            key={sub.path}
+                                            to={sub.path}
+                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
+                                                ? 'bg-slate-800 text-white font-semibold'
+                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
+                                                }`}
+                                        >
+                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
+                                            <span>{sub.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ═══ 직원 관리 (접이식 서브메뉴) ═══ */}
                 {(user.role === 'admin' || isViewingBusiness) && (
