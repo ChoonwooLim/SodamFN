@@ -9,6 +9,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [calculating, setCalculating] = useState(false);
+    const [overrides, setOverrides] = useState({ np: '', hi: '', lti: '', ei: '', it: '', lit: '' });
 
     const year = parseInt(month.split('-')[0]);
     const monthNum = parseInt(month.split('-')[1]);
@@ -64,13 +65,15 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [attRes, holRes] = await Promise.all([
+            const [attRes, holRes, payrollRes] = await Promise.all([
                 fetch(`${API_URL}/api/payroll/attendance/${staffId}/${month}`),
-                fetch(`${API_URL}/api/payroll/holidays/${month}`)
+                fetch(`${API_URL}/api/payroll/holidays/${month}`),
+                fetch(`${API_URL}/api/payroll/staff/${staffId}/${month}`)
             ]);
 
             const attResult = await attRes.json();
             const holResult = await holRes.json();
+            const payrollResult = payrollRes.ok ? await payrollRes.json() : null;
 
             const dataMap = {};
 
@@ -101,6 +104,19 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
 
             if (holResult.status === 'success') {
                 setCompanyHolidays(holResult.data.map(h => h.date));
+            }
+
+            if (payrollResult && payrollResult.status === 'success' && payrollResult.data.overrides) {
+                // Merge loaded overrides with existing empty state defaults
+                const loaded = payrollResult.data.overrides;
+                setOverrides(prev => ({
+                    np: loaded.np !== undefined ? loaded.np : prev.np,
+                    hi: loaded.hi !== undefined ? loaded.hi : prev.hi,
+                    lti: loaded.lti !== undefined ? loaded.lti : prev.lti,
+                    ei: loaded.ei !== undefined ? loaded.ei : prev.ei,
+                    it: loaded.it !== undefined ? loaded.it : prev.it,
+                    lit: loaded.lit !== undefined ? loaded.lit : prev.lit,
+                }));
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -217,10 +233,20 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                 return;
             }
 
+            const reqOverrides = {};
+            // Only send overrides if they have a numeric value
+            ['np', 'hi', 'lti', 'ei', 'it', 'lit'].forEach(k => {
+                if (overrides[k] !== '' && !isNaN(overrides[k])) reqOverrides[k] = parseInt(overrides[k]);
+            });
+
             const response = await fetch(`${API_URL}/api/payroll/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ staff_id: staffId, month })
+                body: JSON.stringify({ 
+                    staff_id: staffId, 
+                    month,
+                    overrides: Object.keys(reqOverrides).length > 0 ? reqOverrides : null
+                })
             });
 
             if (!response.ok) {
@@ -399,8 +425,37 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                     </p>
                 </div>
 
+                {/* Overrides Section */}
+                <div className="px-6 py-3 bg-white border-t border-slate-200">
+                    <p className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                        <span>세무사 산출(연말정산 등) 수동 덮어쓰기 (선택입력)</span>
+                        <span className="text-[10px] text-slate-400 font-normal italic">* 입력한 항목만 덮어씌워지며 빈칸은 자동 계산됩니다.</span>
+                    </p>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                        {[
+                            { key: 'np', label: '국민연금' },
+                            { key: 'hi', label: '건강보험' },
+                            { key: 'lti', label: '요양보험' },
+                            { key: 'ei', label: '고용보험' },
+                            { key: 'it', label: '소득세' },
+                            { key: 'lit', label: '지방소득세' },
+                        ].map((item) => (
+                            <div key={item.key} className="flex flex-col">
+                                <label className="text-[10px] text-slate-500 font-semibold mb-1">{item.label}</label>
+                                <input
+                                    type="number"
+                                    className="border border-slate-300 rounded p-1 text-xs text-right text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                    placeholder="자동식"
+                                    value={overrides[item.key]}
+                                    onChange={(e) => setOverrides(prev => ({ ...prev, [item.key]: e.target.value }))}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Footer */}
-                <div className="p-4 sm:p-6 border-t bg-white flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
+                <div className="p-4 sm:p-6 border-t bg-slate-50 flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3">
                     <button
                         onClick={handleSave}
                         disabled={saving || calculating}

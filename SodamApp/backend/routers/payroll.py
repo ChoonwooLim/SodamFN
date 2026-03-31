@@ -29,7 +29,8 @@ class AttendanceSaveRequest(BaseModel):
 
 class PayrollCalculateRequest(BaseModel):
     staff_id: int
-    month: str # YYYY-MM
+    month: str
+    overrides: Optional[dict] = None  # Add overrides for tax/insurances # YYYY-MM
 
 class InsuranceBaseImport(BaseModel):
     staff_name: str
@@ -202,14 +203,31 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         if staff.contract_type == "정규직":
             # For Regular staff, use fixed monthly salary
             total_base_pay = staff.monthly_salary or 0
-            work_breakdown.append({
-                "label": "기본급 (정규직)",
-                "rate": total_base_pay,
-                "hours": 0,
-                "days": 0,
-                "amount": total_base_pay,
-                "dates": "월급여"
-            })
+            
+            # --- 퇴사월 일할 계산 (Proration) ---
+            if staff.end_date and staff.end_date.strftime("%Y-%m") == req.month:
+                from calendar import monthrange
+                days_in_month = monthrange(target_year, target_month)[1]
+                worked_days = min(staff.end_date.day, days_in_month)
+                total_base_pay = int(total_base_pay * worked_days / days_in_month)
+                
+                work_breakdown.append({
+                    "label": f"기본급 (중도퇴사 일할계산: {worked_days}일)",
+                    "rate": staff.monthly_salary,
+                    "hours": 0,
+                    "days": worked_days,
+                    "amount": total_base_pay,
+                    "dates": f"{worked_days}/{days_in_month}일"
+                })
+            else:
+                work_breakdown.append({
+                    "label": "기본급 (정규직)",
+                    "rate": total_base_pay,
+                    "hours": 0,
+                    "days": 0,
+                    "amount": total_base_pay,
+                    "dates": "월급여"
+                })
         else:
             # For Part-time/Day-worker, calculate based on attendance
             # Filter attendances belonging to the target month for Base Pay
@@ -448,9 +466,24 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
             d_lit = int(d_it * 0.1 / 10) * 10      # 지방소득세: 소득세의 10%
             
             # 국민연금/건강보험: 미가입 (insurance_4major=False일 때)
-            
+            d_np, d_hi, d_lti = 0, 0, 0
+
+        # ── 4. 세무사 산출 기준(Overrides) 수동 덮어쓰기 적용 ──
+        if req.overrides:
+            if req.overrides.get('np') is not None: d_np = int(req.overrides['np'])
+            if req.overrides.get('hi') is not None: d_hi = int(req.overrides['hi'])
+            if req.overrides.get('lti') is not None: d_lti = int(req.overrides['lti'])
+            if req.overrides.get('ei') is not None: d_ei = int(req.overrides['ei'])
+            if req.overrides.get('it') is not None: d_it = int(req.overrides['it'])
+            if req.overrides.get('lit') is not None: d_lit = int(req.overrides['lit'])
+        
+        # 5. 최종 금액 산출
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
+        
+        # Save overrides if any
+        if req.overrides:
+            details['overrides'] = req.overrides
         
         # Tax Support (제세공과금 지원금) - 사업주 세금 대납
         tax_support = 0
@@ -599,6 +632,7 @@ def get_staff_payroll(staff_id: int, month: str, bid = Depends(get_bid_from_toke
                 "net_pay": (payroll.base_pay or 0) + (payroll.bonus_holiday or 0) - (payroll.deductions or 0),
                 "tax_support": payroll.bonus_tax_support,
                 "total_pay": payroll.total_pay,
+                "overrides": details.get("overrides", {}),
                 "work_breakdown": details.get("work_breakdown", []),
                 "holiday_details": details.get("holiday_details", {}),
                 "bank_name": staff.bank_name if staff else "",

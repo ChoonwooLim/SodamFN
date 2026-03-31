@@ -740,22 +740,43 @@ def _calc_accrued_retirement(staff, end_date):
         else:
             pl_accrued += int(p.total_pay * 0.0833)  # 1/12
     
-    # 법적 퇴직금 (1년 이상 시)
+    # 법적 퇴직금 (1년 이상 시 평균임금 계산)
     legal_retirement = 0
+    breakdown = {}
     if work_days >= 365 and payrolls:
+        # 최근 3개월 분의 급여 총합 산출 (Gross Pay = base + holiday + meal)
         recent = payrolls[:3]
-        avg_monthly = sum(p.total_pay for p in recent) / len(recent)
-        daily_wage = avg_monthly / 30
+        total_gross = sum((p.base_pay or 0) + (p.bonus_holiday or 0) + (p.bonus_meal or 0) for p in recent)
+        
+        # 정확한 일수 계산 (사직일로부터 3개월 전)
+        from dateutil.relativedelta import relativedelta
+        start_3m_date = end_date - relativedelta(months=3)
+        exact_days = (end_date - start_3m_date).days
+        if exact_days == 0: exact_days = 90
+        
+        daily_wage = total_gross / exact_days
         legal_retirement = int(daily_wage * 30 * work_days / 365)
+        
+        breakdown = {
+            "total_gross_3m": total_gross,
+            "exact_days_3m": exact_days,
+            "daily_wage": int(daily_wage),
+            "recent_months": [p.month for p in recent]
+        }
     elif work_days >= 365:
-        if staff.hourly_wage >= 100000:
-            avg_monthly = staff.hourly_wage
-        else:
-            avg_monthly = staff.hourly_wage * 209
+        # 출근 기록/급여 기록이 없을 경우 (Fallback)
+        avg_monthly = staff.hourly_wage if staff.hourly_wage >= 100000 else staff.hourly_wage * 209
         daily_wage = avg_monthly / 30
         legal_retirement = int(daily_wage * 30 * work_days / 365)
+        
+        breakdown = {
+            "total_gross_3m": avg_monthly * 3,
+            "exact_days_3m": 90,
+            "daily_wage": int(daily_wage),
+            "recent_months": ["기록없음(기본급추정)"]
+        }
     
-    return legal_retirement, work_days, pl_accrued
+    return legal_retirement, work_days, pl_accrued, breakdown
 
 
 @router.get("/retirement")
@@ -782,6 +803,9 @@ def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depend
             payment = payment_by_staff.get(staff.id)
             
             if payment:
+                # payment does not store breakdown, we recalculate it for display
+                legal, w_days, p_accrued, breakdown = _calc_accrued_retirement(staff, payment.end_date)
+                
                 result.append({
                     "staff_id": staff.id,
                     "staff_name": staff.name,
@@ -797,10 +821,11 @@ def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depend
                     "note": payment.note,
                     "pl_accrued": getattr(payment, 'pl_accrued', 0),
                     "under_one_year": payment.work_days < 365,
+                    "breakdown": breakdown
                 })
             else:
                 # 아직 지급 기록 없음 → 자동 산정
-                legal, work_days, pl_accrued = _calc_accrued_retirement(staff, date.today())
+                legal, work_days, pl_accrued, breakdown = _calc_accrued_retirement(staff, date.today())
                 result.append({
                     "staff_id": staff.id,
                     "staff_name": staff.name,
@@ -816,6 +841,7 @@ def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depend
                     "note": None,
                     "pl_accrued": pl_accrued,
                     "under_one_year": work_days < 365,
+                    "breakdown": breakdown
                 })
         
         return {"status": "success", "data": result}
@@ -844,7 +870,7 @@ def create_retirement_payment(data: RetirementPaymentCreate, _admin: AuthUser = 
         if existing:
             raise HTTPException(status_code=400, detail="이미 퇴직금 지급 기록이 존재합니다.")
         
-        legal, work_days, pl_accrued = _calc_accrued_retirement(staff, data.end_date)
+        legal, work_days, pl_accrued, breakdown = _calc_accrued_retirement(staff, data.end_date)
         difference = data.paid_amount - legal
         
         from models import MonthlyProfitLoss

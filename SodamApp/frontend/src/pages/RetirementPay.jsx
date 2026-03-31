@@ -227,8 +227,32 @@ export default function RetirementPay() {
                                 <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>실제 지급하는 경우 아래에 금액을 입력하세요 (선택)</div>
                             </div>
                         ) : showModal.accrued_amount > 0 && (
-                            <div style={{ padding: '10px 12px', background: '#f0fdf4', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
-                                <span style={{ color: '#16a34a', fontWeight: 700 }}>💰 법적 퇴직금: {showModal.accrued_amount.toLocaleString()}원</span>
+                            <div style={{ padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 16 }}>
+                                <div style={{ color: '#16a34a', fontWeight: 800, fontSize: 14, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>💰 법적 퇴직금</span>
+                                    <span>{showModal.accrued_amount.toLocaleString()}원</span>
+                                </div>
+                                {showModal.breakdown && (
+                                    <div style={{ fontSize: 11, color: '#475569', background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <span>최근 3개월 급여총액:</span>
+                                            <b>{showModal.breakdown.total_gross_3m?.toLocaleString()} 원</b>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <span>정산 기준 일수 (3개월):</span>
+                                            <b>{showModal.breakdown.exact_days_3m}일</b>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                            <span>1일 평균임금:</span>
+                                            <b style={{color: '#7c3aed'}}>{showModal.breakdown.daily_wage?.toLocaleString()} 원</b>
+                                        </div>
+                                        <div style={{ borderTop: '1px dashed #cbd5e1', margin: '6px 0' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>산정식:</span>
+                                            <span>{showModal.breakdown.daily_wage?.toLocaleString()} × 30일 × ({showModal.work_days}일 / 365)</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
