@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Wallet, UserMinus, Calendar, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { Wallet, UserMinus, Calendar, AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 export default function RetirementPay() {
@@ -10,6 +11,7 @@ export default function RetirementPay() {
         end_date: '', paid_amount: '', payment_date: '', note: ''
     });
     const [msg, setMsg] = useState('');
+    const navigate = useNavigate();
 
     const fetchData = async () => {
         setLoading(true);
@@ -155,16 +157,29 @@ export default function RetirementPay() {
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{statusBadge(item.status)}</td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => openModal(item)}
-                                                style={{
-                                                    padding: '4px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                                                    background: item.status === '미등록' ? '#7c3aed' : '#3b82f6',
-                                                    color: 'white', border: 'none', cursor: 'pointer',
-                                                }}
-                                            >
-                                                {item.status === '미등록' ? '등록' : '수정'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                                <button
+                                                    onClick={() => navigate(`/retirement-calc/${item.staff_id}`)}
+                                                    title="퇴직금 산정 명세서 (PDF)"
+                                                    style={{
+                                                        padding: '4px 8px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                                        background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', cursor: 'pointer',
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                    }}
+                                                >
+                                                    <FileText size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() => openModal(item)}
+                                                    style={{
+                                                        padding: '4px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                                                        background: item.status === '미등록' ? '#7c3aed' : '#3b82f6',
+                                                        color: 'white', border: 'none', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    {item.status === '미등록' ? '등록' : '수정'}
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

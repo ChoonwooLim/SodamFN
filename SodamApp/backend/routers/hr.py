@@ -847,6 +847,79 @@ def get_retirement_list(_admin: AuthUser = Depends(get_admin_user), bid = Depend
         return {"status": "success", "data": result}
 
 
+@router.get("/retirement/calc/{staff_id}")
+def get_retirement_calculation_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """PDF 출력을 위한 구체적인 퇴직금 산정 내역 리턴"""
+    from models import RetirementPayment
+    from sqlmodel import Session as _Session
+    from database import engine as _engine
+    
+    with _Session(_engine) as session:
+        staff = session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+        if not staff:
+            raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+            
+        payment = session.exec(apply_bid_filter(select(RetirementPayment), RetirementPayment, bid).where(RetirementPayment.staff_id == staff_id)).first()
+        calc_end_date = payment.end_date if payment else (staff.end_date or date.today())
+        
+        legal, w_days, p_accrued, breakdown = _calc_accrued_retirement(staff, calc_end_date)
+        
+        # Pay history
+        payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id).order_by(Payroll.month.desc()).limit(4)).all()
+        
+        from dateutil.relativedelta import relativedelta
+        start_3m_date = calc_end_date - relativedelta(months=3)
+        
+        history = []
+        for p in payrolls:
+            # We approximate the exact days included by looking at the month string
+            try:
+                p_month_dt = datetime.strptime(f"{p.month}-01", "%Y-%m-%d").date()
+                from calendar import monthrange
+                last_day = monthrange(p_month_dt.year, p_month_dt.month)[1]
+                p_end = date(p_month_dt.year, p_month_dt.month, last_day)
+                
+                # Intersection with [start_3m_date, calc_end_date]
+                i_start = max(start_3m_date, p_month_dt)
+                i_end = min(calc_end_date, p_end)
+                
+                if i_start <= i_end:
+                    days_in_period = (i_end - i_start).days + 1
+                    
+                    history.append({
+                        "period": f"{i_start.strftime('%Y-%m-%d')} ~ {i_end.strftime('%Y-%m-%d')}",
+                        "days": days_in_period,
+                        "base_pay": int((p.base_pay or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.base_pay or 0),
+                        "meal_pay": int((p.bonus_meal or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.bonus_meal or 0),
+                        "holiday_pay": int((p.bonus_holiday or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.bonus_holiday or 0)
+                    })
+            except Exception:
+                pass
+                
+        # Calculate sums
+        history.reverse() # chronological
+        for h in history:
+            h["subtotal"] = h["base_pay"] + h["meal_pay"] + h["holiday_pay"]
+
+        return {
+            "status": "success",
+            "data": {
+                "staff": {
+                    "emp_no": staff.id,
+                    "name": staff.name,
+                    "dept": staff.department if hasattr(staff, 'department') else "",
+                    "level": staff.position if hasattr(staff, 'position') else "직급없음",
+                    "start_date": str(staff.start_date),
+                    "end_date": str(calc_end_date),
+                    "work_days": w_days
+                },
+                "breakdown": breakdown,
+                "history": history,
+                "legal_retirement": legal
+            }
+        }
+
+
 @router.post("/retirement")
 def create_retirement_payment(data: RetirementPaymentCreate, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """퇴직금 지급 기록 생성"""
