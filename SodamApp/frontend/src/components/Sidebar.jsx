@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -28,7 +28,7 @@ export default function Sidebar() {
         if (boardPaths.some(p => location.pathname.startsWith(p))) {
             setBoardOpen(true);
         }
-        const hrPaths = ['/hr/retirement', '/retirement-calc'];
+        const hrPaths = ['/staff', '/hr/retirement', '/retirement-calc'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) {
             setHrOpen(true);
         }
@@ -116,7 +116,6 @@ export default function Sidebar() {
         { icon: ShoppingBag, label: '매입 관리', path: '/purchase' },
         { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
         { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
-        { icon: Users, label: '직원 관리', path: '/staff' },
         { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
     ];
 
@@ -148,8 +147,9 @@ export default function Sidebar() {
     ];
 
     const hrSubItems = [
-        { icon: Wallet, label: '퇴직/급여 관리대장', path: '/hr/retirement', color: 'text-blue-400' },
-        { icon: FileText, label: '퇴직금 정밀산출/명세서', path: '/retirement-calc', color: 'text-indigo-400' },
+        { icon: UserCircle, label: '인사기록관리', path: '/staff', color: 'text-emerald-400' },
+        { icon: Wallet, label: '퇴직금 지급관리', path: '/hr/retirement', color: 'text-blue-400' },
+        { icon: FileText, label: '퇴직금 산출', path: '/retirement-calc', color: 'text-indigo-400' },
     ];
 
     const bottomMenuItems = isSuperAdmin
@@ -179,7 +179,7 @@ export default function Sidebar() {
     };
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
-    const isHrActive = ['/hr/retirement', '/retirement-calc'].some(p => location.pathname.startsWith(p));
+    const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;
@@ -264,7 +264,7 @@ export default function Sidebar() {
                 )}
                 {mainMenuItems.map(renderMenuItem)}
 
-                {/* ═══ 퇴직금 관리 (접이식 서브메뉴) ═══ */}
+                {/* ═══ 직원 관리 (접이식 서브메뉴) ═══ */}
                 {(user.role === 'admin' || isViewingBusiness) && (
                     <div className="mb-0.5">
                         <button
@@ -274,8 +274,8 @@ export default function Sidebar() {
                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                 }`}
                         >
-                            <Wallet size={20} />
-                            <span className="font-medium text-sm flex-1 text-left">퇴직금 관리</span>
+                            <Users size={20} />
+                            <span className="font-medium text-sm flex-1 text-left">직원관리</span>
                             {hrOpen
                                 ? <ChevronUp size={16} className="text-slate-500" />
                                 : <ChevronDown size={16} className="text-slate-500" />
