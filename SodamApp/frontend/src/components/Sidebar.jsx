@@ -28,7 +28,7 @@ export default function Sidebar() {
         if (boardPaths.some(p => location.pathname.startsWith(p))) {
             setBoardOpen(true);
         }
-        const hrPaths = ['/staff', '/hr/retirement', '/retirement-calc'];
+        const hrPaths = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) {
             setHrOpen(true);
         }
@@ -148,6 +148,7 @@ export default function Sidebar() {
 
     const hrSubItems = [
         { icon: UserCircle, label: '인사기록관리', path: '/staff', color: 'text-emerald-400' },
+        { icon: Wallet, label: '급여대장', path: '/hr/payroll-ledger', color: 'text-amber-400' },
         { icon: Wallet, label: '퇴직금 지급관리', path: '/hr/retirement', color: 'text-blue-400' },
         { icon: FileText, label: '퇴직금 산출', path: '/retirement-calc', color: 'text-indigo-400' },
     ];
@@ -179,7 +180,7 @@ export default function Sidebar() {
     };
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
-    const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
+    const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;

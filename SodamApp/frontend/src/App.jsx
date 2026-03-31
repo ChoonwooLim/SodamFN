@@ -42,6 +42,7 @@ const GuestDashboard = React.lazy(() => import('./pages/GuestDashboard'));
 const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationForm'));
 const RetirementPay = React.lazy(() => import('./pages/RetirementPay'));
 const RetirementPayCalc = React.lazy(() => import('./pages/RetirementPayCalc'));
+const PayrollLedger = React.lazy(() => import('./pages/PayrollLedger'));
 const MoreMenu = React.lazy(() => import('./pages/MoreMenu'));
 
 // Loading Fallback Component
@@ -166,6 +167,7 @@ export default function App() {
               <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
               <Route path="/retirement-calc" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
+              <Route path="/hr/payroll-ledger" element={<ProtectedRoute adminOnly><PayrollLedger /></ProtectedRoute>} />
               <Route path="/more" element={<ProtectedRoute adminOnly><MoreMenu /></ProtectedRoute>} />
 
               {/* STAFF ROUTES */}

@@ -45,7 +45,8 @@ cd c:\WORK\SodamFN\SodamApp\backend && python -c "import sys; sys.path.insert(0,
 1. `git add -A` → 자동 실행
 // turbo
 2. `git commit -m "커밋메시지"` → 자동 실행
-3. `git push` → ❌ **AI가 실행하지 않음. 사용자가 직접 푸시.**
+// turbo
+3. `git push` → 자동 실행 (작업 완료 후 즉시 배포 가능하도록)
 
 ### 커밋 메시지 규칙
 - `feat:` 새 기능 / `fix:` 버그 수정 / `style:` UI / `refactor:` 리팩토링 / `docs:` 문서 / `infra:` 인프라
