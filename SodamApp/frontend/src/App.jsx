@@ -43,6 +43,7 @@ const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationFo
 const RetirementPay = React.lazy(() => import('./pages/RetirementPay'));
 const RetirementPayCalc = React.lazy(() => import('./pages/RetirementPayCalc'));
 const PayrollLedger = React.lazy(() => import('./pages/PayrollLedger'));
+const DeliveryAppDashboard = React.lazy(() => import('./pages/DeliveryAppDashboard'));
 const MoreMenu = React.lazy(() => import('./pages/MoreMenu'));
 
 // Loading Fallback Component
@@ -141,6 +142,7 @@ export default function App() {
               <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
               <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
               <Route path="/purchase" element={<ProtectedRoute adminOnly><PurchaseManagement /></ProtectedRoute>} />
+              <Route path="/finance/delivery" element={<ProtectedRoute adminOnly><DeliveryAppDashboard /></ProtectedRoute>} />
               <Route path="/purchase-requests" element={<ProtectedRoute adminOnly><PurchaseRequests /></ProtectedRoute>} />
               <Route path="/emergency-contacts" element={<ProtectedRoute adminOnly><EmergencyContactsAdmin /></ProtectedRoute>} />
               <Route path="/announcements" element={<ProtectedRoute adminOnly><AnnouncementsAdmin /></ProtectedRoute>} />

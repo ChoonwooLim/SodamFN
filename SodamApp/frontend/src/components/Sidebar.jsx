@@ -33,7 +33,7 @@ export default function Sidebar() {
         if (hrPaths.some(p => location.pathname.startsWith(p))) {
             setHrOpen(true);
         }
-        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales'];
+        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'];
         if (plPaths.some(p => location.pathname.startsWith(p))) {
             setPlOpen(true);
         }
@@ -124,7 +124,7 @@ export default function Sidebar() {
         { icon: Receipt, label: '손익계산서', path: '/finance/profitloss', color: 'text-emerald-400' },
         { icon: BarChart3, label: '매출관리', path: '/revenue', color: 'text-blue-400' },
         { icon: ShoppingBag, label: '매입관리', path: '/purchase', color: 'text-orange-400' },
-        { icon: Truck, label: '배달앱관리', path: '/revenue?view=delivery', color: 'text-amber-400' },
+        { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
     ];
 
@@ -190,7 +190,7 @@ export default function Sidebar() {
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
-    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales'].some(p => location.pathname.startsWith(p));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'].some(p => location.pathname.startsWith(p));
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;
