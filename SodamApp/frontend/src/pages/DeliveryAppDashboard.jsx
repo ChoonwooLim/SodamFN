@@ -437,59 +437,155 @@ export default function DeliveryAppDashboard() {
           )}
         </div>
 
-        {/* ═══ FEE BREAKDOWN ═══ */}
-        {Object.keys(channelTotals).length > 0 && (
-          <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <AlertCircle size={16} className="text-red-400" />
-                <span className="text-sm font-bold text-slate-700">채널별 수수료 상세</span>
-              </div>
-            </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {CHANNELS.map(ch => {
-                const ct = channelTotals[ch.id] || {};
-                if (!ct.total_sales) return null;
-                const feeRate = ct.fee_rate || 0;
+        {/* ═══ FEE BREAKDOWN DETAIL ═══ */}
+        {Object.keys(channelTotals).length > 0 && (() => {
+          // Aggregate fee_breakdown across all months per channel
+          const channelFeeDetails = {};
+          monthlyData.forEach(m => {
+            CHANNELS.forEach(ch => {
+              const cd = m.channels?.[ch.id];
+              if (!cd || !cd.fee_breakdown) return;
+              if (!channelFeeDetails[ch.id]) channelFeeDetails[ch.id] = { aggregated: {}, byMonth: [] };
+              const fb = cd.fee_breakdown;
+              const monthItems = {};
+              Object.entries(fb).forEach(([k, v]) => {
+                if (v > 0) {
+                  channelFeeDetails[ch.id].aggregated[k] = (channelFeeDetails[ch.id].aggregated[k] || 0) + v;
+                  monthItems[k] = v;
+                }
+              });
+              if (Object.keys(monthItems).length > 0) {
+                channelFeeDetails[ch.id].byMonth.push({ month: m.month, items: monthItems, totalFees: cd.total_fees, totalSales: cd.total_sales });
+              }
+            });
+          });
 
-                return (
-                  <div key={ch.id} className={`rounded-xl p-4 border ${ch.light}`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-lg">{ch.icon}</span>
-                      <span className="font-bold text-sm">{ch.label} 수수료 분석</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span>총매출 대비 수수료율:</span>
-                        <span className="font-black">{pct(feeRate)}%</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span>총 수수료:</span>
-                        <span className="font-bold text-red-500">{fmt(ct.total_fees)}원</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span>총매출:</span>
-                        <span className="font-bold">{fmt(ct.total_sales)}원</span>
-                      </div>
-                      {/* Visual Fee Bar */}
-                      <div className="mt-2 pt-2 border-t border-current/10">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-3 bg-white/50 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-current rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(feeRate, 100)}%`, opacity: 0.6 }}
-                            />
+          return (
+            <div className="bg-white rounded-2xl shadow-lg shadow-slate-200/60 border border-slate-100 overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={16} className="text-red-400" />
+                  <span className="text-sm font-bold text-slate-700">채널별 수수료 세부 내역</span>
+                  <span className="text-[10px] px-2 py-0.5 bg-red-50 text-red-500 rounded-full font-bold">상세분석</span>
+                </div>
+              </div>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {CHANNELS.map(ch => {
+                  const ct = channelTotals[ch.id] || {};
+                  if (!ct.total_sales) return null;
+                  const feeRate = ct.fee_rate || 0;
+                  const detail = channelFeeDetails[ch.id];
+                  const aggregated = detail?.aggregated || {};
+                  const byMonth = detail?.byMonth || [];
+                  const aggEntries = Object.entries(aggregated).sort(([,a], [,b]) => b - a);
+                  const totalAggFees = aggEntries.reduce((s, [,v]) => s + v, 0);
+
+                  return (
+                    <div key={ch.id} className={`rounded-2xl border overflow-hidden ${ch.light}`}>
+                      {/* Channel Header */}
+                      <div className={`bg-gradient-to-r ${ch.bg} px-5 py-3 text-white`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{ch.icon}</span>
+                            <div>
+                              <span className="font-bold text-sm">{ch.label} 수수료 분석</span>
+                              <div className="text-[10px] text-white/60 mt-0.5">
+                                총매출 {fmt(ct.total_sales)}원 기준
+                              </div>
+                            </div>
                           </div>
-                          <span className="text-[10px] font-black w-12 text-right">{pct(feeRate)}%</span>
+                          <div className="text-right">
+                            <div className="text-2xl font-black">{pct(feeRate)}%</div>
+                            <div className="text-[10px] text-white/60">수수료율</div>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-3 gap-px bg-current/5 border-b border-current/10">
+                        <div className="bg-white/80 p-3 text-center">
+                          <div className="text-[10px] opacity-60 font-bold">총 수수료</div>
+                          <div className="text-sm font-black text-red-500">-{fmt(ct.total_fees)}</div>
+                        </div>
+                        <div className="bg-white/80 p-3 text-center">
+                          <div className="text-[10px] opacity-60 font-bold">정산금</div>
+                          <div className="text-sm font-black text-emerald-600">{fmt(ct.settlement_amount)}</div>
+                        </div>
+                        <div className="bg-white/80 p-3 text-center">
+                          <div className="text-[10px] opacity-60 font-bold">주문수</div>
+                          <div className="text-sm font-black">{fmt(ct.order_count)}건</div>
+                        </div>
+                      </div>
+
+                      {/* Fee Breakdown Detail (Aggregated) */}
+                      <div className="p-4">
+                        {aggEntries.length > 0 ? (
+                          <>
+                            <div className="text-[11px] font-bold opacity-70 mb-2 flex items-center gap-1">
+                              📋 수수료 구성 내역 <span className="font-normal opacity-60">(연간합계)</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {aggEntries.map(([name, amount]) => {
+                                const ratio = totalAggFees > 0 ? (amount / totalAggFees * 100) : 0;
+                                return (
+                                  <div key={name} className="group">
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-medium truncate flex-1">{name}</span>
+                                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                                        <span className="text-[10px] px-1.5 py-0.5 bg-current/5 rounded font-bold opacity-70">{pct(ratio)}%</span>
+                                        <span className="font-bold text-red-500 font-mono w-24 text-right">-{fmt(amount)}원</span>
+                                      </div>
+                                    </div>
+                                    <div className="h-1 bg-current/5 rounded-full mt-1 overflow-hidden">
+                                      <div className="h-full bg-red-400/60 rounded-full transition-all duration-500" style={{ width: `${ratio}%` }} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Monthly Detail Rows */}
+                            {byMonth.length > 1 && (
+                              <details className="mt-3 pt-3 border-t border-current/10">
+                                <summary className="text-[11px] font-bold opacity-60 cursor-pointer hover:opacity-100 transition-opacity">
+                                  📅 월별 세부 내역 보기 ({byMonth.length}개월)
+                                </summary>
+                                <div className="mt-2 space-y-2">
+                                  {byMonth.map(mb => (
+                                    <div key={mb.month} className="bg-white/60 rounded-lg p-2.5 border border-current/5">
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <span className="text-[11px] font-bold">{mb.month}월</span>
+                                        <span className="text-[10px] text-red-500 font-bold font-mono">수수료 -{fmt(mb.totalFees)}원</span>
+                                      </div>
+                                      <div className="space-y-0.5">
+                                        {Object.entries(mb.items).sort(([,a],[,b]) => b - a).map(([name, val]) => (
+                                          <div key={name} className="flex justify-between text-[11px]">
+                                            <span className="opacity-70 truncate">{name}</span>
+                                            <span className="font-mono font-medium text-red-500 ml-2 shrink-0">-{fmt(val)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-center py-4 text-xs opacity-40">
+                            <div className="text-lg mb-1">📊</div>
+                            수수료 세부 내역이 없습니다.<br/>
+                            <span className="text-[10px]">정산파일 업로드 시 자동으로 표시됩니다.</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ═══ MOBILE UPLOAD ═══ */}
         <div className="sm:hidden">
