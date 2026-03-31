@@ -467,7 +467,7 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         existing = service.session.exec(apply_bid_filter(select(Payroll), Payroll, bid).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
         # bid filter applied via select stmt above
         if not existing:
-            existing = Payroll(staff_id=req.staff_id, month=req.month)
+            existing = Payroll(staff_id=req.staff_id, month=req.month, business_id=bid)
             
         existing.base_pay = total_base_pay
         existing.bonus = total_holiday_pay

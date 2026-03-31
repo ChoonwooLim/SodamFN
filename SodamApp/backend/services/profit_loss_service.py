@@ -346,8 +346,11 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
         for p in payrolls
     )
     
-    # Calculate net pay (실수령액) = total_pay - all deductions
-    total_labor_net = sum(p.total_pay or 0 for p in payrolls) - employee_insurance - employee_tax
+    # Calculate gross pay directly from base_pay and bonus_holiday
+    gross_pay_sum = sum((p.base_pay or 0) + (p.bonus_holiday or 0) for p in payrolls)
+
+    # Calculate net pay (실수령액)
+    total_labor_net = gross_pay_sum - employee_insurance - employee_tax
     
     # 사업주 세금 대납 (bonus_tax_support): 정규직 등 사업주가 공제액을 대신 부담하는 경우
     # 해당 직원의 인건비는 실수령액이 아니라 총지급액(gross) 기준으로 반영
@@ -355,7 +358,7 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
     total_labor_net += tax_support_total
     
     # Calculate retirement fund as 10% of gross labor cost (세전 기준 유지)
-    total_labor_gross = sum(p.total_pay or 0 for p in payrolls) + tax_support_total
+    total_labor_gross = gross_pay_sum
     retirement_fund = int(total_labor_gross * 0.1)
     
     # Employer-side 4대보험료 = employee deductions (노사 반반)
