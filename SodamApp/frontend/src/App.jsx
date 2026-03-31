@@ -164,6 +164,7 @@ export default function App() {
               <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
               <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
               <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
+              <Route path="/retirement-calc" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/more" element={<ProtectedRoute adminOnly><MoreMenu /></ProtectedRoute>} />
 

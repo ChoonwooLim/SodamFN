@@ -10,6 +10,7 @@ export default function Sidebar() {
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [boardOpen, setBoardOpen] = useState(false);
+    const [hrOpen, setHrOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
     // SuperAdmin view-as state
@@ -21,11 +22,15 @@ export default function Sidebar() {
         setMobileOpen(false);
     }, [location.pathname]);
 
-    // Auto-expand board submenu if current path is in board group
+    // Auto-expand board/hr submenus
     useEffect(() => {
         const boardPaths = ['/board', '/open-checklist', '/inventory-check-admin'];
         if (boardPaths.some(p => location.pathname.startsWith(p))) {
             setBoardOpen(true);
+        }
+        const hrPaths = ['/hr/retirement', '/retirement-calc'];
+        if (hrPaths.some(p => location.pathname.startsWith(p))) {
+            setHrOpen(true);
         }
     }, [location.pathname]);
 
@@ -112,7 +117,6 @@ export default function Sidebar() {
         { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales' },
         { icon: Receipt, label: '손익계산서', path: '/finance/profitloss' },
         { icon: Users, label: '직원 관리', path: '/staff' },
-        { icon: Wallet, label: '퇴직금 관리', path: '/hr/retirement' },
         { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
     ];
 
@@ -143,6 +147,11 @@ export default function Sidebar() {
         { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-cyan-400' },
     ];
 
+    const hrSubItems = [
+        { icon: Wallet, label: '퇴직/급여 관리대장', path: '/hr/retirement', color: 'text-blue-400' },
+        { icon: FileText, label: '퇴직금 정밀산출/명세서', path: '/retirement-calc', color: 'text-indigo-400' },
+    ];
+
     const bottomMenuItems = isSuperAdmin
         ? [
             ...(isViewingBusiness ? [
@@ -170,6 +179,7 @@ export default function Sidebar() {
     };
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
+    const isHrActive = ['/hr/retirement', '/retirement-calc'].some(p => location.pathname.startsWith(p));
 
     const renderMenuItem = (item) => {
         const Icon = item.icon;
@@ -254,6 +264,47 @@ export default function Sidebar() {
                 )}
                 {mainMenuItems.map(renderMenuItem)}
 
+                {/* ═══ 퇴직금 관리 (접이식 서브메뉴) ═══ */}
+                {(user.role === 'admin' || isViewingBusiness) && (
+                    <div className="mb-0.5">
+                        <button
+                            onClick={() => setHrOpen(!hrOpen)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isHrActive
+                                ? 'bg-indigo-600/20 text-indigo-300'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                }`}
+                        >
+                            <Wallet size={20} />
+                            <span className="font-medium text-sm flex-1 text-left">퇴직금 관리</span>
+                            {hrOpen
+                                ? <ChevronUp size={16} className="text-slate-500" />
+                                : <ChevronDown size={16} className="text-slate-500" />
+                            }
+                        </button>
+                        {hrOpen && (
+                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
+                                {hrSubItems.map(sub => {
+                                    const SubIcon = sub.icon;
+                                    const isSubActive = location.pathname.startsWith(sub.path);
+                                    return (
+                                        <Link
+                                            key={sub.path}
+                                            to={sub.path}
+                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
+                                                ? 'bg-slate-800 text-white font-semibold'
+                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
+                                                }`}
+                                        >
+                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
+                                            <span>{sub.label}</span>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+                
                 {/* ═══ 통합게시판관리 (접이식 서브메뉴) ═══ */}
                 {(user.role === 'admin' || isViewingBusiness) && (
                     <div>

@@ -94,9 +94,9 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
         stmt = apply_bid_filter(select(Staff), Staff, bid)
         
         # Apply Status Filter if Provided
-        if status:
+        if status and status.lower() != "all":
             stmt = stmt.where(Staff.status == status)
-        elif not q:
+        elif not status and not q:
             # Default: If no status AND no query, show only Active
             stmt = stmt.where(Staff.status == "재직")
             
@@ -723,7 +723,7 @@ def _calc_accrued_retirement(staff, end_date):
     from sqlmodel import Session as _Session
     
     start = staff.start_date
-    work_days = (end_date - start).days
+    work_days = (end_date - start).days + 1
     
     with _Session(_engine) as s:
         payrolls = s.exec(
@@ -744,21 +744,44 @@ def _calc_accrued_retirement(staff, end_date):
     legal_retirement = 0
     breakdown = {}
     if work_days >= 365 and payrolls:
-        # 최근 3개월 분의 급여 총합 산출 (Gross Pay = base + holiday + meal)
-        recent = payrolls[:3]
-        total_gross = sum((p.base_pay or 0) + (p.bonus_holiday or 0) + (p.bonus_meal or 0) for p in recent)
+        # 최근 3개월 분의 급여 총합 산출 ( Gross Pay )
+        # 3개월 이전의 부분적인 달 (예: 12.29~12.31)을 포함하기 위해 최대 4개를 탐색
+        recent = payrolls[:4]
         
-        # 정확한 일수 계산 (사직일로부터 3개월 전)
         from dateutil.relativedelta import relativedelta
-        start_3m_date = end_date - relativedelta(months=3)
-        exact_days = (end_date - start_3m_date).days
-        if exact_days == 0: exact_days = 90
+        from datetime import timedelta, date, datetime
+        start_3m_date = end_date - relativedelta(months=3) + timedelta(days=1)
+        exact_days = (end_date - start_3m_date).days + 1
+        if exact_days <= 0: exact_days = 90
+        
+        total_gross = 0
+        from calendar import monthrange
+        for p in recent:
+            try:
+                p_month_dt = datetime.strptime(f"{p.month}-01", "%Y-%m-%d").date()
+                last_day = monthrange(p_month_dt.year, p_month_dt.month)[1]
+                p_end = date(p_month_dt.year, p_month_dt.month, last_day)
+                
+                i_start = max(start_3m_date, p_month_dt)
+                i_end = min(end_date, p_end)
+                
+                if i_start <= i_end:
+                    days_in_period = (i_end - i_start).days + 1
+                    must_prorate = i_start > p_month_dt
+                    
+                    b_pay = int((p.base_pay or 0) * days_in_period / last_day) if must_prorate else (p.base_pay or 0)
+                    h_pay = int((p.bonus_holiday or 0) * days_in_period / last_day) if must_prorate else (p.bonus_holiday or 0)
+                    m_pay = int((p.bonus_meal or 0) * days_in_period / last_day) if must_prorate else (p.bonus_meal or 0)
+                    
+                    total_gross += (b_pay + h_pay + m_pay)
+            except:
+                pass
         
         daily_wage = total_gross / exact_days
         legal_retirement = int(daily_wage * 30 * work_days / 365)
         
         breakdown = {
-            "total_gross_3m": total_gross,
+            "total_gross_3m": int(total_gross),
             "exact_days_3m": exact_days,
             "daily_wage": int(daily_wage),
             "recent_months": [p.month for p in recent]
@@ -860,15 +883,18 @@ def get_retirement_calculation_detail(staff_id: int, _admin: AuthUser = Depends(
             raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
             
         payment = session.exec(apply_bid_filter(select(RetirementPayment), RetirementPayment, bid).where(RetirementPayment.staff_id == staff_id)).first()
-        calc_end_date = payment.end_date if payment else (staff.end_date or date.today())
+        calc_end_date = payment.end_date if payment else (getattr(staff, 'contract_end_date', None) or date.today())
         
         legal, w_days, p_accrued, breakdown = _calc_accrued_retirement(staff, calc_end_date)
         
         # Pay history
+        from models import Payroll
         payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id).order_by(Payroll.month.desc()).limit(4)).all()
         
         from dateutil.relativedelta import relativedelta
-        start_3m_date = calc_end_date - relativedelta(months=3)
+        from datetime import timedelta
+        # 3 month period logic (ends at calc_end_date, starts (months-3) + 1 day)
+        start_3m_date = calc_end_date - relativedelta(months=3) + timedelta(days=1)
         
         history = []
         for p in payrolls:
@@ -886,12 +912,18 @@ def get_retirement_calculation_detail(staff_id: int, _admin: AuthUser = Depends(
                 if i_start <= i_end:
                     days_in_period = (i_end - i_start).days + 1
                     
+                    # If this is the FIRST month of the period (i_start > p._month_dt), 
+                    # we must prorate because the payroll represents the full month.
+                    # If this is the LAST month (i_end < p_end), we DO NOT prorate, 
+                    # because SodamFN's payroll generation already prorates the final paycheck based on actual worked days!
+                    must_prorate = i_start > p_month_dt
+                    
                     history.append({
                         "period": f"{i_start.strftime('%Y-%m-%d')} ~ {i_end.strftime('%Y-%m-%d')}",
                         "days": days_in_period,
-                        "base_pay": int((p.base_pay or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.base_pay or 0),
-                        "meal_pay": int((p.bonus_meal or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.bonus_meal or 0),
-                        "holiday_pay": int((p.bonus_holiday or 0) * days_in_period / last_day) if i_start > p_month_dt or i_end < p_end else (p.bonus_holiday or 0)
+                        "base_pay": int((p.base_pay or 0) * days_in_period / last_day) if must_prorate else (p.base_pay or 0),
+                        "meal_pay": int((p.bonus_meal or 0) * days_in_period / last_day) if must_prorate else (p.bonus_meal or 0),
+                        "holiday_pay": int((p.bonus_holiday or 0) * days_in_period / last_day) if must_prorate else (p.bonus_holiday or 0)
                     })
             except Exception:
                 pass
