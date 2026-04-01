@@ -25,15 +25,15 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'framer-motion', 'lucide-react'],
+    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
   },
   build: {
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          ui: ['lucide-react', 'recharts'],
-          utils: ['axios', 'date-fns', 'framer-motion']
+          ui: ['lucide-react'],
+          utils: ['axios', 'date-fns']
         }
       }
     },

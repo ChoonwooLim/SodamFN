@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional, List
 from models import DailyExpense, Vendor, MonthlyProfitLoss, Staff
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, or_, and_
 from database import engine
 from tenant_filter import get_bid_from_token, apply_bid_filter
 
@@ -72,13 +72,17 @@ def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(
                     cm -= 1
             trend_months.reverse()
 
+            month_conditions = [and_(MonthlyProfitLoss.year == y, MonthlyProfitLoss.month == m) for y, m in trend_months]
+            trend_records = session.exec(apply_bid_filter(
+                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+            ).where(
+                or_(*month_conditions)
+            )).all()
+            
+            trend_map = {(r.year, r.month): r for r in trend_records}
+
             for y, m in trend_months:
-                rec = session.exec(apply_bid_filter(
-                    select(MonthlyProfitLoss), MonthlyProfitLoss, bid
-                ).where(
-                    MonthlyProfitLoss.year == y,
-                    MonthlyProfitLoss.month == m
-                )).first()
+                rec = trend_map.get((y, m))
                 t = _pl_totals(rec)
                 monthly_trend.append({"month": f"{m}월", **t})
 

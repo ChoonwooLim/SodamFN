@@ -712,31 +712,30 @@ export default function RevenueManagement() {
     };
 
     return (
-        <div className="revenue-page">
+        <div className="revenue-page min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
             {/* ── Header ── */}
-            <div className="revenue-header">
-                <div className="revenue-header-top">
-                    <h1>
-                        <div className="header-icon">
-                            <TrendingUp size={20} />
+            <div className="max-w-6xl mx-auto px-6 pt-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                            <TrendingUp size={20} className="text-white" />
                         </div>
-                        <div className="header-text">
-                            <h1>매출관리</h1>
-                            <p className="header-subtitle">Revenue Management</p>
+                        <div>
+                            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0">매출관리</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Revenue Management</p>
                         </div>
-                    </h1>
-                    {/* Year-only nav for annual views, month nav for monthly views */}
+                    </div>
                     {(viewMode === 'revenueDetail' || viewMode === 'deliveryApp') ? (
-                        <div className="revenue-month-nav">
-                            <button onClick={() => setPlYear(y => y - 1)}><ChevronLeft size={16} /></button>
-                            <span className="revenue-month-label">{plYear}년</span>
-                            <button onClick={() => setPlYear(y => y + 1)}><ChevronRight size={16} /></button>
+                        <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
+                            <button onClick={() => setPlYear(y => y - 1)} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronLeft size={16} /></button>
+                            <span className="text-base font-bold text-slate-700 min-w-[80px] text-center">{plYear}년</span>
+                            <button onClick={() => setPlYear(y => y + 1)} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronRight size={16} /></button>
                         </div>
                     ) : (
-                        <div className="revenue-month-nav">
-                            <button onClick={prevMonth}><ChevronLeft size={16} /></button>
-                            <span className="revenue-month-label">{year}년 {month}월</span>
-                            <button onClick={nextMonth}><ChevronRight size={16} /></button>
+                        <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
+                            <button onClick={prevMonth} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronLeft size={16} /></button>
+                            <span className="text-base font-bold text-slate-700 min-w-[100px] text-center">{year}년 {month}월</span>
+                            <button onClick={nextMonth} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronRight size={16} /></button>
                         </div>
                     )}
                 </div>
@@ -744,30 +743,34 @@ export default function RevenueManagement() {
 
             {/* ── Summary Cards ── */}
             {!isMobile && (
-                <div className="revenue-summary-row" style={{ marginTop: 20 }}>
-                    <div className="revenue-summary-card">
-                        <div className="card-label">💵 현금매출</div>
-                        <div className="card-value">{formatNumber(summary.by_category?.cash || 0)}원</div>
-                    </div>
-                    <div className="revenue-summary-card">
-                        <div className="card-label">💳 카드매출</div>
-                        <div className="card-value">{formatNumber(summary.by_category?.card || 0)}원</div>
-                    </div>
-                    <div className="revenue-summary-card">
-                        <div className="card-label">🛵 배달앱매출</div>
-                        <div className="card-value">{formatNumber(summary.by_category?.delivery || 0)}원</div>
-                    </div>
-                    <div className="revenue-summary-card total">
-                        <div className="card-label">💰 총 매출</div>
-                        <div className="card-value">{formatNumber(summary.total || 0)}원</div>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="grid grid-cols-4 gap-3 mb-5">
+                        {[
+                            { label: '💵 현금매출', value: formatNumber(summary.by_category?.cash || 0) + '원', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/20' },
+                            { label: '💳 카드매출', value: formatNumber(summary.by_category?.card || 0) + '원', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/20' },
+                            { label: '🛵 배달앱매출', value: formatNumber(summary.by_category?.delivery || 0) + '원', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/20' },
+                            { label: '💰 총 매출', value: formatNumber(summary.total || 0) + '원', gradient: 'from-slate-700 to-slate-800', shadow: 'shadow-slate-700/20', highlight: true },
+                        ].map((card, i) => (
+                            <div key={i} className={`bg-white rounded-2xl p-4 shadow-sm border card-animate hover:shadow-md transition-shadow ${card.highlight ? 'border-slate-300 bg-gradient-to-br from-slate-50 to-white' : 'border-slate-100'}`} style={{ animationDelay: `${i * 0.05}s` }}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-md ${card.shadow} shrink-0`}>
+                                        <span className="text-white text-xs">{card.label.split(' ')[0]}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] text-slate-400 font-semibold">{card.label.split(' ').slice(1).join(' ')}</div>
+                                        <div className={`text-base font-extrabold truncate ${card.highlight ? 'text-slate-800' : 'text-slate-700'}`}>{card.value}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            <div className="revenue-tab-bar">
+            <div className="max-w-6xl mx-auto px-6 flex items-center justify-between gap-3 mb-5 flex-wrap">
                 {/* Category filter tabs (only for list/grid views) */}
                 {(viewMode === 'list' || viewMode === 'grid') && (
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
                         {[
                             { id: 'all', label: '📊 전체' },
                             { id: 'cash', label: '💵 현금' },
@@ -776,7 +779,9 @@ export default function RevenueManagement() {
                         ].map(t => (
                             <button
                                 key={t.id}
-                                className={`revenue-tab ${tab === t.id ? 'active' : ''}`}
+                                className={`px-3 py-1.5 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all ${
+                                    tab === t.id ? 'bg-slate-800 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                }`}
                                 onClick={() => setTab(t.id)}
                             >
                                 {t.label}
@@ -784,62 +789,39 @@ export default function RevenueManagement() {
                         ))}
                     </div>
                 )}
-                {/* Spacer for non-filter views */}
-                {!(viewMode === 'list' || viewMode === 'grid') && <div style={{ flex: 1 }} />}
-                <div className="view-mode-toggle">
+                {!(viewMode === 'list' || viewMode === 'grid') && <div className="flex-1" />}
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl flex-wrap">
                     {isMobile ? (
                         <>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
-                                onClick={() => setViewMode('dashboard')}
-                            >
-                                📊 대시보드
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
-                                onClick={() => setViewMode('upload')}
-                            >
-                                📤 업로드
-                            </button>
+                            {[
+                                { id: 'dashboard', label: '📊 대시보드' },
+                                { id: 'upload', label: '📤 업로드' },
+                            ].map(v => (
+                                <button key={v.id}
+                                    className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
+                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                    onClick={() => setViewMode(v.id)}
+                                >{v.label}</button>
+                            ))}
                         </>
                     ) : (
                         <>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`}
-                                onClick={() => setViewMode('dashboard')}
-                            >
-                                📊 대시보드
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`}
-                                onClick={() => setViewMode('list')}
-                            >
-                                📋 리스트
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
-                                onClick={() => setViewMode('grid')}
-                            >
-                                📅 월별 상세 내역
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'revenueDetail' ? 'active' : ''}`}
-                                onClick={() => setViewMode('revenueDetail')}
-                            >
-                                💰 매출요약
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'deliveryApp' ? 'active' : ''}`}
-                                onClick={() => setViewMode('deliveryApp')}
-                            >
-                                🛵 배달앱
-                            </button>
-                            <button
-                                className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`}
-                                onClick={() => setViewMode('upload')}
-                            >
-                                📤 업로드
-                            </button>
+                            {[
+                                { id: 'dashboard', label: '📊 대시보드' },
+                                { id: 'list', label: '📋 리스트' },
+                                { id: 'grid', label: '📅 월별 상세 내역' },
+                                { id: 'revenueDetail', label: '💰 매출요약' },
+                                { id: 'deliveryApp', label: '🛵 배달앱' },
+                                { id: 'upload', label: '📤 업로드' },
+                            ].map(v => (
+                                <button key={v.id}
+                                    className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
+                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                    onClick={() => setViewMode(v.id)}
+                                >{v.label}</button>
+                            ))}
                         </>
                     )}
                 </div>
@@ -1042,21 +1024,24 @@ export default function RevenueManagement() {
                 ];
 
                 return (
-                    <div className="revenue-dashboard">
+                    <div className="max-w-[900px] mx-auto px-6">
                         {/* Channel Breakdown */}
-                        <div className="rev-dash-section">
-                            <h3>📊 채널별 매출 비중</h3>
-                            <div className="rev-channel-bars">
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate">
+                            <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center text-xs text-white">📊</span>
+                                채널별 매출 비중
+                            </h3>
+                            <div className="flex flex-col gap-3">
                                 {CHANNELS.map(ch => {
                                     const pct = totalAmt > 0 ? (ch.amount / totalAmt * 100) : 0;
                                     return (
-                                        <div className="rev-channel-bar-item" key={ch.key}>
-                                            <div className="bar-label">
-                                                <span>{ch.icon} {ch.label}</span>
-                                                <span className="bar-amount">{formatNumber(ch.amount)}원 ({pct.toFixed(1)}%)</span>
+                                        <div key={ch.key}>
+                                            <div className="flex justify-between text-[13px] text-slate-600 mb-1">
+                                                <span className="font-medium">{ch.icon} {ch.label}</span>
+                                                <span className="text-xs text-slate-400 font-semibold">{formatNumber(ch.amount)}원 ({pct.toFixed(1)}%)</span>
                                             </div>
-                                            <div className="bar-track">
-                                                <div className="bar-fill" style={{ width: `${pct}%`, background: ch.color }} />
+                                            <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: ch.color }} />
                                             </div>
                                         </div>
                                     );
@@ -1065,55 +1050,64 @@ export default function RevenueManagement() {
                         </div>
 
                         {/* Daily Revenue Chart */}
-                        <div className="rev-dash-section">
-                            <h3>📈 일별 매출 추이</h3>
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.1s' }}>
+                            <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs text-white">📈</span>
+                                일별 매출 추이
+                            </h3>
                             {byDay.length > 0 ? (
-                                <div className="rev-daily-chart">
+                                <div className="flex gap-0.5 items-end h-[160px] px-1">
                                     {byDay.map(d => {
                                         const dayNum = d.date.split('-')[2];
                                         return (
-                                            <div className="rev-daily-bar" key={d.date}>
-                                                <div className="daily-bar-stack">
+                                            <div className="flex-1 flex flex-col items-center gap-1" key={d.date}>
+                                                <div className="flex-1 w-full flex flex-col justify-end min-h-[100px]">
                                                     {d.delivery > 0 && (
-                                                        <div className="daily-bar-seg delivery" style={{ height: `${(d.delivery / maxDayTotal) * 100}%` }} title={`배달 ${formatNumber(d.delivery)}`} />
+                                                        <div className="w-full rounded-t-sm transition-all duration-300" style={{ height: `${(d.delivery / maxDayTotal) * 100}%`, background: '#7fb5b5' }} title={`배달 ${formatNumber(d.delivery)}`} />
                                                     )}
                                                     {d.card > 0 && (
-                                                        <div className="daily-bar-seg card" style={{ height: `${(d.card / maxDayTotal) * 100}%` }} title={`카드 ${formatNumber(d.card)}`} />
+                                                        <div className="w-full transition-all duration-300" style={{ height: `${(d.card / maxDayTotal) * 100}%`, background: '#3d7b7b' }} title={`카드 ${formatNumber(d.card)}`} />
                                                     )}
                                                     {d.cash > 0 && (
-                                                        <div className="daily-bar-seg cash" style={{ height: `${(d.cash / maxDayTotal) * 100}%` }} title={`현금 ${formatNumber(d.cash)}`} />
+                                                        <div className="w-full rounded-b-sm transition-all duration-300" style={{ height: `${(d.cash / maxDayTotal) * 100}%`, background: '#1e3a3a' }} title={`현금 ${formatNumber(d.cash)}`} />
                                                     )}
                                                 </div>
-                                                <span className="daily-bar-label">{dayNum}</span>
+                                                <span className="text-[9px] text-slate-400 font-semibold">{dayNum}</span>
                                             </div>
                                         );
                                     })}
                                 </div>
                             ) : (
-                                <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>데이터가 없습니다</div>
+                                <div className="text-slate-400 text-center py-6 text-sm">데이터가 없습니다</div>
                             )}
-                            <div className="rev-daily-legend">
-                                <span><span className="legend-dot" style={{ background: '#1e3a3a' }} />현금</span>
-                                <span><span className="legend-dot" style={{ background: '#3d7b7b' }} />카드</span>
-                                <span><span className="legend-dot" style={{ background: '#7fb5b5' }} />배달앱</span>
+                            <div className="flex justify-center gap-4 mt-3 text-xs text-slate-500">
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#1e3a3a' }} />현금</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#3d7b7b' }} />카드</span>
+                                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#7fb5b5' }} />배달앱</span>
                             </div>
                         </div>
 
                         {/* Top Vendors */}
-                        <div className="rev-dash-section">
-                            <h3>🏆 TOP {byVendor.length} 거래처</h3>
-                            <div className="rev-top-vendors">
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate" style={{ animationDelay: '0.2s' }}>
+                            <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-xs text-white">🏆</span>
+                                TOP {byVendor.length} 거래처
+                            </h3>
+                            <div className="flex flex-col">
                                 {byVendor.length > 0 ? byVendor.map((v, i) => (
-                                    <div className="rev-vendor-item" key={v.name}>
-                                        <span className={`tv-rank ${i < 3 ? 'top3' : ''}`}>{i + 1}</span>
-                                        <span className="tv-name">{v.name}</span>
-                                        <span className={`tv-cat-badge ${v.category}`}>
-                                            {v.category === 'cash' ? '💵' : v.category === 'card' ? '💳' : '🛵'}
+                                    <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-b-0" key={v.name}>
+                                        <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
+                                        <span className="text-sm font-semibold text-slate-700 flex-1">{v.name}</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                            v.category === 'cash' ? 'bg-emerald-50 text-emerald-600' :
+                                            v.category === 'card' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600'
+                                        }`}>
+                                            {v.category === 'cash' ? '💵 현금' : v.category === 'card' ? '💳 카드' : '🛵 배달'}
                                         </span>
-                                        <span className="tv-amount">{formatNumber(v.total)}원</span>
+                                        <span className="text-sm font-bold text-slate-800">{formatNumber(v.total)}원</span>
                                     </div>
                                 )) : (
-                                    <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>거래처 데이터가 없습니다</div>
+                                    <div className="text-slate-400 text-center py-6 text-sm">거래처 데이터가 없습니다</div>
                                 )}
                             </div>
                         </div>
@@ -1126,24 +1120,24 @@ export default function RevenueManagement() {
             {/* LIST VIEW */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'list' && (
-                <div className="revenue-content">
-                    <div className="revenue-toolbar">
-                        <span className="count-badge">총 {filteredData.length}건</span>
-                        <button className="revenue-add-btn" onClick={openAddModal}>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <span className="inline-flex items-center px-3 py-1.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg">총 {filteredData.length}건</span>
+                        <button className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-xl border-none cursor-pointer shadow-md shadow-blue-500/20 hover:shadow-lg transition-shadow" onClick={openAddModal}>
                             <Plus size={16} /> 매출 추가
                         </button>
                     </div>
 
                     {loading ? (
-                        <div className="revenue-loading">
-                            <div className="spinner" />
-                            <p style={{ color: '#94a3b8', fontSize: 13 }}>불러오는 중...</p>
+                        <div className="flex flex-col items-center justify-center py-16">
+                            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-3" />
+                            <p className="text-slate-400 text-sm">불러오는 중...</p>
                         </div>
                     ) : filteredData.length === 0 ? (
-                        <div className="revenue-empty">
-                            <div className="revenue-empty-icon">📋</div>
-                            <h3>매출 데이터가 없습니다</h3>
-                            <p>{year}년 {month}월에 등록된 매출 내역이 없습니다.</p>
+                        <div className="text-center py-16">
+                            <div className="text-5xl mb-4">📋</div>
+                            <h3 className="text-lg font-bold text-slate-700 mb-1">매출 데이터가 없습니다</h3>
+                            <p className="text-sm text-slate-400">{year}년 {month}월에 등록된 매출 내역이 없습니다.</p>
                         </div>
                     ) : (
                         <table className="revenue-table">
@@ -1278,55 +1272,52 @@ export default function RevenueManagement() {
             {/* GRID VIEW — Monthly Full View */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'grid' && isMobile ? (
-                <div className="revenue-content">
-                    <div className="desktop-only-notice">
-                        <div className="notice-icon">🖥️</div>
-                        <h3>월별 상세 내역은 PC에서 확인해주세요</h3>
-                        <p>31일 × 거래처 그리드는 넓은 화면에서 최적화되어 있습니다.<br />📋 리스트 탭에서 데이터를 확인하실 수 있습니다.</p>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
+                        <div className="text-5xl mb-4">🖥️</div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-2">월별 상세 내역은 PC에서 확인해주세요</h3>
+                        <p className="text-sm text-slate-400">31일 × 거래처 그리드는 넓은 화면에서 최적화되어 있습니다.<br />📋 리스트 탭에서 데이터를 확인하실 수 있습니다.</p>
                     </div>
                 </div>
             ) : viewMode === 'grid' && (
-                <div className="revenue-content grid-mode">
-                    <div className="grid-header-bar">
-                        <div className="grid-stats">
-                            <div className="grid-stat">
-                                <span className="grid-stat-label">거래처 수</span>
-                                <span className="grid-stat-value">{displayVendors.length}개
-                                    {hideEmpty && emptyVendorCount > 0 && <small> (+{emptyVendorCount} 숨김)</small>}
-                                </span>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate">
+                        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                            <div className="grid grid-cols-3 gap-3 flex-1">
+                                <div className="bg-slate-50 rounded-xl p-3">
+                                    <div className="text-[11px] text-slate-400 font-semibold">거래처 수</div>
+                                    <div className="text-lg font-extrabold text-slate-800">{displayVendors.length}개
+                                        {hideEmpty && emptyVendorCount > 0 && <span className="text-xs text-slate-400 font-medium"> (+{emptyVendorCount} 숨김)</span>}
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 rounded-xl p-3">
+                                    <div className="text-[11px] text-slate-400 font-semibold">거래 건수</div>
+                                    <div className="text-lg font-extrabold text-slate-800">{filteredData.length}건</div>
+                                </div>
+                                <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                                    <div className="text-[11px] text-blue-400 font-semibold">총 매출</div>
+                                    <div className="text-lg font-extrabold text-blue-600">{formatNumber(gridGrandTotal)}원</div>
+                                </div>
                             </div>
-                            <div className="grid-stat">
-                                <span className="grid-stat-label">거래 건수</span>
-                                <span className="grid-stat-value">{filteredData.length}건</span>
-                            </div>
-                            <div className="grid-stat">
-                                <span className="grid-stat-label">총 매출</span>
-                                <span className="grid-stat-value highlight">{formatNumber(gridGrandTotal)}원</span>
+                            <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600 font-medium">
+                                    <input type="checkbox" checked={hideEmpty} onChange={e => setHideEmpty(e.target.checked)} className="w-4 h-4 accent-blue-600 cursor-pointer" />
+                                    <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
+                                </label>
+                                <a href="/vendor-settings" className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors no-underline">⚙️ 거래처 관리</a>
                             </div>
                         </div>
-                        <div className="grid-controls">
-                            <label className="hide-empty-toggle">
-                                <input
-                                    type="checkbox"
-                                    checked={hideEmpty}
-                                    onChange={e => setHideEmpty(e.target.checked)}
-                                />
-                                <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
-                            </label>
-                            <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
-                        </div>
-                    </div>
 
                     {loading ? (
-                        <div className="revenue-loading">
-                            <div className="spinner" />
-                            <p style={{ color: '#94a3b8', fontSize: 13 }}>불러오는 중...</p>
+                        <div className="flex flex-col items-center justify-center py-16">
+                            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-3" />
+                            <p className="text-slate-400 text-sm">불러오는 중...</p>
                         </div>
                     ) : displayVendors.length === 0 ? (
-                        <div className="revenue-empty">
-                            <div className="revenue-empty-icon">📋</div>
-                            <h3>매출 거래처가 없습니다</h3>
-                            <p><a href="/vendor-settings">거래처 관리</a>에서 매출처를 추가하세요.</p>
+                        <div className="text-center py-16">
+                            <div className="text-5xl mb-4">📋</div>
+                            <h3 className="text-lg font-bold text-slate-700 mb-1">매출 거래처가 없습니다</h3>
+                            <p className="text-sm text-slate-400"><a href="/vendor-settings" className="text-blue-500 hover:underline">거래처 관리</a>에서 매출처를 추가하세요.</p>
                         </div>
                     ) : (
                         <div className="grid-table-wrapper">
@@ -1401,8 +1392,9 @@ export default function RevenueManagement() {
                         </div>
                     )}
 
-                    <div className="grid-instructions">
-                        <p>💡 셀을 클릭하면 금액을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+                    <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                        <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 금액을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+                    </div>
                     </div>
                 </div>
             )}
@@ -1411,11 +1403,11 @@ export default function RevenueManagement() {
             {/* REVENUE DETAIL VIEW — 수입상세 (Annual 12-month matrix) */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'revenueDetail' && isMobile ? (
-                <div className="revenue-content">
-                    <div className="desktop-only-notice">
-                        <div className="notice-icon">🖥️</div>
-                        <h3>매출요약은 PC에서 확인해주세요</h3>
-                        <p>12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
+                        <div className="text-5xl mb-4">🖥️</div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-2">매출요약은 PC에서 확인해주세요</h3>
+                        <p className="text-sm text-slate-400">12개월 매트릭스 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
                     </div>
                 </div>
             ) : viewMode === 'revenueDetail' && (() => {
@@ -1459,8 +1451,12 @@ export default function RevenueManagement() {
                 };
 
                 return (
-                    <div className="revenue-content revenue-detail-mode">
-                        <h3 className="rd-section-title">💰 매출처별 요약 내역</h3>
+                    <div className="max-w-6xl mx-auto px-6">
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                        <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center text-xs text-white">💰</span>
+                            매출처별 요약 내역
+                        </h3>
                         <div className="rd-table-container">
                             <table className="rd-table">
                                 <thead>
@@ -1501,19 +1497,20 @@ export default function RevenueManagement() {
                                 </tbody>
                             </table>
                         </div>
-                        <div className="grid-instructions">
-                            <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 수입 대비 비율입니다.</p>
+                        <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                            <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 수입 대비 비율입니다.</p>
+                        </div>
                         </div>
                     </div>
                 );
             })()}
 
             {viewMode === 'deliveryApp' && isMobile ? (
-                <div className="revenue-content">
-                    <div className="desktop-only-notice">
-                        <div className="notice-icon">🖥️</div>
-                        <h3>배달앱 상세 내역은 PC에서 확인해주세요</h3>
-                        <p>배달앱 비교 분석 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
+                <div className="max-w-6xl mx-auto px-6">
+                    <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100 text-center">
+                        <div className="text-5xl mb-4">🖥️</div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-2">배달앱 상세 내역은 PC에서 확인해주세요</h3>
+                        <p className="text-sm text-slate-400">배달앱 비교 분석 테이블은 넓은 화면에서 최적화되어 있습니다.</p>
                     </div>
                 </div>
             ) : viewMode === 'deliveryApp' && (() => {
@@ -1531,49 +1528,40 @@ export default function RevenueManagement() {
                 const grandFeeRate = grandSales > 0 ? (grandFees / grandSales * 100).toFixed(1) : 0;
 
                 return (
-                    <div className="revenue-content delivery-app-mode">
-                        <h3 className="del-section-title">🛵 배달앱 정산 분석 — {plYear}년</h3>
+                    <div className="max-w-6xl mx-auto px-6">
+                        <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-xs text-white">🛵</span>
+                            배달앱 정산 분석 — {plYear}년
+                        </h3>
 
                         {/* Grand Total Summary */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                            <div className="revenue-summary-card" style={{ padding: '20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>📊 총 주문매출</div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{formatNumber(grandSales)}<span style={{ fontSize: '16px', fontWeight: 600, marginLeft: '2px' }}>원</span></div>
-                            </div>
-                            
-                            <div className="revenue-summary-card" style={{ padding: '20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>🧾 총 수수료</div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#ef4444' }}>-{formatNumber(grandFees)}<span style={{ fontSize: '16px', fontWeight: 600, marginLeft: '2px' }}>원</span></div>
-                            </div>
-
-                            <div className="revenue-summary-card" style={{ padding: '20px', background: '#f0fdf4', borderRadius: '16px', border: '1px solid #bbf7d0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '14px', color: '#047857', fontWeight: 700, marginBottom: '8px' }}>💰 실 정산금</div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{formatNumber(grandSettle)}<span style={{ fontSize: '16px', fontWeight: 600, marginLeft: '2px' }}>원</span></div>
-                            </div>
-
-                            <div className="revenue-summary-card" style={{ padding: '20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>📦 총 주문수</div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{grandOrders.toLocaleString()}<span style={{ fontSize: '16px', fontWeight: 600, marginLeft: '2px' }}>건</span></div>
-                            </div>
-
-                            <div className="revenue-summary-card" style={{ padding: '20px', background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                                <div style={{ fontSize: '14px', color: '#64748b', fontWeight: 600, marginBottom: '8px' }}>📈 평균 수수료율</div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{grandFeeRate}<span style={{ fontSize: '16px', fontWeight: 600, marginLeft: '2px' }}>%</span></div>
-                            </div>
+                        <div className="grid grid-cols-5 gap-3 mb-5">
+                            {[
+                                { label: '📊 총 주문매출', value: formatNumber(grandSales), unit: '원', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
+                                { label: '🧾 총 수수료', value: '-' + formatNumber(grandFees), unit: '원', color: 'text-rose-500', bg: 'bg-white border-slate-100' },
+                                { label: '💰 실 정산금', value: formatNumber(grandSettle), unit: '원', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
+                                { label: '📦 총 주문수', value: grandOrders.toLocaleString(), unit: '건', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
+                                { label: '📈 평균 수수료율', value: grandFeeRate, unit: '%', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
+                            ].map((card, i) => (
+                                <div key={i} className={`rounded-2xl p-5 shadow-sm border card-animate ${card.bg}`} style={{ animationDelay: `${i * 0.05}s` }}>
+                                    <div className="text-sm text-slate-500 font-semibold mb-2">{card.label}</div>
+                                    <div className={`text-2xl font-extrabold ${card.color}`}>{card.value}<span className="text-base font-semibold ml-0.5">{card.unit}</span></div>
+                                </div>
+                            ))}
                         </div>
 
                         {/* Channel Summary Cards */}
-                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)`, gap: 10, marginBottom: 20 }}>
-                            {sortedChannels.map(ch => {
+                        <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)` }}>
+                            {sortedChannels.map((ch, i) => {
                                 const ct = channelTotals[ch];
                                 return (
-                                    <div key={ch} className="revenue-summary-card" style={{ padding: '20px 24px', flex: 1 }}>
-                                        <div className="card-label" style={{ fontSize: '15px', color: '#64748b' }}>{CHANNEL_ICONS[ch]} {ch}</div>
-                                        <div className="card-value" style={{ fontSize: 26, fontWeight: 800, margin: '8px 0', color: '#0f172a' }}>{formatNumber(ct.settlement_amount)}원</div>
-                                        <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>
+                                    <div key={ch} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate" style={{ animationDelay: `${(i + 5) * 0.05}s` }}>
+                                        <div className="text-[15px] text-slate-500 font-semibold">{CHANNEL_ICONS[ch]} {ch}</div>
+                                        <div className="text-2xl font-extrabold text-slate-800 my-2">{formatNumber(ct.settlement_amount)}원</div>
+                                        <div className="text-[13px] text-slate-500 mt-1">
                                             매출 {formatNumber(ct.total_sales)}원 · 수수료 {ct.fee_rate}%
                                         </div>
-                                        <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>
+                                        <div className="text-[13px] text-slate-400 mt-1">
                                             {ct.order_count.toLocaleString()}건
                                         </div>
                                     </div>
@@ -1701,29 +1689,32 @@ export default function RevenueManagement() {
                         </div>
 
                         {/* Channel Fee Breakdown Cards */}
-                        <h3 className="del-section-title" style={{ marginTop: 24, fontSize: '1.25rem' }}>📊 채널별 수수료 상세</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)`, gap: 16 }}>
+                        <h3 className="text-[15px] font-bold text-slate-800 mt-6 mb-4 flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center text-xs text-white">📊</span>
+                            채널별 수수료 상세
+                        </h3>
+                        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)` }}>
                             {sortedChannels.map(ch => {
                                 const ct = channelTotals[ch];
                                 // Collect fee breakdowns from latest month
                                 const latestMonth = monthly.find(m => m.channels[ch]);
                                 const feeBreakdown = latestMonth?.channels[ch]?.fee_breakdown || {};
                                 return (
-                                    <div key={ch} className="revenue-summary-card" style={{ padding: '24px' }}>
-                                        <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 12 }}>{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
-                                        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 6 }}>
-                                            총매출 대비 수수료율: <span style={{ color: '#ef4444', fontWeight: 700 }}>{ct.fee_rate}%</span>
+                                    <div key={ch} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+                                        <div className="text-lg font-extrabold text-slate-800 mb-3">{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
+                                        <div className="text-sm text-slate-500 mb-1.5">
+                                            총매출 대비 수수료율: <span className="text-rose-500 font-bold">{ct.fee_rate}%</span>
                                         </div>
-                                        <div style={{ fontSize: 14, color: '#64748b', marginBottom: 12 }}>
-                                            총 수수료: <span style={{ color: '#ef4444', fontWeight: 600 }}>{formatNumber(ct.total_fees)}원</span> / 총매출: {formatNumber(ct.total_sales)}원
+                                        <div className="text-sm text-slate-500 mb-3">
+                                            총 수수료: <span className="text-rose-500 font-semibold">{formatNumber(ct.total_fees)}원</span> / 총매출: {formatNumber(ct.total_sales)}원
                                         </div>
                                         {Object.keys(feeBreakdown).length > 0 && (
-                                            <div style={{ borderTop: '2px dashed #e2e8f0', paddingTop: 12, marginTop: 12 }}>
-                                                <div style={{ fontSize: 13, color: '#475569', fontWeight: 600, marginBottom: 8 }}>최근 세부 수수료 내역:</div>
+                                            <div className="border-t-2 border-dashed border-slate-200 pt-3 mt-3">
+                                                <div className="text-[13px] text-slate-600 font-semibold mb-2">최근 세부 수수료 내역:</div>
                                                 {Object.entries(feeBreakdown).filter(([, v]) => v > 0).map(([k, v]) => (
-                                                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#64748b', padding: '4px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                                    <div key={k} className="flex justify-between text-sm text-slate-500 py-1 border-b border-slate-50">
                                                         <span>{k}</span>
-                                                        <span style={{ color: '#ef4444', fontWeight: 500 }}>{formatNumber(v)}원</span>
+                                                        <span className="text-rose-500 font-medium">{formatNumber(v)}원</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1889,43 +1880,52 @@ export default function RevenueManagement() {
                         <input type="file" accept=".xlsx,.xls,.pdf,.csv" multiple style={{ display: 'none' }} ref={excelInputRef} onChange={handleUploadFileChange} />
                     </div>
                 ) : (
-                    <div className="revenue-content upload-mode">
-                        <div className="upload-section">
-                            <div className="upload-tabs">
-                                <button className={`upload-tab-btn ${uploadTab === 'camera' ? 'active camera' : ''}`} onClick={() => setUploadTab('camera')}>
-                                    <Camera size={16} /> 촬영/이미지
-                                </button>
-                                <button className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`} onClick={() => setUploadTab('excel')}>
-                                    <FileSpreadsheet size={16} /> 문서 업로드
-                                </button>
-                                <button className={`upload-tab-btn ${uploadTab === 'history' ? 'active history' : ''}`} onClick={() => setUploadTab('history')}>
-                                    <RotateCcw size={16} /> 취소/기록
-                                </button>
+                    <div className="max-w-6xl mx-auto px-6">
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                            <div className="flex gap-2 mb-4">
+                                {[
+                                    { id: 'camera', label: '촬영/이미지', icon: <Camera size={16} />, gradient: 'from-cyan-600 to-cyan-700' },
+                                    { id: 'excel', label: '문서 업로드', icon: <FileSpreadsheet size={16} />, gradient: 'from-emerald-600 to-emerald-700' },
+                                    { id: 'history', label: '취소/기록', icon: <RotateCcw size={16} />, gradient: 'from-slate-600 to-slate-700' },
+                                ].map(t => (
+                                    <button key={t.id}
+                                        className={`flex items-center gap-1.5 px-4 py-2 border-none text-sm font-semibold cursor-pointer rounded-xl transition-all ${
+                                            uploadTab === t.id
+                                                ? `bg-gradient-to-r ${t.gradient} text-white shadow-sm`
+                                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                        }`}
+                                        onClick={() => setUploadTab(t.id)}
+                                    >
+                                        {t.icon} {t.label}
+                                    </button>
+                                ))}
                             </div>
 
                             {uploadTab === 'history' ? (
-                                <div className="upload-history-wrapper">
+                                <div className="bg-slate-50 rounded-xl p-4">
                                     <UploadHistoryList type="revenue" onRollback={fetchData} />
                                 </div>
                             ) : (
                                 <div
-                                    className="upload-drop-zone"
+                                    className="border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center cursor-pointer hover:border-blue-300 transition-colors"
                                     onClick={() => uploadTab === 'camera' ? fileInputRef.current?.click() : excelInputRef.current?.click()}
                                 >
                                     {uploadLoading ? (
-                                        <div className="upload-loading">
-                                            <div className="spinner" />
-                                            <p>{uploadProgress || '처리 중입니다...'}</p>
+                                        <div className="flex flex-col items-center">
+                                            <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-3" />
+                                            <p className="text-sm text-slate-500">{uploadProgress || '처리 중입니다...'}</p>
                                         </div>
                                     ) : (
                                         <>
-                                            <div className={`upload-icon-box ${uploadTab}`}>
-                                                {uploadTab === 'camera' ? <Camera size={32} /> : <UploadCloud size={32} />}
+                                            <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br ${
+                                                uploadTab === 'camera' ? 'from-cyan-600 to-cyan-700' : 'from-emerald-600 to-emerald-700'
+                                            } shadow-lg`}>
+                                                {uploadTab === 'camera' ? <Camera size={32} className="text-white" /> : <UploadCloud size={32} className="text-white" />}
                                             </div>
-                                            <p className="upload-main-text">
+                                            <p className="text-base font-bold text-slate-700 mb-1">
                                                 {uploadTab === 'camera' ? '클릭하여 이미지 선택' : '클릭하여 문서 파일 선택'}
                                             </p>
-                                            <p className="upload-sub-text">
+                                            <p className="text-xs text-slate-400">
                                                 {uploadTab === 'camera'
                                                     ? '영수증 또는 매출 내역 이미지를 업로드하세요'
                                                     : '엑셀, PDF, CSV 파일 지원 — 여러 파일 선택 가능'}
@@ -1945,26 +1945,26 @@ export default function RevenueManagement() {
 
             {/* ── Add / Edit Modal ── */}
             {showModal && (
-                <div className="revenue-modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="revenue-modal" onClick={e => e.stopPropagation()}>
-                        <h2>
-                            {modalMode === 'add' ? <><Plus size={18} /> 매출 추가</> : <><Edit3 size={18} /> 매출 수정</>}
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                        <h2 className="text-lg font-extrabold text-slate-800 mb-5 flex items-center gap-2">
+                            {modalMode === 'add' ? <><Plus size={18} className="text-blue-500" /> 매출 추가</> : <><Edit3 size={18} className="text-blue-500" /> 매출 수정</>}
                         </h2>
 
-                        <div className="form-group">
-                            <label className="form-label">날짜</label>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-slate-600 mb-1.5">날짜</label>
                             <input
                                 type="date"
-                                className="form-input"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                                 value={form.date}
                                 onChange={e => setForm({ ...form, date: e.target.value })}
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">거래처</label>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-slate-600 mb-1.5">거래처</label>
                             <select
-                                className="form-select"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                                 value={form.vendor_id}
                                 onChange={e => setForm({ ...form, vendor_id: e.target.value })}
                             >
@@ -2002,29 +2002,15 @@ export default function RevenueManagement() {
                             const selectedVendor = vendors.find(v => v.id === Number(form.vendor_id));
                             if (selectedVendor && selectedVendor.category === 'store') {
                                 return (
-                                    <div className="form-group">
-                                        <label className="form-label">결제수단</label>
-                                        <div className="payment-method-toggle" style={{ display: 'flex', gap: 16, marginTop: 4 }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 14 }}>
-                                                <input
-                                                    type="radio"
-                                                    name="paymentMethod"
-                                                    value="Card"
-                                                    checked={form.payment_method === 'Card'}
-                                                    onChange={e => setForm({ ...form, payment_method: e.target.value })}
-                                                    style={{ marginRight: 6 }}
-                                                />
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-semibold text-slate-600 mb-1.5">결제수단</label>
+                                        <div className="flex gap-4 mt-1">
+                                            <label className="flex items-center cursor-pointer text-sm gap-1.5">
+                                                <input type="radio" name="paymentMethod" value="Card" checked={form.payment_method === 'Card'} onChange={e => setForm({ ...form, payment_method: e.target.value })} className="accent-blue-500" />
                                                 💳 카드
                                             </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 14 }}>
-                                                <input
-                                                    type="radio"
-                                                    name="paymentMethod"
-                                                    value="Cash"
-                                                    checked={form.payment_method === 'Cash'}
-                                                    onChange={e => setForm({ ...form, payment_method: e.target.value })}
-                                                    style={{ marginRight: 6 }}
-                                                />
+                                            <label className="flex items-center cursor-pointer text-sm gap-1.5">
+                                                <input type="radio" name="paymentMethod" value="Cash" checked={form.payment_method === 'Cash'} onChange={e => setForm({ ...form, payment_method: e.target.value })} className="accent-blue-500" />
                                                 💵 현금
                                             </label>
                                         </div>
@@ -2034,31 +2020,31 @@ export default function RevenueManagement() {
                             return null;
                         })()}
 
-                        <div className="form-group">
-                            <label className="form-label">금액 (원)</label>
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-slate-600 mb-1.5">금액 (원)</label>
                             <input
                                 type="number"
-                                className="form-input amount"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-right font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                                 placeholder="0"
                                 value={form.amount}
                                 onChange={e => setForm({ ...form, amount: e.target.value })}
                             />
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">비고</label>
+                        <div className="mb-5">
+                            <label className="block text-sm font-semibold text-slate-600 mb-1.5">비고</label>
                             <input
                                 type="text"
-                                className="form-input"
+                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
                                 placeholder="메모 (선택)"
                                 value={form.note}
                                 onChange={e => setForm({ ...form, note: e.target.value })}
                             />
                         </div>
 
-                        <div className="revenue-modal-actions">
-                            <button className="modal-btn secondary" onClick={() => setShowModal(false)}>취소</button>
-                            <button className="modal-btn primary" onClick={handleSubmit}>
+                        <div className="flex gap-3 justify-end">
+                            <button className="px-5 py-2.5 bg-slate-100 text-slate-600 text-sm font-semibold rounded-xl border-none cursor-pointer hover:bg-slate-200 transition-colors" onClick={() => setShowModal(false)}>취소</button>
+                            <button className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-xl border-none cursor-pointer shadow-md shadow-blue-500/20 hover:shadow-lg transition-shadow" onClick={handleSubmit}>
                                 {modalMode === 'add' ? '추가' : '저장'}
                             </button>
                         </div>

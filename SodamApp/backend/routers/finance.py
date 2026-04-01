@@ -20,20 +20,27 @@ async def upload_sales_approval(file: UploadFile = File(...), current_user = Dep
         if not data:
             raise HTTPException(status_code=400, detail="Failed to parse file or empty data")
         
+        approval_nums = [item["approval_number"] for item in data]
+        approval_dates = [item["approval_date"] for item in data]
+        
+        existing_records = service.session.exec(
+            apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
+                CardSalesApproval.approval_number.in_(approval_nums),
+                CardSalesApproval.approval_date.in_(approval_dates)
+            )
+        ).all()
+        
+        existing_set = {(r.approval_number, str(r.approval_date)) for r in existing_records}
+        
         count = 0
         for item in data:
-            existing = service.session.exec(
-                apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
-                    CardSalesApproval.approval_number == item["approval_number"],
-                    CardSalesApproval.approval_date == item["approval_date"]
-                )
-            ).first()
-            
-            if not existing:
+            key = (item["approval_number"], str(item["approval_date"]))
+            if key not in existing_set:
                 item['business_id'] = bid
                 new_sales = CardSalesApproval(**item)
                 service.session.add(new_sales)
                 count += 1
+                existing_set.add(key)
                 
         service.session.commit()
         return {"status": "success", "message": f"{count} new sales records imported"}
@@ -50,21 +57,25 @@ async def upload_card_payment(file: UploadFile = File(...), current_user = Depen
         if not data:
             raise HTTPException(status_code=400, detail="Failed to parse file or empty data")
         
+        dates = [item["payment_date"] for item in data]
+        
+        existing_records = service.session.exec(
+            apply_bid_filter(select(CardPayment), CardPayment, bid).where(
+                CardPayment.payment_date.in_(dates)
+            )
+        ).all()
+        
+        existing_set = {(str(r.payment_date), r.card_corp, r.net_deposit) for r in existing_records}
+        
         count = 0
         for item in data:
-            existing = service.session.exec(
-                apply_bid_filter(select(CardPayment), CardPayment, bid).where(
-                    CardPayment.payment_date == item["payment_date"],
-                    CardPayment.card_corp == item["card_corp"],
-                    CardPayment.net_deposit == item["net_deposit"]
-                )
-            ).first()
-            
-            if not existing:
+            key = (str(item["payment_date"]), item["card_corp"], item["net_deposit"])
+            if key not in existing_set:
                 item['business_id'] = bid
                 new_payment = CardPayment(**item)
                 service.session.add(new_payment)
                 count += 1
+                existing_set.add(key)
         
         service.session.commit()
         
@@ -78,20 +89,29 @@ async def upload_card_payment(file: UploadFile = File(...), current_user = Depen
         for p in all_payments:
             monthly_fees[(p.payment_date.year, p.payment_date.month)] += p.fees
         
-        for (year, month), total_fee in monthly_fees.items():
-            pl = service.session.exec(
+        if monthly_fees:
+            years = [y for y, m in monthly_fees.keys()]
+            months = [m for y, m in monthly_fees.keys()]
+            
+            existing_pls = service.session.exec(
                 apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
-                    MonthlyProfitLoss.year == year,
-                    MonthlyProfitLoss.month == month,
+                    MonthlyProfitLoss.year.in_(years),
+                    MonthlyProfitLoss.month.in_(months)
                 )
-            ).first()
-            if pl:
-                pl.expense_card_fee = total_fee
-                service.session.add(pl)
-            else:
-                pl = MonthlyProfitLoss(year=year, month=month, business_id=bid, expense_card_fee=total_fee)
-                service.session.add(pl)
-        service.session.commit()
+            ).all()
+            
+            pl_map = {(pl.year, pl.month): pl for pl in existing_pls}
+            
+            for (year, month), total_fee in monthly_fees.items():
+                pl = pl_map.get((year, month))
+                if pl:
+                    pl.expense_card_fee = total_fee
+                    service.session.add(pl)
+                else:
+                    pl = MonthlyProfitLoss(year=year, month=month, business_id=bid, expense_card_fee=total_fee)
+                    service.session.add(pl)
+                    pl_map[(year, month)] = pl
+            service.session.commit()
         
         return {"status": "success", "message": f"{count} payment records imported. Card fees synced to P/L."}
     except Exception as e:

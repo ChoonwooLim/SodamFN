@@ -76,25 +76,22 @@ def list_businesses(
 ):
     """전체 매장 목록 조회 (필터 지원)"""
     with Session(engine) as s:
-        stmt = select(Business)
+        staff_subq = select(func.count(Staff.id)).where(Staff.business_id == Business.id).scalar_subquery().label("staff_count")
+        user_subq = select(func.count(User.id)).where(User.business_id == Business.id).scalar_subquery().label("user_count")
+        
+        stmt = select(Business, staff_subq, user_subq)
+        
         if status:
             stmt = stmt.where(Business.subscription_status == status)
         if business_type:
             stmt = stmt.where(Business.business_type == business_type)
         if region:
             stmt = stmt.where(Business.region == region)
-        businesses = s.exec(stmt.order_by(Business.created_at.desc())).all()
+        
+        rows = s.exec(stmt.order_by(Business.created_at.desc())).all()
         
         results = []
-        for biz in businesses:
-            # Count staff and users
-            staff_count = s.exec(
-                select(func.count(Staff.id)).where(Staff.business_id == biz.id)
-            ).one()
-            user_count = s.exec(
-                select(func.count(User.id)).where(User.business_id == biz.id)
-            ).one()
-            
+        for biz, staff_count, user_count in rows:
             results.append({
                 "id": biz.id,
                 "name": biz.name,
@@ -108,8 +105,8 @@ def list_businesses(
                 "subscription_status": biz.subscription_status,
                 "is_active": biz.is_active,
                 "created_at": str(biz.created_at),
-                "staff_count": staff_count,
-                "user_count": user_count,
+                "staff_count": staff_count or 0,
+                "user_count": user_count or 0,
             })
         
         return {"status": "success", "data": results}
@@ -186,51 +183,44 @@ def get_monitoring_overview(
         month = date.today().month
     
     with Session(engine) as s:
-        businesses = s.exec(select(Business).where(Business.is_active == True)).all()
+        month_str = f"{year}-{month:02d}"
+        
+        staff_subq = select(func.count(Staff.id)).where(
+            Staff.business_id == Business.id,
+            Staff.status == "재직"
+        ).scalar_subquery().label("staff_count")
+        
+        rev_subq = select(func.coalesce(func.sum(Revenue.amount), 0)).where(
+            Revenue.business_id == Business.id,
+            func.extract('year', Revenue.date) == year,
+            func.extract('month', Revenue.date) == month
+        ).scalar_subquery().label("biz_revenue")
+        
+        labor_subq = select(func.coalesce(func.sum(Payroll.base_pay + Payroll.bonus_holiday), 0)).where(
+            Payroll.business_id == Business.id,
+            Payroll.month == month_str
+        ).scalar_subquery().label("biz_labor")
+        
+        stmt = select(
+            Business,
+            staff_subq,
+            rev_subq,
+            labor_subq
+        ).where(Business.is_active == True)
+        
+        rows = s.exec(stmt).all()
         
         overview = []
         total_revenue = 0
         total_labor = 0
         total_profit = 0
         
-        for biz in businesses:
-            # Monthly P/L
-            pl = s.exec(
-                select(MonthlyProfitLoss).where(
-                    MonthlyProfitLoss.year == year,
-                    MonthlyProfitLoss.month == month
-                )
-            ).first()
-            
-            # Staff count  
-            staff_count = s.exec(
-                select(func.count(Staff.id)).where(
-                    Staff.business_id == biz.id,
-                    Staff.status == "재직"
-                )
-            ).one()
-            
-            # Revenue for this business (sum from Revenue table)
-            biz_revenue = s.exec(
-                select(func.coalesce(func.sum(Revenue.amount), 0)).where(
-                    Revenue.business_id == biz.id,
-                    func.extract('year', Revenue.date) == year,
-                    func.extract('month', Revenue.date) == month
-                )
-            ).one()
-            
-            # Labor cost (payroll total)
-            month_str = f"{year}-{month:02d}"
-            biz_labor = s.exec(
-                select(func.coalesce(func.sum(Payroll.base_pay + Payroll.bonus_holiday), 0)).where(
-                    Payroll.staff_id.in_(
-                        select(Staff.id).where(Staff.business_id == biz.id)
-                    ),
-                    Payroll.month == month_str
-                )
-            ).one()
-            
+        for biz, staff_count, biz_revenue, biz_labor in rows:
+            staff_count = staff_count or 0
+            biz_revenue = biz_revenue or 0
+            biz_labor = biz_labor or 0
             biz_profit = biz_revenue - biz_labor
+            
             total_revenue += biz_revenue
             total_labor += biz_labor
             total_profit += biz_profit
@@ -253,7 +243,7 @@ def get_monitoring_overview(
                 "year": year,
                 "month": month,
                 "summary": {
-                    "total_businesses": len(businesses),
+                    "total_businesses": len(rows),
                     "total_revenue": total_revenue,
                     "total_labor_cost": total_labor,
                     "total_profit": total_profit,
@@ -299,15 +289,16 @@ def get_billing_summary(
         month = date.today().month
     
     with Session(engine) as s:
-        businesses = s.exec(
-            select(Business).where(Business.is_active == True)
-        ).all()
+        stmt = select(Business, SubscriptionPlan).outerjoin(
+            SubscriptionPlan, Business.plan_id == SubscriptionPlan.id
+        ).where(Business.is_active == True)
+        
+        rows = s.exec(stmt).all()
         
         billing = []
         total_billing = 0
         
-        for biz in businesses:
-            plan = s.get(SubscriptionPlan, biz.plan_id) if biz.plan_id else None
+        for biz, plan in rows:
             monthly_fee = plan.price_monthly if plan else 0
             total_billing += monthly_fee
             
@@ -575,31 +566,36 @@ def get_analytics(
         month = date.today().month
     
     with Session(engine) as s:
-        businesses = s.exec(select(Business).where(Business.is_active == True)).all()
+        staff_subq = select(func.count(Staff.id)).where(
+            Staff.business_id == Business.id, Staff.status == "재직"
+        ).scalar_subquery()
+        
+        rev_subq = select(func.coalesce(func.sum(Revenue.amount), 0)).where(
+            Revenue.business_id == Business.id,
+            func.extract('year', Revenue.date) == year,
+            func.extract('month', Revenue.date) == month
+        ).scalar_subquery()
+        
+        stmt = select(
+            Business.business_type,
+            Business.region,
+            staff_subq.label("staff_count"),
+            rev_subq.label("biz_revenue")
+        ).where(Business.is_active == True)
+        
+        rows = s.exec(stmt).all()
         
         # Group by business_type
         type_stats = {}
         region_stats = {}
+        total_businesses = len(rows)
         
-        for biz in businesses:
-            # Revenue
-            biz_revenue = s.exec(
-                select(func.coalesce(func.sum(Revenue.amount), 0)).where(
-                    Revenue.business_id == biz.id,
-                    func.extract('year', Revenue.date) == year,
-                    func.extract('month', Revenue.date) == month
-                )
-            ).one()
-            
-            # Staff count
-            staff_count = s.exec(
-                select(func.count(Staff.id)).where(
-                    Staff.business_id == biz.id, Staff.status == "재직"
-                )
-            ).one()
+        for btype_raw, region_raw, staff_count, biz_revenue in rows:
+            biz_revenue = biz_revenue or 0
+            staff_count = staff_count or 0
             
             # Group by type
-            btype = biz.business_type or "기타"
+            btype = btype_raw or "기타"
             if btype not in type_stats:
                 type_stats[btype] = {"count": 0, "total_revenue": 0, "total_staff": 0}
             type_stats[btype]["count"] += 1
@@ -607,7 +603,7 @@ def get_analytics(
             type_stats[btype]["total_staff"] += staff_count
             
             # Group by region
-            region = biz.region or "미설정"
+            region = region_raw or "미설정"
             if region not in region_stats:
                 region_stats[region] = {"count": 0, "total_revenue": 0}
             region_stats[region]["count"] += 1

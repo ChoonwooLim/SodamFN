@@ -177,7 +177,9 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
         
         # Phase 1: Insert data
         with Session(engine) as session:
-            # Re-attach upload_history if needed (not strictly necessary if we rely on ID)
+            # Build vendor lookup cache
+            all_vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
+            vendor_by_name = {v.name: v for v in all_vendors}
             
             for item in expenses_data:
                 if item['amount'] > 0:
@@ -192,9 +194,7 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                         continue
                     
                     # Find or create vendor
-                    vendor = session.exec(
-                        apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == item_name)
-                    ).first()
+                    vendor = vendor_by_name.get(item_name)
                     
                     if not vendor:
                         vendor = Vendor(
@@ -206,6 +206,7 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                         )
                         session.add(vendor)
                         session.flush()  # Get the ID
+                        vendor_by_name[item_name] = vendor
                         vendor_created_count += 1
                     
                     # Create DailyExpense record
