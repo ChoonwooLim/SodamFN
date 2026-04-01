@@ -1,5 +1,6 @@
 from typing import Optional, List
 from sqlmodel import Field, Session, SQLModel, create_engine, select, Relationship
+from sqlalchemy import Index, UniqueConstraint
 import datetime
 from datetime import time, date
 
@@ -281,6 +282,9 @@ class WorkLocation(SQLModel, table=True):
     is_active: bool = True
 
 class Attendance(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_attendance_staff_date", "staff_id", "date"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     date: datetime.date = Field(index=True)
     check_in: Optional[time] = None
@@ -303,6 +307,9 @@ class Attendance(SQLModel, table=True):
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 class Payroll(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("staff_id", "month", name="uq_payroll_staff_month"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     month: str # YYYY-MM
@@ -349,6 +356,9 @@ class GlobalSetting(SQLModel, table=True):
 # --- Profit/Loss Statement ---
 
 class MonthlyProfitLoss(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("business_id", "year", "month", name="uq_monthlypl_business_year_month"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     year: int = Field(index=True)
@@ -399,6 +409,10 @@ class DeliveryRevenue(SQLModel, table=True):
 
 
 class DailyExpense(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_dailyexpense_business_date", "business_id", "date"),
+        Index("ix_dailyexpense_business_vendor", "business_id", "vendor_id"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     date: datetime.date = Field(index=True)

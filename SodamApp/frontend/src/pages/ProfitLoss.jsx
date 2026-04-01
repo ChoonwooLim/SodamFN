@@ -262,7 +262,14 @@ export default function ProfitLoss() {
         );
     };
 
-    if (loading) return <div className="loading">로딩 중...</div>;
+    if (loading) return (
+        <div className="flex items-center justify-center h-[300px]">
+            <div className="text-center">
+                <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-3" />
+                <span className="text-sm text-slate-400 font-medium">데이터를 불러오는 중...</span>
+            </div>
+        </div>
+    );
 
     // ═══════════════════════════════════════════
     // DASHBOARD VIEW
@@ -324,89 +331,78 @@ export default function ProfitLoss() {
             'expense_other': '#94a3b8',
         };
 
+        const kpiCards = [
+            { label: '전월 매출', value: formatNumber(prevRevenue) + '원', icon: '💰', color: 'blue', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/20' },
+            { label: '전월 지출', value: formatNumber(prevExpense) + '원', icon: '📤', color: 'rose', gradient: 'from-rose-500 to-rose-600', shadow: 'shadow-rose-500/20' },
+            { label: '전월 순이익', value: formatNumber(prevProfit) + '원', icon: prevProfit >= 0 ? '📈' : '📉', color: 'emerald', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/20', valueColor: prevProfit >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+            { label: '전월 마진율', value: prevMargin + '%', icon: '🎯', color: 'amber', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/20', valueColor: Number(prevMargin) >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+        ];
+
         return (
-            <div className="pl-dashboard">
+            <div className="max-w-[900px]">
                 {/* Key Metric Cards */}
-                <div className="pl-dash-cards">
-                    <div className="pl-dash-card revenue">
-                        <div className="pl-dash-card-icon">💰</div>
-                        <div className="pl-dash-card-content">
-                            <span className="pl-dash-card-label">전월 매출</span>
-                            <span className="pl-dash-card-value">{formatNumber(prevRevenue)}원</span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                    {kpiCards.map((card, i) => (
+                        <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-lg ${card.shadow} text-lg shrink-0`}>
+                                    {card.icon}
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{card.label}</div>
+                                    <div className={`text-base md:text-lg font-extrabold truncate ${card.valueColor || 'text-slate-800'}`}>{card.value}</div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="pl-dash-card expense">
-                        <div className="pl-dash-card-icon">📤</div>
-                        <div className="pl-dash-card-content">
-                            <span className="pl-dash-card-label">전월 지출</span>
-                            <span className="pl-dash-card-value">{formatNumber(prevExpense)}원</span>
-                        </div>
-                    </div>
-                    <div className="pl-dash-card profit">
-                        <div className="pl-dash-card-icon">{prevProfit >= 0 ? '📈' : '📉'}</div>
-                        <div className="pl-dash-card-content">
-                            <span className="pl-dash-card-label">전월 순이익</span>
-                            <span className={`pl-dash-card-value ${prevProfit >= 0 ? 'positive' : 'negative'}`}>
-                                {formatNumber(prevProfit)}원
-                            </span>
-                        </div>
-                    </div>
-                    <div className="pl-dash-card margin">
-                        <div className="pl-dash-card-icon">🎯</div>
-                        <div className="pl-dash-card-content">
-                            <span className="pl-dash-card-label">전월 마진율</span>
-                            <span className={`pl-dash-card-value ${Number(prevMargin) >= 0 ? 'positive' : 'negative'}`}>
-                                {prevMargin}%
-                            </span>
-                        </div>
-                    </div>
+                    ))}
                 </div>
 
                 {/* Annual Summary */}
-                <div className="pl-dash-section">
-                    <h3>📅 {year}년 연간 요약</h3>
-                    <div className="pl-annual-summary">
-                        <div className="pl-annual-item">
-                            <span className="label">총 매출</span>
-                            <span className="value">{formatNumber(yearRevenue)}원</span>
-                        </div>
-                        <div className="pl-annual-item">
-                            <span className="label">총 지출</span>
-                            <span className="value expense">{formatNumber(yearExpense)}원</span>
-                        </div>
-                        <div className="pl-annual-item highlight">
-                            <span className="label">총 순이익</span>
-                            <span className={`value ${yearProfit >= 0 ? 'positive' : 'negative'}`}>{formatNumber(yearProfit)}원</span>
-                        </div>
-                        <div className="pl-annual-item">
-                            <span className="label">연간 마진율</span>
-                            <span className={`value ${Number(yearMargin) >= 0 ? 'positive' : 'negative'}`}>{yearMargin}%</span>
-                        </div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.2s' }}>
+                    <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xs text-white">📅</span>
+                        {year}년 연간 요약
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {[
+                            { label: '총 매출', value: formatNumber(yearRevenue) + '원', bg: 'bg-slate-50', textColor: 'text-slate-800' },
+                            { label: '총 지출', value: formatNumber(yearExpense) + '원', bg: 'bg-slate-50', textColor: 'text-rose-500' },
+                            { label: '총 순이익', value: formatNumber(yearProfit) + '원', bg: yearProfit >= 0 ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200', textColor: yearProfit >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+                            { label: '연간 마진율', value: yearMargin + '%', bg: 'bg-slate-50', textColor: Number(yearMargin) >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+                        ].map((item, i) => (
+                            <div key={i} className={`${item.bg} rounded-xl p-3`}>
+                                <div className="text-[11px] text-slate-400 font-semibold mb-1">{item.label}</div>
+                                <div className={`text-[15px] font-bold ${item.textColor}`}>{item.value}</div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
                 {/* Monthly Trend */}
-                <div className="pl-dash-section">
-                    <h3>📊 월별 매출/지출 추이</h3>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.25s' }}>
+                    <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs text-white">📊</span>
+                        월별 매출/지출 추이
+                    </h3>
                     {activeMonths.length > 0 ? (
-                        <div className="pl-monthly-chart">
+                        <div className="flex gap-1 items-end h-[160px] px-1">
                             {monthSummaries.map(m => (
-                                <div className="pl-month-col" key={m.month}>
-                                    <div className="pl-month-bars">
+                                <div className="flex-1 flex flex-col items-center gap-1" key={m.month}>
+                                    <div className="flex-1 w-full flex gap-0.5 items-end min-h-[100px]">
                                         <div
-                                            className="pl-bar revenue"
+                                            className="flex-1 bg-blue-500 rounded-t min-h-[2px] transition-all duration-300"
                                             style={{ height: `${(m.revenue / maxMonthValue) * 100}%` }}
                                             title={`매출 ${formatNumber(m.revenue)}`}
                                         />
                                         <div
-                                            className="pl-bar expense"
+                                            className="flex-1 bg-rose-400 rounded-t min-h-[2px] transition-all duration-300 opacity-70"
                                             style={{ height: `${(m.expense / maxMonthValue) * 100}%` }}
                                             title={`지출 ${formatNumber(m.expense)}`}
                                         />
                                     </div>
-                                    <span className="pl-month-label">{m.month}월</span>
+                                    <span className="text-[10px] text-slate-400 font-semibold">{m.month}월</span>
                                     {m.profit !== 0 && (
-                                        <span className={`pl-month-profit ${m.profit >= 0 ? 'positive' : 'negative'}`}>
+                                        <span className={`text-[9px] font-bold ${m.profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                             {m.profit >= 0 ? '+' : ''}{(m.profit / 10000).toFixed(0)}만
                                         </span>
                                     )}
@@ -414,36 +410,39 @@ export default function ProfitLoss() {
                             ))}
                         </div>
                     ) : (
-                        <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>데이터가 없습니다</div>
+                        <div className="text-slate-400 text-center py-6 text-sm">데이터가 없습니다</div>
                     )}
-                    <div className="pl-chart-legend">
-                        <span><span className="legend-dot" style={{ background: '#3b82f6' }} />매출</span>
-                        <span><span className="legend-dot" style={{ background: '#ef4444' }} />지출</span>
+                    <div className="flex justify-center gap-4 mt-3 text-xs text-slate-500">
+                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />매출</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block" />지출</span>
                     </div>
                 </div>
 
                 {/* Expense Breakdown */}
-                <div className="pl-dash-section">
-                    <h3>💸 지출 항목별 비중 (연간)</h3>
-                    <div className="pl-expense-breakdown">
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate" style={{ animationDelay: '0.3s' }}>
+                    <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-xs text-white">💸</span>
+                        지출 항목별 비중 (연간)
+                    </h3>
+                    <div className="flex flex-col gap-2.5">
                         {expenseBreakdown.map(e => {
                             const pct = yearExpense > 0 ? ((e.total / yearExpense) * 100).toFixed(1) : '0.0';
                             const cat = EXPENSE_CATEGORIES.find(c => e.label === c.label);
                             const color = EXPENSE_COLORS[e.key] || '#94a3b8';
                             return (
-                                <div className="pl-expense-bar-item" key={e.key}>
-                                    <div className="bar-label">
-                                        <span>{cat?.icon || '📋'} {e.label}</span>
-                                        <span className="bar-amount">{formatNumber(e.total)}원 ({pct}%)</span>
+                                <div key={e.key}>
+                                    <div className="flex justify-between text-[13px] text-slate-600 mb-1">
+                                        <span className="font-medium">{cat?.icon || '📋'} {e.label}</span>
+                                        <span className="text-xs text-slate-400 font-semibold">{formatNumber(e.total)}원 ({pct}%)</span>
                                     </div>
-                                    <div className="bar-track">
-                                        <div className="bar-fill" style={{ width: `${(e.total / maxExpense) * 100}%`, background: color }} />
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(e.total / maxExpense) * 100}%`, background: color }} />
                                     </div>
                                 </div>
                             );
                         })}
                         {expenseBreakdown.length === 0 && (
-                            <div style={{ color: '#9ca3af', padding: 24, textAlign: 'center' }}>지출 데이터가 없습니다</div>
+                            <div className="text-slate-400 text-center py-6 text-sm">지출 데이터가 없습니다</div>
                         )}
                     </div>
                 </div>
@@ -453,8 +452,11 @@ export default function ProfitLoss() {
 
     // Render expense detail table
     const renderExpenseDetail = () => (
-        <div className="expense-detail-section">
-            <h3 className="section-title">📊 세부지출 내역서</h3>
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+            <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-xs text-white">📊</span>
+                세부지출 내역서
+            </h3>
             <div className="table-container">
                 <table className="pl-table expense-table">
                     <thead>
@@ -495,8 +497,8 @@ export default function ProfitLoss() {
                     </tbody>
                 </table>
             </div>
-            <div className="instructions">
-                <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 지출 대비 비율입니다.</p>
+            <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 직접 수정할 수 있습니다. 비율은 전체 지출 대비 비율입니다.</p>
             </div>
         </div>
     );
@@ -510,63 +512,71 @@ export default function ProfitLoss() {
         const totalProfit = totalRevenue - totalExpense;
         const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : 0;
 
-        return (
-            <div className="analysis-section">
-                <h3 className="section-title">📈 월별 분석</h3>
+        const analysisCards = [
+            { label: '총 수입', value: formatNumber(totalRevenue) + '원', avg: `월평균 ${formatNumber(Math.round(totalRevenue / activeMonthCount))}원`, gradient: 'from-emerald-500 to-emerald-600', bg: 'bg-emerald-50', textColor: 'text-emerald-700', borderColor: 'border-emerald-200' },
+            { label: '총 지출', value: formatNumber(totalExpense) + '원', avg: `월평균 ${formatNumber(Math.round(totalExpense / activeMonthCount))}원`, gradient: 'from-rose-500 to-rose-600', bg: 'bg-rose-50', textColor: 'text-rose-700', borderColor: 'border-rose-200' },
+            { label: '순수익', value: formatNumber(totalProfit) + '원', avg: `수익률 ${profitMargin}%`, gradient: 'from-blue-500 to-blue-600', bg: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200' },
+        ];
 
-                <div className="summary-cards">
-                    <div className="summary-card revenue-card">
-                        <div className="card-label">총 수입</div>
-                        <div className="card-value">{formatNumber(totalRevenue)}원</div>
-                        <div className="card-avg">월평균 {formatNumber(Math.round(totalRevenue / activeMonthCount))}원</div>
-                    </div>
-                    <div className="summary-card expense-card">
-                        <div className="card-label">총 지출</div>
-                        <div className="card-value">{formatNumber(totalExpense)}원</div>
-                        <div className="card-avg">월평균 {formatNumber(Math.round(totalExpense / activeMonthCount))}원</div>
-                    </div>
-                    <div className="summary-card profit-card">
-                        <div className="card-label">순수익</div>
-                        <div className="card-value">{formatNumber(totalProfit)}원</div>
-                        <div className="card-avg">수익률 {profitMargin}%</div>
-                    </div>
+        return (
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-xs text-white">📈</span>
+                    월별 분석
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    {analysisCards.map((card, i) => (
+                        <div key={i} className={`${card.bg} border ${card.borderColor} rounded-2xl p-5 card-animate`} style={{ animationDelay: `${i * 0.05}s` }}>
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${card.gradient} flex items-center justify-center shadow-sm`}>
+                                    <span className="text-white text-xs font-bold">{i === 0 ? '📈' : i === 1 ? '📤' : '💎'}</span>
+                                </div>
+                                <span className={`text-sm font-semibold ${card.textColor} opacity-80`}>{card.label}</span>
+                            </div>
+                            <div className={`text-xl font-extrabold ${card.textColor} mb-1`}>{card.value}</div>
+                            <div className={`text-xs ${card.textColor} opacity-60`}>{card.avg}</div>
+                        </div>
+                    ))}
                 </div>
 
-                <div className="monthly-chart">
-                    <h4>월별 손익 추이</h4>
-                    <table className="pl-table">
-                        <thead>
-                            <tr>
-                                <th>구분</th>
-                                {MONTHS.map(m => <th key={m}>{m}월</th>)}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr className="revenue-row">
-                                <td>수입</td>
-                                {MONTHS.map(m => (
-                                    <td key={m} className="revenue-positive">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
-                                ))}
-                            </tr>
-                            <tr className="expense-row">
-                                <td>지출</td>
-                                {MONTHS.map(m => (
-                                    <td key={m} className="expense-negative">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
-                                ))}
-                            </tr>
-                            <tr className="profit-row">
-                                <td>손익</td>
-                                {MONTHS.map(m => {
-                                    const profit = calcProfit(getMonthData(m));
-                                    return (
-                                        <td key={m} className={profit >= 0 ? 'profit-positive' : 'profit-negative'}>
-                                            {formatNumber(profit)}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        </tbody>
-                    </table>
+                <div className="mt-4">
+                    <h4 className="text-sm font-bold text-slate-700 mb-3">월별 손익 추이</h4>
+                    <div className="table-container">
+                        <table className="pl-table">
+                            <thead>
+                                <tr>
+                                    <th>구분</th>
+                                    {MONTHS.map(m => <th key={m}>{m}월</th>)}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr className="revenue-row">
+                                    <td>수입</td>
+                                    {MONTHS.map(m => (
+                                        <td key={m} className="revenue-positive">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
+                                    ))}
+                                </tr>
+                                <tr className="expense-row">
+                                    <td>지출</td>
+                                    {MONTHS.map(m => (
+                                        <td key={m} className="expense-negative">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
+                                    ))}
+                                </tr>
+                                <tr className="profit-row">
+                                    <td>손익</td>
+                                    {MONTHS.map(m => {
+                                        const profit = calcProfit(getMonthData(m));
+                                        return (
+                                            <td key={m} className={profit >= 0 ? 'profit-positive' : 'profit-negative'}>
+                                                {formatNumber(profit)}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         );
@@ -801,38 +811,40 @@ export default function ProfitLoss() {
         };
 
         return (
-            <div className="monthly-expense-section">
-                <div className="sticky-summary-header">
-                    <h3 className="section-title">📅 {month}월 비용 상세</h3>
-                    <div className="expense-summary">
-                        <div className="expense-stat">
-                            <span className="stat-label">거래처 수</span>
-                            <span className="stat-value">{displayVendors.length}개 {hideEmptyVendors && emptyVendorCount > 0 && <small>(+{emptyVendorCount} 숨김)</small>}</span>
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate relative">
+                <div className="sticky top-0 z-[200] bg-white/95 backdrop-blur-sm pb-4 mb-4 border-b border-slate-200">
+                    <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-xs text-white">📅</span>
+                        {month}월 비용 상세
+                    </h3>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="bg-slate-50 rounded-xl p-3">
+                            <div className="text-[11px] text-slate-400 font-semibold">거래처 수</div>
+                            <div className="text-lg font-extrabold text-slate-800">{displayVendors.length}개 {hideEmptyVendors && emptyVendorCount > 0 && <span className="text-xs text-slate-400 font-medium">(+{emptyVendorCount} 숨김)</span>}</div>
                         </div>
-                        <div className="expense-stat">
-                            <span className="stat-label">거래 건수</span>
-                            <span className="stat-value">{expenses.length}건</span>
+                        <div className="bg-slate-50 rounded-xl p-3">
+                            <div className="text-[11px] text-slate-400 font-semibold">거래 건수</div>
+                            <div className="text-lg font-extrabold text-slate-800">{expenses.length}건</div>
                         </div>
-                        <div className="expense-stat">
-                            <span className="stat-label">총 지출</span>
-                            <span className="stat-value highlight">{formatNumber(grandTotal)}원</span>
+                        <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
+                            <div className="text-[11px] text-rose-400 font-semibold">총 지출</div>
+                            <div className="text-lg font-extrabold text-rose-600">{formatNumber(grandTotal)}원</div>
                         </div>
                     </div>
 
-                    <div className="vendor-controls-banner">
-                        <div className="hide-empty-toggle">
-                            <label className="toggle-label">
-                                <input
-                                    type="checkbox"
-                                    checked={hideEmptyVendors}
-                                    onChange={(e) => setHideEmptyVendors(e.target.checked)}
-                                />
-                                <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
-                            </label>
-                        </div>
-                        <div className="vendor-settings-link-container">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-sky-50 to-blue-50 rounded-xl border border-sky-200">
+                        <label className="flex items-center gap-2 cursor-pointer text-sm text-sky-700 font-medium">
+                            <input
+                                type="checkbox"
+                                checked={hideEmptyVendors}
+                                onChange={(e) => setHideEmptyVendors(e.target.checked)}
+                                className="w-4 h-4 accent-sky-600 cursor-pointer"
+                            />
+                            <span>빈 거래처 숨기기 ({emptyVendorCount}개)</span>
+                        </label>
+                        <div className="flex items-center gap-2 text-sm text-blue-700">
                             <span>💡 거래처 추가/삭제/순서변경은</span>
-                            <a href="/vendor-settings" className="vendor-settings-link">⚙️ 거래처 관리</a>
+                            <a href="/vendor-settings" className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors no-underline">⚙️ 거래처 관리</a>
                             <span>에서 설정하세요.</span>
                         </div>
                     </div>
@@ -880,8 +892,8 @@ export default function ProfitLoss() {
                     </table>
                 </div>
 
-                <div className="instructions">
-                    <p>💡 셀을 클릭하면 금액을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+                <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                    <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 금액을 직접 입력/수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
                 </div>
             </div>
         );
@@ -890,7 +902,7 @@ export default function ProfitLoss() {
     // Render the summary table (existing)
     const renderSummaryTable = () => (
         <>
-            <div className="table-container">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto card-animate">
                 <table className="pl-table">
                     <colgroup>
                         <col style={{ width: '52px' }} />
@@ -984,8 +996,8 @@ export default function ProfitLoss() {
                     </tbody>
                 </table>
             </div>
-            <div className="instructions">
-                <p>💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+            <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
             </div>
         </>
     );
@@ -1311,47 +1323,54 @@ export default function ProfitLoss() {
     }
 
     // ═══════════════════════════════════════════
-    // DESKTOP LAYOUT (unchanged)
+    // DESKTOP LAYOUT
     // ═══════════════════════════════════════════
     return (
-        <div className="profitloss-page">
-            <div className="pl-inner-wrapper">
-            <div className="page-header">
-                <div className="header-left">
-                    <div className="header-icon"><BarChart3 size={20} /></div>
-                    <div>
-                        <h1>손익계산서</h1>
-                        <p className="header-subtitle">Profit & Loss Statement</p>
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-6xl mx-auto px-6 pt-8 pb-32">
+                {/* Page Header */}
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <BarChart3 size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0">손익계산서</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Profit & Loss Statement</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
+                        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer text-sm transition-colors flex items-center justify-center">◀</button>
+                        <span className="text-base font-bold text-slate-700 min-w-[60px] text-center">{year}년</span>
+                        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer text-sm transition-colors flex items-center justify-center">▶</button>
                     </div>
                 </div>
-                <div className="year-selector">
-                    <button onClick={() => setYear(y => y - 1)}>◀</button>
-                    <span>{year}년</span>
-                    <button onClick={() => setYear(y => y + 1)}>▶</button>
+
+                {/* Tab Navigation */}
+                <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl flex-wrap">
+                    {MAIN_TABS.map(tab => (
+                        <button
+                            key={tab.id}
+                            className={`px-5 py-2.5 border-none text-sm font-semibold cursor-pointer rounded-xl transition-all whitespace-nowrap ${
+                                activeTab === tab.id
+                                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
+                                    : 'bg-transparent text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                            }`}
+                            onClick={() => { setActiveTab(tab.id); setOpenDropdown(null); }}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
-            </div>
 
-            {/* Tab Navigation */}
-            <div className="tab-navigation">
-                {MAIN_TABS.map(tab => (
-                    <button
-                        key={tab.id}
-                        className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-                        onClick={() => { setActiveTab(tab.id); setOpenDropdown(null); }}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab Content */}
-            <div className="tab-content">
-                {activeTab === 'dashboard' && renderDashboard()}
-                {activeTab === 'summary' && renderSummaryTable()}
-                {activeTab === 'expenses' && renderExpenseDetail()}
-                {activeTab === 'analysis' && renderAnalysis()}
-                {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
-            </div>
+                {/* Tab Content */}
+                <div className="animate-fadeIn">
+                    {activeTab === 'dashboard' && renderDashboard()}
+                    {activeTab === 'summary' && renderSummaryTable()}
+                    {activeTab === 'expenses' && renderExpenseDetail()}
+                    {activeTab === 'analysis' && renderAnalysis()}
+                    {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
+                </div>
             </div>
         </div>
     );
