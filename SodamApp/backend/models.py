@@ -86,6 +86,17 @@ class Product(SQLModel, table=True):
     
     inventory: Optional["Inventory"] = Relationship(back_populates="product")
 
+class DeliveryImage(SQLModel, table=True):
+    """배달앱/상품관리용 이미지"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    name: str  # 상품명
+    category: str = "김밥류"  # 김밥류, 분식류, 주먹밥류, 음료류
+    image_url: str  # 이미지 URL (R2 or local)
+    storage_key: Optional[str] = None  # storage key for deletion
+    source: str = "upload"  # upload, ai_generated, static
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 class Expense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
