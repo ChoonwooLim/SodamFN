@@ -28,6 +28,15 @@ const PRODUCT_IMAGES = [
   { id: 20, name: '불고기주먹밥', file: 'bulgogi-onigiri.jpg', category: '주먹밥류' },
   { id: 21, name: '멸치주먹밥', file: 'myeolchi-onigiri.jpg', category: '주먹밥류' },
   { id: 22, name: '햄치즈주먹밥', file: 'hamcheese-onigiri.jpg', category: '주먹밥류' },
+  { id: 23, name: '소담세트', file: 'sodam-set.jpg', category: '분식류' },
+  { id: 24, name: '생수', file: 'water.jpg', category: '음료류' },
+  { id: 25, name: '코카콜라', file: 'coca-cola.jpg', category: '음료류' },
+  { id: 26, name: '칠성사이다', file: 'chilsung-cider.jpg', category: '음료류' },
+  { id: 27, name: '칠성사이다(제로)', file: 'chilsung-cider-zero.jpg', category: '음료류' },
+  { id: 28, name: '펩시콜라(제로)', file: 'pepsi-zero.jpg', category: '음료류' },
+  { id: 29, name: '데미소다', file: 'demi-soda.jpg', category: '음료류' },
+  { id: 30, name: '애사비', file: 'apple-vinegar.jpg', category: '음료류' },
+  { id: 31, name: '환타', file: 'fanta.jpg', category: '음료류' },
 ];
 
 /* ── 배달 플랫폼 프리셋 ── */
@@ -38,7 +47,7 @@ const PLATFORMS = [
   { id: 'original', name: '원본', size: '원본 크기', w: null, h: null, color: '#64748B', bg: '#F8FAFC' },
 ];
 
-const CATEGORIES = ['전체', '김밥류', '분식류', '주먹밥류'];
+const CATEGORIES = ['전체', '김밥류', '분식류', '주먹밥류', '음료류'];
 const IMG_BASE = '/recipes/products/';
 
 export default function DeliveryImages() {

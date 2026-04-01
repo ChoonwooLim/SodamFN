@@ -1,10 +1,13 @@
 {
   "permissions": {
-    "defaultMode": "dontAsk",
     "allow": [
       "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); from datetime import date,timedelta; from sqlmodel import Session, select; from database import engine; from models import DevWorkLog; s=Session\\(engine\\); yesterday=date.today\\(\\)-timedelta\\(days=1\\); logs=s.exec\\(select\\(DevWorkLog\\).where\\(DevWorkLog.date>=yesterday, ~DevWorkLog.title.startswith\\('[HEAD]'\\)\\).order_by\\(DevWorkLog.date.desc\\(\\)\\)\\).all\\(\\); [print\\(f'[{l.date}] [{l.category}] {l.title}\\\\n{l.ai_summary or \\\\\"\\\\\"}\\\\n---'\\) for l in logs]; print\\(f'총 {len\\(logs\\)}건'\\); s.close\\(\\)\")",
       "Skill(update-config)",
       "Skill(update-config:*)"
+    ],
+    "defaultMode": "dontAsk",
+    "additionalDirectories": [
+      "D:\\GoogleDrive\\소담김밥\\배달관련서류\\업로드용이미지\\쿠팡이츠"
     ]
   }
 }
