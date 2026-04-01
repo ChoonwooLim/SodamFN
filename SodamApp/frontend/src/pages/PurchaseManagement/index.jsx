@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet, Camera } from 'lucide-react';
-import api from '../api';
-import UploadHistoryList from '../components/UploadHistoryList';
+import api from '../../api';
+import UploadHistoryList from '../../components/UploadHistoryList';
 import './PurchaseManagement.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -19,21 +19,9 @@ const CARD_COLORS = {
     '기타': { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
 };
 
-const EXPENSE_CATEGORIES = [
-    { id: '원재료비', label: '원재료비', icon: '🥬', color: '#10b981' },
-    { id: '소모품비', label: '소모품비', icon: '📦', color: '#059669' },
-    { id: '수도광열비', label: '수도광열비', icon: '💡', color: '#8b5cf6' },
-    { id: '임차료', label: '임차료', icon: '🏠', color: '#7c3aed' },
-    { id: '수선비', label: '수선비', icon: '🔧', color: '#6366f1' },
-    { id: '감가상각비', label: '감가상각비', icon: '⚙️', color: '#0ea5e9' },
-    { id: '세금과공과', label: '세금과공과', icon: '🏛️', color: '#14b8a6' },
-    { id: '보험료', label: '보험료', icon: '🛡️', color: '#f97316' },
-    { id: '인건비', label: '인건비', icon: '👷', color: '#0d9488' },
-    { id: '카드수수료', label: '카드수수료', icon: '💳', color: '#ef4444' },
-    { id: '배달앱수수료', label: '배달앱 수수료', icon: '🛵', color: '#f43f5e' },
-    { id: '기타경비', label: '기타경비', icon: '📋', color: '#64748b' },
-    { id: '개인가계부', label: '개인가계부', icon: '👤', color: '#f59e0b' },
-];
+import { formatNumber, getWeekday } from '../../utils/format';
+import { EXPENSE_CATEGORIES } from '../../utils/constants';
+
 
 // 카테고리 선택 도우미 데이터 (한국 개인사업자 회계기준)
 const CATEGORY_HELP_DATA = {
@@ -87,16 +75,7 @@ const CATEGORY_HELP_DATA = {
     },
 };
 
-function formatNumber(n) {
-    if (n == null) return '0';
-    return Number(n).toLocaleString('ko-KR');
-}
 
-function getWeekday(dateStr) {
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const d = new Date(dateStr);
-    return days[d.getDay()];
-}
 
 function getCardColor(note) {
     if (!note) return CARD_COLORS['기타'];
@@ -562,73 +541,75 @@ export default function PurchaseManagement() {
     const topVendors = summary.top_vendors || [];
 
     return (
-        <div className="purchase-page">
+        <div className="purchase-page min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
             {/* ── Header ── */}
-            <div className="purchase-header">
-                <div className="purchase-header-top">
-                    <h1>
-                        <div className="header-icon">
-                            <ShoppingBag size={20} />
+            <div className="max-w-6xl mx-auto px-6 pt-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                            <ShoppingBag size={20} className="text-white" />
                         </div>
-                        <div className="header-text">
-                            <h1>매입관리</h1>
-                            <p className="header-subtitle">Purchase Management</p>
+                        <div>
+                            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0">매입관리</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Purchase Management</p>
                         </div>
-                    </h1>
-                    <div className="purchase-month-nav">
-                        <button onClick={prevMonth}><ChevronLeft size={16} /></button>
-                        <span className="purchase-month-label">{year}년 {month}월</span>
-                        <button onClick={nextMonth}><ChevronRight size={16} /></button>
+                    </div>
+                    <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
+                        <button onClick={prevMonth} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronLeft size={16} /></button>
+                        <span className="text-base font-bold text-slate-700 min-w-[100px] text-center">{year}년 {month}월</span>
+                        <button onClick={nextMonth} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer flex items-center justify-center transition-colors"><ChevronRight size={16} /></button>
                     </div>
                 </div>
             </div>
 
             {/* ── Summary Cards ── */}
-            <div className="purchase-summary-row">
-                <div className="purchase-summary-card total">
-                    <div className="card-label">💰 사업용 총 매입</div>
-                    <div className="card-value">{formatNumber(businessTotal)}원</div>
-                    <div className="card-sub">개인가계부 제외</div>
-                </div>
-                <div className="purchase-summary-card personal" onClick={() => setViewMode('household')}>
-                    <div className="card-label">👤 개인가계부</div>
-                    <div className="card-value">{formatNumber(personalTotal)}원</div>
-                    <div className="card-sub">별도 관리됨</div>
-                </div>
+            <div className="max-w-6xl mx-auto px-6">
+                <div className="grid grid-cols-5 gap-3 mb-5">
+                    <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl p-4 shadow-sm border border-slate-200 card-animate">
+                        <div className="text-[11px] text-slate-400 font-semibold">💰 사업용 총 매입</div>
+                        <div className="text-lg font-extrabold text-slate-800 mt-1">{formatNumber(businessTotal)}원</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">개인가계부 제외</div>
+                    </div>
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 card-animate cursor-pointer hover:shadow-md transition-shadow" style={{ animationDelay: '0.05s' }} onClick={() => setViewMode('household')}>
+                        <div className="text-[11px] text-amber-500 font-semibold">👤 개인가계부</div>
+                        <div className="text-lg font-extrabold text-amber-600 mt-1">{formatNumber(personalTotal)}원</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">별도 관리됨</div>
+                    </div>
 
-                {EXPENSE_CATEGORIES.slice(0, 2).map(cat => {
-                    const catInfo = categoryData[cat.id];
-                    return (
-                        <div className="purchase-summary-card" key={cat.id}>
-                            <div className="card-label">{cat.icon} {cat.label}</div>
-                            <div className="card-value">{formatNumber(catInfo?.amount || 0)}원</div>
-                            <div className="card-sub">{catInfo?.count || 0}건</div>
-                        </div>
-                    );
-                })}
-                {/* 배달앱 수수료 카드 */}
-                <div className="purchase-summary-card" style={{ borderTop: '3px solid #ef4444' }}>
-                    <div className="card-label">🛵 배달앱 수수료</div>
-                    <div className="card-value" style={{ color: '#ef4444' }}>{formatNumber(summary.total_delivery_fee || 0)}원</div>
-                    <div className="card-sub">{summary.delivery_fees?.length || 0}개 앱</div>
+                    {EXPENSE_CATEGORIES.slice(0, 2).map((cat, i) => {
+                        const catInfo = categoryData[cat.id];
+                        return (
+                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate" key={cat.id} style={{ animationDelay: `${(i + 2) * 0.05}s` }}>
+                                <div className="text-[11px] text-slate-400 font-semibold">{cat.icon} {cat.label}</div>
+                                <div className="text-lg font-extrabold text-slate-700 mt-1">{formatNumber(catInfo?.amount || 0)}원</div>
+                                <div className="text-[10px] text-slate-400 mt-0.5">{catInfo?.count || 0}건</div>
+                            </div>
+                        );
+                    })}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-rose-200 card-animate" style={{ animationDelay: '0.2s' }}>
+                        <div className="text-[11px] text-rose-400 font-semibold">🛵 배달앱 수수료</div>
+                        <div className="text-lg font-extrabold text-rose-500 mt-1">{formatNumber(summary.total_delivery_fee || 0)}원</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">{summary.delivery_fees?.length || 0}개 앱</div>
+                    </div>
                 </div>
             </div>
 
             {/* ── Tab Bar ── */}
-            <div className="purchase-tab-bar">
-                <div className="view-mode-toggle">
-                    <button className={`view-mode-btn ${viewMode === 'dashboard' ? 'active' : ''}`} onClick={() => setViewMode('dashboard')}>
-                        📊 대시보드
-                    </button>
-                    <button className={`view-mode-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}>
-                        📋 사업용 내역
-                    </button>
-                    <button className={`view-mode-btn ${viewMode === 'household' ? 'active' : ''}`} onClick={() => setViewMode('household')}>
-                        📒 가계부
-                    </button>
-                    <button className={`view-mode-btn ${viewMode === 'upload' ? 'active' : ''}`} onClick={() => setViewMode('upload')}>
-                        📤 업로드
-                    </button>
+            <div className="max-w-6xl mx-auto px-6 mb-5">
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+                    {[
+                        { id: 'dashboard', label: '📊 대시보드' },
+                        { id: 'list', label: '📋 사업용 내역' },
+                        { id: 'household', label: '📒 가계부' },
+                        { id: 'upload', label: '📤 업로드' },
+                    ].map(v => (
+                        <button key={v.id}
+                            className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
+                                viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                            }`}
+                            onClick={() => setViewMode(v.id)}
+                        >{v.label}</button>
+                    ))}
                 </div>
             </div>
 
@@ -636,11 +617,11 @@ export default function PurchaseManagement() {
             {/* DASHBOARD VIEW */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'dashboard' && (
-                <div className="purchase-dashboard">
+                <div className="space-y-4">
                     {/* Category Breakdown */}
-                    <div className="dashboard-section">
-                        <h3>📂 카테고리별 매입 현황</h3>
-                        <div className="category-bars">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">📂 카테고리별 매입 현황</h3>
+                        <div className="space-y-3">
                             {EXPENSE_CATEGORIES.filter(cat => cat.id !== '개인가계부').map(cat => {
                                 const catInfo = categoryData[cat.id];
                                 const amount = catInfo?.amount || 0;
@@ -649,13 +630,13 @@ export default function PurchaseManagement() {
                                 const ALWAYS_SHOW = ['배달앱수수료', '카드수수료'];
                                 if (amount === 0 && !ALWAYS_SHOW.includes(cat.id)) return null;
                                 return (
-                                    <div className="category-bar-item" key={cat.id}>
-                                        <div className="bar-label">
-                                            <span>{cat.icon} {cat.label}</span>
-                                            <span className="bar-amount">{formatNumber(amount)}원 ({pct.toFixed(1)}%)</span>
+                                    <div key={cat.id}>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-semibold text-slate-600">{cat.icon} {cat.label}</span>
+                                            <span className="text-xs font-bold text-slate-800">{formatNumber(amount)}원 ({pct.toFixed(1)}%)</span>
                                         </div>
-                                        <div className="bar-track">
-                                            <div className="bar-fill" style={{ width: `${pct}%`, background: cat.color }} />
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: cat.color }} />
                                         </div>
                                     </div>
                                 );
@@ -664,20 +645,20 @@ export default function PurchaseManagement() {
                     </div>
 
                     {/* Card + Bank (left) + Delivery Fee (right) — 2 columns */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '3.5fr 6.5fr', gap: '16px' }}>
+                    <div className="grid grid-cols-[3.5fr_6.5fr] gap-4">
                         {/* LEFT: Card Company + Bank Transfer */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <div className="flex flex-col gap-4">
                             {/* Card Company Breakdown */}
-                            <div className="dashboard-section" style={{ minWidth: 0 }}>
-                                <h3>💳 카드사별 매입 현황</h3>
-                                <div className="card-company-grid">
+                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate min-w-0">
+                                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">💳 카드사별 매입 현황</h3>
+                                <div className="grid grid-cols-2 gap-2">
                                     {Object.entries(cardData).filter(([k]) => k !== '기타').sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
                                         const colors = CARD_COLORS[card] || CARD_COLORS['기타'];
                                         return (
-                                            <div className="card-company-item" key={card} style={{ background: colors.bg, borderColor: colors.border }}>
-                                                <div className="cc-name" style={{ color: colors.text }}>{card}</div>
-                                                <div className="cc-amount">{formatNumber(info.amount)}원</div>
-                                                <div className="cc-count">{info.count}건</div>
+                                            <div key={card} className="rounded-xl p-3 border text-center" style={{ background: colors.bg, borderColor: colors.border }}>
+                                                <div className="text-xs font-bold mb-1" style={{ color: colors.text }}>{card}</div>
+                                                <div className="text-sm font-extrabold text-slate-800">{formatNumber(info.amount)}원</div>
+                                                <div className="text-[11px] text-slate-400">{info.count}건</div>
                                             </div>
                                         );
                                     })}
@@ -685,30 +666,30 @@ export default function PurchaseManagement() {
                             </div>
 
                             {/* Bank Transfer Breakdown */}
-                            <div className="dashboard-section" style={{ minWidth: 0 }}>
-                                <h3>🏦 계좌이체 현황</h3>
-                                <div className="card-company-grid">
+                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate min-w-0">
+                                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">🏦 계좌이체 현황</h3>
+                                <div className="grid grid-cols-2 gap-2">
                                     {Object.keys(bankData).length > 0 ? (
                                         Object.entries(bankData).sort((a, b) => b[1].amount - a[1].amount).map(([bank, info]) => {
                                             const colors = CARD_COLORS[bank] || { bg: '#ede9fe', text: '#7c3aed', border: '#c4b5fd' };
                                             return (
-                                                <div className="card-company-item" key={bank} style={{ background: colors.bg, borderColor: colors.border }}>
-                                                    <div className="cc-name" style={{ color: colors.text }}>{bank}</div>
-                                                    <div className="cc-amount">{formatNumber(info.amount)}원</div>
-                                                    <div className="cc-count">{info.count}건</div>
+                                                <div key={bank} className="rounded-xl p-3 border text-center" style={{ background: colors.bg, borderColor: colors.border }}>
+                                                    <div className="text-xs font-bold mb-1" style={{ color: colors.text }}>{bank}</div>
+                                                    <div className="text-sm font-extrabold text-slate-800">{formatNumber(info.amount)}원</div>
+                                                    <div className="text-[11px] text-slate-400">{info.count}건</div>
                                                 </div>
                                             );
                                         })
                                     ) : (
-                                        <div style={{ color: '#9ca3af', padding: '20px', textAlign: 'center' }}>계좌이체 내역 없음</div>
+                                        <div className="col-span-2 text-slate-400 py-5 text-center text-sm">계좌이체 내역 없음</div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
                         {/* RIGHT: Delivery App Fee Breakdown */}
-                        <div className="dashboard-section" style={{ minWidth: 0 }}>
-                            <h3>🛵 배달앱 수수료 상세</h3>
+                        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate min-w-0">
+                            <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">🛵 배달앱 수수료 상세</h3>
                             {summary.delivery_fees && summary.delivery_fees.length > 0 ? (
                                 <>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
@@ -804,21 +785,23 @@ export default function PurchaseManagement() {
                                     </div>
                                 </>
                             ) : (
-                                <div style={{ color: '#9ca3af', padding: '20px', textAlign: 'center' }}>배달앱 정산 파일 업로드 후 자동 표시</div>
+                                <div className="text-slate-400 py-5 text-center text-sm">배달앱 정산 파일 업로드 후 자동 표시</div>
                             )}
                         </div>
                     </div>
 
                     {/* Top Vendors */}
-                    <div className="dashboard-section">
-                        <h3>🏆 TOP 10 거래처</h3>
-                        <div className="top-vendors-list">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">🏆 TOP 10 거래처</h3>
+                        <div className="space-y-1">
                             {topVendors.map((v, i) => (
-                                <div className="top-vendor-item" key={v.name}>
-                                    <span className="tv-rank">{i + 1}</span>
-                                    <span className="tv-name">{v.name}</span>
-                                    <span className="tv-count">{v.count}건</span>
-                                    <span className="tv-amount">{formatNumber(v.amount)}원</span>
+                                <div key={v.name} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
+                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0 ${
+                                        i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'
+                                    }`}>{i + 1}</span>
+                                    <span className="text-sm font-semibold text-slate-700 flex-1 truncate">{v.name}</span>
+                                    <span className="text-[11px] text-slate-400 font-medium">{v.count}건</span>
+                                    <span className="text-sm font-bold text-slate-800 tabular-nums">{formatNumber(v.amount)}원</span>
                                 </div>
                             ))}
                         </div>
@@ -830,13 +813,14 @@ export default function PurchaseManagement() {
             {/* LIST / HOUSEHOLD VIEW */}
             {/* ═══════════════════════════════════════════ */}
             {(viewMode === 'list' || viewMode === 'household') && (
-                <div className="purchase-content">
-                    <div className="purchase-toolbar">
-                        <div className="toolbar-left">
-                            <div className="search-box">
-                                <Search size={16} />
+                <div className="space-y-4">
+                    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                                <Search size={16} className="text-slate-400" />
                                 <input
                                     type="text"
+                                    className="bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-slate-400 w-40"
                                     placeholder="거래처 검색..."
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
@@ -845,7 +829,7 @@ export default function PurchaseManagement() {
 
                             {!isHouseholdMode && (
                                 <select
-                                    className="category-filter"
+                                    className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
                                     value={filterCategory}
                                     onChange={e => setFilterCategory(e.target.value)}
                                 >
@@ -857,35 +841,35 @@ export default function PurchaseManagement() {
                             )}
 
                             {isHouseholdMode && (
-                                <div className="household-badge">
+                                <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
                                     📒 가계부 모드 (개인가계부만 표시)
-                                </div>
+                                </span>
                             )}
                         </div>
-                        <div className="toolbar-right">
-                            <span className="count-badge">총 {filteredData.length}건</span>
-                            <button className="purchase-add-btn" onClick={openAddModal}>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">총 {filteredData.length}건</span>
+                            <button className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl border-none cursor-pointer shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all" onClick={openAddModal}>
                                 <Plus size={16} /> {isHouseholdMode ? '생활비 추가' : '매입 추가'}
                             </button>
                         </div>
                     </div>
 
                     {loading ? (
-                        <div className="purchase-loading">
-                            <div className="spinner" />
-                            <p>불러오는 중...</p>
+                        <div className="flex flex-col items-center justify-center py-16 gap-3">
+                            <div className="w-8 h-8 border-3 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+                            <p className="text-sm text-slate-400">불러오는 중...</p>
                         </div>
                     ) : filteredData.length === 0 ? (
-                        <div className="purchase-empty">
-                            <div className="purchase-empty-icon">{isHouseholdMode ? '📒' : '📋'}</div>
-                            <h3>{isHouseholdMode ? '개인 생활비 내역이 없습니다' : '사업용 매입 내역이 없습니다'}</h3>
-                            <p className="purchase-empty-date">{year}년 {month}월</p>
-                            <p className="purchase-empty-hint">
-                                우측 상단 <strong>+ 매입 추가</strong> 또는 <strong>업로드</strong> 탭에서 데이터를 등록하세요
+                        <div className="bg-white rounded-2xl p-10 shadow-sm border border-slate-100 text-center card-animate">
+                            <div className="text-4xl mb-3">{isHouseholdMode ? '📒' : '📋'}</div>
+                            <h3 className="text-base font-bold text-slate-700 mb-1">{isHouseholdMode ? '개인 생활비 내역이 없습니다' : '사업용 매입 내역이 없습니다'}</h3>
+                            <p className="text-sm text-slate-400 mb-2">{year}년 {month}월</p>
+                            <p className="text-xs text-slate-400">
+                                우측 상단 <strong className="text-slate-600">+ 매입 추가</strong> 또는 <strong className="text-slate-600">업로드</strong> 탭에서 데이터를 등록하세요
                             </p>
                         </div>
                     ) : (
-                        <div className="purchase-list">
+                        <div className="space-y-3">
                             {sortedDates.map(dateStr => {
                                 const items = groupedByDate[dateStr];
                                 const dayTotal = items.reduce((sum, i) => sum + (i.amount || 0), 0);
@@ -893,68 +877,69 @@ export default function PurchaseManagement() {
                                 const dayNum = dateStr.split('-')[2];
 
                                 return (
-                                    <div className="day-group" key={dateStr}>
-                                        <div className="day-group-header">
+                                    <div key={dateStr} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden card-animate">
+                                        <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-slate-50 to-slate-100/80 border-b border-slate-100">
                                             <button
-                                                className="day-select-btn"
+                                                className="text-slate-400 hover:text-orange-500 transition-colors bg-transparent border-none cursor-pointer p-0"
                                                 onClick={() => toggleSelectDay(items)}
                                                 title="이 날짜 전체 선택/해제"
                                             >
                                                 {items.every(i => selectedIds.has(i.id))
-                                                    ? <CheckSquare size={16} className="checked" />
+                                                    ? <CheckSquare size={16} className="text-orange-500" />
                                                     : <Square size={16} />}
                                             </button>
-                                            <span className="day-date" onClick={() => toggleDateCollapse(dateStr)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span className="flex items-center gap-1 text-sm font-bold text-slate-700 cursor-pointer select-none" onClick={() => toggleDateCollapse(dateStr)}>
                                                 {collapsedDates.has(dateStr) ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
                                                 📅 {month}/{dayNum} ({weekday})
                                             </span>
-                                            <span className="day-count">{items.length}건</span>
-                                            <span className="day-total">{formatNumber(dayTotal)}원</span>
+                                            <span className="text-[11px] text-slate-400 font-medium ml-1">{items.length}건</span>
+                                            <span className="text-sm font-extrabold text-slate-800 ml-auto tabular-nums">{formatNumber(dayTotal)}원</span>
                                         </div>
                                         {!collapsedDates.has(dateStr) && (
-                                            <div className="day-items">
+                                            <div className="divide-y divide-slate-50">
                                                 {items.map(item => {
                                                     const cardCompany = getCardCompany(item.note);
                                                     const cardColor = getCardColor(item.note);
                                                     const catInfo = EXPENSE_CATEGORIES.find(c => c.id === item.category) || EXPENSE_CATEGORIES[5];
 
                                                     return (
-                                                        <div className={`purchase-item ${selectedIds.has(item.id) ? 'selected' : ''}`} key={item.id}>
-                                                            <label className="item-checkbox" onClick={e => e.stopPropagation()}>
+                                                        <div key={item.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${selectedIds.has(item.id) ? 'bg-orange-50/50' : 'hover:bg-slate-50/50'}`}>
+                                                            <label className="cursor-pointer shrink-0" onClick={e => e.stopPropagation()}>
                                                                 <input
                                                                     type="checkbox"
+                                                                    className="w-4 h-4 accent-orange-500"
                                                                     checked={selectedIds.has(item.id)}
                                                                     onChange={() => toggleSelect(item.id)}
                                                                 />
                                                             </label>
-                                                            <div className="item-left">
-                                                                <div className="item-vendor">{item.vendor_name}</div>
-                                                                <div className="item-meta">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm font-semibold text-slate-700 truncate">{item.vendor_name}</div>
+                                                                <div className="flex items-center gap-1.5 mt-0.5">
                                                                     {cardCompany && (
-                                                                        <span className="card-badge" style={{ background: cardColor.bg, color: cardColor.text, borderColor: cardColor.border }}>
+                                                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border" style={{ background: cardColor.bg, color: cardColor.text, borderColor: cardColor.border }}>
                                                                             {cardCompany}
                                                                         </span>
                                                                     )}
-                                                                    <span className="cat-badge" style={{ color: catInfo.color }}>
+                                                                    <span className="text-[11px] font-medium" style={{ color: catInfo.color }}>
                                                                         {catInfo.icon} {catInfo.label}
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <div className="item-right">
-                                                                <div className="item-amount">{formatNumber(item.amount)}원</div>
-                                                                <div className="item-actions">
+                                                            <div className="text-right shrink-0">
+                                                                <div className="text-sm font-bold text-slate-800 tabular-nums">{formatNumber(item.amount)}원</div>
+                                                                <div className="flex items-center gap-1 mt-1 justify-end">
                                                                     <button
-                                                                        className="action-btn toggle-type"
+                                                                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors"
                                                                         onClick={() => toggleCategory(item)}
                                                                         title={isHouseholdMode ? "사업비용으로 변경" : "개인비용으로 변경"}
                                                                     >
-                                                                        <ArrowRightLeft size={14} />
+                                                                        <ArrowRightLeft size={13} />
                                                                     </button>
-                                                                    <button className="action-btn" onClick={() => openEditModal(item)} title="수정">
-                                                                        <Edit3 size={14} />
+                                                                    <button className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => openEditModal(item)} title="수정">
+                                                                        <Edit3 size={13} />
                                                                     </button>
-                                                                    <button className="action-btn delete" onClick={() => handleDelete(item.id)} title="삭제">
-                                                                        <Trash2 size={14} />
+                                                                    <button className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => handleDelete(item.id)} title="삭제">
+                                                                        <Trash2 size={13} />
                                                                     </button>
                                                                 </div>
                                                             </div>
@@ -971,11 +956,11 @@ export default function PurchaseManagement() {
 
                     {/* ── Batch Action Bar ── */}
                     {selectedIds.size > 0 && (
-                        <div className="batch-action-bar">
-                            <span className="batch-count">✅ {selectedIds.size}건 선택</span>
-                            <div className="batch-actions">
+                        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-700 px-5 py-3 flex items-center gap-3 flex-wrap">
+                            <span className="text-xs font-bold text-white">✅ {selectedIds.size}건 선택</span>
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <select
-                                    className="batch-category-select"
+                                    className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none cursor-pointer"
                                     defaultValue=""
                                     onChange={(e) => {
                                         if (e.target.value) {
@@ -990,19 +975,19 @@ export default function PurchaseManagement() {
                                     ))}
                                 </select>
                                 {!isHouseholdMode && (
-                                    <button className="batch-btn personal" onClick={() => handleBatchCategory('개인가계부')}>
+                                    <button className="text-xs font-bold px-3 py-1.5 rounded-lg bg-violet-600 text-white border-none cursor-pointer hover:bg-violet-500 transition-colors" onClick={() => handleBatchCategory('개인가계부')}>
                                         👤 개인비용 전환
                                     </button>
                                 )}
                                 {isHouseholdMode && (
-                                    <button className="batch-btn business" onClick={() => handleBatchCategory('기타비용')}>
+                                    <button className="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white border-none cursor-pointer hover:bg-blue-500 transition-colors" onClick={() => handleBatchCategory('기타비용')}>
                                         💼 사업비용 전환
                                     </button>
                                 )}
-                                <button className="batch-btn delete" onClick={handleBatchDelete}>
+                                <button className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-600 text-white border-none cursor-pointer hover:bg-red-500 transition-colors" onClick={handleBatchDelete}>
                                     🗑️ 삭제
                                 </button>
-                                <button className="batch-btn cancel" onClick={() => setSelectedIds(new Set())}>
+                                <button className="text-xs font-bold px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 border-none cursor-pointer hover:bg-slate-600 transition-colors" onClick={() => setSelectedIds(new Set())}>
                                     ✕ 선택해제
                                 </button>
                             </div>
@@ -1015,23 +1000,23 @@ export default function PurchaseManagement() {
             {/* UPLOAD VIEW */}
             {/* ═══════════════════════════════════════════ */}
             {viewMode === 'upload' && (
-                <div className="purchase-upload upload-mode">
-                    <div className="upload-section">
-                        <div className="upload-tabs">
+                <div className="space-y-4">
+                    <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
+                        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-4">
                             <button
-                                className={`upload-tab-btn ${uploadTab === 'camera' ? 'active camera' : ''}`}
+                                className={`flex items-center gap-1.5 px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all ${uploadTab === 'camera' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'}`}
                                 onClick={() => { setUploadTab('camera'); setOcrResult(null); }}
                             >
                                 <Camera size={16} /> 촬영/이미지
                             </button>
                             <button
-                                className={`upload-tab-btn ${uploadTab === 'excel' ? 'active excel' : ''}`}
+                                className={`flex items-center gap-1.5 px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all ${uploadTab === 'excel' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'}`}
                                 onClick={() => setUploadTab('excel')}
                             >
                                 <FileSpreadsheet size={16} /> 문서 업로드
                             </button>
                             <button
-                                className={`upload-tab-btn ${uploadTab === 'history' ? 'active history' : ''}`}
+                                className={`flex items-center gap-1.5 px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all ${uploadTab === 'history' ? 'bg-slate-700 text-white shadow-md shadow-slate-700/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'}`}
                                 onClick={() => setUploadTab('history')}
                             >
                                 <RotateCcw size={16} /> 취소/기록
@@ -1039,79 +1024,79 @@ export default function PurchaseManagement() {
                         </div>
 
                         {uploadTab === 'history' ? (
-                            <div className="upload-history-wrapper">
+                            <div className="mt-2">
                                 <UploadHistoryList type="purchase" onRollback={fetchData} />
                             </div>
                         ) : uploadTab === 'camera' ? (
                             <>
                                 {!ocrResult ? (
                                     <div
-                                        className="upload-drop-zone"
+                                        className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer hover:border-orange-400 hover:bg-orange-50/30 transition-all"
                                         onClick={() => !uploadLoading && imageInputRef.current?.click()}
                                     >
                                         {uploadLoading ? (
-                                            <div className="upload-loading">
-                                                <div className="spinner" />
-                                                <p>🔍 영수증 분석 중...</p>
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="w-8 h-8 border-3 border-slate-200 border-t-orange-500 rounded-full animate-spin" />
+                                                <p className="text-sm text-slate-500">🔍 영수증 분석 중...</p>
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="upload-icon-box camera">
+                                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-500/20 text-white">
                                                     <Camera size={32} />
                                                 </div>
-                                                <p className="upload-main-text">
+                                                <p className="text-base font-bold text-slate-700 mb-1">
                                                     영수증 촬영 또는 이미지 선택
                                                 </p>
-                                                <p className="upload-sub-text">
+                                                <p className="text-xs text-slate-400">
                                                     매입 영수증을 촬영하면 자동으로 거래처, 금액, 날짜를 분석합니다
                                                 </p>
                                             </>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="ocr-result-card">
-                                        <div className="ocr-result-header">
-                                            <span className="ocr-result-badge">📸 분석 완료</span>
-                                            <span className="ocr-confidence">정확도 {Math.round((ocrResult.confidence || 0.9) * 100)}%</span>
+                                    <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                                        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600">
+                                            <span className="text-xs font-bold text-white">📸 분석 완료</span>
+                                            <span className="text-[11px] font-semibold text-emerald-100">정확도 {Math.round((ocrResult.confidence || 0.9) * 100)}%</span>
                                         </div>
-                                        <div className="ocr-result-body">
-                                            <div className="ocr-field">
-                                                <span className="ocr-label">🏪 거래처</span>
-                                                <span className="ocr-value">{ocrResult.vendor_name}</span>
+                                        <div className="p-4 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-slate-400 font-semibold">🏪 거래처</span>
+                                                <span className="text-sm font-bold text-slate-800">{ocrResult.vendor_name}</span>
                                             </div>
-                                            <div className="ocr-field">
-                                                <span className="ocr-label">💰 금액</span>
-                                                <span className="ocr-value amount">{(ocrResult.total_amount || 0).toLocaleString()}원</span>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-slate-400 font-semibold">💰 금액</span>
+                                                <span className="text-sm font-extrabold text-blue-600">{(ocrResult.total_amount || 0).toLocaleString()}원</span>
                                             </div>
-                                            <div className="ocr-field">
-                                                <span className="ocr-label">📅 날짜</span>
-                                                <span className="ocr-value">{ocrResult.date}</span>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-slate-400 font-semibold">📅 날짜</span>
+                                                <span className="text-sm font-bold text-slate-800">{ocrResult.date}</span>
                                             </div>
-                                            <div className="ocr-field">
-                                                <span className="ocr-label">📂 카테고리</span>
-                                                <span className="ocr-value">{ocrResult.category}</span>
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs text-slate-400 font-semibold">📂 카테고리</span>
+                                                <span className="text-sm font-bold text-slate-800">{ocrResult.category}</span>
                                             </div>
                                             {ocrResult.items && ocrResult.items.length > 0 && (
-                                                <div className="ocr-items">
-                                                    <span className="ocr-label">🛒 품목</span>
-                                                    <div className="ocr-items-list">
+                                                <div className="pt-2 border-t border-slate-200">
+                                                    <span className="text-xs text-slate-400 font-semibold block mb-2">🛒 품목</span>
+                                                    <div className="space-y-1">
                                                         {ocrResult.items.map((item, i) => (
-                                                            <div key={i} className="ocr-item-row">
-                                                                <span>{item.name}</span>
-                                                                <span>{item.amount?.toLocaleString()}원</span>
+                                                            <div key={i} className="flex justify-between text-xs">
+                                                                <span className="text-slate-600">{item.name}</span>
+                                                                <span className="font-bold text-slate-700 tabular-nums">{item.amount?.toLocaleString()}원</span>
                                                             </div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="ocr-result-footer">
-                                            <button className="ocr-btn secondary" onClick={() => setOcrResult(null)}>🔄 다시 촬영</button>
-                                            <button className="ocr-btn success" onClick={() => { setOcrResult(null); fetchData(); }}>
+                                        <div className="flex gap-2 px-4 pb-3">
+                                            <button className="flex-1 py-2.5 rounded-xl bg-slate-200 text-slate-600 text-xs font-bold border-none cursor-pointer hover:bg-slate-300 transition-colors" onClick={() => setOcrResult(null)}>🔄 다시 촬영</button>
+                                            <button className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold border-none cursor-pointer shadow-md shadow-emerald-500/20 hover:shadow-lg transition-all" onClick={() => { setOcrResult(null); fetchData(); }}>
                                                 ✅ 저장 완료
                                             </button>
                                         </div>
-                                        <p className="ocr-saved-note">✅ 데이터가 이미 자동 저장되었습니다</p>
+                                        <p className="text-center text-[11px] text-emerald-500 font-medium pb-3">✅ 데이터가 이미 자동 저장되었습니다</p>
                                     </div>
                                 )}
                                 <input
@@ -1150,28 +1135,28 @@ export default function PurchaseManagement() {
                         ) : (
                             <>
                                 <div
-                                    className="upload-drop-zone"
+                                    className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-all"
                                     onClick={() => !uploadLoading && fileInputRef.current?.click()}
                                 >
                                     {uploadLoading ? (
-                                        <div className="upload-loading">
-                                            <div className="spinner" />
-                                            <p>{uploadProgress || '처리 중입니다...'}</p>
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-8 h-8 border-3 border-slate-200 border-t-emerald-500 rounded-full animate-spin" />
+                                            <p className="text-sm text-slate-500">{uploadProgress || '처리 중입니다...'}</p>
                                         </div>
                                     ) : (
                                         <>
-                                            <div className="upload-icon-box excel">
+                                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20 text-white">
                                                 <UploadCloud size={32} />
                                             </div>
-                                            <p className="upload-main-text">
+                                            <p className="text-base font-bold text-slate-700 mb-1">
                                                 클릭하여 문서 파일 선택
                                             </p>
-                                            <p className="upload-sub-text">
+                                            <p className="text-xs text-slate-400 mb-3">
                                                 .xls, .xlsx, .pdf, .csv 파일 — 여러 파일 동시 가능
                                             </p>
-                                            <div className="supported-cards" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', marginTop: 12 }}>
+                                            <div className="flex flex-wrap gap-1.5 justify-center">
                                                 {Object.entries(CARD_COLORS).filter(([k]) => k !== '기타').map(([card, colors]) => (
-                                                    <span className="supported-card-badge" key={card} style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}>
+                                                    <span key={card} className="text-[10px] font-bold px-2 py-1 rounded-md border" style={{ background: colors.bg, color: colors.text, borderColor: colors.border }}>
                                                         {card}
                                                     </span>
                                                 ))}
@@ -1190,20 +1175,20 @@ export default function PurchaseManagement() {
 
                                 {/* Upload Results */}
                                 {uploadResult && (
-                                    <div className="upload-results" style={{ marginTop: 16 }}>
+                                    <div className="mt-4 space-y-2">
                                         {uploadResult.map((r, i) => (
-                                            <div className={`upload-result-item ${r.status}`} key={i}>
-                                                <div className="ur-file">{r.file}</div>
+                                            <div key={i} className={`rounded-xl p-3 border ${r.status === 'success' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                                                <div className="text-xs font-bold text-slate-700 mb-1">{r.file}</div>
                                                 {r.status === 'success' ? (
-                                                    <div className="ur-detail">
-                                                        <span className="ur-card">{r.card_company}</span>
-                                                        <span className="ur-count">✅ {r.count}건 저장</span>
-                                                        {r.skipped > 0 && <span className="ur-skipped">⏭️ {r.skipped}건 중복</span>}
-                                                        {r.vendors_created > 0 && <span className="ur-vendors">🏪 {r.vendors_created}개 거래처 생성</span>}
-                                                        {r.auto_classified > 0 && <span className="ur-auto">🤖 {r.auto_classified}건 자동분류</span>}
+                                                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
+                                                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{r.card_company}</span>
+                                                        <span className="text-emerald-600">✅ {r.count}건 저장</span>
+                                                        {r.skipped > 0 && <span className="text-amber-600">⏭️ {r.skipped}건 중복</span>}
+                                                        {r.vendors_created > 0 && <span className="text-violet-600">🏪 {r.vendors_created}개 거래처 생성</span>}
+                                                        {r.auto_classified > 0 && <span className="text-sky-600">🤖 {r.auto_classified}건 자동분류</span>}
                                                     </div>
                                                 ) : (
-                                                    <div className="ur-error">❌ {r.message}</div>
+                                                    <div className="text-xs text-red-600 font-medium">❌ {r.message}</div>
                                                 )}
                                             </div>
                                         ))}
@@ -1219,57 +1204,64 @@ export default function PurchaseManagement() {
             {/* ADD/EDIT MODAL */}
             {/* ═══════════════════════════════════════════ */}
             {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>{modalMode === 'add' ? '매입 추가' : '매입 수정'}</h3>
-                            <button className="modal-close" onClick={() => setShowModal(false)}><X size={18} /></button>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                            <h3 className="text-base font-bold text-slate-800">{modalMode === 'add' ? '매입 추가' : '매입 수정'}</h3>
+                            <button className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors" onClick={() => setShowModal(false)}><X size={18} /></button>
                         </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>거래처명</label>
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1.5">거래처명</label>
                                 <input
                                     type="text"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                                     value={form.vendor_name}
                                     onChange={e => setForm({ ...form, vendor_name: e.target.value })}
                                     placeholder="예: 다인푸드, (주)가락봉투"
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>날짜</label>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1.5">날짜</label>
                                 <input
                                     type="date"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                                     value={form.date}
                                     onChange={e => setForm({ ...form, date: e.target.value })}
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>금액</label>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1.5">금액</label>
                                 <input
                                     type="number"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                                     value={form.amount}
                                     onChange={e => setForm({ ...form, amount: e.target.value })}
                                     placeholder="0"
                                 />
                             </div>
-                            <div className="form-group">
-                                <label>
+                            <div>
+                                <label className="flex items-center gap-2 text-xs font-semibold text-slate-500 mb-2">
                                     카테고리
                                     <button
                                         type="button"
-                                        className="category-helper-btn"
+                                        className="text-[11px] text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors font-semibold"
                                         onClick={() => setShowCategoryHelper(true)}
                                         title="카테고리 선택 도우미"
                                     >
                                         ❓ 선택도우미
                                     </button>
                                 </label>
-                                <div className="category-chips">
+                                <div className="flex flex-wrap gap-1.5">
                                     {EXPENSE_CATEGORIES.map(c => (
                                         <button
                                             key={c.id}
                                             type="button"
-                                            className={`category-chip ${form.category === c.id ? 'active' : ''}`}
+                                            className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-all ${
+                                                form.category === c.id
+                                                    ? 'text-white border-transparent shadow-sm'
+                                                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                                            }`}
                                             onClick={() => setForm({ ...form, category: c.id })}
                                             style={form.category === c.id ? { background: c.color, borderColor: c.color } : {}}
                                         >
@@ -1278,19 +1270,20 @@ export default function PurchaseManagement() {
                                     ))}
                                 </div>
                             </div>
-                            <div className="form-group">
-                                <label>비고</label>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1.5">비고</label>
                                 <input
                                     type="text"
+                                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
                                     value={form.note}
                                     onChange={e => setForm({ ...form, note: e.target.value })}
                                     placeholder="메모 (선택)"
                                 />
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <button className="btn-cancel" onClick={() => setShowModal(false)}>취소</button>
-                            <button className="btn-save" onClick={handleSubmit}>
+                        <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
+                            <button className="px-5 py-2.5 rounded-xl bg-slate-200 text-slate-600 text-sm font-bold border-none cursor-pointer hover:bg-slate-300 transition-colors" onClick={() => setShowModal(false)}>취소</button>
+                            <button className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-bold border-none cursor-pointer shadow-md shadow-orange-500/20 hover:shadow-lg transition-all" onClick={handleSubmit}>
                                 {modalMode === 'add' ? '추가' : '저장'}
                             </button>
                         </div>
@@ -1299,38 +1292,37 @@ export default function PurchaseManagement() {
             )}
             {/* 카테고리 선택 도우미 모달 */}
             {showCategoryHelper && (
-                <div className="modal-overlay" onClick={() => setShowCategoryHelper(false)} style={{ zIndex: 1100 }}>
-                    <div className="modal-content category-helper-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, maxHeight: '80vh', overflow: 'auto' }}>
-                        <div className="modal-header">
-                            <h3>❓ 카테고리 선택 도우미</h3>
-                            <button className="modal-close" onClick={() => setShowCategoryHelper(false)}>×</button>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setShowCategoryHelper(false)}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+                            <h3 className="text-base font-bold text-slate-800">❓ 카테고리 선택 도우미</h3>
+                            <button className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors" onClick={() => setShowCategoryHelper(false)}>×</button>
                         </div>
-                        <div className="modal-body" style={{ padding: '12px 16px' }}>
-                            <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
+                        <div className="p-4">
+                            <p className="text-xs text-slate-400 mb-3">
                                 한국 개인사업자 회계기준에 맞춤 카테고리입니다. 카테고리를 클릭하면 선택됩니다.
                             </p>
+                            <div className="space-y-2">
                             {EXPENSE_CATEGORIES.map(cat => {
                                 const help = CATEGORY_HELP_DATA[cat.id];
                                 if (!help) return null;
                                 return (
                                     <div
                                         key={cat.id}
-                                        className="category-helper-item"
+                                        className="rounded-xl p-3 cursor-pointer transition-all hover:scale-[1.01] border"
                                         onClick={() => { setForm(f => ({ ...f, category: cat.id })); setShowCategoryHelper(false); }}
                                         style={{
-                                            padding: '10px 14px', marginBottom: 8, borderRadius: 10,
-                                            background: form.category === cat.id ? `${cat.color}18` : '#1e293b',
-                                            border: `1px solid ${form.category === cat.id ? cat.color : '#334155'}`,
-                                            cursor: 'pointer', transition: 'all 0.15s',
+                                            background: form.category === cat.id ? `${cat.color}10` : '#f8fafc',
+                                            borderColor: form.category === cat.id ? cat.color : '#e2e8f0',
                                         }}
                                     >
-                                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>
+                                        <div className="text-sm font-semibold text-slate-700 mb-1">
                                             {cat.icon} {cat.label}
-                                            <span style={{ fontWeight: 400, fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{help.desc}</span>
+                                            <span className="text-xs font-normal text-slate-400 ml-2">{help.desc}</span>
                                         </div>
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                                        <div className="flex flex-wrap gap-1">
                                             {help.items.map((item, i) => (
-                                                <span key={i} style={{ fontSize: 11, color: '#64748b', background: '#0f172a', padding: '2px 8px', borderRadius: 6 }}>
+                                                <span key={i} className="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
                                                     {item}
                                                 </span>
                                             ))}
@@ -1338,6 +1330,7 @@ export default function PurchaseManagement() {
                                     </div>
                                 );
                             })}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1347,15 +1340,15 @@ export default function PurchaseManagement() {
             {/* VENDOR REVIEW MODAL (2-step upload) */}
             {/* ═══════════════════════════════════════════ */}
             {showVendorReview && previewData && (
-                <div className="modal-overlay">
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>🔍 거래처 확인 ({previewData.card_company})</h3>
-                            <button className="modal-close" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-auto" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white z-10">
+                            <h3 className="text-base font-bold text-slate-800">🔍 거래처 확인 ({previewData.card_company})</h3>
+                            <button className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>
                                 <X size={18} />
                             </button>
                         </div>
-                        <div className="modal-body">
+                        <div className="p-5">
                             {/* Summary */}
                             <div style={{ background: '#0f172a', borderRadius: 12, padding: '14px 18px', marginBottom: 16 }}>
                                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
@@ -1545,8 +1538,8 @@ export default function PurchaseManagement() {
                                 })}
                             </div>
                         </div>
-                        <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <button className="btn-cancel" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>취소</button>
+                        <div className="flex justify-between items-center px-5 py-4 border-t border-slate-100 bg-slate-50/50 sticky bottom-0">
+                            <button className="px-5 py-2.5 rounded-xl bg-slate-200 text-slate-600 text-sm font-bold border-none cursor-pointer hover:bg-slate-300 transition-colors" onClick={() => { setShowVendorReview(false); setPreviewData(null); }}>취소</button>
                             <button
                                 className="btn-save"
                                 disabled={!canConfirmUpload() || confirmLoading}

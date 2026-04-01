@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart3 } from 'lucide-react';
-import api from '../api';
-import { useIsMobile } from '../hooks/useMediaQuery';
+import api from '../../api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import './ProfitLoss.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'; // Keep for now if needed, but api client handles base URL
@@ -34,21 +34,7 @@ const EXPENSE_FIELDS = [
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-// 매입처 카테고리 정의 (VendorSettings.jsx와 동기화)
-// Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
-const EXPENSE_CATEGORIES = [
-    { id: '원재료비', label: '원재료비', icon: '🥬' },
-    { id: '소모품비', label: '소모품비', icon: '📦' },
-    { id: '수도광열비', label: '수도광열비', icon: '💡' },
-    { id: '임차료', label: '임차료', icon: '🏠' },
-    { id: '수선비', label: '수선비', icon: '🔧' },
-    { id: '감가상각비', label: '감가상각비', icon: '⚙️' },
-    { id: '세금과공과', label: '세금과공과', icon: '🏛️' },
-    { id: '보험료', label: '보험료', icon: '🛡️' },
-    { id: '인건비', label: '인건비', icon: '👷' },
-    { id: '카드수수료', label: '카드수수료', icon: '💳' },
-    { id: '기타경비', label: '기타경비', icon: '📋' },
-];
+import { EXPENSE_CATEGORIES } from '../../utils/constants';
 
 // Main tabs (always visible) — 수입상세/배달앱은 매출관리로 이동
 const MAIN_TABS = [
@@ -63,10 +49,7 @@ const MONTH_TABS = Array.from({ length: 12 }, (_, i) => ({
     label: `${i + 1}월`
 }));
 
-function formatNumber(num) {
-    if (num === undefined || num === null) return '-';
-    return num.toLocaleString();
-}
+import { formatNumber } from '../../utils/format';
 
 export default function ProfitLoss() {
     const isMobile = useIsMobile();

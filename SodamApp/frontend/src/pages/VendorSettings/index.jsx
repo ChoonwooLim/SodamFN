@@ -1,30 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, Plus, Trash2, ChevronUp, ChevronDown, Edit2, X, Check, Building2, Package, GitMerge } from 'lucide-react';
-import api from '../api';
+import api from '../../api';
 import './VendorSettings.css';
-import VendorInfoManagement from '../components/VendorInfoManagement';
-// 매입처 카테고리 정의 (백엔드 CATEGORY_TO_PL_FIELD와 동기화)
-// Note: 인건비는 Payroll에서 자동 동기화, 퇴직금적립은 인건비×10% 자동계산
-const EXPENSE_CATEGORIES = [
-    { id: '원재료비', label: '원재료비', icon: '🥬' },
-    { id: '소모품비', label: '소모품비', icon: '📦' },
-    { id: '수도광열비', label: '수도광열비', icon: '💡' },
-    { id: '임차료', label: '임차료', icon: '🏠' },
-    { id: '수선비', label: '수선비', icon: '🔧' },
-    { id: '감가상각비', label: '감가상각비', icon: '⚙️' },
-    { id: '세금과공과', label: '세금과공과', icon: '🏛️' },
-    { id: '보험료', label: '보험료', icon: '🛡️' },
-    { id: '인건비', label: '인건비', icon: '👷' },
-    { id: '카드수수료', label: '카드수수료', icon: '💳' },
-    { id: '기타경비', label: '기타경비', icon: '📋' },
-    { id: '개인가계부', label: '개인가계부', icon: '👤' },
-];
-// 매출처 카테고리 정의
-const REVENUE_CATEGORIES = [
-    { id: 'delivery', label: '배달앱매출', icon: '🛵' },
-    { id: 'store', label: '매장매출', icon: '🏪' },
-];
+import VendorInfoManagement from '../../components/VendorInfoManagement';
+import { EXPENSE_CATEGORIES, REVENUE_CATEGORIES, DELIVERY_APPS, CARD_COMPANIES, PAY_SERVICES } from '../../utils/constants';
+
 export default function VendorSettings() {
     const navigate = useNavigate();
     const [vendors, setVendors] = useState([]);
@@ -73,7 +54,7 @@ export default function VendorSettings() {
         }
     };
 
-    const DELIVERY_APPS = ['배달의민족', '쿠팡이츠', '땡겨요', '요기요'];
+
 
     const handleAddStore = async () => {
         if (!newStoreName.trim()) return;
@@ -88,7 +69,7 @@ export default function VendorSettings() {
             });
 
             // Automated Card Companies
-            const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
+
 
             for (const company of CARD_COMPANIES) {
                 await handleCreateVendor({
@@ -100,7 +81,7 @@ export default function VendorSettings() {
             }
 
             // Automated Pay Services
-            const PAY_SERVICES = ['서울페이', '제로페이', '네이버페이', '카카오페이', '애플페이', '삼성페이'];
+
 
             for (const pay of PAY_SERVICES) {
                 await handleCreateVendor({
@@ -237,7 +218,7 @@ export default function VendorSettings() {
                 });
 
                 // 2. Automated Card Companies
-                const CARD_COMPANIES = ['농협카드', '신한카드', '삼성카드', '국민카드', '롯데카드', '현대카드', '우리카드', '하나카드', 'BC카드'];
+
 
                 for (const company of CARD_COMPANIES) {
                     await handleCreateVendor({
@@ -249,7 +230,7 @@ export default function VendorSettings() {
                 }
 
                 // 3. Automated Pay Services
-                const PAY_SERVICES = ['서울페이', '제로페이', '네이버페이', '카카오페이', '애플페이', '삼성페이'];
+
 
                 for (const pay of PAY_SERVICES) {
                     await handleCreateVendor({

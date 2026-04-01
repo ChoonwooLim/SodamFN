@@ -2,51 +2,21 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, TrendingUp, Camera, FileSpreadsheet, RotateCcw, UploadCloud } from 'lucide-react';
 import axios from 'axios';
-import api from '../api';
-import UploadHistoryList from '../components/UploadHistoryList';
-import { useIsMobile } from '../hooks/useMediaQuery';
+import api from '../../api';
+import UploadHistoryList from '../../components/UploadHistoryList';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import './RevenueManagement.css';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-// ── PL Revenue (수입상세) ──
-const PL_REVENUE_FIELDS = [
-    { key: 'revenue_store', label: '매장매출', icon: '🏪' },
-    { key: 'revenue_coupang', label: '쿠팡 매출', icon: '🛒' },
-    { key: 'revenue_baemin', label: '배민 매출', icon: '🏍️' },
-    { key: 'revenue_yogiyo', label: '요기요 매출', icon: '🍜' },
-    { key: 'revenue_ddangyo', label: '땡겨요 매출', icon: '📱' },
-];
+import { formatNumber, getWeekday } from '../../utils/format';
+import { PL_REVENUE_FIELDS, DELIVERY_CHANNELS, REVENUE_CATEGORIES } from '../../utils/constants';
+
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-// ── Delivery Channels (배달앱) ──
-const DELIVERY_CHANNELS = [
-    { id: 'coupang', label: '쿠팡이츠', apiKey: 'Coupang', icon: '🛒' },
-    { id: 'baemin', label: '배달의민족', apiKey: 'Baemin', icon: '🏍️' },
-    { id: 'yogiyo', label: '요기요', apiKey: 'Yogiyo', icon: '🍜' },
-    { id: 'ddangyo', label: '땡겨요', apiKey: 'Ddangyo', icon: '📱' },
-];
-
 const CATEGORY_LABELS = {
     store: { label: '매장매출', icon: '🏪', badge: 'store' },
     delivery: { label: '배달앱매출', icon: '🛵', badge: 'delivery' },
 };
-
-const REVENUE_CATEGORIES = [
-    { id: 'store', label: '매장매출', icon: '🏪' },
-    { id: 'delivery', label: '배달앱매출', icon: '🛵' },
-];
-
-function formatNumber(n) {
-    if (n == null) return '0';
-    return Number(n).toLocaleString('ko-KR');
-}
-
-function getWeekday(dateStr) {
-    const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const d = new Date(dateStr);
-    return days[d.getDay()];
-}
 
 export default function RevenueManagement() {
     const navigate = useNavigate();
