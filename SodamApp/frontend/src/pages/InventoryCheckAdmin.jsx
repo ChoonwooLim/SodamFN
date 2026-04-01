@@ -116,29 +116,29 @@ export default function InventoryCheckAdmin() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <header className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-cyan-100 rounded-xl">
-                            <Package size={24} className="text-cyan-700" />
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                            <Package size={20} className="text-white" />
                         </div>
                         <div>
-                            <h1 className="text-2xl font-black text-slate-900">오픈 재고 체크</h1>
-                            <p className="text-sm text-slate-500">매일 재고 수량을 기록하고 관리합니다</p>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">오픈 재고 체크</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">매일 재고 수량을 기록하고 관리합니다</p>
                         </div>
                     </div>
                     <button onClick={() => setShowSettings(!showSettings)}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${showSettings ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all ${showSettings ? 'bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
                         <Settings size={16} />
                         항목 관리
                     </button>
-                </div>
+                </header>
 
                 {/* ══════ Settings Panel ══════ */}
                 {showSettings && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 mb-6">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow mb-6 card-animate">
                         <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
                             <Settings size={16} className="text-slate-500" /> 재고 항목 설정
                         </h3>
@@ -231,8 +231,8 @@ export default function InventoryCheckAdmin() {
                 )}
 
                 {/* ══════ Input Form ══════ */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                    <div className="bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-4 flex items-center gap-3">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-6 card-animate">
+                    <div className="bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-4 flex items-center gap-3">
                         <Package size={20} className="text-white" />
                         <span className="text-white font-bold text-lg">재고 수량 입력</span>
                         {submitted && (

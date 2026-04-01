@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Wallet, Save, Building2, MapPin, Navigation, Loader2 } from 'lucide-react';
+import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon } from 'lucide-react';
 import VendorSettings from './VendorSettings';
 import ContractSettings from './ContractSettings';
 import GoogleMapPicker from '../components/GoogleMapPicker';
 import api from '../api';
+
+const TABS = [
+    { key: 'vendor', label: '거래처 및 품목 관리' },
+    { key: 'contract', label: '전자계약서 양식' },
+    { key: 'payment', label: '급여 출금계좌' },
+    { key: 'location', label: '매장 위치 관리' },
+    { key: 'logo', label: '회사 로고 관리' },
+];
 
 export default function Settings() {
     const [activeTab, setActiveTab] = useState('vendor');
@@ -152,242 +160,219 @@ export default function Settings() {
     };
 
     return (
-        <div className="p-6 bg-slate-50 min-h-screen pb-24">
-            <header className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900">환경 설정</h1>
-                <p className="text-slate-500">시스템의 전반적인 설정을 관리합니다.</p>
-            </header>
-
-            {/* Tabs */}
-            <div className="flex gap-2 mb-6 border-b border-slate-200">
-                <button
-                    onClick={() => setActiveTab('vendor')}
-                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'vendor'
-                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    거래처 및 품목 관리
-                </button>
-                <button
-                    onClick={() => setActiveTab('contract')}
-                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'contract'
-                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    전자계약서 양식
-                </button>
-                <button
-                    onClick={() => setActiveTab('payment')}
-                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'payment'
-                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    급여 출금계좌
-                </button>
-                <button
-                    onClick={() => setActiveTab('location')}
-                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'location'
-                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    📍 매장 위치 관리
-                </button>
-                <button
-                    onClick={() => setActiveTab('logo')}
-                    className={`px-4 py-2 text-sm font-bold rounded-t-lg transition-colors ${activeTab === 'logo'
-                        ? 'bg-white text-blue-600 border-t border-x border-slate-200 -mb-px'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
-                >
-                    🎨 회사 로고 관리
-                </button>
-            </div>
-
-            {/* Content Area */}
-            {activeTab === 'vendor' ? (
-                <div className="-mt-6 -mx-6">
-                    <VendorSettings />
-                </div>
-            ) : activeTab === 'contract' ? (
-                <ContractSettings />
-            ) : activeTab === 'location' ? (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-3xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-3 bg-emerald-100 rounded-xl">
-                            <MapPin className="w-6 h-6 text-emerald-600" />
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-500/20">
+                            <SettingsIcon size={20} className="text-white" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold text-slate-800">매장 위치 설정 (Geofence)</h2>
-                            <p className="text-sm text-slate-500">GPS 출퇴근 인증에 사용할 매장 위치와 허용 반경을 설정합니다.</p>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">환경 설정</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">시스템의 전반적인 설정을 관리합니다</p>
                         </div>
                     </div>
+                </header>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">매장명</label>
-                            <input type="text" value={location.name} onChange={(e) => setLocation({ ...location, name: e.target.value })} placeholder="소담김밥" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">위도 (Latitude)</label>
-                                <input type="number" step="0.0001" value={location.latitude} onChange={(e) => setLocation({ ...location, latitude: parseFloat(e.target.value) || 0 })} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-600 mb-1">경도 (Longitude)</label>
-                                <input type="number" step="0.0001" value={location.longitude} onChange={(e) => setLocation({ ...location, longitude: parseFloat(e.target.value) || 0 })} className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
-                            </div>
-                        </div>
-
-                        <button onClick={handleUseCurrentLocation} disabled={gettingGps} className="w-full flex items-center justify-center gap-2 py-3 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors disabled:opacity-50">
-                            {gettingGps ? <Loader2 size={18} className="animate-spin" /> : <Navigation size={18} />}
-                            {gettingGps ? 'GPS 좌표 획득 중...' : '📍 현재 위치로 설정'}
-                        </button>
-
-                        {/* Google Maps Picker */}
-                        <GoogleMapPicker
-                            latitude={location.latitude}
-                            longitude={location.longitude}
-                            radius={location.radius_meters}
-                            onLocationChange={(lat, lng) => setLocation(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(6)), longitude: parseFloat(lng.toFixed(6)) }))}
-                        />
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-2">허용 반경: <strong>{location.radius_meters}m</strong></label>
-                            <input type="range" min="5" max="10" step="1" value={location.radius_meters} onChange={(e) => setLocation({ ...location, radius_meters: parseInt(e.target.value) })} className="w-full accent-emerald-600" />
-                            <div className="flex justify-between text-xs text-slate-400 mt-1"><span>5m</span><span>6m</span><span>7m</span><span>8m</span><span>9m</span><span>10m</span></div>
-                        </div>
-
-                        {locMessage && (
-                            <div className={`text-sm font-medium p-3 rounded-lg ${locMessage.includes('오류') || locMessage.includes('거부') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                {locMessage}
-                            </div>
-                        )}
-
-                        <button onClick={handleSaveLocation} disabled={locSaving} className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50">
-                            <Save size={18} />
-                            {locSaving ? '저장 중...' : '매장 위치 저장'}
-                        </button>
-                    </div>
-                </div>
-            ) : activeTab === 'payment' ? (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-3 bg-indigo-100 rounded-xl">
-                            <Building2 className="w-6 h-6 text-indigo-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">급여 출금계좌 설정</h2>
-                            <p className="text-sm text-slate-500">직원 급여 이체에 사용할 사업자 계좌 정보를 입력합니다.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">은행명</label>
-                            <input
-                                type="text"
-                                value={bizAccount.bank}
-                                onChange={(e) => setBizAccount({ ...bizAccount, bank: e.target.value })}
-                                placeholder="예: 국민은행"
-                                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">계좌번호</label>
-                            <input
-                                type="text"
-                                value={bizAccount.number}
-                                onChange={(e) => setBizAccount({ ...bizAccount, number: e.target.value })}
-                                placeholder="예: 123-456-789012"
-                                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-600 mb-1">예금주</label>
-                            <input
-                                type="text"
-                                value={bizAccount.holder}
-                                onChange={(e) => setBizAccount({ ...bizAccount, holder: e.target.value })}
-                                placeholder="예: 소담김밥"
-                                className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                        </div>
-
-                        {message && (
-                            <div className={`text-sm font-medium p-3 rounded-lg ${message.includes('오류') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                {message}
-                            </div>
-                        )}
-
+                {/* Tabs */}
+                <div className="flex gap-2 mb-8 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                    {TABS.map(tab => (
                         <button
-                            onClick={handleSaveBizAccount}
-                            disabled={saving}
-                            className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                                activeTab === tab.key
+                                    ? 'bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-sm'
+                                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                            }`}
                         >
-                            <Save size={18} />
-                            {saving ? '저장 중...' : '저장'}
+                            {tab.label}
                         </button>
-                    </div>
+                    ))}
                 </div>
-            ) : activeTab === 'logo' ? (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 max-w-xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-3 bg-pink-100 rounded-xl">
-                            <Building2 className="w-6 h-6 text-pink-600" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-slate-800">회사 로고 설정</h2>
-                            <p className="text-sm text-slate-500">사이드바 좌측 상단에 표시될 매장의 로고 이미지를 업로드합니다.</p>
-                        </div>
-                    </div>
 
-                    <div className="space-y-4">
-                        <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center">
-                            {logoPreview ? (
-                                <img src={logoPreview} alt="Logo Preview" className="w-24 h-24 rounded-full object-cover bg-white shadow-md mb-4" />
-                            ) : (
-                                <div className="w-24 h-24 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mb-4">
-                                    <span className="text-slate-400 font-bold">로고 없음</span>
+                {/* Content Area */}
+                {activeTab === 'vendor' ? (
+                    <div className="-mt-2">
+                        <VendorSettings />
+                    </div>
+                ) : activeTab === 'contract' ? (
+                    <ContractSettings />
+                ) : activeTab === 'location' ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-3xl card-animate">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <MapPin size={18} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">매장 위치 설정 (Geofence)</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">GPS 출퇴근 인증에 사용할 매장 위치와 허용 반경을 설정합니다.</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">매장명</label>
+                                <input type="text" value={location.name} onChange={(e) => setLocation({ ...location, name: e.target.value })} placeholder="소담김밥" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">위도 (Latitude)</label>
+                                    <input type="number" step="0.0001" value={location.latitude} onChange={(e) => setLocation({ ...location, latitude: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">경도 (Longitude)</label>
+                                    <input type="number" step="0.0001" value={location.longitude} onChange={(e) => setLocation({ ...location, longitude: parseFloat(e.target.value) || 0 })} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" />
+                                </div>
+                            </div>
+
+                            <button onClick={handleUseCurrentLocation} disabled={gettingGps} className="w-full flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-all disabled:opacity-50">
+                                {gettingGps ? <Loader2 size={16} className="animate-spin" /> : <Navigation size={16} />}
+                                {gettingGps ? 'GPS 좌표 획득 중...' : '현재 위치로 설정'}
+                            </button>
+
+                            {/* Google Maps Picker */}
+                            <GoogleMapPicker
+                                latitude={location.latitude}
+                                longitude={location.longitude}
+                                radius={location.radius_meters}
+                                onLocationChange={(lat, lng) => setLocation(prev => ({ ...prev, latitude: parseFloat(lat.toFixed(6)), longitude: parseFloat(lng.toFixed(6)) }))}
+                            />
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">허용 반경: <strong className="text-slate-700">{location.radius_meters}m</strong></label>
+                                <input type="range" min="5" max="10" step="1" value={location.radius_meters} onChange={(e) => setLocation({ ...location, radius_meters: parseInt(e.target.value) })} className="w-full accent-emerald-600" />
+                                <div className="flex justify-between text-xs text-slate-400 mt-1"><span>5m</span><span>6m</span><span>7m</span><span>8m</span><span>9m</span><span>10m</span></div>
+                            </div>
+
+                            {locMessage && (
+                                <div className={`text-sm font-medium p-4 rounded-xl ${locMessage.includes('오류') || locMessage.includes('거부') ? 'bg-red-50 border border-red-200 text-red-600' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'}`}>
+                                    {locMessage}
                                 </div>
                             )}
 
-                            <input
-                                type="file"
-                                id="logoUpload"
-                                className="hidden"
-                                accept="image/jpeg, image/png, image/gif, image/webp"
-                                onChange={handleLogoFileChange}
-                            />
-                            <label
-                                htmlFor="logoUpload"
-                                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg cursor-pointer transition-colors"
-                            >
-                                이미지 선택
-                            </label>
-                            <p className="text-xs text-slate-400 mt-3">권장 사이즈: 100x100 픽셀 이상 (정사각형)<br />지원 형식: JPG, PNG, GIF, WEBP</p>
+                            <button onClick={handleSaveLocation} disabled={locSaving} className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm disabled:opacity-50">
+                                <Save size={16} />
+                                {locSaving ? '저장 중...' : '매장 위치 저장'}
+                            </button>
+                        </div>
+                    </div>
+                ) : activeTab === 'payment' ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-3xl card-animate">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                <Building2 size={18} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">급여 출금계좌 설정</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">직원 급여 이체에 사용할 사업자 계좌 정보를 입력합니다.</p>
+                            </div>
                         </div>
 
-                        {logoMessage && (
-                            <div className={`text-sm font-medium p-3 rounded-lg ${logoMessage.includes('오류') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                {logoMessage}
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">은행명</label>
+                                <input
+                                    type="text"
+                                    value={bizAccount.bank}
+                                    onChange={(e) => setBizAccount({ ...bizAccount, bank: e.target.value })}
+                                    placeholder="예: 국민은행"
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                />
                             </div>
-                        )}
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">계좌번호</label>
+                                <input
+                                    type="text"
+                                    value={bizAccount.number}
+                                    onChange={(e) => setBizAccount({ ...bizAccount, number: e.target.value })}
+                                    placeholder="예: 123-456-789012"
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">예금주</label>
+                                <input
+                                    type="text"
+                                    value={bizAccount.holder}
+                                    onChange={(e) => setBizAccount({ ...bizAccount, holder: e.target.value })}
+                                    placeholder="예: 소담김밥"
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                />
+                            </div>
 
-                        <button
-                            onClick={handleSaveLogo}
-                            disabled={logoSaving || !logoFile}
-                            className="w-full flex items-center justify-center gap-2 bg-pink-600 text-white py-3 rounded-lg font-bold hover:bg-pink-700 transition-colors disabled:opacity-50"
-                        >
-                            <Save size={18} />
-                            {logoSaving ? '저장 중...' : '로고 저장 및 변경'}
-                        </button>
+                            {message && (
+                                <div className={`text-sm font-medium p-4 rounded-xl ${message.includes('오류') || message.includes('권한') || message.includes('인증') ? 'bg-red-50 border border-red-200 text-red-600' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'}`}>
+                                    {message}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleSaveBizAccount}
+                                disabled={saving}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm disabled:opacity-50"
+                            >
+                                <Save size={16} />
+                                {saving ? '저장 중...' : '저장'}
+                            </button>
+                        </div>
                     </div>
-                </div>
-            ) : null}
+                ) : activeTab === 'logo' ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-3xl card-animate">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-500 to-pink-600 flex items-center justify-center shadow-lg shadow-pink-500/20">
+                                <Building2 size={18} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">회사 로고 설정</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">사이드바 좌측 상단에 표시될 매장의 로고 이미지를 업로드합니다.</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+                                {logoPreview ? (
+                                    <img src={logoPreview} alt="Logo Preview" className="w-24 h-24 rounded-full object-cover bg-white shadow-md mb-4" />
+                                ) : (
+                                    <div className="w-24 h-24 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center mb-4">
+                                        <span className="text-slate-400 font-bold text-xs">로고 없음</span>
+                                    </div>
+                                )}
+
+                                <input
+                                    type="file"
+                                    id="logoUpload"
+                                    className="hidden"
+                                    accept="image/jpeg, image/png, image/gif, image/webp"
+                                    onChange={handleLogoFileChange}
+                                />
+                                <label
+                                    htmlFor="logoUpload"
+                                    className="px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-all cursor-pointer"
+                                >
+                                    이미지 선택
+                                </label>
+                                <p className="text-xs text-slate-400 mt-3">권장 사이즈: 100x100 픽셀 이상 (정사각형)<br />지원 형식: JPG, PNG, GIF, WEBP</p>
+                            </div>
+
+                            {logoMessage && (
+                                <div className={`text-sm font-medium p-4 rounded-xl ${logoMessage.includes('오류') ? 'bg-red-50 border border-red-200 text-red-600' : 'bg-emerald-50 border border-emerald-200 text-emerald-600'}`}>
+                                    {logoMessage}
+                                </div>
+                            )}
+
+                            <button
+                                onClick={handleSaveLogo}
+                                disabled={logoSaving || !logoFile}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm disabled:opacity-50"
+                            >
+                                <Save size={16} />
+                                {logoSaving ? '저장 중...' : '로고 저장 및 변경'}
+                            </button>
+                        </div>
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 }

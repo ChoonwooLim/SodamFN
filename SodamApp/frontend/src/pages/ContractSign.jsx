@@ -373,7 +373,7 @@ export default function ContractSignPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-4 pb-32 print:p-0 print:bg-white print:pb-0">
+        <div className="min-h-screen bg-slate-50 print:p-0 print:bg-white print:pb-0">
             {/* Print Portal Styles */}
             <style>{`
                 @page { size: A4; margin: 0; }
@@ -387,13 +387,17 @@ export default function ContractSignPage() {
                 @media screen { .contract-print-portal { display: none; } }
             `}</style>
 
-            <header className="flex items-center gap-4 mb-6 no-print">
-                <button onClick={() => step > 0 ? setStep(s => s - 1) : navigate(-1)} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
-                    <ChevronLeft size={20} />
-                </button>
-                <h1 className="text-xl font-bold text-slate-900">
-                    {isSigned ? "전자 근로계약서" : step === 0 ? "1. 계약서 확인" : step === 1 ? "2. 정보 입력" : step === 2 ? "3. 전자도장 만들기" : "4. 서명 및 날인"}
-                </h1>
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
+            <header className="flex items-center gap-3 mb-8 no-print">
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 cursor-pointer" onClick={() => step > 0 ? setStep(s => s - 1) : navigate(-1)}>
+                    <PenTool size={20} className="text-white" />
+                </div>
+                <div>
+                    <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                        {isSigned ? "전자 근로계약서" : step === 0 ? "1. 계약서 확인" : step === 1 ? "2. 정보 입력" : step === 2 ? "3. 전자도장 만들기" : "4. 서명 및 날인"}
+                    </h1>
+                    <p className="text-xs text-slate-400 mt-0.5">Electronic Contract</p>
+                </div>
             </header>
 
             {isSigned ? (
@@ -598,6 +602,7 @@ export default function ContractSignPage() {
                     )}
                 </div>
             )}
+            </div>
         </div>
     );
 }

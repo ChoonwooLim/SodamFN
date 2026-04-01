@@ -41,20 +41,20 @@ function AnnouncementsTab() {
         <>
             <div className="flex justify-end mb-4">
                 <button onClick={() => { resetForm(); setShowForm(!showForm); }}
-                    className="flex items-center gap-1 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800">
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm">
                     {showForm ? <X size={16} /> : <Plus size={16} />} {showForm ? '취소' : '새 공지'}
                 </button>
             </div>
             {showForm && (
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
-                    <div className="space-y-3">
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">제목</label>
-                            <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="공지 제목" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">내용</label>
-                            <textarea className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" rows={4} placeholder="공지 내용" value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} /></div>
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 mb-6 card-animate">
+                    <div className="space-y-4">
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">제목</label>
+                            <input className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="공지 제목" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">내용</label>
+                            <textarea className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" rows={4} placeholder="공지 내용" value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} /></div>
                         <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={form.pinned} onChange={e => setForm({ ...form, pinned: e.target.checked })} /><Pin size={14} /> 상단 고정</label>
                     </div>
-                    <button onClick={handleSave} className="mt-4 flex items-center gap-1 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700">
+                    <button onClick={handleSave} className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm">
                         <Save size={16} /> {editId ? '수정' : '저장'}
                     </button>
                 </div>
@@ -62,9 +62,9 @@ function AnnouncementsTab() {
             {items.length === 0 ? (
                 <EmptyState icon={Megaphone} text="등록된 공지사항이 없습니다." />
             ) : (
-                <div className="space-y-3">
-                    {items.map(a => (
-                        <div key={a.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <div className="space-y-4">
+                    {items.map((a, idx) => (
+                        <div key={a.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 card-animate" style={{ animationDelay: `${idx * 0.05}s` }}>
                             <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
@@ -75,8 +75,8 @@ function AnnouncementsTab() {
                                     <span className="text-[10px] text-slate-400 mt-1 block">{a.created_at ? new Date(a.created_at).toLocaleDateString('ko-KR') : ''}</span>
                                 </div>
                                 <div className="flex gap-1">
-                                    <button onClick={() => handleEdit(a)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={14} /></button>
-                                    <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-400"><Trash2 size={14} /></button>
+                                    <button onClick={() => handleEdit(a)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"><Edit2 size={14} /></button>
+                                    <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 rounded-xl text-red-400 transition-colors"><Trash2 size={14} /></button>
                                 </div>
                             </div>
                         </div>
@@ -115,9 +115,9 @@ function SuggestionsTab() {
     const handleDelete = async (id) => { if (!window.confirm('삭제하시겠습니까?')) return; try { await api.delete(`/suggestions/${id}`); fetch_(); } catch { alert('삭제 실패'); } };
 
     return items.length === 0 ? <EmptyState icon={MessageSquarePlus} text="건의사항이 없습니다." /> : (
-        <div className="space-y-3">
-            {items.map(s => (
-                <div key={s.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-pointer" onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}>
+        <div className="space-y-4">
+            {items.map((s, idx) => (
+                <div key={s.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 cursor-pointer card-animate" style={{ animationDelay: `${idx * 0.05}s` }} onClick={() => setExpandedId(expandedId === s.id ? null : s.id)}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <span className="font-bold text-sm text-slate-700">{s.staff_name}</span>
@@ -136,15 +136,15 @@ function SuggestionsTab() {
                                 </div>
                             )}
                             <div className="flex gap-2 flex-wrap">
-                                {s.status === 'pending' && <button onClick={() => updateStatus(s.id, 'reviewed')} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">확인</button>}
-                                {s.status !== 'resolved' && <button onClick={() => updateStatus(s.id, 'resolved')} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700">완료</button>}
-                                <button onClick={() => setReplyId(replyId === s.id ? null : s.id)} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold hover:bg-indigo-200">답변</button>
-                                <button onClick={() => handleDelete(s.id)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold hover:bg-red-100"><Trash2 size={12} /></button>
+                                {s.status === 'pending' && <button onClick={() => updateStatus(s.id, 'reviewed')} className="px-3 py-1.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors">확인</button>}
+                                {s.status !== 'resolved' && <button onClick={() => updateStatus(s.id, 'resolved')} className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors">완료</button>}
+                                <button onClick={() => setReplyId(replyId === s.id ? null : s.id)} className="px-3 py-1.5 bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold hover:bg-indigo-200 transition-colors">답변</button>
+                                <button onClick={() => handleDelete(s.id)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors"><Trash2 size={12} /></button>
                             </div>
                             {replyId === s.id && (
                                 <div className="mt-3 flex gap-2">
-                                    <input className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="답변 입력..." value={replyText} onChange={e => setReplyText(e.target.value)} />
-                                    <button onClick={() => sendReply(s.id)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700"><Send size={14} /></button>
+                                    <input className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="답변 입력..." value={replyText} onChange={e => setReplyText(e.target.value)} />
+                                    <button onClick={() => sendReply(s.id)} className="px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-bold hover:from-indigo-500 hover:to-indigo-600 transition-all shadow-sm"><Send size={14} /></button>
                                 </div>
                             )}
                         </div>
@@ -175,14 +175,14 @@ function PurchasesTab() {
     return (
         <>
             <div className="flex justify-end mb-4">
-                <button onClick={fetchReqs} className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50">
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                <button onClick={fetchReqs} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-all">
+                    <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                 </button>
             </div>
             {requests.length === 0 ? <EmptyState icon={ShoppingCart} text="구매 요청이 없습니다." /> : (
                 <div className="space-y-4">
-                    {requests.map(req => (
-                        <div key={req.id} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+                    {requests.map((req, idx) => (
+                        <div key={req.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 card-animate" style={{ animationDelay: `${idx * 0.05}s` }}>
                             <div className="flex items-center justify-between mb-3">
                                 <div className="flex items-center gap-2">
                                     <span className="font-bold text-slate-800">{req.staff_name}</span>
@@ -193,7 +193,7 @@ function PurchasesTab() {
                             <div className="bg-slate-50 rounded-xl p-3 mb-3">
                                 {req.items.map((item, i) => (
                                     <div key={i} className="flex items-center gap-2 py-1 text-sm">
-                                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></span>
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full flex-shrink-0"></span>
                                         <span className="font-bold text-slate-700">{item.name}</span>
                                         {item.quantity && <span className="text-slate-500">({item.quantity})</span>}
                                         {item.note && <span className="text-slate-400 text-xs">— {item.note}</span>}
@@ -202,8 +202,8 @@ function PurchasesTab() {
                             </div>
                             {req.status === 'pending' && (
                                 <div className="flex gap-2">
-                                    <button onClick={() => updateStatus(req.id, 'completed')} className="flex-1 flex items-center justify-center gap-1 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700"><CheckCircle size={14} /> 구매 완료</button>
-                                    <button onClick={() => updateStatus(req.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-50 text-red-500 border border-red-200 rounded-xl text-xs font-bold hover:bg-red-100"><XCircle size={14} /> 반려</button>
+                                    <button onClick={() => updateStatus(req.id, 'completed')} className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-xl text-xs font-bold hover:from-emerald-500 hover:to-emerald-600 transition-all shadow-sm"><CheckCircle size={14} /> 구매 완료</button>
+                                    <button onClick={() => updateStatus(req.id, 'rejected')} className="flex-1 flex items-center justify-center gap-1 py-2.5 bg-white border border-red-200 text-red-500 rounded-xl text-xs font-bold hover:bg-red-50 transition-all"><XCircle size={14} /> 반려</button>
                                 </div>
                             )}
                         </div>
@@ -251,49 +251,49 @@ function EmergencyTab() {
         <>
             <div className="flex justify-end mb-4">
                 <button onClick={() => { resetForm(); setShowForm(!showForm); }}
-                    className="flex items-center gap-1 px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800">
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm">
                     {showForm ? <X size={16} /> : <Plus size={16} />} {showForm ? '취소' : '추가'}
                 </button>
             </div>
             {showForm && (
-                <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm mb-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">업체/서비스명</label>
-                            <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="예: 쿠팡이츠 AS센터" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">전화번호</label>
-                            <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="예: 1600-9827" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">분류</label>
-                            <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 mb-6 card-animate">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">업체/서비스명</label>
+                            <input className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="예: 쿠팡이츠 AS센터" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">전화번호</label>
+                            <input className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="예: 1600-9827" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">분류</label>
+                            <select className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
                                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                             </select></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">매장 아이디</label>
-                            <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="예: sodam_gangnam" value={form.store_id} onChange={e => setForm({ ...form, store_id: e.target.value })} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">비고</label>
-                            <input className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" placeholder="메모" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
-                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">정렬순서</label>
-                            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={form.display_order} onChange={e => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">매장 아이디</label>
+                            <input className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="예: sodam_gangnam" value={form.store_id} onChange={e => setForm({ ...form, store_id: e.target.value })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">비고</label>
+                            <input className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" placeholder="메모" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
+                        <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">정렬순서</label>
+                            <input type="number" className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all" value={form.display_order} onChange={e => setForm({ ...form, display_order: parseInt(e.target.value) || 0 })} /></div>
                     </div>
-                    <button onClick={handleSave} className="mt-4 flex items-center gap-1 px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700"><Save size={16} /> {editId ? '수정' : '저장'}</button>
+                    <button onClick={handleSave} className="mt-4 flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm"><Save size={16} /> {editId ? '수정' : '저장'}</button>
                 </div>
             )}
             {contacts.length === 0 ? <EmptyState icon={Phone} text="등록된 비상연락처가 없습니다." /> : (
-                <div className="space-y-3">
-                    {contacts.map(c => (
-                        <div key={c.id} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4">
+                <div className="space-y-4">
+                    {contacts.map((c, idx) => (
+                        <div key={c.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 flex items-center gap-4 card-animate" style={{ animationDelay: `${idx * 0.05}s` }}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <span className="font-black text-lg text-slate-900">{c.name}</span>
+                                    <span className="font-bold text-lg text-slate-900">{c.name}</span>
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${categoryColor[c.category] || categoryColor['기타']}`}>{c.category || '기타'}</span>
                                 </div>
                                 <div className="flex items-center gap-4 flex-wrap">
-                                    <span className="text-base font-semibold text-slate-600 tracking-wide">📞 {formatPhone(c.phone)}</span>
+                                    <span className="text-base font-semibold text-slate-600 tracking-wide">{formatPhone(c.phone)}</span>
                                     {c.store_id && <span className="text-sm font-semibold text-indigo-500">매장ID: {c.store_id}</span>}
                                 </div>
-                                {c.note && <p className="text-sm text-slate-400 mt-1">📝 {c.note}</p>}
+                                {c.note && <p className="text-sm text-slate-400 mt-1">{c.note}</p>}
                             </div>
                             <div className="flex gap-2">
-                                <button onClick={() => handleEdit(c)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400"><Edit2 size={18} /></button>
-                                <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-400"><Trash2 size={18} /></button>
+                                <button onClick={() => handleEdit(c)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"><Edit2 size={18} /></button>
+                                <button onClick={() => handleDelete(c.id)} className="p-2 hover:bg-red-50 rounded-xl text-red-400 transition-colors"><Trash2 size={18} /></button>
                             </div>
                         </div>
                     ))}
@@ -329,9 +329,9 @@ function ChatTab() {
     return (
         <>
             {/* Message Input */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-4 flex gap-3 items-center">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4 flex gap-3 items-center">
                 <input
-                    className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400"
+                    className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                     placeholder="메시지를 입력하세요..."
                     value={text}
                     onChange={e => setText(e.target.value)}
@@ -340,7 +340,7 @@ function ChatTab() {
                 <button
                     onClick={handleSend}
                     disabled={!text.trim() || sending}
-                    className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl text-sm font-bold hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                 >
                     {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} 전송
                 </button>
@@ -348,9 +348,9 @@ function ChatTab() {
 
             {/* Messages List */}
             {messages.length === 0 ? <EmptyState icon={MessageCircle} text="메시지가 없습니다." /> : (
-                <div className="space-y-2">
-                    {messages.map(m => (
-                        <div key={m.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-start gap-3">
+                <div className="space-y-3">
+                    {messages.map((m, idx) => (
+                        <div key={m.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-4 flex items-start gap-3 card-animate" style={{ animationDelay: `${idx * 0.03}s` }}>
                             <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm flex-shrink-0">
                                 {(m.staff_name || '?')[0]}
                             </div>
@@ -361,7 +361,7 @@ function ChatTab() {
                                 </div>
                                 <p className="text-sm text-slate-600 whitespace-pre-wrap">{m.message}</p>
                             </div>
-                            <button onClick={() => handleDelete(m.id)} className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-400 flex-shrink-0"><Trash2 size={14} /></button>
+                            <button onClick={() => handleDelete(m.id)} className="p-1.5 hover:bg-red-50 rounded-xl text-slate-300 hover:text-red-400 flex-shrink-0 transition-colors"><Trash2 size={14} /></button>
                         </div>
                     ))}
                 </div>
@@ -373,9 +373,9 @@ function ChatTab() {
 // ─── Shared Empty State ──────────────────────────
 function EmptyState({ icon: Icon, text }) {
     return (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12 text-center card-animate">
             <Icon size={48} className="mx-auto text-slate-300 mb-3" />
-            <p className="text-slate-400 text-sm">{text}</p>
+            <p className="text-sm font-semibold text-slate-500">{text}</p>
         </div>
     );
 }
@@ -398,18 +398,21 @@ export default function BoardManagement() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 pb-24">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <header className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl shadow-lg shadow-indigo-500/20">
-                        <ClipboardList size={24} />
+                <header className="flex items-center gap-3 mb-8">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <ClipboardList size={20} className="text-white" />
                     </div>
-                    <h1 className="text-2xl font-black text-slate-900">통합 게시판 관리</h1>
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">통합 게시판 관리</h1>
+                        <p className="text-xs text-slate-400 mt-0.5">공지사항, 건의사항, 구매요청, 비상연락처, 직원소통방</p>
+                    </div>
                 </header>
 
                 {/* Tab Navigation */}
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                <div className="flex gap-2 mb-8 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
                     {TABS.map(tab => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.key;
@@ -417,7 +420,7 @@ export default function BoardManagement() {
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all"
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all"
                                 style={{
                                     background: isActive ? tab.color : 'white',
                                     color: isActive ? 'white' : '#475569',

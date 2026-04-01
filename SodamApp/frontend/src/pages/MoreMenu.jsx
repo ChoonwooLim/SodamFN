@@ -82,41 +82,23 @@ export default function MoreMenu() {
     ];
 
     return (
-        <div style={{
-            minHeight: '100vh',
-            background: '#f8fafc',
-            paddingBottom: 100,
-        }}>
+        <div className="min-h-screen bg-slate-50 pb-32">
             {/* Profile Header */}
-            <div style={{
-                background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                padding: '48px 24px 28px',
-                borderRadius: '0 0 28px 28px',
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                    <div style={{
-                        width: 52, height: 52, borderRadius: 16,
-                        background: 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 22, fontWeight: 800, color: 'white',
-                        boxShadow: '0 4px 12px rgba(99,102,241,0.4)',
-                    }}>
+            <div className="bg-gradient-to-br from-slate-700 to-slate-800 px-6 pt-12 pb-7 rounded-b-[28px]">
+                <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xl font-extrabold text-white shadow-lg shadow-slate-700/20 border border-white/10">
                         {tokenInfo.name?.[0] || 'A'}
                     </div>
                     <div>
-                        <div style={{ color: 'white', fontSize: 18, fontWeight: 800, letterSpacing: -0.5 }}>
+                        <div className="text-white text-lg font-extrabold tracking-tight">
                             {tokenInfo.name}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                            <span style={{
-                                fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-                                background: 'rgba(59,130,246,0.25)', color: '#93c5fd',
-                                textTransform: 'uppercase', letterSpacing: 1,
-                            }}>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/25 text-blue-300 uppercase tracking-wider">
                                 {tokenInfo.grade}
                             </span>
                             {businessName && (
-                                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 500 }}>
+                                <span className="text-xs text-slate-400 font-medium">
                                     {businessName}
                                 </span>
                             )}
@@ -126,22 +108,13 @@ export default function MoreMenu() {
             </div>
 
             {/* Menu Sections */}
-            <div style={{ padding: '16px 16px 0' }}>
+            <div className="px-4 pt-4">
                 {menuSections.map((section, si) => (
-                    <div key={si} className="card-animate" style={{ marginBottom: 20, animationDelay: `${si * 0.08}s` }}>
-                        <div style={{
-                            fontSize: 11, fontWeight: 700, color: '#94a3b8',
-                            textTransform: 'uppercase', letterSpacing: 1.5,
-                            padding: '0 4px', marginBottom: 8,
-                        }}>
+                    <div key={si} className="card-animate mb-5" style={{ animationDelay: `${si * 0.08}s` }}>
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1 mb-2">
                             {section.title}
                         </div>
-                        <div style={{
-                            background: 'white',
-                            borderRadius: 16,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                            overflow: 'hidden',
-                        }}>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             {section.items.map((item, ii) => {
                                 const Icon = item.icon;
                                 return (

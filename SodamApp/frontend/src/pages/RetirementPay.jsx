@@ -88,13 +88,19 @@ export default function RetirementPay() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-            <div>
-                <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                    <Wallet className="text-purple-600" /> 퇴직금 관리
-                </h1>
-                <p className="text-slate-500 mt-1">퇴사자 퇴직금 적립 현황 및 지급 기록</p>
-            </div>
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32 space-y-6">
+            <header className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <Wallet size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">퇴직금 관리</h1>
+                        <p className="text-xs text-slate-400 mt-0.5">퇴사자 퇴직금 적립 현황 및 지급 기록</p>
+                    </div>
+                </div>
+            </header>
 
             {msg && (
                 <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-bold">
@@ -110,7 +116,7 @@ export default function RetirementPay() {
                     <p className="text-slate-500 font-bold">퇴사자가 없습니다</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden card-animate">
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                             <thead>
@@ -313,6 +319,7 @@ export default function RetirementPay() {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }

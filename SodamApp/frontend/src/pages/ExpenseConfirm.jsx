@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../api';
-import { Check, ChevronLeft, Calendar, ShoppingBag, DollarSign, Tag } from 'lucide-react';
+import { Check, ChevronLeft, Calendar, ShoppingBag, DollarSign, Tag, Receipt } from 'lucide-react';
 
 export default function ExpenseConfirm() {
     const { state } = useLocation();
@@ -40,17 +40,25 @@ export default function ExpenseConfirm() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 flex flex-col">
-            <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col">
-                <header className="flex items-center gap-4 mb-8">
-                    <button onClick={() => navigate(-1)} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
-                        <ChevronLeft size={20} />
+        <div className="min-h-screen bg-slate-50 flex flex-col">
+            <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col px-6 py-8 pb-32">
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                            <Receipt size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">내역 확인</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Expense Confirm</p>
+                        </div>
+                    </div>
+                    <button onClick={() => navigate(-1)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-all">
+                        <ChevronLeft size={16} /> 뒤로
                     </button>
-                    <h1 className="text-xl font-bold text-slate-900">내역 확인</h1>
                 </header>
 
                 <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
-                    <div className="bg-white rounded-3xl p-6 shadow-soft space-y-6 mb-6">
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 hover:shadow-md transition-shadow space-y-6 mb-6 card-animate">
 
                         {/* Amount Input (Hero) */}
                         <div className="relative">
@@ -121,7 +129,7 @@ export default function ExpenseConfirm() {
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-base font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm disabled:opacity-50 active:scale-[0.98]"
                         >
                             {submitting ? (
                                 <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

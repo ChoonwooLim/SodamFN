@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter, Trash2 } from 'lucide-react';
+import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter, Trash2, Users } from 'lucide-react';
 import api from '../api';
 import StaffAddModal from '../components/StaffAddModal';
 
@@ -100,36 +100,39 @@ export default function StaffPage() {
     const sortedStaffs = getSortedStaffs();
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 pb-24">
-            <div className="max-w-5xl mx-auto">
-                <header className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/dashboard')} className="p-2 bg-white rounded-full shadow-sm text-slate-600">
-                            <ChevronLeft size={20} />
-                        </button>
-                        <h1 className="text-xl font-bold text-slate-900">직원 관리</h1>
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <Users size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">직원 관리</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Staff Management</p>
+                        </div>
                     </div>
                     <button
                         onClick={() => setIsAddModalOpen(true)}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-2xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm"
                     >
-                        <UserPlus size={18} /> 신규 직원 추가
+                        <UserPlus size={16} /> 신규 직원 추가
                     </button>
                 </header>
 
                 <div className="flex flex-col md:flex-row gap-4 mb-6 justify-between items-start md:items-center">
                     {/* Status Tabs & Sort */}
                     <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-                        <div className="bg-slate-200 p-1 rounded-xl inline-flex self-start">
+                        <div className="bg-slate-100 p-1 rounded-xl inline-flex self-start">
                             <button
                                 onClick={() => setStatusFilter("재직")}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '재직' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === '재직' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
                             >
                                 재직 직원
                             </button>
                             <button
                                 onClick={() => setStatusFilter("퇴사")}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${statusFilter === '퇴사' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${statusFilter === '퇴사' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100'}`}
                             >
                                 퇴사 직원
                             </button>
@@ -156,9 +159,9 @@ export default function StaffPage() {
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             placeholder="이름 검색..."
-                            className="flex-1 p-2 px-4 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                         />
-                        <button type="submit" className="bg-slate-900 text-white px-5 rounded-xl font-medium">검색</button>
+                        <button type="submit" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 text-white rounded-xl text-sm font-semibold hover:from-slate-700 hover:to-slate-800 transition-all shadow-sm">검색</button>
                     </form>
                 </div>
 
@@ -176,7 +179,7 @@ export default function StaffPage() {
                             <div
                                 key={staff.id}
                                 onClick={() => navigate(`/staff/${staff.id}`)}
-                                className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow group"
+                                className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow group card-animate"
                             >
                                 <div>
                                     <div className="flex items-center gap-2">

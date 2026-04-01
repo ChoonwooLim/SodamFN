@@ -34,10 +34,18 @@ export default function ContractMyPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6">
-            <div className="max-w-md mx-auto">
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-md mx-auto px-6 py-8 pb-32">
                 <header className="flex items-center justify-between mb-8">
-                    <h1 className="text-2xl font-bold text-slate-900">내 전자계약</h1>
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                            <FileText size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">내 전자계약</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">My Contracts</p>
+                        </div>
+                    </div>
                     <button
                         onClick={handleLogout}
                         className="p-2 text-slate-400 hover:text-red-500 transition-colors"

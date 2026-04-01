@@ -339,22 +339,25 @@ export default function RetirementPayCalc() {
 
     // --- EDIT MODE ---
     return (
-        <div className="bg-slate-50 min-h-screen pb-20 p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
-                <div className="mb-6 flex flex-wrap gap-4 items-center justify-between">
-                    <div>
-                        <button onClick={() => navigate('/hr/retirement')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-semibold mb-3">
-                            <ArrowLeft size={16} /> 목록으로 돌아가기
-                        </button>
-                        <h1 className="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
-                            <Calculator className="text-blue-600" /> 퇴직금 명세서 산출/수정
-                        </h1>
-                        <p className="text-slate-500 text-sm mt-1">시스템에서 불러온 데이터를 모니터링하고 예외 사항을 수정한 뒤 최종 명세서를 출력하세요.</p>
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                            <Calculator size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">퇴직금 명세서 산출/수정</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">시스템 데이터 모니터링 및 최종 명세서 출력</p>
+                        </div>
                     </div>
-                </div>
+                    <button onClick={() => navigate('/hr/retirement')} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-medium hover:bg-slate-50 transition-all">
+                        <ArrowLeft size={16} /> 목록으로
+                    </button>
+                </header>
 
                 {/* 0. Select Staff */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow mb-6 card-animate">
                     <label className="block text-sm font-bold text-slate-700 mb-2">직원 선택 (데이터 자동 로딩)</label>
                     <select 
                         value={selectedStaffId} 
@@ -383,7 +386,7 @@ export default function RetirementPayCalc() {
                 ) : (
                     <div className="space-y-6">
                         {/* 1. Date Adjustments */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow card-animate">
                             <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">1. 산정 기준일 조정</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -399,7 +402,7 @@ export default function RetirementPayCalc() {
                         </div>
 
                         {/* 2. 3-Month Details Edit */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow card-animate">
                             <h2 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">2. 직전 3개월 급여 내역 수정 (수동 연차수당 등)</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-center border-collapse">

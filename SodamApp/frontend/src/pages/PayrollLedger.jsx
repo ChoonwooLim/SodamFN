@@ -172,21 +172,20 @@ export default function PayrollLedger() {
   // RENDER
   // =============================================================================
   return (
-    <div className="min-h-screen pb-24" style={{ background: '#475569' }}>
+    <div className="min-h-screen bg-slate-50 pb-32">
       {/* ═══ HEADER ═══ */}
-      <div style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' }} className="text-white">
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
-              <button onClick={() => navigate('/staff')} className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition-all">
-                <ChevronLeft size={20} />
-              </button>
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                <Wallet size={20} className="text-white" />
+              </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
-                  <Wallet className="text-blue-400" size={24} />
+                <h1 className="text-xl font-bold tracking-tight">
                   급여대장
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">Payroll Ledger — 직원별 급여 관리</p>
+                <p className="text-xs text-slate-400 mt-0.5">Payroll Ledger — 직원별 급여 관리</p>
               </div>
             </div>
 
@@ -218,12 +217,12 @@ export default function PayrollLedger() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6" style={{ marginTop: 16 }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
           {/* ═══ LEFT PANEL: Staff List ═══ */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl overflow-hidden sticky top-4" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden sticky top-4">
               <div className="p-4" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
                 <div className="flex items-center gap-2 mb-3">
                   <Users size={16} className="text-blue-500" />
