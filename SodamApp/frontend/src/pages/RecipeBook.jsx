@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, X, Flame, ListOrdered } from 'lucide-react';
+import { ChevronLeft, X, Flame, ListOrdered, ChefHat, Search, UtensilsCrossed } from 'lucide-react';
 import './RecipeBook.css';
 
 // ── Recipe Data ──
@@ -108,125 +108,310 @@ const CATEGORY_LABEL = {
     sushi: '초밥', meat: '고기', prep: '손질', onigiri: '주먹밥',
 };
 
+const CATEGORY_COLORS = {
+    banchan: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', dot: 'bg-amber-400' },
+    tuna: { bg: 'bg-sky-50', border: 'border-sky-200', text: 'text-sky-700', dot: 'bg-sky-400' },
+    sauce: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', dot: 'bg-rose-400' },
+    sushi: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', dot: 'bg-orange-400' },
+    meat: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', dot: 'bg-red-400' },
+    prep: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', dot: 'bg-emerald-400' },
+    onigiri: { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', dot: 'bg-violet-400' },
+};
+
 export default function RecipeBook() {
     const navigate = useNavigate();
     const [activeCategory, setActiveCategory] = useState('all');
-    const [lightboxIdx, setLightboxIdx] = useState(null);
     const [detail, setDetail] = useState(null);
+    const [search, setSearch] = useState('');
 
-    const filtered = activeCategory === 'all'
-        ? RECIPES
-        : RECIPES.filter(r => r.category === activeCategory);
-
-    const navLightbox = (dir) => {
-        const next = lightboxIdx + dir;
-        if (next >= 0 && next < filtered.length) setLightboxIdx(next);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Escape') { setLightboxIdx(null); setDetail(null); }
-        if (lightboxIdx !== null) {
-            if (e.key === 'ArrowLeft') navLightbox(-1);
-            if (e.key === 'ArrowRight') navLightbox(1);
+    const filtered = useMemo(() => {
+        let list = activeCategory === 'all'
+            ? RECIPES
+            : RECIPES.filter(r => r.category === activeCategory);
+        if (search.trim()) {
+            const q = search.trim().toLowerCase();
+            list = list.filter(r =>
+                r.name.toLowerCase().includes(q) ||
+                r.ingredients.some(ing => ing.toLowerCase().includes(q))
+            );
         }
-    };
+        return list;
+    }, [activeCategory, search]);
+
+    const categoryCounts = useMemo(() => {
+        const counts = { all: RECIPES.length };
+        CATEGORIES.forEach(c => {
+            if (c.key !== 'all') counts[c.key] = RECIPES.filter(r => r.category === c.key).length;
+        });
+        return counts;
+    }, []);
 
     return (
-        <div className="recipe-page" onKeyDown={handleKeyDown} tabIndex={0}>
-            {/* Header */}
-            <div className="recipe-header">
-                <div className="recipe-header-top">
-                    <button className="recipe-back-btn" onClick={() => navigate(-1)}>
+        <div className="min-h-screen bg-slate-50/80 pb-32">
+            {/* ── Hero Header ── */}
+            <div className="max-w-5xl mx-auto px-6 pt-8 pb-2">
+                <div className="flex items-center gap-3 mb-1">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20 border-none cursor-pointer text-white hover:shadow-xl hover:shadow-orange-500/30 transition-all"
+                    >
                         <ChevronLeft size={20} />
                     </button>
-                    <h1>📖 레시피 관리</h1>
+                    <div>
+                        <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0 flex items-center gap-2">
+                            <ChefHat size={22} className="text-orange-500" />
+                            레시피 북
+                        </h1>
+                        <p className="text-xs text-slate-400 mt-0.5 ml-0.5">
+                            총 {RECIPES.length}개의 레시피
+                        </p>
+                    </div>
                 </div>
-                <p className="recipe-subtitle">총 {RECIPES.length}개</p>
             </div>
 
-            {/* Tabs */}
-            <div className="recipe-tabs">
-                {CATEGORIES.map(cat => {
-                    const cnt = cat.key === 'all' ? RECIPES.length : RECIPES.filter(r => r.category === cat.key).length;
-                    return (
-                        <button key={cat.key} className={`recipe-tab ${activeCategory === cat.key ? 'active' : ''}`} onClick={() => setActiveCategory(cat.key)}>
-                            {cat.emoji} {cat.label} <span className="tab-count">{cnt}</span>
+            {/* ── Search Bar ── */}
+            <div className="max-w-5xl mx-auto px-6 py-3">
+                <div className="flex items-center gap-2.5 bg-white rounded-xl px-4 py-2.5 border border-slate-200 focus-within:border-orange-300 focus-within:ring-2 focus-within:ring-orange-100 transition-all shadow-sm">
+                    <Search size={16} className="text-slate-300 flex-shrink-0" />
+                    <input
+                        type="text"
+                        placeholder="레시피 또는 재료 검색..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="flex-1 border-none outline-none bg-transparent text-sm text-slate-700 placeholder:text-slate-300"
+                    />
+                    {search && (
+                        <button
+                            onClick={() => setSearch('')}
+                            className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors"
+                        >
+                            <X size={10} />
                         </button>
-                    );
-                })}
+                    )}
+                </div>
             </div>
 
-            {/* Grid */}
-            {filtered.length === 0 ? (
-                <div className="recipe-empty">
-                    <div className="empty-icon">🍽️</div>
-                    <h3>레시피가 없습니다</h3>
-                    <p>이 카테고리에 등록된 레시피가 없어요</p>
-                </div>
-            ) : (
-                <div className="recipe-grid">
-                    {filtered.map((r, idx) => (
-                        <div key={r.id} className="recipe-card" onClick={() => r.file ? setLightboxIdx(idx) : setDetail(r)}>
-                            {r.file ? (
-                                <img className="recipe-card-image" src={`/recipes/${r.file}`} alt={r.name} loading="lazy" />
-                            ) : (
-                                <div className="recipe-card-placeholder">
-                                    <span className="placeholder-emoji">{r.emoji}</span>
-                                    <span className="placeholder-name">{r.name}</span>
-                                </div>
-                            )}
-                            <div className="recipe-card-info">
-                                <span className="recipe-card-title">{r.emoji} {r.name}</span>
-                                <span className="recipe-card-badge">{CATEGORY_LABEL[r.category]}</span>
-                            </div>
-                        </div>
+            {/* ── Category Tabs ── */}
+            <div className="max-w-5xl mx-auto px-6 pb-2">
+                <div className="flex flex-wrap gap-1.5">
+                    {CATEGORIES.map(cat => (
+                        <button
+                            key={cat.key}
+                            onClick={() => setActiveCategory(cat.key)}
+                            className={`
+                                inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold
+                                border-none cursor-pointer transition-all whitespace-nowrap
+                                ${activeCategory === cat.key
+                                    ? 'bg-slate-800 text-white shadow-md shadow-slate-800/15'
+                                    : 'bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700 shadow-sm border border-slate-100'
+                                }
+                            `}
+                        >
+                            <span className="text-sm">{cat.emoji}</span>
+                            {cat.label}
+                            <span className={`
+                                text-[10px] font-bold px-1.5 py-0.5 rounded-md min-w-[18px] text-center
+                                ${activeCategory === cat.key
+                                    ? 'bg-white/20 text-white'
+                                    : 'bg-slate-100 text-slate-400'
+                                }
+                            `}>
+                                {categoryCounts[cat.key]}
+                            </span>
+                        </button>
                     ))}
                 </div>
-            )}
+            </div>
 
-            {/* Image Lightbox */}
-            {lightboxIdx !== null && filtered[lightboxIdx]?.file && (
-                <div className="recipe-lightbox" onClick={() => setLightboxIdx(null)}>
-                    <div className="recipe-lightbox-content" onClick={e => e.stopPropagation()}>
-                        <button className="recipe-lightbox-close" onClick={() => setLightboxIdx(null)}><X size={15} /></button>
-                        {lightboxIdx > 0 && <button className="recipe-lightbox-nav prev" onClick={() => navLightbox(-1)}><ChevronLeft size={18} /></button>}
-                        <img className="recipe-lightbox-img" src={`/recipes/${filtered[lightboxIdx].file}`} alt={filtered[lightboxIdx].name} />
-                        {lightboxIdx < filtered.length - 1 && <button className="recipe-lightbox-nav next" onClick={() => navLightbox(1)}><ChevronRight size={18} /></button>}
-                        <div className="recipe-lightbox-title">{filtered[lightboxIdx].emoji} {filtered[lightboxIdx].name}</div>
-                        <div className="recipe-lightbox-actions">
-                            <button className="recipe-lightbox-detail-btn" onClick={() => { setDetail(filtered[lightboxIdx]); setLightboxIdx(null); }}>
-                                <ListOrdered size={14} /> 상세 레시피
-                            </button>
-                        </div>
+            {/* ── Recipe Grid ── */}
+            {filtered.length === 0 ? (
+                <div className="max-w-5xl mx-auto px-6 py-20 text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-100 mb-4">
+                        <UtensilsCrossed size={32} className="text-slate-300" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-500 mb-1">레시피가 없습니다</h3>
+                    <p className="text-sm text-slate-400">
+                        {search ? `"${search}" 검색 결과가 없어요` : '이 카테고리에 등록된 레시피가 없어요'}
+                    </p>
+                </div>
+            ) : (
+                <div className="max-w-5xl mx-auto px-6 pt-3 pb-10">
+                    <div className="recipe-grid-layout">
+                        {filtered.map((r, idx) => {
+                            const colors = CATEGORY_COLORS[r.category];
+                            return (
+                                <div
+                                    key={r.id}
+                                    onClick={() => setDetail(r)}
+                                    className="group bg-white rounded-2xl shadow-sm border border-slate-100
+                                               hover:shadow-lg hover:border-slate-200 hover:-translate-y-0.5
+                                               cursor-pointer transition-all duration-200 overflow-hidden card-animate"
+                                    style={{ animationDelay: `${idx * 0.04}s` }}
+                                >
+                                    {/* Card Top — Emoji Hero */}
+                                    {r.file ? (
+                                        <img
+                                            src={`/recipes/${r.file}`}
+                                            alt={r.name}
+                                            loading="lazy"
+                                            className="w-full aspect-square object-cover"
+                                        />
+                                    ) : (
+                                        <div className={`aspect-[4/3] flex flex-col items-center justify-center gap-1 ${colors.bg} relative overflow-hidden`}>
+                                            <div className="absolute inset-0 opacity-[0.03]"
+                                                 style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '20px 20px' }} />
+                                            <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm">
+                                                {r.emoji}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {/* Card Body */}
+                                    <div className="p-3.5">
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <h3 className="text-sm font-bold text-slate-800 leading-snug m-0">
+                                                {r.name}
+                                            </h3>
+                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md whitespace-nowrap flex-shrink-0 ${colors.bg} ${colors.text} ${colors.border} border`}>
+                                                {CATEGORY_LABEL[r.category]}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                                            <span className="flex items-center gap-1">
+                                                <Flame size={11} className="text-orange-300" />
+                                                재료 {r.ingredients.length}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <ListOrdered size={11} className="text-slate-300" />
+                                                {r.steps.length}단계
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
 
-            {/* Detail Modal */}
+            {/* ── Detail Panel (Slide-up) ── */}
             {detail && (
-                <div className="recipe-detail-overlay" onClick={() => setDetail(null)}>
-                    <div className="recipe-detail-modal" onClick={e => e.stopPropagation()}>
-                        <div className="recipe-detail-modal-header">
-                            <h2>{detail.emoji} {detail.name} <span className="recipe-detail-badge">{CATEGORY_LABEL[detail.category]}</span></h2>
-                            <button className="recipe-detail-close" onClick={() => setDetail(null)}><X size={16} /></button>
-                        </div>
-                        {detail.file && <img className="recipe-detail-image" src={`/recipes/${detail.file}`} alt={detail.name} />}
-                        <div className="recipe-detail-body">
-                            <div className="recipe-detail-section">
-                                <h3><Flame size={15} /> 재료</h3>
-                                <ul className="recipe-detail-ingredients">
-                                    {detail.ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-                                </ul>
+                <div
+                    className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex justify-center recipe-overlay-enter"
+                    onClick={() => setDetail(null)}
+                >
+                    <div
+                        className="bg-white w-full max-w-lg h-full overflow-y-auto recipe-panel-enter"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Panel Header */}
+                        <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-100">
+                            <div className="flex items-center justify-between px-5 py-4">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <span className="text-2xl flex-shrink-0">{detail.emoji}</span>
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-extrabold text-slate-800 m-0 truncate">
+                                            {detail.name}
+                                        </h2>
+                                        <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-md mt-0.5 ${CATEGORY_COLORS[detail.category].bg} ${CATEGORY_COLORS[detail.category].text}`}>
+                                            {CATEGORY_LABEL[detail.category]}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setDetail(null)}
+                                    className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors flex-shrink-0"
+                                >
+                                    <X size={16} />
+                                </button>
                             </div>
-                            <div className="recipe-detail-section">
-                                <h3><ListOrdered size={15} /> 조리 방법</h3>
-                                <ol className="recipe-detail-steps">
-                                    {detail.steps.map((s, i) => (
-                                        <li key={i} className={s.startsWith('※') ? 'step-warning' : ''}>{s}</li>
+                        </div>
+
+                        {/* Panel Image */}
+                        {detail.file && (
+                            <img src={`/recipes/${detail.file}`} alt={detail.name} className="w-full block" />
+                        )}
+
+                        {/* Panel Body */}
+                        <div className="px-5 py-6 space-y-6">
+                            {/* Ingredients */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shadow-sm shadow-orange-400/20">
+                                        <Flame size={14} className="text-white" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-700 m-0">
+                                        재료
+                                        <span className="text-slate-400 font-medium ml-1.5">{detail.ingredients.length}가지</span>
+                                    </h3>
+                                </div>
+                                <div className="space-y-1.5">
+                                    {detail.ingredients.map((ing, i) => (
+                                        <div
+                                            key={i}
+                                            className="flex items-start gap-3 text-sm text-slate-600 py-2.5 px-3.5 rounded-xl bg-orange-50/60 border border-orange-100/80"
+                                        >
+                                            <span className="w-5 h-5 rounded-full bg-orange-200 text-orange-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                                                {i + 1}
+                                            </span>
+                                            <span className="leading-relaxed">{ing}</span>
+                                        </div>
                                     ))}
-                                </ol>
-                            </div>
+                                </div>
+                            </section>
+
+                            {/* Steps */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-sm shadow-slate-600/20">
+                                        <ListOrdered size={14} className="text-white" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-slate-700 m-0">
+                                        조리 방법
+                                        <span className="text-slate-400 font-medium ml-1.5">{detail.steps.length}단계</span>
+                                    </h3>
+                                </div>
+                                <div className="relative">
+                                    {/* Timeline line */}
+                                    <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-200" />
+
+                                    <div className="space-y-0">
+                                        {detail.steps.map((s, i) => {
+                                            const isWarning = s.startsWith('※');
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`relative flex items-start gap-3 py-3 pl-0 pr-1 ${isWarning ? '' : ''}`}
+                                                >
+                                                    {/* Step number / warning dot */}
+                                                    <div className={`
+                                                        relative z-10 w-[30px] h-[30px] rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold
+                                                        ${isWarning
+                                                            ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
+                                                            : 'bg-slate-700 text-white shadow-sm shadow-slate-700/20'
+                                                        }
+                                                    `}>
+                                                        {isWarning ? '!' : i + 1}
+                                                    </div>
+                                                    <div className={`
+                                                        flex-1 text-sm leading-relaxed pt-1
+                                                        ${isWarning
+                                                            ? 'text-red-600 font-semibold bg-red-50 rounded-xl px-3 py-2.5 border border-red-100 -mt-0.5'
+                                                            : 'text-slate-600'
+                                                        }
+                                                    `}>
+                                                        {s}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </section>
                         </div>
+
+                        {/* Bottom safe area */}
+                        <div className="h-10" />
                     </div>
                 </div>
             )}
