@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, X, Flame, ListOrdered, ChefHat, Search, UtensilsCrossed, ShoppingBag, Wheat } from 'lucide-react';
+import { ChevronLeft, X, Flame, ListOrdered, ChefHat, Search, UtensilsCrossed, ShoppingBag, Wheat, Package } from 'lucide-react';
 import './RecipeBook.css';
 
 // ══════════════════════════════════════════
@@ -200,31 +200,37 @@ const INGREDIENT_RECIPES = [
     },
     {
         id: 'i12', file: null, name: '스팸 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,600g', '후리가케 50g', '참기름 16g', '스팸 반 조각 / 1개당 밥 160g'],
         steps: ['밥에 후리가케와 참기름을 넣고 골고루 섞는다.', '1개당 밥 160g + 스팸 반 조각으로 삼각틀에 성형한다.'],
     },
     {
         id: 'i13', file: null, name: '순한참치 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,600g', '후리가케 50g', '참기름 16g', '참치 20g / 1개당 밥 160g (총 180g)'],
         steps: ['밥에 후리가케와 참기름을 넣고 골고루 섞는다.', '1개당 밥 160g + 참치 20g으로 삼각틀에 성형한다.'],
     },
     {
         id: 'i14', file: null, name: '매콤참치 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,600g', '후리가케 50g', '참기름 16g', '참치 20g / 1개당 밥 160g (총 180g)'],
         steps: ['밥에 후리가케와 참기름을 넣고 골고루 섞는다.', '1개당 밥 160g + 매콤 참치 20g으로 삼각틀에 성형한다.'],
     },
     {
         id: 'i15', file: null, name: '불고기 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,710g', '후리가케 54g', '참기름 17g', '불고기 9g / 1개당 밥 171g (총 180g)'],
         steps: ['밥에 후리가케와 참기름을 넣고 골고루 섞는다.', '1개당 밥 171g + 불고기 9g으로 삼각틀에 성형한다.'],
     },
     {
         id: 'i16', file: null, name: '멸치 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,740g', '후리가케 55g', '참기름 17g', '멸치 6g / 1개당 밥 174g'],
         steps: ['밥에 후리가케와 참기름을 넣고 골고루 섞는다.', '1개당 밥 174g + 멸치 6g으로 삼각틀에 성형한다.'],
     },
     {
         id: 'i17', file: null, name: '햄치즈 주먹밥', category: 'onigiri', emoji: '🍙',
+        yield: '10개',
         ingredients: ['밥 1,650g', '후리가케 52g', '참기름 16g', '햄 반 줄 / 치즈 반 개 / 1개당 밥 165g'],
         steps: ['햄을 약 3mm 두께로 썰어 밥에 섞는다.', '밥 165g의 1/3을 삼각틀에 깐다.', '그 위에 치즈 1/4을 올린다.', '나머지 밥 2/3를 올려 삼각틀로 완성한다.', '삼각틀에서 뺀 후 평평한 면에 치즈 1/4을 올린다.', '평평한 쪽에 김가루를 묻힌다.', '비닐 포장지에 넣고 삼각 주먹밥 라벨을 붙인다.'],
     },
@@ -486,6 +492,12 @@ export default function RecipeBook() {
                                                     <ListOrdered size={11} className="text-slate-300" />
                                                     {r.steps.length}단계
                                                 </span>
+                                                {r.yield && (
+                                                    <span className="flex items-center gap-1 ml-auto text-[11px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-md">
+                                                        <Package size={11} />
+                                                        {r.yield}
+                                                    </span>
+                                                )}
                                             </div>
                                         ) : (
                                             <p className="text-[11px] text-slate-300 m-0">레시피 준비 중</p>
@@ -517,9 +529,17 @@ export default function RecipeBook() {
                                         <h2 className="text-lg font-extrabold text-slate-800 m-0 truncate">
                                             {detail.name}
                                         </h2>
-                                        <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-md mt-0.5 ${(categoryColors[detail.category] || {}).bg || 'bg-slate-50'} ${(categoryColors[detail.category] || {}).text || 'text-slate-600'}`}>
-                                            {categoryLabel[detail.category]}
-                                        </span>
+                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                            <span className={`inline-flex text-[11px] font-semibold px-2 py-0.5 rounded-md ${(categoryColors[detail.category] || {}).bg || 'bg-slate-50'} ${(categoryColors[detail.category] || {}).text || 'text-slate-600'}`}>
+                                                {categoryLabel[detail.category]}
+                                            </span>
+                                            {detail.yield && (
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                                                    <Package size={11} />
+                                                    제조수량 {detail.yield}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <button
