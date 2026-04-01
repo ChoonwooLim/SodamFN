@@ -105,7 +105,7 @@ const Layout = ({ children }) => {
       {isAdmin && <Sidebar />}
 
       {/* Main Content Area */}
-      <div className={`flex-1 relative md:min-h-screen ${isAdmin ? 'md:ml-64' : ''}`}>
+      <div className={`flex-1 relative md:min-h-screen ${isAdmin ? 'md:ml-[272px]' : ''}`}>
         <div key={location.pathname} className="mobile-page-enter">
           {children}
         </div>

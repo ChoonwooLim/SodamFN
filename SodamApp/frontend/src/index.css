@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./styles/design-tokens.css";
+@import "./styles/premium-components.css";
 
 @theme {
     --color-slate-50: #f8fafc;
@@ -28,8 +30,21 @@
 @layer base {
     body {
         @apply bg-slate-50 text-slate-900 antialiased;
-        /* Prevent pull-to-refresh on mobile */
         overscroll-behavior-y: none;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+
+    /* Smooth scrolling */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Selection color */
+    ::selection {
+        background: rgba(59, 130, 246, 0.15);
+        color: #0F172A;
     }
 }
 
@@ -50,6 +65,13 @@
         @apply bg-white/80 backdrop-blur-md border-t border-white/20;
     }
 
+    .glass-dark {
+        background: rgba(15, 23, 42, 0.8);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
     .hide-scrollbar::-webkit-scrollbar {
         display: none;
     }
@@ -58,12 +80,32 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+
+    /* Gradient text utility */
+    .text-gradient {
+        background-clip: text;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    /* Subtle grid pattern background */
+    .bg-grid-pattern {
+        background-image:
+            linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
+
+    /* Dot pattern background */
+    .bg-dot-pattern {
+        background-image: radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
 }
 
 /* PWA Standalone Mode Styles */
 @media all and (display-mode: standalone) {
     body {
-        /* Account for status bar in standalone mode */
         padding-top: env(safe-area-inset-top, 0px);
     }
 }
@@ -79,4 +121,23 @@
 * {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #94A3B8;
 }

@@ -21,14 +21,15 @@ export default function BottomNav() {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
             <div style={{
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                borderTop: '1px solid rgba(0,0,0,0.06)',
+                background: 'rgba(255,255,255,0.92)',
+                backdropFilter: 'blur(24px) saturate(180%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                borderTop: '1px solid rgba(0,0,0,0.04)',
                 display: 'flex',
                 justifyContent: 'space-around',
                 alignItems: 'center',
-                padding: '4px 2px 6px',
+                padding: '2px 4px 4px',
+                boxShadow: '0 -4px 24px rgba(0,0,0,0.04)',
             }}>
                 {navItems.map((item) => {
                     const Icon = item.icon;
@@ -38,44 +39,48 @@ export default function BottomNav() {
                         <Link
                             key={item.path}
                             to={item.path}
+                            className="touch-feedback"
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                padding: '4px 4px',
-                                borderRadius: 10,
+                                padding: '6px 8px 4px',
+                                borderRadius: 12,
                                 textDecoration: 'none',
-                                minWidth: 48,
-                                transition: 'all 0.2s',
+                                minWidth: 52,
                                 position: 'relative',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                             }}
                         >
                             {active && (
                                 <div className="bnav-active-bg" style={{
                                     position: 'absolute',
-                                    top: 0,
-                                    width: 32,
-                                    height: 32,
+                                    top: 2,
+                                    width: 36,
+                                    height: 36,
                                     borderRadius: 10,
-                                    background: 'rgba(59,130,246,0.1)',
+                                    background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(99,102,241,0.08))',
                                 }} />
                             )}
                             <Icon
                                 size={20}
-                                strokeWidth={active ? 2.5 : 1.8}
+                                strokeWidth={active ? 2.2 : 1.6}
                                 style={{
-                                    color: active ? '#3b82f6' : '#94a3b8',
+                                    color: active ? '#3B82F6' : '#94A3B8',
                                     position: 'relative',
                                     zIndex: 1,
+                                    transition: 'all 0.2s ease',
+                                    ...(active ? { filter: 'drop-shadow(0 1px 3px rgba(59,130,246,0.3))' } : {}),
                                 }}
                             />
                             <span style={{
                                 fontSize: 9,
-                                marginTop: 2,
+                                marginTop: 1,
                                 fontWeight: active ? 700 : 500,
-                                color: active ? '#3b82f6' : '#94a3b8',
-                                letterSpacing: -0.3,
+                                color: active ? '#3B82F6' : '#94A3B8',
+                                letterSpacing: active ? -0.2 : -0.3,
+                                transition: 'all 0.2s ease',
                             }}>
                                 {item.label}
                             </span>

@@ -14,32 +14,20 @@ export default function Sidebar() {
     const [plOpen, setPlOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
-    // SuperAdmin view-as state
     const [businesses, setBusinesses] = useState([]);
     const [viewAsBid, setViewAsBid] = useState(localStorage.getItem('view_as_business_id') || '');
 
-    // Close drawer on route change
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [location.pathname]);
+    useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
-    // Auto-expand board/hr submenus
     useEffect(() => {
         const boardPaths = ['/board', '/open-checklist', '/inventory-check-admin'];
-        if (boardPaths.some(p => location.pathname.startsWith(p))) {
-            setBoardOpen(true);
-        }
+        if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
         const hrPaths = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'];
-        if (hrPaths.some(p => location.pathname.startsWith(p))) {
-            setHrOpen(true);
-        }
+        if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
         const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'];
-        if (plPaths.some(p => location.pathname.startsWith(p))) {
-            setPlOpen(true);
-        }
+        if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
     }, [location.pathname]);
 
-    // Get user info from localStorage
     const token = localStorage.getItem('token');
     let user = { role: 'admin', real_name: '관리자', grade: 'admin', profile_image: null };
 
@@ -58,18 +46,14 @@ export default function Sidebar() {
         }
     }
 
-    // Fetch businesses for SuperAdmin dropdown
     useEffect(() => {
         if (user.role === 'superadmin') {
             api.get('/superadmin/businesses/dropdown')
-                .then(res => {
-                    if (res.data?.data) setBusinesses(res.data.data);
-                })
+                .then(res => { if (res.data?.data) setBusinesses(res.data.data); })
                 .catch(err => console.error('Failed to fetch businesses for dropdown', err));
         }
     }, [user.role]);
 
-    // Fetch dynamic business name on mount
     useEffect(() => {
         if (user.role === 'superadmin') {
             if (viewAsBid) {
@@ -97,7 +81,6 @@ export default function Sidebar() {
         }
     }, [user.business_id, viewAsBid, businesses]);
 
-    // Handle business switch for SuperAdmin
     const handleViewAsChange = (newBid) => {
         if (newBid) {
             localStorage.setItem('view_as_business_id', newBid);
@@ -107,14 +90,12 @@ export default function Sidebar() {
             localStorage.removeItem('business_id');
         }
         setViewAsBid(newBid);
-        // Navigate to appropriate page based on selection
         window.location.href = newBid ? '/dashboard' : '/superadmin';
     };
 
     const isSuperAdmin = user.role === 'superadmin';
     const isViewingBusiness = isSuperAdmin && viewAsBid;
 
-    // Admin menu items (shared between admin and superadmin-viewing-business)
     const adminMenuItems = [
         { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
         { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
@@ -194,269 +175,238 @@ export default function Sidebar() {
     const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
     const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'].some(p => location.pathname.startsWith(p));
 
+    // ── Premium menu item renderer ──
     const renderMenuItem = (item) => {
         const Icon = item.icon;
         const fullPath = item.path;
         const isActive = fullPath.includes('?')
             ? location.pathname + location.search === fullPath
             : location.pathname === fullPath;
-        const activeColor = isSuperAdmin
-            ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/20'
-            : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20';
+
         return (
             <Link
                 key={fullPath}
                 to={fullPath}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
-                    ? activeColor
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    }`}
+                className={`sidebar-menu-item ${isActive ? (isSuperAdmin ? 'active-super' : 'active') : ''}`}
             >
-                <Icon size={20} />
-                <span className="font-medium text-sm">{item.label}</span>
+                <Icon size={18} className="icon-glow" />
+                <span>{item.label}</span>
             </Link>
+        );
+    };
+
+    // ── Submenu section renderer ──
+    const renderSubmenu = (label, icon, isOpen, setOpen, isGroupActive, items, accentColor) => {
+        const Icon = icon;
+        return (
+            <div className="mb-0.5">
+                <button
+                    onClick={() => setOpen(!isOpen)}
+                    className={`sidebar-menu-item w-full ${isGroupActive ? 'active' : ''}`}
+                    style={{ justifyContent: 'flex-start' }}
+                >
+                    <Icon size={18} className="icon-glow" />
+                    <span className="flex-1 text-left">{label}</span>
+                    <ChevronDown
+                        size={14}
+                        className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+                    />
+                </button>
+                <div className={`sidebar-submenu ${isOpen ? 'expanded' : 'collapsed'}`}>
+                    <div className="mt-1 space-y-0.5">
+                        {items.map(sub => {
+                            const SubIcon = sub.icon;
+                            const isSubActive = sub.path.includes('?')
+                                ? (location.pathname + location.search) === sub.path
+                                : location.pathname === sub.path || location.pathname.startsWith(sub.path);
+                            return (
+                                <Link
+                                    key={sub.path}
+                                    to={sub.path}
+                                    className={`sidebar-sub-item ${isSubActive ? 'active' : ''}`}
+                                >
+                                    <SubIcon size={14} className={isSubActive ? 'text-white' : sub.color} />
+                                    <span>{sub.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
         );
     };
 
     const sidebarContent = (
         <>
-            <div className="p-6 border-b border-slate-800/50">
+            {/* ── Header / Profile ── */}
+            <div className="p-5 pb-4">
                 <div className="flex items-center gap-3 mb-4">
                     {logoUrl ? (
-                        <img src={logoUrl} alt="Store Logo" className="w-16 h-16 rounded-full object-cover" />
+                        <img src={logoUrl} alt="Store Logo" className="w-10 h-10 rounded-xl object-cover ring-2 ring-white/10" />
                     ) : user.profile_image ? (
-                        <img src={user.profile_image} alt="Profile" className="w-10 h-10 rounded-full border border-slate-700 object-cover" />
+                        <img src={user.profile_image} alt="Profile" className="w-10 h-10 rounded-xl object-cover ring-2 ring-white/10" />
                     ) : (
-                        <div className={`w-10 h-10 rounded-full ${isSuperAdmin ? 'bg-amber-500' : 'bg-blue-600'} flex items-center justify-center font-bold text-white shadow-lg ${isSuperAdmin ? 'shadow-amber-500/20' : 'shadow-blue-500/20'}`}>
+                        <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white text-sm"
+                            style={{
+                                background: isSuperAdmin
+                                    ? 'linear-gradient(135deg, #F59E0B, #D97706)'
+                                    : 'linear-gradient(135deg, #3B82F6, #2563EB)',
+                                boxShadow: isSuperAdmin
+                                    ? '0 4px 12px rgba(245,158,11,0.3)'
+                                    : '0 4px 12px rgba(59,130,246,0.3)',
+                            }}
+                        >
                             {user.real_name?.[0] || 'U'}
                         </div>
                     )}
-                    <div>
-                        <h2 className="text-xl font-bold text-white leading-tight">{user.real_name}</h2>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="text-base font-bold text-white leading-tight truncate">{user.real_name}</h2>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-xs px-2 py-0.5 rounded ${isSuperAdmin ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'} font-bold uppercase tracking-wider`}>
+                            <span
+                                className="text-[10px] px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider"
+                                style={{
+                                    background: isSuperAdmin ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                                    color: isSuperAdmin ? '#FCD34D' : '#93C5FD',
+                                }}
+                            >
                                 {isSuperAdmin ? 'SUPER' : user.grade}
                             </span>
-                            <span className="text-xs text-slate-500 font-medium">
+                            <span className="text-[11px] text-slate-500">
                                 {user.role === 'superadmin' ? '플랫폼 총괄' : user.role === 'admin' ? '관리자' : '직원'}
                             </span>
                         </div>
                     </div>
                 </div>
 
-                {/* SuperAdmin 사업장 view-as 표시 (전환은 대시보드 매장관리에서) */}
                 {isViewingBusiness && (
-                    <div className="mt-3 mb-2">
-                        <div className="flex items-center gap-1 text-[10px] text-amber-400">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                            현재 {businesses.find(b => String(b.id) === String(viewAsBid))?.name || ''} 관리자 뷰
-                        </div>
+                    <div className="flex items-center gap-1.5 text-[10px] text-amber-400 mb-3 pl-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        현재 {businesses.find(b => String(b.id) === String(viewAsBid))?.name || ''} 관리자 뷰
                     </div>
                 )}
 
-                <div className="mt-3 -mx-2 mb-2">
-                    <div className={`${isViewingBusiness ? 'bg-[#1a2636] border-t border-[#2a3a4d] border-b-4 border-b-[#0f1923]' : 'bg-[#202c27] border-t border-[#33423b] border-b-4 border-b-[#141b18]'} rounded-xl shadow-lg shadow-black/40 overflow-hidden transform transition-all`}>
-                        <h1 className="text-xl font-black tracking-tight flex flex-nowrap items-center justify-center py-2.5 px-3 whitespace-nowrap break-keep">
-                            <span className={`${isViewingBusiness ? 'text-amber-400' : 'text-orange-500'} drop-shadow-sm whitespace-nowrap break-keep shrink-0`}>{businessName}</span>
-                            <span className="text-slate-600 font-light mx-2 shrink-0">|</span>
-                            <span className="text-white">셈</span><span className="text-blue-500">하나</span>
-                        </h1>
-                    </div>
+                {/* Business Name Card */}
+                <div className="relative overflow-hidden rounded-xl" style={{
+                    background: isViewingBusiness
+                        ? 'linear-gradient(135deg, #1a2636, #1e2d42)'
+                        : 'linear-gradient(135deg, #162218, #1a2c20)',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+                }}>
+                    <div className="absolute inset-0 opacity-20" style={{
+                        backgroundImage: 'radial-gradient(circle at 80% 20%, rgba(59,130,246,0.15) 0%, transparent 60%)',
+                    }} />
+                    <h1 className="relative text-lg font-black tracking-tight flex items-center justify-center py-3 px-4">
+                        <span className={`${isViewingBusiness ? 'text-amber-400' : 'text-emerald-400'} drop-shadow-sm`}>{businessName}</span>
+                        <span className="text-slate-600 font-light mx-2">|</span>
+                        <span className="text-white">셈</span><span className="text-blue-400">하나</span>
+                    </h1>
                 </div>
             </div>
-            <nav className="flex-1 px-4 space-y-1 mt-4 overflow-y-auto">
-                {/* SuperAdmin: show platform menu link when viewing a business */}
+
+            {/* ── Divider ── */}
+            <div className="mx-5 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)' }} />
+
+            {/* ── Navigation ── */}
+            <nav className="flex-1 px-3 space-y-0.5 mt-3 overflow-y-auto hide-scrollbar">
                 {isViewingBusiness && (
                     <button
                         onClick={() => handleViewAsChange('')}
-                        className="flex items-center gap-3 px-4 py-2 mb-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition-all text-xs font-medium w-full"
+                        className="sidebar-menu-item w-full mb-1"
+                        style={{ color: '#FBBF24', fontSize: '12px' }}
                     >
-                        <Shield size={16} />
+                        <Shield size={15} />
                         <span>← SuperAdmin 대시보드</span>
                     </button>
                 )}
+
+                {/* Section: Main */}
+                <div className="px-3 pt-2 pb-1.5">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">메인</span>
+                </div>
                 {mainMenuItems.map(renderMenuItem)}
 
-                {/* ═══ 손익관리 (접이식 서브메뉴) ═══ */}
+                {/* Section: Finance */}
                 {(user.role === 'admin' || isViewingBusiness) && (
-                    <div className="mb-0.5">
-                        <button
-                            onClick={() => setPlOpen(!plOpen)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isPLActive
-                                ? 'bg-emerald-600/20 text-emerald-300'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                }`}
-                        >
-                            <PieChart size={20} />
-                            <span className="font-medium text-sm flex-1 text-left">손익관리</span>
-                            {plOpen
-                                ? <ChevronUp size={16} className="text-slate-500" />
-                                : <ChevronDown size={16} className="text-slate-500" />
-                            }
-                        </button>
-                        {plOpen && (
-                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
-                                {plSubItems.map(sub => {
-                                    const SubIcon = sub.icon;
-                                    const isSubActive = sub.path.includes('?')
-                                        ? (location.pathname + location.search) === sub.path
-                                        : location.pathname === sub.path || location.pathname.startsWith(sub.path);
-                                    return (
-                                        <Link
-                                            key={sub.path}
-                                            to={sub.path}
-                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
-                                                ? 'bg-slate-800 text-white font-semibold'
-                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
-                                                }`}
-                                        >
-                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
-                                            <span>{sub.label}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <>
+                        <div className="px-3 pt-4 pb-1.5">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">경영관리</span>
+                        </div>
+                        {renderSubmenu('손익관리', PieChart, plOpen, setPlOpen, isPLActive, plSubItems, 'emerald')}
+                        {renderSubmenu('직원관리', Users, hrOpen, setHrOpen, isHrActive, hrSubItems, 'indigo')}
+                        {renderSubmenu('통합게시판', ClipboardList, boardOpen, setBoardOpen, isBoardActive, boardSubItems, 'blue')}
+                    </>
                 )}
 
-                {/* ═══ 직원 관리 (접이식 서브메뉴) ═══ */}
-                {(user.role === 'admin' || isViewingBusiness) && (
-                    <div className="mb-0.5">
-                        <button
-                            onClick={() => setHrOpen(!hrOpen)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isHrActive
-                                ? 'bg-indigo-600/20 text-indigo-300'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                }`}
-                        >
-                            <Users size={20} />
-                            <span className="font-medium text-sm flex-1 text-left">직원관리</span>
-                            {hrOpen
-                                ? <ChevronUp size={16} className="text-slate-500" />
-                                : <ChevronDown size={16} className="text-slate-500" />
-                            }
-                        </button>
-                        {hrOpen && (
-                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
-                                {hrSubItems.map(sub => {
-                                    const SubIcon = sub.icon;
-                                    const isSubActive = location.pathname.startsWith(sub.path);
-                                    return (
-                                        <Link
-                                            key={sub.path}
-                                            to={sub.path}
-                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
-                                                ? 'bg-slate-800 text-white font-semibold'
-                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
-                                                }`}
-                                        >
-                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
-                                            <span>{sub.label}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                {/* Section: Tools */}
+                {bottomMenuItems.length > 0 && (
+                    <>
+                        <div className="px-3 pt-4 pb-1.5">
+                            <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">도구</span>
+                        </div>
+                        {bottomMenuItems.map(renderMenuItem)}
+                    </>
                 )}
-                
-                {/* ═══ 통합게시판관리 (접이식 서브메뉴) ═══ */}
-                {(user.role === 'admin' || isViewingBusiness) && (
-                    <div>
-                        <button
-                            onClick={() => setBoardOpen(!boardOpen)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isBoardActive
-                                ? 'bg-blue-600/20 text-blue-300'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                }`}
-                        >
-                            <ClipboardList size={20} />
-                            <span className="font-medium text-sm flex-1 text-left">통합게시판관리</span>
-                            {boardOpen
-                                ? <ChevronUp size={16} className="text-slate-500" />
-                                : <ChevronDown size={16} className="text-slate-500" />
-                            }
-                        </button>
-                        {boardOpen && (
-                            <div className="ml-4 mt-1 space-y-0.5 border-l-2 border-slate-700 pl-3">
-                                {boardSubItems.map(sub => {
-                                    const SubIcon = sub.icon;
-                                    const isSubActive = location.pathname === sub.path;
-                                    return (
-                                        <Link
-                                            key={sub.path}
-                                            to={sub.path}
-                                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all text-sm ${isSubActive
-                                                ? 'bg-slate-800 text-white font-semibold'
-                                                : 'text-slate-500 hover:bg-slate-800/50 hover:text-slate-300'
-                                                }`}
-                                        >
-                                            <SubIcon size={16} className={isSubActive ? 'text-white' : sub.color} />
-                                            <span>{sub.label}</span>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {bottomMenuItems.map(renderMenuItem)}
             </nav>
 
-            <div className="p-4 border-t border-slate-800">
-                {/* SuperAdmin 전체보기 모드: 수퍼관리자앱만 표시 */}
+            {/* ── Footer ── */}
+            <div className="p-3 space-y-0.5">
+                <div className="mx-2 mb-2 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)' }} />
+
                 {isSuperAdmin && !isViewingBusiness && (
                     <Link
                         to="/admin-app-preview"
-                        className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/admin-app-preview' ? 'bg-amber-500/20 text-amber-300' : 'text-amber-400 hover:bg-amber-500/10'}`}
+                        className={`sidebar-menu-item ${location.pathname === '/admin-app-preview' ? 'active-super' : ''}`}
                     >
-                        <Shield size={20} />
-                        <span className="font-medium text-sm">수퍼관리자앱</span>
-                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">SUPER</span>
+                        <Shield size={16} />
+                        <span>수퍼관리자앱</span>
+                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(245,158,11,0.15)', color: '#FBBF24' }}>SUPER</span>
                     </Link>
                 )}
-                {/* 사업장 선택 시 또는 일반 admin: 직원용/관리자 앱 표시 */}
+
                 {(user.role === 'admin' || isViewingBusiness) && (
                     <>
                         <Link
                             to="/staff-app-preview"
-                            className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/staff-app-preview' ? 'bg-emerald-500/20 text-emerald-300' : 'text-emerald-400 hover:bg-emerald-500/10'}`}
+                            className={`sidebar-menu-item ${location.pathname === '/staff-app-preview' ? 'active' : ''}`}
                         >
-                            <Smartphone size={20} />
-                            <span className="font-medium text-sm">직원용 앱</span>
-                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">PWA</span>
+                            <Smartphone size={16} />
+                            <span>직원용 앱</span>
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(16,185,129,0.15)', color: '#6EE7B7' }}>PWA</span>
                         </Link>
                         <Link
                             to="/admin-app-preview"
-                            className={`flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl transition-all ${location.pathname === '/admin-app-preview' ? 'bg-violet-500/20 text-violet-300' : 'text-violet-400 hover:bg-violet-500/10'}`}
+                            className={`sidebar-menu-item ${location.pathname === '/admin-app-preview' ? 'active' : ''}`}
                         >
-                            <Monitor size={20} />
-                            <span className="font-medium text-sm">관리자 앱</span>
-                            <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-400 font-medium">모니터</span>
+                            <Monitor size={16} />
+                            <span>관리자 앱</span>
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#C4B5FD' }}>WEB</span>
                         </Link>
                     </>
                 )}
+
+                {/* Brand Footer */}
                 <a
                     href="/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group"
+                    className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-slate-500 hover:text-slate-300 transition-all group"
                 >
-                    <Home size={20} className="text-slate-400 group-hover:text-white transition-colors" />
-                    <span className="font-bold text-base tracking-tight flex items-center">
-                        <span className="text-white">셈</span><span className="text-blue-500">하나</span>
-                        <span className="text-slate-600 font-light mx-1.5">|</span>
-                        <span className="text-slate-300">SEM</span><span className="text-blue-500">HANA</span>
+                    <Home size={16} className="group-hover:text-white transition-colors" />
+                    <span className="font-bold text-sm tracking-tight flex items-center">
+                        <span className="text-white">셈</span><span className="text-blue-400">하나</span>
+                        <span className="text-slate-700 font-light mx-1.5">|</span>
+                        <span className="text-slate-400 text-xs">SEMHANA</span>
                     </span>
                 </a>
+
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 w-full px-4 py-3 text-slate-400 hover:text-white transition-colors"
+                    className="sidebar-menu-item w-full"
+                    style={{ color: '#94A3B8' }}
                 >
-                    <LogOut size={20} />
-                    <span className="font-medium text-sm">로그아웃</span>
+                    <LogOut size={16} />
+                    <span>로그아웃</span>
                 </button>
             </div>
         </>
@@ -464,52 +414,58 @@ export default function Sidebar() {
 
     return (
         <>
-            {/* Desktop Sidebar — always visible */}
-            <aside className="hidden md:flex flex-col w-64 bg-slate-900 min-h-screen text-white fixed left-0 top-0 z-50">
+            {/* Desktop Sidebar */}
+            <aside
+                className="hidden md:flex flex-col min-h-screen text-white fixed left-0 top-0 z-50"
+                style={{
+                    width: 'var(--sidebar-width, 272px)',
+                    background: 'var(--sidebar-bg, linear-gradient(180deg, #0F172A 0%, #1E293B 100%))',
+                }}
+            >
                 {sidebarContent}
             </aside>
 
-            {/* Mobile Hamburger Button */}
+            {/* Mobile Hamburger */}
             <button
                 onClick={() => setMobileOpen(true)}
-                className="md:hidden fixed top-3 left-3 z-[60] w-10 h-10 rounded-xl bg-slate-900/90 backdrop-blur-sm text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                className="md:hidden fixed top-3 left-3 z-[60] w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                style={{
+                    background: 'rgba(15, 23, 42, 0.9)',
+                    backdropFilter: 'blur(8px)',
+                    WebkitBackdropFilter: 'blur(8px)',
+                }}
                 aria-label="메뉴 열기"
             >
-                <Menu size={20} />
+                <Menu size={18} />
             </button>
 
-            {/* Mobile Drawer Overlay */}
+            {/* Mobile Overlay */}
             {mobileOpen && (
                 <div
-                    className="md:hidden fixed inset-0 z-[70] bg-black/50 backdrop-blur-sm"
+                    className="md:hidden fixed inset-0 z-[70] fade-overlay"
+                    style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
                     onClick={() => setMobileOpen(false)}
-                    style={{ animation: 'fadeIn 0.2s ease' }}
                 />
             )}
 
             {/* Mobile Drawer */}
             <aside
-                className={`md:hidden fixed top-0 left-0 z-[80] w-72 h-full bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'
-                    }`}
+                className={`md:hidden fixed top-0 left-0 z-[80] w-[280px] h-full text-white flex flex-col transition-transform duration-300 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                style={{
+                    background: 'var(--sidebar-bg, linear-gradient(180deg, #0F172A 0%, #1E293B 100%))',
+                    boxShadow: mobileOpen ? '16px 0 48px rgba(0,0,0,0.5)' : 'none',
+                }}
             >
-                {/* Close Button */}
                 <button
                     onClick={() => setMobileOpen(false)}
-                    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                    className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-white/10"
+                    style={{ background: 'rgba(255,255,255,0.06)' }}
                     aria-label="메뉴 닫기"
                 >
-                    <X size={16} />
+                    <X size={14} className="text-slate-400" />
                 </button>
-
                 {sidebarContent}
             </aside>
-
-            <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-            `}</style>
         </>
     );
 }

@@ -1,0 +1,136 @@
+/* ═══════════════════════════════════════════════════════════════
+   SEMHANA Design Tokens v2.0
+   World-class design system foundation
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+    /* ── Brand Colors ── */
+    --brand-primary: #0F172A;
+    --brand-accent: #3B82F6;
+    --brand-accent-hover: #2563EB;
+    --brand-gradient: linear-gradient(135deg, #3B82F6, #8B5CF6);
+    --brand-gradient-warm: linear-gradient(135deg, #F59E0B, #EF4444);
+
+    /* ── Semantic Colors ── */
+    --color-success: #10B981;
+    --color-success-light: #D1FAE5;
+    --color-success-dark: #059669;
+    --color-warning: #F59E0B;
+    --color-warning-light: #FEF3C7;
+    --color-warning-dark: #D97706;
+    --color-error: #EF4444;
+    --color-error-light: #FEE2E2;
+    --color-error-dark: #DC2626;
+    --color-info: #3B82F6;
+    --color-info-light: #DBEAFE;
+    --color-info-dark: #2563EB;
+
+    /* ── Surface Colors ── */
+    --surface-primary: #FFFFFF;
+    --surface-secondary: #F8FAFC;
+    --surface-tertiary: #F1F5F9;
+    --surface-elevated: #FFFFFF;
+    --surface-overlay: rgba(15, 23, 42, 0.6);
+
+    /* ── Text Colors ── */
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-tertiary: #94A3B8;
+    --text-disabled: #CBD5E1;
+    --text-inverse: #FFFFFF;
+    --text-link: #3B82F6;
+
+    /* ── Border Colors ── */
+    --border-primary: #E2E8F0;
+    --border-secondary: #F1F5F9;
+    --border-focus: #3B82F6;
+    --border-error: #EF4444;
+
+    /* ── Typography Scale (8pt grid based) ── */
+    --text-display: 2.5rem;     /* 40px - Hero numbers */
+    --text-h1: 1.875rem;        /* 30px - Page titles */
+    --text-h2: 1.5rem;          /* 24px - Section headers */
+    --text-h3: 1.25rem;         /* 20px - Card titles */
+    --text-h4: 1.125rem;        /* 18px - Subsection */
+    --text-body: 0.9375rem;     /* 15px - Body text */
+    --text-sm: 0.8125rem;       /* 13px - Secondary text */
+    --text-xs: 0.75rem;         /* 12px - Captions */
+    --text-xxs: 0.6875rem;      /* 11px - Tags, badges */
+
+    --leading-tight: 1.25;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+
+    --tracking-tight: -0.025em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.025em;
+    --tracking-wider: 0.05em;
+
+    /* ── Font Weights ── */
+    --weight-regular: 400;
+    --weight-medium: 500;
+    --weight-semibold: 600;
+    --weight-bold: 700;
+    --weight-extrabold: 800;
+    --weight-black: 900;
+
+    /* ── Spacing Scale (4px base) ── */
+    --space-0: 0;
+    --space-1: 0.25rem;   /* 4px */
+    --space-2: 0.5rem;    /* 8px */
+    --space-3: 0.75rem;   /* 12px */
+    --space-4: 1rem;      /* 16px */
+    --space-5: 1.25rem;   /* 20px */
+    --space-6: 1.5rem;    /* 24px */
+    --space-8: 2rem;      /* 32px */
+    --space-10: 2.5rem;   /* 40px */
+    --space-12: 3rem;     /* 48px */
+    --space-16: 4rem;     /* 64px */
+
+    /* ── Border Radius ── */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-3xl: 24px;
+    --radius-full: 9999px;
+
+    /* ── Shadows (Layered for depth) ── */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.04);
+    --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.10), 0 8px 16px rgba(0, 0, 0, 0.05);
+    --shadow-2xl: 0 24px 64px rgba(0, 0, 0, 0.14), 0 12px 24px rgba(0, 0, 0, 0.06);
+    --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.3);
+    --shadow-glow-amber: 0 0 20px rgba(245, 158, 11, 0.3);
+
+    /* ── Transitions ── */
+    --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+    --duration-fast: 150ms;
+    --duration-normal: 250ms;
+    --duration-slow: 400ms;
+    --duration-slower: 600ms;
+
+    /* ── Z-Index Scale ── */
+    --z-base: 0;
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-overlay: 30;
+    --z-modal: 40;
+    --z-sidebar: 50;
+    --z-toast: 60;
+    --z-tooltip: 70;
+
+    /* ── Sidebar ── */
+    --sidebar-width: 272px;
+    --sidebar-collapsed-width: 72px;
+    --sidebar-bg: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+}
