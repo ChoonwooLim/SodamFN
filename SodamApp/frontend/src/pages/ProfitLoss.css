@@ -3,9 +3,16 @@
 }
 
 .profitloss-page {
-    padding: 16px;
+    min-height: 100vh;
+    background: #f8fafc;
+    padding: 0;
     width: 100%;
-    /* ... */
+}
+
+.profitloss-page > .pl-inner-wrapper {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 8rem;
 }
 
 /* ... existing code ... */
@@ -59,13 +66,40 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 2rem;
+}
+
+.page-header .header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.page-header .header-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    background: linear-gradient(to bottom right, #10b981, #059669);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+    color: white;
+    font-size: 1.25rem;
 }
 
 .page-header h1 {
-    font-size: 1.75rem;
+    font-size: 1.25rem;
     font-weight: 700;
-    color: #1f2937;
+    color: #0f172a;
+    letter-spacing: -0.025em;
+    margin: 0;
+}
+
+.page-header .header-subtitle {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 2px;
 }
 
 .year-selector {
@@ -402,24 +436,24 @@
 /* Tab Navigation */
 .tab-navigation {
     display: flex;
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 24px;
     background: #f1f5f9;
-    padding: 6px;
-    border-radius: 12px;
+    padding: 4px;
+    border-radius: 0.75rem;
     flex-wrap: wrap;
     overflow: visible;
 }
 
 .tab-button {
-    padding: 12px 24px;
+    padding: 10px 20px;
     border: none;
     background: transparent;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
     color: #64748b;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 0.75rem;
     transition: all 0.2s ease;
     white-space: nowrap;
 }
@@ -430,9 +464,9 @@
 }
 
 .tab-button.active {
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    background: #0f172a;
     color: white;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
 }
 
 /* Dropdown Group */

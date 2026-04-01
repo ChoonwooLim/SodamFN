@@ -717,11 +717,13 @@ export default function RevenueManagement() {
             <div className="revenue-header">
                 <div className="revenue-header-top">
                     <h1>
-                        <button onClick={() => navigate(-1)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <ChevronLeft size={18} />
-                        </button>
-                        <TrendingUp size={22} />
-                        매출관리
+                        <div className="header-icon">
+                            <TrendingUp size={20} />
+                        </div>
+                        <div className="header-text">
+                            <h1>매출관리</h1>
+                            <p className="header-subtitle">Revenue Management</p>
+                        </div>
                     </h1>
                     {/* Year-only nav for annual views, month nav for monthly views */}
                     {(viewMode === 'revenueDetail' || viewMode === 'deliveryApp') ? (

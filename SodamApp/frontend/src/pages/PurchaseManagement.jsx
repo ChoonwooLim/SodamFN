@@ -567,11 +567,13 @@ export default function PurchaseManagement() {
             <div className="purchase-header">
                 <div className="purchase-header-top">
                     <h1>
-                        <button onClick={() => navigate(-1)} className="purchase-back-btn">
-                            <ChevronLeft size={18} />
-                        </button>
-                        <ShoppingBag size={22} />
-                        매입 관리
+                        <div className="header-icon">
+                            <ShoppingBag size={20} />
+                        </div>
+                        <div className="header-text">
+                            <h1>매입관리</h1>
+                            <p className="header-subtitle">Purchase Management</p>
+                        </div>
                     </h1>
                     <div className="purchase-month-nav">
                         <button onClick={prevMonth}><ChevronLeft size={16} /></button>

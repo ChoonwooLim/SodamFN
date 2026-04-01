@@ -9,9 +9,13 @@ export default function UserManual() {
 
     return (
         <div className="manual-page">
+            <div className="manual-inner">
             <div className="manual-header">
-                <h1><BookOpen size={28} /> 사용 매뉴얼</h1>
-                <p>셈하나 관리 시스템의 주요 기능 사용법을 안내합니다.</p>
+                <div className="header-icon"><BookOpen size={20} /></div>
+                <div className="header-text">
+                    <h1>사용 매뉴얼</h1>
+                    <p>셈하나 관리 시스템의 주요 기능 사용법</p>
+                </div>
             </div>
 
             {/* 목차 */}
@@ -807,6 +811,7 @@ export default function UserManual() {
                     </p>
                 </>
             </div>
+        </div>
         </div>
     );
 }

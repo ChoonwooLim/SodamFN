@@ -69,13 +69,17 @@ export default function CardSales() {
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
 
     return (
-        <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                        <CreditCard className="text-blue-600" /> 카드 매출 분석
-                    </h1>
-                    <p className="text-slate-500 mt-1">여신금융협회 데이터를 기반으로 매출 및 입금을 분석합니다.</p>
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-6xl mx-auto px-6 py-8 pb-32 space-y-6">
+            <header className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                        <CreditCard size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">카드매출 관리</h1>
+                        <p className="text-xs text-slate-400 mt-0.5">여신금융협회 데이터 기반 매출/입금 분석</p>
+                    </div>
                 </div>
 
                 {/* Date Filter */}
@@ -98,7 +102,7 @@ export default function CardSales() {
                         조회
                     </button>
                 </div>
-            </div>
+            </header>
 
             {msg && (
                 <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-bold animate-pulse">
@@ -112,8 +116,8 @@ export default function CardSales() {
                     <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === tab
-                            ? 'bg-white text-blue-600 shadow-sm'
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === tab
+                            ? 'bg-slate-900 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-800'
                             }`}
                     >
@@ -333,6 +337,7 @@ export default function CardSales() {
                     </div>
                 </div>
             )}
+        </div>
         </div>
     );
 }

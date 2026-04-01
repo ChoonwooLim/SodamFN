@@ -497,10 +497,13 @@ export default function VendorSettings() {
             <div className="vendor-settings-page">
                 <div className="vendor-settings-container">
                     <header className="vendor-settings-header">
-                        <button onClick={() => navigate(-1)} className="back-button">
-                            <ChevronLeft size={20} />
-                        </button>
-                        <h1>설정</h1>
+                        <div className="header-icon">
+                            <Building2 size={20} />
+                        </div>
+                        <div>
+                            <h1>거래처 관리</h1>
+                            <p className="header-subtitle">Vendor Settings</p>
+                        </div>
                     </header>
                     <div className="vendor-settings-content">
                         <div className="settings-top-bar">

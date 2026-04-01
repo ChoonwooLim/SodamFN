@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { BarChart3 } from 'lucide-react';
 import api from '../api';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import './ProfitLoss.css';
@@ -1314,8 +1315,15 @@ export default function ProfitLoss() {
     // ═══════════════════════════════════════════
     return (
         <div className="profitloss-page">
+            <div className="pl-inner-wrapper">
             <div className="page-header">
-                <h1>손익계산서</h1>
+                <div className="header-left">
+                    <div className="header-icon"><BarChart3 size={20} /></div>
+                    <div>
+                        <h1>손익계산서</h1>
+                        <p className="header-subtitle">Profit & Loss Statement</p>
+                    </div>
+                </div>
                 <div className="year-selector">
                     <button onClick={() => setYear(y => y - 1)}>◀</button>
                     <span>{year}년</span>
@@ -1343,6 +1351,7 @@ export default function ProfitLoss() {
                 {activeTab === 'expenses' && renderExpenseDetail()}
                 {activeTab === 'analysis' && renderAnalysis()}
                 {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}
+            </div>
             </div>
         </div>
     );

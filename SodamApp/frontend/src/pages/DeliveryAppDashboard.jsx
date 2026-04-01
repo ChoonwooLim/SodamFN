@@ -115,19 +115,19 @@ export default function DeliveryAppDashboard() {
      STYLES — Revenue/Purchase 동일 색상 체계
      ═══════════════════════════════════════════════ */
   const S = {
-    page: { minHeight: '100vh', background: '#475569', paddingBottom: 80 },
-    header: { background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding: '20px 32px 16px', color: 'white', position: 'sticky', top: 0, zIndex: 40 },
-    headerTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-    headerLeft: { display: 'flex', alignItems: 'center', gap: 16 },
-    backBtn: { background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    title: { fontSize: 20, fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: 10 },
+    page: { minHeight: '100vh', background: '#f8fafc', paddingBottom: 80 },
+    header: { padding: '2rem 1.5rem 0', maxWidth: '72rem', margin: '0 auto' },
+    headerTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: '2rem' },
+    headerLeft: { display: 'flex', alignItems: 'center', gap: 12 },
+    headerIcon: { width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(to bottom right, #f59e0b, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(245, 158, 11, 0.2)', color: 'white', flexShrink: 0 },
+    title: { fontSize: 20, fontWeight: 700, margin: 0, color: '#0f172a', letterSpacing: '-0.025em' },
     subtitle: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
     navGroup: { display: 'flex', alignItems: 'center', gap: 8 },
-    navBtn: { background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-    navLabel: { fontSize: 16, fontWeight: 700, minWidth: 80, textAlign: 'center' },
+    navBtn: { background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    navLabel: { fontSize: 16, fontWeight: 700, minWidth: 80, textAlign: 'center', color: '#0f172a' },
     uploadBtn: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' },
     // Summary cards
-    summaryRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '0 32px', marginTop: 16, position: 'relative', zIndex: 5 },
+    summaryRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, padding: '0 1.5rem', maxWidth: '72rem', margin: '0 auto', position: 'relative', zIndex: 5 },
     card: { background: 'white', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' },
     cardTotal: { background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)', borderRadius: 16, padding: '18px 20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' },
     cardLabel: { fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 },
@@ -136,7 +136,7 @@ export default function DeliveryAppDashboard() {
     cardValueLight: { fontSize: 22, fontWeight: 800, color: 'white' },
     cardSub: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
     // Content
-    content: { margin: '16px 32px 0', background: '#f1f5f9', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.2)' },
+    content: { margin: '16px auto 0', maxWidth: '72rem', padding: '0 1.5rem', background: 'white', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' },
     sectionHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #e2e8f0' },
     sectionTitle: { fontSize: 15, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 },
     // Channel cards within content
@@ -159,7 +159,7 @@ export default function DeliveryAppDashboard() {
     totalTd: { padding: '14px 12px', textAlign: 'right', fontWeight: 700, color: 'white', fontSize: 14 },
     totalTdLabel: { padding: '14px 12px', textAlign: 'center', fontWeight: 800, color: 'white', fontSize: 14 },
     // Fee detail
-    feeSection: { margin: '16px 32px 0', background: '#f1f5f9', borderRadius: 16, boxShadow: '0 2px 12px rgba(0,0,0,0.2)' },
+    feeSection: { margin: '16px auto 0', maxWidth: '72rem', padding: '0 1.5rem', background: 'white', borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1)' },
     feeCard: { background: 'white', borderRadius: 12, padding: 0, border: '1px solid #e2e8f0', overflow: 'hidden' },
     feeCardHeader: { background: 'linear-gradient(135deg, #134e4a, #1e3a3a)', padding: '14px 16px', color: 'white' },
     feeCardBody: { padding: 16 },
@@ -174,13 +174,11 @@ export default function DeliveryAppDashboard() {
       <div style={S.header}>
         <div style={S.headerTop}>
           <div style={S.headerLeft}>
-            <button style={S.backBtn} onClick={() => navigate(-1)}>
-              <ChevronLeft size={18} />
-            </button>
+            <div style={S.headerIcon}>
+              <Truck size={20} />
+            </div>
             <div>
-              <h1 style={S.title}>
-                <Truck size={20} /> 배달앱 관리
-              </h1>
+              <h1 style={S.title}>배달앱관리</h1>
               <div style={S.subtitle}>Delivery App Settlement Dashboard</div>
             </div>
           </div>

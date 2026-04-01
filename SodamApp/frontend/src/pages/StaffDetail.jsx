@@ -456,19 +456,22 @@ export default function StaffDetail() {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 pb-24">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <header className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate('/staff')} className="p-2 bg-white rounded-full shadow-sm text-slate-600 hover:bg-slate-100 transition-colors">
-                            <ChevronLeft size={24} />
-                        </button>
-                        <h1 className="text-2xl font-bold text-slate-900">인사기록카드: {formData.name}</h1>
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                            <User size={20} className="text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">직원 상세</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">{formData.name} 인사기록카드</p>
+                        </div>
                     </div>
                     <button
                         onClick={handleSave}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 shadow-md transition-all active:scale-95"
+                        className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-slate-800 shadow-md transition-all active:scale-95"
                     >
                         <Save size={20} /> 저장하기
                     </button>

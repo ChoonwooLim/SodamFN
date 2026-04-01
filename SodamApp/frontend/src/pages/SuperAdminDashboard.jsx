@@ -263,29 +263,26 @@ export default function SuperAdminDashboard() {
     // RENDER
     // ==========================================
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-6 pb-24">
-            <div className="max-w-7xl mx-auto">
+        <div className="min-h-screen bg-slate-50">
+            <div className="max-w-6xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <header className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
-                            <ChevronLeft size={24} />
-                        </button>
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                            <Shield size={20} className="text-white" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3">
-                                <Shield className="text-amber-400" size={28} />
-                                SuperAdmin Dashboard
-                            </h1>
-                            <p className="text-slate-400 text-sm mt-1">멀티테넌트 플랫폼 관리 센터</p>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">SuperAdmin</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">멀티테넌트 플랫폼 관리 센터</p>
                         </div>
                     </div>
-                    <button onClick={() => fetchData(activeTab)} className="p-2 bg-white/10 rounded-xl hover:bg-white/20" title="새로고침">
+                    <button onClick={() => fetchData(activeTab)} className="p-2 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600" title="새로고침">
                         <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
                 </header>
 
                 {/* Tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
+                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl overflow-x-auto mb-6 scrollbar-hide">
                     {TABS.map(tab => {
                         const Icon = tab.icon;
                         const showBadge = tab.key === 'applications' && pendingCount > 0;
@@ -294,14 +291,14 @@ export default function SuperAdminDashboard() {
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all relative ${activeTab === tab.key
-                                    ? 'bg-amber-500 text-slate-900 shadow-lg shadow-amber-500/30'
-                                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                                    ? 'bg-slate-900 text-white shadow-sm'
+                                    : 'text-slate-500 hover:bg-slate-200 hover:text-slate-800'
                                     }`}
                             >
                                 <Icon size={16} />
                                 {tab.label}
                                 {showBadge && (
-                                    <span className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full ${activeTab === tab.key ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-[10px] font-bold rounded-full bg-red-500 text-white">
                                         {pendingCount}
                                     </span>
                                 )}
