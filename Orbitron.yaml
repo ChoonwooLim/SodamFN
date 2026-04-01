@@ -37,6 +37,8 @@ services:
         value: "sodam-uploads"
       - key: R2_PUBLIC_URL
         value: ""  # Set after R2 bucket creation
+      - key: REPLICATE_API_TOKEN
+        value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
       - key: SUPERADMIN_USERNAME
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD

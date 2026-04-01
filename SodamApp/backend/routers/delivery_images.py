@@ -148,12 +148,96 @@ class AIGenerateRequest(BaseModel):
     name: str = "AI 생성 이미지"
     category: str = "김밥류"
     style: str = "natural"  # natural, studio, minimal
+    provider: str = "replicate"  # replicate, openai
 
 STYLE_SUFFIXES = {
     "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
     "studio": "studio food photography, dramatic lighting, dark background, professional plating, high-end restaurant quality, shallow depth of field",
     "minimal": "minimal flat lay food photography, bright clean background, modern styling, negative space, Instagram-worthy composition",
 }
+
+
+def _get_ai_provider():
+    """사용 가능한 AI 이미지 생성 프로바이더 확인"""
+    replicate_token = os.getenv("REPLICATE_API_TOKEN")
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if replicate_token:
+        return "replicate", replicate_token
+    if openai_key:
+        return "openai", openai_key
+    return None, None
+
+
+async def _generate_with_replicate(full_prompt: str, api_token: str) -> str:
+    """Replicate API로 SDXL 이미지 생성 (비용: ~$0.005/장, 속도: 3~10초)"""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        # Replicate prediction 생성
+        response = await client.post(
+            "https://api.replicate.com/v1/predictions",
+            headers={
+                "Authorization": f"Bearer {api_token}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "version": "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
+                "input": {
+                    "prompt": full_prompt,
+                    "width": 1024,
+                    "height": 1024,
+                    "num_inference_steps": 4,
+                    "guidance_scale": 0.0,
+                    "num_outputs": 1,
+                },
+            },
+        )
+        if response.status_code != 201:
+            raise Exception(f"Replicate API 오류: {response.status_code} {response.text}")
+
+        prediction = response.json()
+        prediction_url = prediction.get("urls", {}).get("get")
+
+        if not prediction_url:
+            raise Exception("Replicate prediction URL을 받지 못했습니다")
+
+        # 폴링: 결과 대기 (최대 120초)
+        for _ in range(60):
+            poll = await client.get(
+                prediction_url,
+                headers={"Authorization": f"Bearer {api_token}"},
+            )
+            result = poll.json()
+            status = result.get("status")
+
+            if status == "succeeded":
+                output = result.get("output")
+                if isinstance(output, list) and output:
+                    return output[0]
+                raise Exception("Replicate 출력이 비어 있습니다")
+            elif status == "failed":
+                raise Exception(f"Replicate 생성 실패: {result.get('error', '알 수 없는 오류')}")
+
+            import asyncio
+            await asyncio.sleep(2)
+
+        raise Exception("Replicate 생성 타임아웃 (120초 초과)")
+
+
+async def _generate_with_openai(full_prompt: str, api_key: str) -> str:
+    """OpenAI DALL-E 3로 이미지 생성 (비용: $0.04/장)"""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key)
+    response = client.images.generate(
+        model="dall-e-3",
+        prompt=full_prompt,
+        size="1024x1024",
+        quality="standard",
+        n=1,
+    )
+    return response.data[0].url
+
 
 @router.post("/ai-generate")
 async def ai_generate_image(
@@ -162,34 +246,27 @@ async def ai_generate_image(
     _admin: AuthUser = Depends(get_admin_user),
     bid=Depends(get_bid_from_token),
 ):
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    provider, api_key = _get_ai_provider()
+    if not provider:
         raise HTTPException(
             status_code=503,
-            detail="OPENAI_API_KEY가 설정되지 않았습니다. .env 파일에 추가해주세요.",
+            detail="AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.",
         )
 
     style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
     full_prompt = f"{req.prompt}. {style_suffix}"
 
     try:
-        from openai import OpenAI
+        # 프로바이더별 이미지 생성
+        if provider == "replicate":
+            ai_image_url = await _generate_with_replicate(full_prompt, api_key)
+        else:
+            ai_image_url = await _generate_with_openai(full_prompt, api_key)
 
-        client = OpenAI(api_key=api_key)
-        response = client.images.generate(
-            model="dall-e-3",
-            prompt=full_prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
-        )
-
-        ai_image_url = response.data[0].url
-
-        # AI 생성 이미지를 스토리지에 저장
+        # 생성된 이미지를 스토리지에 저장
         import httpx
 
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
             img_response = await http_client.get(ai_image_url)
             if img_response.status_code != 200:
                 raise Exception("AI 이미지 다운로드 실패")
@@ -198,9 +275,11 @@ async def ai_generate_image(
 
         storage = get_storage()
         timestamp = int(datetime.now().timestamp() * 1000)
-        storage_key = f"delivery_images/ai_{timestamp}.png"
+        ext = "webp" if provider == "replicate" else "png"
+        storage_key = f"delivery_images/ai_{timestamp}.{ext}"
+        content_type = f"image/{ext}"
         file_data = BytesIO(img_response.content)
-        stored_url = storage.upload_file(file_data, storage_key, "image/png")
+        stored_url = storage.upload_file(file_data, storage_key, content_type)
 
         # DB에 저장
         img = DeliveryImage(
@@ -223,17 +302,23 @@ async def ai_generate_image(
                 "category": img.category,
                 "image_url": img.image_url,
                 "source": img.source,
+                "provider": provider,
             },
         }
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"AI image generation error: {e}")
+        logger.error(f"AI image generation error ({provider}): {e}")
         raise HTTPException(status_code=500, detail=f"AI 이미지 생성 실패: {str(e)}")
 
 
 # ── AI 설정 상태 확인 ──
 @router.get("/ai-status")
 def ai_status(_admin: AuthUser = Depends(get_admin_user)):
-    has_key = bool(os.getenv("OPENAI_API_KEY"))
-    return {"status": "success", "ai_enabled": has_key}
+    provider, _ = _get_ai_provider()
+    return {
+        "status": "success",
+        "ai_enabled": provider is not None,
+        "provider": provider,
+        "provider_name": {"replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
+    }

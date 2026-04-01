@@ -72,6 +72,7 @@ export default function DeliveryImages() {
   // API 연동 상태
   const [dbImages, setDbImages] = useState([]);
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiProvider, setAiProvider] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -113,6 +114,7 @@ export default function DeliveryImages() {
         headers: getAuthHeaders(),
       });
       setAiEnabled(res.data?.ai_enabled || false);
+      setAiProvider(res.data?.provider_name || '');
     } catch {
       setAiEnabled(false);
     }
@@ -327,7 +329,7 @@ export default function DeliveryImages() {
           <button
             onClick={() => {
               if (!aiEnabled) {
-                alert('OPENAI_API_KEY가 설정되지 않았습니다.\n백엔드 .env 파일에 OPENAI_API_KEY를 추가해주세요.');
+                alert('AI API 키가 설정되지 않았습니다.\n백엔드 .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.');
                 return;
               }
               setShowAIModal(true);
@@ -709,7 +711,9 @@ export default function DeliveryImages() {
                   <X className="w-5 h-5 text-slate-400" />
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">DALL-E 3 기반으로 고품질 상품 이미지를 생성합니다</p>
+              <p className="text-xs text-slate-500 mt-1">
+                {aiProvider ? `${aiProvider} 기반` : 'AI'} 고품질 상품 이미지 생성
+              </p>
             </div>
 
             <div className="p-6 space-y-4">
