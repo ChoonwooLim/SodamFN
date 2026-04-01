@@ -1,0 +1,365 @@
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body, Depends
+from fastapi.responses import FileResponse
+import urllib.parse
+from datetime import date, datetime
+import shutil
+import os
+from sqlmodel import Session, select, col
+
+from routers.auth import get_admin_user, get_current_user, get_password_hash
+from models import User as AuthUser, Staff, StaffDocument
+from database import get_session
+from tenant_filter import get_bid_from_token, apply_bid_filter
+from pydantic import BaseModel
+from typing import Optional, List
+
+router = APIRouter()
+
+class StaffCreate(BaseModel):
+    name: str
+    role: str
+    hourly_wage: int
+    bank_account: Optional[str] = None
+    email: Optional[str] = None
+    start_date: date = date.today()
+    nationality: str = "South Korea"
+    visa_type: Optional[str] = None
+    dependents_count: int = 1
+    children_count: int = 0
+
+class StaffUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    hourly_wage: Optional[int] = None
+    bank_account: Optional[str] = None
+    bank_name: Optional[str] = None
+    account_number: Optional[str] = None
+    account_holder: Optional[str] = None
+    start_date: Optional[date] = None
+    status: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    contract_type: Optional[str] = None
+    insurance_4major: Optional[bool] = None
+    insurance_base_salary: Optional[int] = None
+    monthly_salary: Optional[int] = None
+    work_schedule: Optional[str] = None
+    doc_contract: Optional[bool] = None
+    doc_health_cert: Optional[bool] = None
+    doc_id_copy: Optional[bool] = None
+    doc_bank_copy: Optional[bool] = None
+    nationality: Optional[str] = None
+    visa_type: Optional[str] = None
+    address: Optional[str] = None
+    resident_number: Optional[str] = None
+    dependents_count: Optional[int] = None
+    children_count: Optional[int] = None
+    
+    contract_start_date: Optional[date] = None
+    contract_end_date: Optional[date] = None
+    work_start_time: Optional[str] = None
+    work_end_time: Optional[str] = None
+    rest_start_time: Optional[str] = None
+    rest_end_time: Optional[str] = None
+    working_days: Optional[str] = None
+    weekly_holiday: Optional[str] = None
+    job_description: Optional[str] = None
+    bonus_enabled: Optional[bool] = None
+    bonus_amount: Optional[str] = None
+    salary_payment_date: Optional[str] = None
+    salary_payment_method: Optional[str] = None
+
+    np_exempt: Optional[bool] = None
+    durunnuri_support: Optional[bool] = None
+    tax_support_enabled: Optional[bool] = None
+    birth_date: Optional[date] = None
+
+@router.get("/staff")
+def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
+    stmt = apply_bid_filter(select(Staff), Staff, bid)
+    
+    if status and status.lower() != "all":
+        stmt = stmt.where(Staff.status == status)
+    elif not status and not q:
+        stmt = stmt.where(Staff.status == "재직")
+        
+    if q:
+        stmt = stmt.where(col(Staff.name).contains(q))
+        
+    staffs = session.exec(stmt).all()
+    return {"status": "success", "data": staffs}
+
+@router.post("/staff")
+def create_staff(staff: StaffCreate, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
+    staff_business_id = _admin.business_id if _admin.role != "superadmin" else None
+    new_staff = Staff(
+        name=staff.name,
+        role=staff.role,
+        hourly_wage=staff.hourly_wage,
+        bank_account=staff.bank_account,
+        start_date=staff.start_date,
+        nationality=staff.nationality,
+        visa_type=staff.visa_type,
+        business_id=staff_business_id or _admin.business_id
+    )
+    session.add(new_staff)
+    session.commit()
+    return {"status": "success", "message": "Staff created"}
+
+@router.get("/staff/{staff_id}")
+def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
+    staff = session.get(Staff, staff_id)
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+        
+    documents = session.exec(select(StaffDocument).where(StaffDocument.staff_id == staff_id)).all()
+    
+    from models import ElectronicContract, User, Payroll
+    contracts = session.exec(select(ElectronicContract).where(ElectronicContract.staff_id == staff_id)).all()
+    user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+    
+    user_info = {
+        "id": user_account.id,
+        "username": user_account.username,
+        "grade": user_account.grade
+    } if user_account else None
+
+    payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
+
+    return {
+        "status": "success", 
+        "data": staff, 
+        "documents": documents, 
+        "payrolls": payrolls, 
+        "contracts": contracts,
+        "user": user_info
+    }
+
+@router.put("/staff/{staff_id}")
+def update_staff(staff_id: int, update_data: StaffUpdate, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
+    staff = session.get(Staff, staff_id)
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+        
+    update_dict = update_data.dict(exclude_unset=True)
+    for key, value in update_dict.items():
+        setattr(staff, key, value)
+        
+    session.add(staff)
+    session.commit()
+    session.refresh(staff)
+    return {"status": "success", "data": staff}
+
+@router.post("/staff/{staff_id}/account")
+def create_staff_account(
+    staff_id: int, 
+    username: str = Body(..., embed=True), 
+    password: str = Body(..., embed=True),
+    grade: str = Body("normal", embed=True),
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session)
+):
+    from models import User
+    try:
+        existing = session.exec(select(User).where(User.username == username)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Username already exists")
+            
+        staff_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+        if staff_account:
+            raise HTTPException(status_code=400, detail="Staff already has an account")
+            
+        staff = session.get(Staff, staff_id)
+        
+        new_user = User(
+            username=username,
+            hashed_password=get_password_hash(password),
+            role="staff",
+            grade=grade,
+            staff_id=staff_id,
+            real_name=staff.name if staff else None,
+            business_id=staff.business_id if staff else _admin.business_id
+        )
+        session.add(new_user)
+        session.commit()
+        return {"status": "success", "message": "Account created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        detail = str(e)
+        if "UNIQUE" in detail.upper() or "unique" in detail:
+            raise HTTPException(status_code=400, detail="이미 존재하는 아이디이거나, 해당 직원에게 이미 계정이 있습니다.")
+        raise HTTPException(status_code=500, detail="계정 생성 중 오류가 발생했습니다.")
+
+@router.put("/staff/{staff_id}/account/grade")
+def update_staff_account_grade(
+    staff_id: int,
+    grade: str = Body(..., embed=True),
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session)
+):
+    from models import User
+    user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+    if not user_account:
+        raise HTTPException(status_code=404, detail="User account not found for this staff")
+        
+    user_account.grade = grade
+    session.add(user_account)
+    session.commit()
+    return {"status": "success", "message": "Grade updated successfully"}
+
+@router.get("/staff/{staff_id}/documents")
+def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
+    staff = session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    documents = session.exec(
+        select(StaffDocument).where(StaffDocument.staff_id == staff_id)
+    ).all()
+    return {
+        "status": "success",
+        "data": [
+            {
+                "id": doc.id,
+                "doc_type": doc.doc_type,
+                "original_filename": doc.original_filename,
+                "file_path": doc.file_path,
+                "uploaded_at": doc.upload_date.isoformat() if doc.upload_date else None,
+            }
+            for doc in documents
+        ]
+    }
+
+@router.post("/staff/{staff_id}/document")
+def upload_staff_document(
+    staff_id: int, 
+    doc_type: str = Form(...), 
+    file: UploadFile = File(...),
+    _user: AuthUser = Depends(get_current_user),
+    bid = Depends(get_bid_from_token),
+    session: Session = Depends(get_session)
+):
+    from services.storage_service import get_storage
+    storage = get_storage()
+    
+    staff = session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+    
+    timestamp = int(datetime.now().timestamp())
+    filename = f"{doc_type}_{timestamp}_{file.filename}"
+    storage_key = f"staff_docs/{staff_id}/{filename}"
+    
+    file_url = storage.upload_file(file.file, storage_key, file.content_type)
+        
+    new_doc = StaffDocument(
+        staff_id=staff_id,
+        doc_type=doc_type,
+        file_path=file_url,
+        original_filename=file.filename
+    )
+    session.add(new_doc)
+    
+    attr_name = f"doc_{doc_type}"
+    if hasattr(staff, attr_name):
+        setattr(staff, attr_name, True)
+        session.add(staff)
+        
+    session.commit()
+    
+    return {"status": "success", "file_path": file_url, "filename": filename}
+
+@router.get("/staff/doc-file/{staff_id}/{filename:path}")
+def serve_staff_document(staff_id: int, filename: str):
+    import mimetypes
+    decoded_filename = urllib.parse.unquote(filename)
+    file_path = os.path.join("uploads", "staff_docs", str(staff_id), decoded_filename)
+    
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    media_type, _ = mimetypes.guess_type(file_path)
+    if not media_type:
+        media_type = "application/octet-stream"
+    
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+    )
+
+@router.delete("/staff/{staff_id}/document/{doc_id}")
+def delete_staff_document(
+    staff_id: int,
+    doc_id: int,
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session)
+):
+    doc = session.get(StaffDocument, doc_id)
+    if not doc or doc.staff_id != staff_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    try:
+        if os.path.exists(doc.file_path):
+            os.remove(doc.file_path)
+    except Exception:
+        pass
+
+    doc_type = doc.doc_type
+    session.delete(doc)
+
+    remaining = session.exec(
+        select(StaffDocument).where(
+            StaffDocument.staff_id == staff_id,
+            StaffDocument.doc_type == doc_type
+        )
+    ).first()
+
+    if not remaining:
+        staff = session.get(Staff, staff_id)
+        if staff:
+            attr_name = f"doc_{doc_type}"
+            if hasattr(staff, attr_name):
+                setattr(staff, attr_name, False)
+                session.add(staff)
+
+    session.commit()
+    return {"status": "success", "message": "Document deleted"}
+
+@router.delete("/staff/{staff_id}")
+def delete_staff(staff_id: int, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
+    staff = session.exec(apply_bid_filter(select(Staff), Staff, bid).where(Staff.id == staff_id)).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff not found")
+        
+    documents = session.exec(select(StaffDocument).where(StaffDocument.staff_id == staff_id)).all()
+    for doc in documents:
+        if os.path.exists(doc.file_path):
+            try:
+                os.remove(doc.file_path)
+            except Exception as e:
+                pass
+        session.delete(doc)
+        
+    base_dir = "uploads/staff_docs"
+    staff_dir = os.path.join(base_dir, str(staff_id))
+    if os.path.exists(staff_dir):
+        try:
+            shutil.rmtree(staff_dir)
+        except Exception as e:
+            pass
+
+    from models import Attendance, Payroll
+    attendances = session.exec(select(Attendance).where(Attendance.staff_id == staff_id)).all()
+    for att in attendances:
+        session.delete(att)
+        
+    payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
+    for pay in payrolls:
+        session.delete(pay)
+        
+    session.delete(staff)
+    
+    session.commit()
+    return {"status": "success", "message": "Staff and all related data deleted"}

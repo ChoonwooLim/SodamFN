@@ -3,7 +3,7 @@ from typing import Optional
 from services.ocr_service import OCRService
 from services.excel_service import ExcelService
 from models import Expense, Revenue, Session, create_engine, SQLModel, User
-from database import engine 
+from database import engine, get_session 
 from sqlmodel import Session
 from routers.auth import get_admin_user
 from tenant_filter import get_bid_from_token, apply_bid_filter
@@ -13,130 +13,8 @@ router = APIRouter()
 
 # --- EXPENSE ENDPOINTS ---
 
-@router.post("/upload/image/expense")
-async def upload_expense_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
-    """
-    Processes an image upload for receipt OCR (Expense).
-    """
-    try:
-        content = await file.read()
-        service = OCRService()
-        result = service.process_image(content)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/upload/image/purchase")
-async def upload_purchase_receipt_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
-    """
-    Processes a receipt image for purchase management.
-    OCR → extract vendor/amount/date → save to DB.
-    """
-    import traceback
-    from sqlmodel import select
-    from models import Vendor, DailyExpense, UploadHistory
-    from services.profit_loss_service import sync_all_expenses
-    
-    try:
-        content = await file.read()
-        service = OCRService()
-        ocr_result = service.process_receipt_image(content)
-        
-        if ocr_result.get("status") != "success":
-            return ocr_result
-        
-        data = ocr_result["data"]
-        vendor_name = data["vendor_name"]
-        total_amount = data["total_amount"]
-        date_str = data["date"]
-        category = data.get("category", "기타비용")
-        
-        try:
-            date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-        except Exception:
-            date_obj = datetime.date.today()
-        
-        # Create Upload History
-        with Session(engine) as session:
-            upload_history = UploadHistory(
-                filename=file.filename or "receipt_photo.jpg",
-                upload_type="purchase",
-                record_count=0,
-                status="active",
-                business_id=bid
-            )
-            session.add(upload_history)
-            session.commit()
-            session.refresh(upload_history)
-            upload_id = upload_history.id
-        
-        # Save to DB
-        with Session(engine) as session:
-            # Find or create vendor
-            vendor = session.exec(
-                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == vendor_name)
-            ).first()
-            
-            if not vendor:
-                vendor = Vendor(
-                    name=vendor_name,
-                    category=category,
-                    vendor_type="expense",
-                    created_by_upload_id=upload_id,
-                    business_id=bid
-                )
-                session.add(vendor)
-                session.flush()
-            
-            # Create DailyExpense
-            expense = DailyExpense(
-                date=date_obj,
-                vendor_name=vendor_name,
-                vendor_id=vendor.id,
-                amount=total_amount,
-                category=category,
-                note=f"📸 영수증 촬영 업로드",
-                upload_id=upload_id,
-                card_company="영수증",
-                business_id=bid
-            )
-            session.add(expense)
-            
-            # Update history
-            upload_record = session.get(UploadHistory, upload_id)
-            if upload_record:
-                upload_record.record_count = 1
-                session.add(upload_record)
-            
-            session.commit()
-        
-        # Sync P/L
-        try:
-            with Session(engine) as sync_session:
-                sync_all_expenses(date_obj.year, date_obj.month, sync_session, bid)
-                sync_session.commit()
-        except Exception:
-            pass
-        
-        return {
-            "status": "success",
-            "message": ocr_result.get("message", "영수증 업로드 완료"),
-            "data": data,
-            "upload_id": upload_id,
-            "saved": {
-                "vendor_name": vendor_name,
-                "amount": total_amount,
-                "date": date_str,
-                "category": category,
-            }
-        }
-    except Exception as e:
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"Receipt Image Upload Error: {error_detail}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/upload/excel/expense")
-async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """
     Processes an excel upload and bulk inserts to DailyExpense.
     Also auto-creates/links vendors and syncs P/L.
@@ -158,7 +36,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
         expenses_data = result.get("data", [])
         
         # --- Create Upload History Record ---
-        with Session(engine) as session:
+        session = session
+        if True:  # was: with Session(engine) as session:
             upload_history = UploadHistory(
                 filename=file.filename or "uploaded_file.xlsx",
                 upload_type="expense",
@@ -176,7 +55,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
         processed_months = set()
         
         # Phase 1: Insert data
-        with Session(engine) as session:
+        session = session
+        if True:  # was: with Session(engine) as session:
             # Build vendor lookup cache
             all_vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
             vendor_by_name = {v.name: v for v in all_vendors}
@@ -236,7 +116,8 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
         
         # Phase 2: Sync P/L in a separate session
         if processed_months:
-            with Session(engine) as sync_session:
+            sync_session = session
+            if True:  # was: with Session(engine) as sync_session:
                 for (year, month) in processed_months:
                     try:
                         sync_all_expenses(year, month, sync_session, bid)
@@ -259,158 +140,6 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
 
 # --- HISTORY & ROLLBACK ENDPOINTS ---
 
-@router.get("/uploads/history")
-def get_upload_history(type: str = None, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
-    from models import UploadHistory
-    from sqlmodel import select, desc
-    
-    with Session(engine) as session:
-        statement = apply_bid_filter(select(UploadHistory), UploadHistory, bid).order_by(desc(UploadHistory.created_at)).limit(20)
-        if type:
-            statement = statement.where(UploadHistory.upload_type == type)
-        results = session.exec(statement).all()
-        return results
-
-@router.delete("/uploads/{upload_id}")
-def rollback_upload(upload_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
-    """
-    Rollback an upload by ID.
-    Deletes all expenses created by this upload.
-    Updates UploadHistory status to 'rolled_back'.
-    Optionally deletes vendors created by this upload IF they are not used elsewhere (safe check).
-    """
-    from models import UploadHistory, DailyExpense, Vendor
-    from sqlmodel import select
-    from services.profit_loss_service import sync_all_expenses
-    
-    with Session(engine) as session:
-        history = session.exec(apply_bid_filter(select(UploadHistory), UploadHistory, bid).where(UploadHistory.id == upload_id)).first()
-        if not history:
-            raise HTTPException(status_code=404, detail="Upload not found")
-        
-        if history.status == "rolled_back":
-             raise HTTPException(status_code=400, detail="Already rolled back")
-
-        # 1. Select Expenses to Delete
-        expenses = session.exec(apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.upload_id == upload_id)).all()
-        expense_count = len(expenses)
-        
-        # Track months for re-sync
-        sync_months = set()
-        for exp in expenses:
-            sync_months.add((exp.date.year, exp.date.month))
-            session.delete(exp)
-            
-        # 2. Select Vendors to Delete (created by this upload)
-        # Only delete if they have no other expenses (orphaned)
-        # Actually simplest is to just delete if created_by_upload_id matches.
-        # But if user manually added expenses to this vendor later, we shouldn't delete the vendor?
-        # Let's verify if vendor has other expenses.
-        vendors_created = session.exec(apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.created_by_upload_id == upload_id)).all()
-        vendor_delete_count = 0
-        
-        for vendor in vendors_created:
-            # Check for other expenses not from this upload
-            # Since we just deleted all expenses from this upload in the session (but not committed),
-            # counting expenses for this vendor in DB might still show them if not flushed?
-            # session.delete puts them in deleted state.
-            # Let's count remaining expenses.
-            # We can use session.exec with count, filtering DailyExpense.vendor_id == vendor.id.
-            # Since deletion is pending in session, standard count query usually sees pre-transaction state unless we flush.
-            session.flush() # Ensure expenses are marked deleted
-            
-            remaining_expenses_count = session.exec(
-                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == vendor.id)
-            ).all() # .count() is deprecated/tricky in some versions, len(all) is safe for small sets
-            
-            if len(remaining_expenses_count) == 0:
-                session.delete(vendor)
-                vendor_delete_count += 1
-        
-        # 3. If this was a bank deposit upload, also reset classification rules
-        if history.upload_type == "revenue":
-            # Check if any deleted vendors were bank deposit related
-            bank_vendors = [v for v in vendors_created if v.item and '은행입금' in v.item]
-            if bank_vendors or any('현금매출' in (e.vendor_name or '') for e in expenses):
-                # Delete all bank_deposit_revenue VendorRules for this business
-                from models import VendorRule
-                bank_rules = session.exec(
-                    apply_bid_filter(select(VendorRule), VendorRule, bid).where(
-                        VendorRule.source == "bank_deposit_revenue"
-                    )
-                ).all()
-                for r in bank_rules:
-                    session.delete(r)
-                print(f"Reset {len(bank_rules)} bank deposit classification rules")
-        
-        # 4. Update History Status
-        history.status = "rolled_back"
-        session.add(history)
-        
-        session.commit()
-        
-        # 4. Re-sync P/L + Clean up DeliveryRevenue if delivery upload
-        try:
-            with Session(engine) as sync_session:
-                from services.profit_loss_service import sync_revenue_to_pl
-                for (year, month) in sync_months:
-                    sync_all_expenses(year, month, sync_session, bid)
-                    sync_revenue_to_pl(year, month, sync_session, bid)
-                    
-                    # Recalculate delivery fees from remaining DeliveryRevenue records
-                    from models import DeliveryRevenue, MonthlyProfitLoss
-                    all_dr = sync_session.exec(
-                        apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
-                            DeliveryRevenue.year == year, DeliveryRevenue.month == month,
-                        )
-                    ).all()
-                    total_delivery_fees = sum(d.total_fees for d in all_dr)
-                    pl = sync_session.exec(
-                        apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
-                            MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month,
-                        )
-                    ).first()
-                    if pl:
-                        pl.expense_delivery_fee = total_delivery_fees
-                        sync_session.add(pl)
-                        
-                sync_session.commit()
-        except Exception as e:
-            print(f"Rollback Sync Error: {e}")
-            
-        return {
-            "status": "success",
-            "message": f"Rollback successful. Deleted {expense_count} expenses and {vendor_delete_count} vendors.",
-            "deleted_expenses": expense_count,
-            "deleted_vendors": vendor_delete_count
-        }
-
-# --- REVENUE ENDPOINTS ---
-
-@router.post("/upload/image/revenue")
-async def upload_revenue_image(file: UploadFile = File(...), _admin: User = Depends(get_admin_user)):
-    """
-    Processes an image upload for REVENUE (Mock).
-    Maybe extracting daily sales report photo?
-    """
-    try:
-        # Mock implementation for Revenue OCR
-        import random
-        today = datetime.date.today().strftime("%Y-%m-%d")
-        
-        # Simulate processing
-        return {
-            "status": "success",
-            "data": {
-                "date": today,
-                "amount": random.randint(500000, 1500000),
-                "channel": "매장",
-                "description": "일일 매출 리포트 스캔"
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.post("/upload/excel/revenue")
 async def upload_revenue_excel(
     file: UploadFile = File(...),
@@ -418,7 +147,7 @@ async def upload_revenue_excel(
     classifications: Optional[str] = Form(None),
     _admin: User = Depends(get_admin_user),
     bid = Depends(get_bid_from_token)
-):
+, session: Session = Depends(get_session)):
     """
     Smart revenue Excel upload.
     Supports: POS 일자별 매출, 카드상세매출, 월별 카드매출 요약, 배달앱 정산
@@ -448,7 +177,8 @@ async def upload_revenue_excel(
             return {"status": "error", "message": "파싱된 매출 데이터가 없습니다."}
         
         # --- Create Upload History ---
-        with Session(engine) as session:
+        session = session
+        if True:  # was: with Session(engine) as session:
             upload_history = UploadHistory(
                 filename=file.filename or "revenue_upload.xlsx",
                 upload_type="revenue",
@@ -469,7 +199,8 @@ async def upload_revenue_excel(
             try:
                 import json
                 rules = json.loads(classifications)
-                with Session(engine) as s:
+                s = session
+                if True:  # was: with Session(engine) as s:
                     for rule in rules:
                         # rule is like { memo: "홍길동", category: "카드수수료" }
                         existing_rule = s.exec(
@@ -502,7 +233,8 @@ async def upload_revenue_excel(
         personal_income_calculated = 0
         processed_months = set()
         
-        with Session(engine) as session:
+        session = session
+        if True:  # was: with Session(engine) as session:
             # Build vendor lookup
             vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
             vendor_by_name = {v.name: v for v in vendors}
@@ -845,7 +577,8 @@ async def upload_revenue_excel(
                 # Rollback - don't save anything yet
                 session.rollback()
                 # Delete the upload history record
-                with Session(engine) as cleanup_session:
+                cleanup_session = session
+                if True:  # was: with Session(engine) as cleanup_session:
                     old_upload = cleanup_session.get(UploadHistory, upload_id)
                     if old_upload:
                         cleanup_session.delete(old_upload)
@@ -931,7 +664,8 @@ async def upload_revenue_excel(
                 
                 # Save card fee to MonthlyProfitLoss
                 from models import MonthlyProfitLoss
-                with Session(engine) as pl_session:
+                pl_session = session
+                if True:  # was: with Session(engine) as pl_session:
                     pl = pl_session.exec(
                         apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid).where(
                             MonthlyProfitLoss.year == target_year,
@@ -958,7 +692,8 @@ async def upload_revenue_excel(
                     session.commit()
                 else:
                     session.rollback()
-                    with Session(engine) as cleanup_s:
+                    cleanup_s = session
+                    if True:  # was: with Session(engine) as cleanup_s:
                         old_up = cleanup_s.get(UploadHistory, upload_id)
                         if old_up:
                             cleanup_s.delete(old_up)
@@ -1010,7 +745,8 @@ async def upload_revenue_excel(
                     CHANNEL_KEY_MAP = {"쿠팡": "Coupang", "배민": "Baemin", "배달의민족": "Baemin", "요기요": "Yogiyo", "땡겨요": "Ddangyo"}
                     dr_channel = CHANNEL_KEY_MAP.get(channel, channel)
                     
-                    with Session(engine) as dr_session:
+                    dr_session = session
+                    if True:  # was: with Session(engine) as dr_session:
                         # Upsert: check if record already exists
                         existing_dr = dr_session.exec(
                             apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
@@ -1097,7 +833,8 @@ async def upload_revenue_excel(
                 data = result.get("data", [])
                 
                 # Pre-fetch existing rules
-                with Session(engine) as s:
+                s = session
+                if True:  # was: with Session(engine) as s:
                     existing_rules = s.exec(
                         apply_bid_filter(select(VendorRule), VendorRule, bid).where(
                             VendorRule.source == "bank_deposit_revenue"
@@ -1147,7 +884,8 @@ async def upload_revenue_excel(
                 if unmapped_items:
                     # rollback transaction
                     if upload_id is not None:
-                        with Session(engine) as dbs:
+                        dbs = session
+                        if True:  # was: with Session(engine) as dbs:
                             rec = dbs.get(UploadHistory, upload_id)
                             if rec:
                                 dbs.delete(rec)
@@ -1160,7 +898,8 @@ async def upload_revenue_excel(
                     }
 
                 # Save Data if no unmapped!
-                with Session(engine) as dbs:
+                dbs = session
+                if True:  # was: with Session(engine) as dbs:
                     # Update MonthlyProfitLoss (Card fee calculation)
                     import calendar
                     last_day = calendar.monthrange(y, m)[1]
@@ -1227,7 +966,8 @@ async def upload_revenue_excel(
         # Sync P/L (expenses + revenue)
         if processed_months:
             try:
-                with Session(engine) as sync_session:
+                sync_session = session
+                if True:  # was: with Session(engine) as sync_session:
                     for (year, month) in processed_months:
                         sync_all_expenses(year, month, sync_session, bid)
                         sync_revenue_to_pl(year, month, sync_session, bid)
@@ -1272,52 +1012,3 @@ async def upload_revenue_excel(
 
 
 # --- Business Logo Upload ---
-@router.post("/upload/image/business-logo")
-async def upload_business_logo(
-    file: UploadFile = File(...), 
-    _admin: User = Depends(get_admin_user),
-    bid: int = Depends(get_bid_from_token)
-):
-    try:
-        from models import Business
-        from services.database_service import DatabaseService
-        from services.storage_service import get_storage
-        from datetime import datetime
-        import os
-        
-        storage = get_storage()
-        
-        # Validate file
-        allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"]
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail="허용되지 않는 파일 형식입니다. (JPG, PNG, GIF, WEBP, SVG만 가능)")
-        
-        # Generate storage key
-        timestamp = int(datetime.now().timestamp() * 1000)
-        ext = os.path.splitext(file.filename or "logo.jpg")[1]
-        filename = f"business_{bid}_{timestamp}{ext}"
-        storage_key = f"logos/{filename}"
-        
-        # Upload to R2 (or local disk fallback)
-        file_url = storage.upload_file(file.file, storage_key, file.content_type)
-        
-        # Update DB
-        service = DatabaseService()
-        try:
-            business = service.session.get(Business, bid)
-            if not business:
-                raise HTTPException(status_code=404, detail="Business not found")
-            business.logo_url = file_url
-            service.session.add(business)
-            service.session.commit()
-        finally:
-            service.close()
-            
-        return {"status": "success", "url": file_url}
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"Business Logo Upload Error: {error_detail}")
-        raise HTTPException(status_code=500, detail="로고 업로드 중 오류가 발생했습니다.")
