@@ -158,7 +158,10 @@ STYLE_SUFFIXES = {
 
 
 def _get_ai_provider():
-    """사용 가능한 AI 이미지 생성 프로바이더 확인"""
+    """사용 가능한 AI 이미지 생성 프로바이더 확인 (우선순위: self-hosted > replicate > openai)"""
+    gpu_server_url = os.getenv("AI_GPU_SERVER_URL")
+    if gpu_server_url:
+        return "self-hosted", gpu_server_url
     replicate_token = os.getenv("REPLICATE_API_TOKEN")
     openai_key = os.getenv("OPENAI_API_KEY")
     if replicate_token:
@@ -166,6 +169,26 @@ def _get_ai_provider():
     if openai_key:
         return "openai", openai_key
     return None, None
+
+
+async def _generate_with_selfhosted(full_prompt: str, server_url: str) -> bytes:
+    """셀프호스팅 GPU 서버로 이미지 생성 (SD 1.5 + LCM-LoRA, ~2초, 무료)"""
+    import httpx
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"{server_url}/generate",
+            json={
+                "prompt": full_prompt,
+                "style": "natural",
+                "width": 512,
+                "height": 512,
+                "steps": 4,
+            },
+        )
+        if response.status_code != 200:
+            raise Exception(f"GPU 서버 오류: {response.status_code} {response.text[:200]}")
+        return response.content  # PNG bytes
 
 
 async def _generate_with_replicate(full_prompt: str, api_token: str) -> str:
@@ -257,29 +280,37 @@ async def ai_generate_image(
     full_prompt = f"{req.prompt}. {style_suffix}"
 
     try:
-        # 프로바이더별 이미지 생성
-        if provider == "replicate":
-            ai_image_url = await _generate_with_replicate(full_prompt, api_key)
-        else:
-            ai_image_url = await _generate_with_openai(full_prompt, api_key)
-
-        # 생성된 이미지를 스토리지에 저장
-        import httpx
-
-        async with httpx.AsyncClient(timeout=60.0) as http_client:
-            img_response = await http_client.get(ai_image_url)
-            if img_response.status_code != 200:
-                raise Exception("AI 이미지 다운로드 실패")
-
         from io import BytesIO
 
-        storage = get_storage()
-        timestamp = int(datetime.now().timestamp() * 1000)
-        ext = "webp" if provider == "replicate" else "png"
-        storage_key = f"delivery_images/ai_{timestamp}.{ext}"
-        content_type = f"image/{ext}"
-        file_data = BytesIO(img_response.content)
-        stored_url = storage.upload_file(file_data, storage_key, content_type)
+        # 프로바이더별 이미지 생성
+        if provider == "self-hosted":
+            # GPU 서버에서 직접 PNG 바이너리 수신
+            image_bytes = await _generate_with_selfhosted(full_prompt, api_key)
+            storage = get_storage()
+            timestamp = int(datetime.now().timestamp() * 1000)
+            storage_key = f"delivery_images/ai_{timestamp}.png"
+            file_data = BytesIO(image_bytes)
+            stored_url = storage.upload_file(file_data, storage_key, "image/png")
+        else:
+            if provider == "replicate":
+                ai_image_url = await _generate_with_replicate(full_prompt, api_key)
+            else:
+                ai_image_url = await _generate_with_openai(full_prompt, api_key)
+
+            # 생성된 이미지를 스토리지에 저장
+            import httpx
+
+            async with httpx.AsyncClient(timeout=60.0) as http_client:
+                img_response = await http_client.get(ai_image_url)
+                if img_response.status_code != 200:
+                    raise Exception("AI 이미지 다운로드 실패")
+
+            storage = get_storage()
+            timestamp = int(datetime.now().timestamp() * 1000)
+            ext = "webp" if provider == "replicate" else "png"
+            storage_key = f"delivery_images/ai_{timestamp}.{ext}"
+            file_data = BytesIO(img_response.content)
+            stored_url = storage.upload_file(file_data, storage_key, f"image/{ext}")
 
         # DB에 저장
         img = DeliveryImage(
@@ -320,5 +351,5 @@ def ai_status(_admin: AuthUser = Depends(get_admin_user)):
         "status": "success",
         "ai_enabled": provider is not None,
         "provider": provider,
-        "provider_name": {"replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
+        "provider_name": {"self-hosted": "셀프호스팅 GPU (SD 1.5 + LCM)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
     }

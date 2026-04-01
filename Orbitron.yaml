@@ -39,6 +39,8 @@ services:
         value: ""  # Set after R2 bucket creation
       - key: REPLICATE_API_TOKEN
         value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
+      - key: AI_GPU_SERVER_URL
+        value: "http://192.168.219.101:8100"  # Self-hosted GPU AI image generation
       - key: SUPERADMIN_USERNAME
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD
