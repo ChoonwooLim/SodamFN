@@ -64,9 +64,12 @@ export default function MoreMenu() {
         {
             title: '매장 운영',
             items: [
-                { icon: BookOpen, label: '레시피 관리', path: '/recipes', color: '#14b8a6', bg: '#f0fdfa' },
-                { icon: Store, label: '거래처 관리', path: '/vendor-settings', color: '#64748b', bg: '#f8fafc' },
+                { icon: BookOpen, label: '레시피 관리', path: '/products/recipes', color: '#14b8a6', bg: '#f0fdfa' },
+                { icon: FileText, label: '메뉴판/가격표', path: '/products/menu-board', color: '#f97316', bg: '#fff7ed' },
+                { icon: Package, label: '배달앱 이미지', path: '/products/delivery-images', color: '#8b5cf6', bg: '#f5f3ff' },
+                { icon: Store, label: '매장 홍보물', path: '/products/store-materials', color: '#64748b', bg: '#f8fafc' },
                 { icon: CheckSquare, label: '오픈 체크리스트', path: '/open-checklist', color: '#22c55e', bg: '#f0fdf4' },
+                { icon: Store, label: '거래처 관리', path: '/vendor-settings', color: '#475569', bg: '#f1f5f9' },
                 { icon: Package, label: '재고 점검', path: '/inventory-check-admin', color: '#06b6d4', bg: '#ecfeff' },
             ]
         },

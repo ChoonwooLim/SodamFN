@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -12,6 +12,7 @@ export default function Sidebar() {
     const [boardOpen, setBoardOpen] = useState(false);
     const [hrOpen, setHrOpen] = useState(false);
     const [plOpen, setPlOpen] = useState(false);
+    const [productOpen, setProductOpen] = useState(false);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
     const [businesses, setBusinesses] = useState([]);
@@ -26,6 +27,8 @@ export default function Sidebar() {
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
         const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
+        const productPaths = ['/products/'];
+        if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
     }, [location.pathname]);
 
     const token = localStorage.getItem('token');
@@ -98,7 +101,13 @@ export default function Sidebar() {
 
     const adminMenuItems = [
         { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
-        { icon: BookOpen, label: '레시피 관리', path: '/recipes' },
+    ];
+
+    const productSubItems = [
+        { icon: BookOpen, label: '레시피 관리', path: '/products/recipes' },
+        { icon: FileText, label: '메뉴판/가격표', path: '/products/menu-board' },
+        { icon: Truck, label: '배달앱 이미지', path: '/products/delivery-images' },
+        { icon: Store, label: '매장 홍보물', path: '/products/store-materials' },
     ];
 
     const plSubItems = [
@@ -174,6 +183,7 @@ export default function Sidebar() {
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/staff', '/hr/retirement', '/retirement-calc', '/hr/payroll-ledger'].some(p => location.pathname === p || (p !== '/staff' && location.pathname.startsWith(p)));
     const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'].some(p => location.pathname.startsWith(p));
+    const isProductActive = productSubItems.some(item => location.pathname === item.path);
 
     // ── Premium menu item renderer ──
     const renderMenuItem = (item) => {
@@ -325,6 +335,15 @@ export default function Sidebar() {
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">메인</span>
                 </div>
                 {mainMenuItems.map(renderMenuItem)}
+
+                {/* Section: Product Management */}
+                {(user.role === 'admin' || isViewingBusiness) && (
+                    <>
+                        {renderSubmenu('상품관리', ShoppingBag, productOpen, setProductOpen,
+                            isProductActive,
+                            productSubItems, 'text-orange-400')}
+                    </>
+                )}
 
                 {/* Section: Finance */}
                 {(user.role === 'admin' || isViewingBusiness) && (

@@ -23,6 +23,9 @@ const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
 const RecipeBook = React.lazy(() => import('./pages/RecipeBook'));
+const MenuBoard = React.lazy(() => import('./pages/ProductManagement/MenuBoard'));
+const DeliveryImages = React.lazy(() => import('./pages/ProductManagement/DeliveryImages'));
+const StoreMaterials = React.lazy(() => import('./pages/ProductManagement/StoreMaterials'));
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const PlatformLanding = React.lazy(() => import('./pages/PlatformLanding'));
 const StaffAppPreview = React.lazy(() => import('./pages/StaffAppPreview'));
@@ -149,7 +152,11 @@ export default function App() {
               <Route path="/announcements" element={<ProtectedRoute adminOnly><AnnouncementsAdmin /></ProtectedRoute>} />
               <Route path="/board" element={<ProtectedRoute adminOnly><BoardManagement /></ProtectedRoute>} />
               <Route path="/deploy" element={<ProtectedRoute adminOnly><DeployManagement /></ProtectedRoute>} />
-              <Route path="/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
+              <Route path="/recipes" element={<Navigate to="/products/recipes" replace />} />
+              <Route path="/products/recipes" element={<ProtectedRoute adminOnly><RecipeBook /></ProtectedRoute>} />
+              <Route path="/products/menu-board" element={<ProtectedRoute adminOnly><MenuBoard /></ProtectedRoute>} />
+              <Route path="/products/delivery-images" element={<ProtectedRoute adminOnly><DeliveryImages /></ProtectedRoute>} />
+              <Route path="/products/store-materials" element={<ProtectedRoute adminOnly><StoreMaterials /></ProtectedRoute>} />
               <Route path="/open-checklist" element={<ProtectedRoute adminOnly><OpenChecklistPage /></ProtectedRoute>} />
               <Route path="/inventory-check-admin" element={<ProtectedRoute adminOnly><InventoryCheckAdmin /></ProtectedRoute>} />
               <Route path="/roadmap" element={<ProtectedRoute adminOnly><DevelopmentRoadmap /></ProtectedRoute>} />
