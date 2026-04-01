@@ -180,16 +180,16 @@ export default function DataInputPage({ mode }) { // mode: 'revenue' | 'expense'
         <div className="min-h-screen bg-slate-900 text-white flex flex-col relative overflow-hidden">
             <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 ${isRevenue ? 'to-blue-900' : 'to-indigo-900'} opacity-50 z-0`}></div>
 
-            <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8">
+            <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-8 pb-32">
                 <button onClick={() => navigate(-1)} className="absolute top-6 left-6 p-2 bg-white/10 rounded-full backdrop-blur-md hover:bg-white/20 transition-colors">
                     <ChevronLeft size={24} />
                 </button>
 
                 <div className="flex flex-col items-center mb-8 animate-fade-in-up">
-                    <div className={`p-3 rounded-2xl mb-4 bg-white/10 backdrop-blur-sm`}>
-                        <ThemeIcon size={32} className="text-white" />
+                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 shadow-lg ${isRevenue ? 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-500/20' : 'bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-indigo-500/20'}`}>
+                        <ThemeIcon size={28} className="text-white" />
                     </div>
-                    <h2 className="text-3xl font-bold mb-3 tracking-tight">{config.title}</h2>
+                    <h2 className="text-2xl font-bold mb-2 tracking-tight">{config.title}</h2>
                     <p className="text-slate-300 text-center leading-relaxed text-sm">
                         {config.desc}<br />
                         <span className={`${themeClass} font-semibold`}>AI 자동 분석</span>이 지원됩니다.

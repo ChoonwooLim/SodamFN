@@ -280,19 +280,19 @@ export default function DevelopmentRoadmap() {
     const [expandedPhase, setExpandedPhase] = useState(1);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-8 pb-24">
-            <div className="max-w-5xl mx-auto">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
                 <header className="mb-8">
-                    <div className="flex items-center gap-4 mb-4">
-                        <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full text-white hover:bg-white/20">
-                            <ChevronLeft size={24} />
-                        </button>
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20 cursor-pointer" onClick={() => navigate(-1)}>
+                            <Rocket size={20} className="text-white" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-white">
+                            <h1 className="text-xl font-bold text-white tracking-tight">
                                 셈<span className="text-amber-400">하나</span> 개발 로드맵
                             </h1>
-                            <p className="text-slate-400 text-sm mt-1">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
+                            <p className="text-xs text-slate-400 mt-0.5">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
                         </div>
                     </div>
 

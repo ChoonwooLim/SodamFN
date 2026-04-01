@@ -128,20 +128,17 @@ export default function DevWorkLog() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-6 pb-24">
-            <div className="max-w-5xl mx-auto">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <header className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => navigate(-1)} className="p-2 bg-white/10 rounded-full hover:bg-white/20">
-                            <ChevronLeft size={24} />
-                        </button>
+                <header className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-600/20">
+                            <FileText size={20} className="text-white" />
+                        </div>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3">
-                                <FileText className="text-amber-400" size={28} />
-                                작업일지
-                            </h1>
-                            <p className="text-slate-400 text-sm mt-1">개발 작업 이력 관리 · AI 참고용</p>
+                            <h1 className="text-xl font-bold text-white tracking-tight">작업일지</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">개발 작업 이력 관리 · AI 참고용</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2">

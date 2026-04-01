@@ -4,15 +4,17 @@
 
 .recipe-page {
     min-height: 100vh;
-    background: linear-gradient(180deg, #faf8f5 0%, #f3efe8 100%);
+    background: #f8fafc;
     padding: 0;
+    padding-bottom: 128px;
 }
 
 /* ── Header ── */
 .recipe-header {
-    background: linear-gradient(135deg, #78350f 0%, #92400e 100%);
-    padding: 28px 32px 20px;
-    color: white;
+    background: #f8fafc;
+    padding: 32px 24px 20px;
+    max-width: 80rem;
+    margin: 0 auto;
 }
 
 .recipe-header-top {
@@ -23,32 +25,37 @@
 }
 
 .recipe-back-btn {
-    background: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
     border: none;
-    color: rgba(255, 255, 255, 0.8);
+    color: white;
     cursor: pointer;
-    padding: 4px;
     display: flex;
-    border-radius: 8px;
-    transition: background 0.15s;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+    transition: all 0.15s;
 }
 
 .recipe-back-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
 }
 
 .recipe-header h1 {
     font-size: 20px;
-    font-weight: 800;
+    font-weight: 700;
     margin: 0;
     letter-spacing: -0.3px;
+    color: #0f172a;
 }
 
 .recipe-subtitle {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    margin: 0;
-    padding-left: 40px;
+    color: #94a3b8;
+    margin: 2px 0 0;
+    padding-left: 56px;
 }
 
 /* ── Category Tabs ── */
@@ -57,21 +64,22 @@
     flex-wrap: wrap;
     gap: 6px;
     padding: 14px 24px;
-    background: white;
-    border-bottom: 1px solid #eee;
+    background: #f8fafc;
+    max-width: 80rem;
+    margin: 0 auto;
 }
 
 .recipe-tab {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 7px 14px;
-    border-radius: 20px;
+    padding: 8px 16px;
+    border-radius: 12px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     border: none;
-    background: #f5f3ef;
-    color: #78716c;
+    background: transparent;
+    color: #64748b;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
@@ -79,19 +87,20 @@
 }
 
 .recipe-tab:hover {
-    background: #ece9e3;
+    background: #f1f5f9;
+    color: #334155;
 }
 
 .recipe-tab.active {
-    background: #78350f;
+    background: #0f172a;
     color: white;
-    box-shadow: 0 2px 8px rgba(120, 53, 15, 0.25);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .recipe-tab .tab-count {
     font-size: 10px;
     font-weight: 700;
-    background: rgba(0, 0, 0, 0.07);
+    background: rgba(0, 0, 0, 0.06);
     padding: 1px 5px;
     border-radius: 8px;
     min-width: 16px;
@@ -107,16 +116,18 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
-    padding: 20px 24px 100px;
+    padding: 20px 24px 40px;
+    max-width: 80rem;
+    margin: 0 auto;
 }
 
 /* ── Unified Recipe Card ── */
 .recipe-card {
     background: white;
-    border-radius: 14px;
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f1f5f9;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     display: flex;
@@ -124,8 +135,8 @@
 }
 
 .recipe-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Image card thumbnail */
@@ -145,8 +156,8 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: linear-gradient(145deg, #fef7ed 0%, #fdf4e7 50%, #fef9f0 100%);
-    border-bottom: 1px solid #f0ebe3;
+    background: linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .recipe-card-placeholder .placeholder-emoji {
@@ -157,7 +168,7 @@
 .recipe-card-placeholder .placeholder-name {
     font-size: 14px;
     font-weight: 700;
-    color: #78350f;
+    color: #334155;
     text-align: center;
     line-height: 1.3;
     padding: 0 12px;
@@ -188,8 +199,8 @@
 .recipe-card-badge {
     font-size: 10px;
     font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 6px;
+    padding: 3px 8px;
+    border-radius: 8px;
     background: #fef3c7;
     color: #92400e;
     white-space: nowrap;
@@ -441,7 +452,7 @@
 .recipe-detail-section h3 {
     font-size: 14px;
     font-weight: 700;
-    color: #78350f;
+    color: #d97706;
     margin: 0 0 12px;
     display: flex;
     align-items: center;
@@ -497,7 +508,7 @@
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: #78350f;
+    background: #d97706;
     color: white;
     font-size: 11px;
     font-weight: 700;

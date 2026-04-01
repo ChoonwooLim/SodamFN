@@ -160,7 +160,7 @@ export default function StoreApplicationForm() {
                 </div>
             </header>
 
-            <main className="pt-24 pb-16 px-4 max-w-4xl mx-auto">
+            <main className="pt-24 pb-32 px-4 max-w-4xl mx-auto">
                 {/* ═══ STEPPER ═══ */}
                 <div className="mb-10">
                     <div className="flex items-center justify-between max-w-xl mx-auto relative">

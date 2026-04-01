@@ -139,7 +139,7 @@ export default function DeployManagement() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" style={{ fontFamily: "'Pretendard', 'Inter', -apple-system, sans-serif" }}>
-        <div className="p-6 max-w-5xl mx-auto pb-24">
+        <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
             {/* Toast */}
             {toast && (
                 <div
@@ -157,27 +157,23 @@ export default function DeployManagement() {
             )}
 
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-                <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                    style={{
-                        background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
-                        boxShadow: '0 8px 24px rgba(139,92,246,0.35)'
-                    }}
-                >
-                    <Rocket size={24} className="text-white" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-black text-white tracking-tight">앱 배포</h1>
-                    <p className="text-sm text-slate-300 mt-0.5">직원 · 관리자 앱 설치 링크 전송</p>
+            <header className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                        <Rocket size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-xl font-bold text-white tracking-tight">앱 배포</h1>
+                        <p className="text-xs text-slate-400 mt-0.5">직원 · 관리자 앱 설치 링크 전송</p>
+                    </div>
                 </div>
                 <button
                     onClick={() => { fetchStaff(); fetchHistory(); }}
-                    className="ml-auto p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all border border-white/10 hover:border-white/20"
+                    className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all border border-white/10 hover:border-white/20"
                 >
                     <RefreshCw size={18} />
                 </button>
-            </div>
+            </header>
 
             {/* App Selector Tabs */}
             <div className="flex gap-3 mb-7 p-1.5 bg-slate-900/60 rounded-2xl border border-white/5">

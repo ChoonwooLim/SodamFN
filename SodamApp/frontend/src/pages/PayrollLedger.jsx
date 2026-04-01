@@ -223,7 +223,7 @@ export default function PayrollLedger() {
           {/* ═══ LEFT PANEL: Staff List ═══ */}
           <div className="lg:col-span-3">
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden sticky top-4">
-              <div className="p-4" style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <div className="p-4 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2 mb-3">
                   <Users size={16} className="text-blue-500" />
                   <span className="text-sm font-bold text-slate-700">직원 선택</span>
