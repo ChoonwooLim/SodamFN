@@ -45,6 +45,7 @@ const RetirementPayCalc = React.lazy(() => import('./pages/RetirementPayCalc'));
 const PayrollLedger = React.lazy(() => import('./pages/PayrollLedger'));
 const DeliveryAppDashboard = React.lazy(() => import('./pages/DeliveryAppDashboard'));
 const MoreMenu = React.lazy(() => import('./pages/MoreMenu'));
+const DesignPlan = React.lazy(() => import('./pages/DesignPlan'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -171,6 +172,7 @@ export default function App() {
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/hr/payroll-ledger" element={<ProtectedRoute adminOnly><PayrollLedger /></ProtectedRoute>} />
               <Route path="/more" element={<ProtectedRoute adminOnly><MoreMenu /></ProtectedRoute>} />
+              <Route path="/design-plan" element={<ProtectedRoute adminOnly><DesignPlan /></ProtectedRoute>} />
 
               {/* STAFF ROUTES */}
               <Route path="/staff-app-preview" element={<ProtectedRoute adminOnly><StaffAppPreview /></ProtectedRoute>} />

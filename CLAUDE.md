@@ -193,12 +193,27 @@ cd c:\WORK\SodamFN && git log --since="midnight" --format="%h %ai %s" --reverse
 
 ---
 
+## 디자인 컨텍스트
+
+UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니다.
+
+**핵심 원칙:**
+- **주 사용자**: 40~50대 자영업자, IT 비숙련 → 큰 글씨, 넓은 터치 영역, 익숙한 패턴
+- **브랜드**: 신뢰감 + 심플 + 따뜻함
+- **Admin**: Pretendard 폰트, Slate/Blue 팔레트, 프로페셔널 톤
+- **Staff App**: Inter 폰트, 밝은 배경 + Teal 액센트, 친근한 모바일 UX
+- **접근성**: WCAG 2.1 AA, 최소 14px, 대비 4.5:1 이상
+- **Impeccable 스킬**: `/audit`, `/critique`, `/polish`, `/typeset` 등 20개 디자인 명령어 사용 가능
+
+---
+
 ## 워크플로우 파일 참조
 
 상세 지침이 필요한 경우 아래 파일들을 참조합니다:
 
 | 파일 | 용도 |
 |------|------|
+| `.impeccable.md` | 디자인 컨텍스트 (사용자, 브랜드, 색상, 접근성) |
 | `.agents/workflows/start.md` | 세션 시작 상세 지침 |
 | `.agents/workflows/end.md` | 세션 종료 상세 지침 |
 | `.agents/workflows/deployment.md` | 배포 아키텍처 상세 |

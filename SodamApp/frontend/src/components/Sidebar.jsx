@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -169,6 +169,7 @@ export default function Sidebar() {
                 { icon: Settings, label: '설정', path: '/settings' },
             ] : []),
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
+            { icon: Palette, label: '디자인 계획서', path: '/design-plan' },
             { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
         ]
         : user.role === 'admin'
@@ -177,6 +178,7 @@ export default function Sidebar() {
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
+            { icon: Palette, label: '디자인 계획서', path: '/design-plan' },
             { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
         ]
         : [
