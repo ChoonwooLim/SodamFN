@@ -76,8 +76,9 @@ postDeploy:
     command: |
       cd SodamApp/staff-app
       npm install
+      npm install terser -D
       npm run build
-      npx wrangler pages deploy dist --project-name sodam-staff --branch main
+      npx wrangler pages deploy dist --project-name sodam-staff --branch main --commit-dirty=true --commit-message="Auto Deploy"
     env:
       - key: VITE_API_URL
         value: "https://sodamfn.twinverse.org"
