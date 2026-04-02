@@ -41,6 +41,10 @@ services:
         value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
       - key: AI_GPU_SERVER_URL
         value: "http://192.168.219.101:8100"  # Self-hosted GPU AI image generation
+      - key: MEDIA_SERVER_URL
+        value: "http://192.168.219.101:8200"  # Central media file server
+      - key: MEDIA_API_KEY
+        value: ""  # Set via Orbitron secrets
       - key: SUPERADMIN_USERNAME
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD
@@ -67,6 +71,8 @@ services:
         value: "https://sodamfn.twinverse.org"
       - key: VITE_STAFF_APP_URL
         value: "https://sodam-staff.pages.dev"
+      - key: VITE_MEDIA_URL
+        value: "http://192.168.219.101:8200"
     routes:
       - source: "/*"
         rewrite: /index.html

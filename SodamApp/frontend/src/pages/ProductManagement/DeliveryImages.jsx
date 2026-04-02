@@ -53,7 +53,8 @@ const PLATFORMS = [
 ];
 
 const CATEGORIES = ['전체', '김밥류', '분식류', '주먹밥류', '음료류'];
-const IMG_BASE = '/recipes/products/';
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || '';
+const IMG_BASE = MEDIA_URL ? `${MEDIA_URL}/files/products/` : '/recipes/products/';
 
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
