@@ -284,7 +284,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         upscale: 1,  // 미리보기는 항상 원본 크기 (빠른 응답), 업스케일은 별도 탭
         width: 512,
         height: 512,
-        steps: 4,
+        steps: 2,
         skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
       };
       if (seed) payload.seed = parseInt(seed, 10);
@@ -295,7 +295,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
       const res = await axios.post(`${API_URL}/api/delivery-images/ai-preview`, payload, {
         headers: getAuthHeaders(),
         responseType: 'blob',
-        timeout: 60000,
+        timeout: 120000,
       });
 
       let imageUrl;
@@ -788,7 +788,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     {generating ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        생성 중... (약 10~15초)
+                        생성 중... (약 30~40초)
                       </>
                     ) : (
                       <>
