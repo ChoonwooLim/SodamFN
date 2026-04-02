@@ -47,18 +47,18 @@ def load_pipeline():
         mem = torch.cuda.get_device_properties(i).total_memory / 1e9
         logger.info(f"  GPU {i}: {name} ({mem:.1f}GB)")
 
-    logger.info("Loading Flux.1-schnell with model CPU offload...")
+    logger.info("Loading Flux.1-schnell with sequential CPU offload (low VRAM)...")
     start = time.time()
 
     pipe = FluxPipeline.from_pretrained(
         MODEL_ID,
         torch_dtype=torch.float16,
     )
-    pipe.enable_model_cpu_offload(gpu_id=0)
+    pipe.enable_sequential_cpu_offload(gpu_id=0)
 
     # i2i 파이프라인: 동일 모델 가중치 공유 (추가 VRAM 없음)
     img2img_pipe = FluxImg2ImgPipeline(**pipe.components)
-    img2img_pipe.enable_model_cpu_offload(gpu_id=0)
+    img2img_pipe.enable_sequential_cpu_offload(gpu_id=0)
 
     elapsed = time.time() - start
     logger.info(f"Pipeline loaded in {elapsed:.1f}s (t2i + i2i)")
