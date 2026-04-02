@@ -64,17 +64,22 @@ def load_pipeline():
     logger.info("Warming up...")
     try:
         torch.cuda.empty_cache()
+        gc.collect()
         pipe(
             "test",
-            num_inference_steps=2,
+            num_inference_steps=1,
             guidance_scale=0.0,
             width=256,
             height=256,
             max_sequence_length=64,
         )
+        torch.cuda.empty_cache()
+        gc.collect()
         logger.info("Warmup done!")
     except Exception as e:
         logger.warning(f"Warmup skipped ({e}). First request will be slower.")
+        torch.cuda.empty_cache()
+        gc.collect()
 
 
 def load_upscaler():
@@ -180,6 +185,8 @@ def generate_image(req: GenerateRequest):
     start = time.time()
 
     with gen_lock:
+        torch.cuda.empty_cache()
+        gc.collect()
         with torch.no_grad():
             result = pipe(
                 full_prompt,
@@ -190,6 +197,7 @@ def generate_image(req: GenerateRequest):
                 max_sequence_length=256,
                 generator=generator,
             )
+        torch.cuda.empty_cache()
 
     gen_time = time.time() - start
     image = result.images[0]
@@ -270,6 +278,8 @@ async def img2img(
     start = time.time()
 
     with gen_lock:
+        torch.cuda.empty_cache()
+        gc.collect()
         with torch.no_grad():
             result = img2img_pipe(
                 full_prompt,
@@ -280,6 +290,7 @@ async def img2img(
                 max_sequence_length=256,
                 generator=generator,
             )
+        torch.cuda.empty_cache()
 
     gen_time = time.time() - start
     image = result.images[0]
