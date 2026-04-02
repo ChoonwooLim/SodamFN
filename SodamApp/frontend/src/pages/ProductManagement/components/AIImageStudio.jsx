@@ -4,7 +4,7 @@ import {
   RotateCw, Sun, Contrast, Save, Wand2, ArrowUpCircle,
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
-  Link, Clipboard
+  Link, Clipboard, Languages, Eye, EyeOff
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -218,6 +218,10 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [referenceImg, setReferenceImg] = useState(null);
   const [referencePreview, setReferencePreview] = useState(null);
   const [referenceDesc, setReferenceDesc] = useState('');
+  const [translatedPrompt, setTranslatedPrompt] = useState('');
+  const [showTranslation, setShowTranslation] = useState(false);
+  const [translating, setTranslating] = useState(false);
+  const [useCustomEnglish, setUseCustomEnglish] = useState(false);
 
   // ── 생성 결과 ──
   const [generating, setGenerating] = useState(false);
@@ -248,15 +252,34 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   // 생성 탭 핸들러
   // ══════════════════════════════
 
-  const handleGenerate = async () => {
+  const handleTranslate = async () => {
     if (!prompt.trim()) return;
+    setTranslating(true);
+    try {
+      const res = await axios.post(`${API_URL}/api/delivery-images/translate-prompt`, {
+        prompt,
+        style,
+        reference_description: referenceDesc || undefined,
+        negative_prompt: negativePrompt || undefined,
+      }, { headers: getAuthHeaders() });
+      setTranslatedPrompt(res.data.full_prompt);
+      setShowTranslation(true);
+      setUseCustomEnglish(true);
+    } catch {
+      alert('번역 실패');
+    }
+    setTranslating(false);
+  };
+
+  const handleGenerate = async () => {
+    if (!prompt.trim() && !translatedPrompt.trim()) return;
     setGenerating(true);
     setGeneratedImage(null);
     setSaved(false);
 
     try {
       const payload = {
-        prompt: prompt,
+        prompt: useCustomEnglish && translatedPrompt.trim() ? translatedPrompt : prompt,
         name: name || prompt.slice(0, 20),
         category,
         style,
@@ -264,10 +287,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         width: 512,
         height: 512,
         steps: 4,
+        skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
       };
       if (seed) payload.seed = parseInt(seed, 10);
-      if (negativePrompt.trim()) payload.negative_prompt = negativePrompt;
-      if (referenceDesc.trim()) payload.reference_description = referenceDesc;
+      if (negativePrompt.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.negative_prompt = negativePrompt;
+      if (referenceDesc.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.reference_description = referenceDesc;
 
       // 미리보기 모드: 이미지만 생성 (DB 저장 안함)
       const res = await axios.post(`${API_URL}/api/delivery-images/ai-preview`, payload, {
@@ -548,8 +572,61 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       rows={3}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none bg-white"
                     />
-                    <p className="text-[10px] text-slate-400 mt-1">한국어 음식명을 자동으로 영어 번역하여 정확도를 높입니다</p>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <p className="text-[10px] text-slate-400">한국어 → 영어 번역 후 직접 수정 가능</p>
+                      <button
+                        onClick={handleTranslate}
+                        disabled={translating || !prompt.trim()}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 transition-all"
+                      >
+                        {translating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+                        영어로 번역
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 영어 프롬프트 (번역 결과) */}
+                  {showTranslation && (
+                    <div className="bg-blue-50/50 rounded-xl border border-blue-200 p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-blue-600 flex items-center gap-1">
+                          <Languages className="w-3.5 h-3.5" />
+                          English Prompt
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={useCustomEnglish}
+                              onChange={e => setUseCustomEnglish(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-[10px] text-blue-500 font-medium">영어 프롬프트 사용</span>
+                          </label>
+                          <button
+                            onClick={() => { setShowTranslation(false); setUseCustomEnglish(false); setTranslatedPrompt(''); }}
+                            className="p-0.5 rounded hover:bg-blue-100 text-blue-400"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <textarea
+                        value={translatedPrompt}
+                        onChange={e => setTranslatedPrompt(e.target.value)}
+                        rows={4}
+                        className={`w-full px-3 py-2 rounded-lg border text-xs resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                          useCustomEnglish ? 'bg-white border-blue-300' : 'bg-slate-100 border-slate-200 text-slate-400'
+                        }`}
+                        disabled={!useCustomEnglish}
+                      />
+                      <p className="text-[10px] text-blue-400 mt-1">
+                        {useCustomEnglish
+                          ? '이 영어 프롬프트가 AI에 직접 전달됩니다 (자유롭게 수정 가능)'
+                          : '체크박스를 켜면 이 영어 프롬프트를 직접 사용합니다'}
+                      </p>
+                    </div>
+                  )}
 
                   {/* 저장 정보 */}
                   <div className="grid grid-cols-2 gap-3">

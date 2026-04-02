@@ -155,6 +155,7 @@ class AIGenerateRequest(BaseModel):
     seed: Optional[int] = None
     negative_prompt: Optional[str] = None
     reference_description: Optional[str] = None  # Text description of reference image
+    skip_translation: bool = False  # True if prompt is already in English
 
 STYLE_SUFFIXES = {
     "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
@@ -339,6 +340,25 @@ async def _generate_with_openai(full_prompt: str, api_key: str) -> str:
     return response.data[0].url
 
 
+# ── 프롬프트 번역 (한국어 → 영어) ──
+class TranslateRequest(BaseModel):
+    prompt: str
+    style: str = "natural"
+    reference_description: Optional[str] = None
+    negative_prompt: Optional[str] = None
+
+@router.post("/translate-prompt")
+def translate_prompt(req: TranslateRequest, _admin: AuthUser = Depends(get_admin_user)):
+    translated = _translate_prompt(req.prompt)
+    style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
+    full_prompt = f"{translated}. {style_suffix}"
+    if req.reference_description:
+        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
+    if req.negative_prompt:
+        full_prompt += f". Avoid: {req.negative_prompt}"
+    return {"translated": translated, "full_prompt": full_prompt}
+
+
 @router.post("/ai-generate")
 async def ai_generate_image(
     req: AIGenerateRequest,
@@ -353,13 +373,16 @@ async def ai_generate_image(
             detail="AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.",
         )
 
-    translated = _translate_prompt(req.prompt)
-    style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-    full_prompt = f"{translated}. {style_suffix}"
-    if req.reference_description:
-        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
-    if req.negative_prompt:
-        full_prompt += f". Avoid: {req.negative_prompt}"
+    if req.skip_translation:
+        full_prompt = req.prompt
+    else:
+        translated = _translate_prompt(req.prompt)
+        style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
+        full_prompt = f"{translated}. {style_suffix}"
+        if req.reference_description:
+            full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
+        if req.negative_prompt:
+            full_prompt += f". Avoid: {req.negative_prompt}"
 
     try:
         from io import BytesIO
@@ -440,13 +463,16 @@ async def ai_preview_image(
     if not provider:
         raise HTTPException(status_code=503, detail="AI API 키가 설정되지 않았습니다.")
 
-    translated = _translate_prompt(req.prompt)
-    style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-    full_prompt = f"{translated}. {style_suffix}"
-    if req.reference_description:
-        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
-    if req.negative_prompt:
-        full_prompt += f". Avoid: {req.negative_prompt}"
+    if req.skip_translation:
+        full_prompt = req.prompt
+    else:
+        translated = _translate_prompt(req.prompt)
+        style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
+        full_prompt = f"{translated}. {style_suffix}"
+        if req.reference_description:
+            full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
+        if req.negative_prompt:
+            full_prompt += f". Avoid: {req.negative_prompt}"
 
     try:
         if provider == "self-hosted":
