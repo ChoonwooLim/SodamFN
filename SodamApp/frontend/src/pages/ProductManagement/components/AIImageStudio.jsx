@@ -184,14 +184,14 @@ const STYLE_OPTIONS = [
 ];
 
 const FOOD_PRESETS = [
-  { label: '김밥 단면', prompt: '김밥, 깔끔하게 잘린 단면이 보이도록' },
-  { label: '떡볶이', prompt: '떡볶이, 매콤한 소스에 쫄깃한 떡' },
-  { label: '라면', prompt: '라면, 양은냄비에 꼬불꼬불한 인스턴트 라면' },
-  { label: '치즈라면', prompt: '치즈라면, 양은냄비 인스턴트 라면 위에 노란 슬라이스 치즈' },
-  { label: '순대', prompt: '순대, 잘린 단면에 당면이 보이도록' },
-  { label: '주먹밥', prompt: '주먹밥, 삼각형 모양 김으로 감싸진' },
-  { label: '어묵', prompt: '어묵 꼬치, 따뜻한 국물에 담긴' },
-  { label: '유부초밥', prompt: '유부초밥, 밥이 들어간 유부 주머니' },
+  { label: '김밥 단면', prompt: '김밥' },
+  { label: '떡볶이', prompt: '떡볶이' },
+  { label: '라면', prompt: '라면' },
+  { label: '치즈라면', prompt: '치즈라면' },
+  { label: '순대', prompt: '순대' },
+  { label: '주먹밥', prompt: '주먹밥' },
+  { label: '어묵', prompt: '어묵' },
+  { label: '유부초밥', prompt: '유부초밥' },
 ];
 
 const UPSCALE_OPTIONS = [
@@ -215,8 +215,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [seed, setSeed] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [referenceImg, setReferenceImg] = useState(null);
-  const [referencePreview, setReferencePreview] = useState(null);
   const [referenceDesc, setReferenceDesc] = useState('');
   const [translatedPrompt, setTranslatedPrompt] = useState('');
   const [showTranslation, setShowTranslation] = useState(false);
@@ -753,35 +751,17 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     </div>
                   </div>
 
-                  {/* 참조 이미지 */}
+                  {/* 스타일 참조 설명 */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">참조 이미지 (선택)</label>
-                    {referencePreview ? (
-                      <div className="relative">
-                        <img src={referencePreview} alt="참조" className="w-full h-28 object-cover rounded-xl border border-slate-200" />
-                        <button
-                          onClick={() => { setReferenceImg(null); setReferencePreview(null); setReferenceDesc(''); }}
-                          className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white hover:bg-black/70"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                        <input
-                          type="text"
-                          value={referenceDesc}
-                          onChange={e => setReferenceDesc(e.target.value)}
-                          placeholder="참조 이미지 설명 (예: 이 구도와 비슷하게)"
-                          className="w-full mt-2 px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-                        />
-                      </div>
-                    ) : (
-                      <ImageDropZone
-                        label="비슷한 느낌의 이미지 업로드"
-                        onImage={({ file, dataUrl }) => {
-                          setReferenceImg(file);
-                          setReferencePreview(dataUrl);
-                        }}
-                      />
-                    )}
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">스타일 참조 (선택)</label>
+                    <p className="text-[10px] text-slate-400 mb-2">원하는 분위기를 텍스트로 설명하면 프롬프트에 반영됩니다</p>
+                    <input
+                      type="text"
+                      value={referenceDesc}
+                      onChange={e => setReferenceDesc(e.target.value)}
+                      placeholder="예: 배달앱 메뉴 사진 스타일, 밝은 조명"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                    />
                   </div>
 
                   {/* 고급 설정 */}

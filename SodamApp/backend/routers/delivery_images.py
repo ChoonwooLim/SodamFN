@@ -158,9 +158,9 @@ class AIGenerateRequest(BaseModel):
     skip_translation: bool = False  # True if prompt is already in English
 
 STYLE_SUFFIXES = {
-    "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
-    "studio": "studio food photography, dramatic lighting, dark background, professional plating, high-end restaurant quality, shallow depth of field",
-    "minimal": "minimal flat lay food photography, bright clean background, modern styling, negative space, Instagram-worthy composition",
+    "natural": "photorealistic food photo, natural daylight, real texture, top-down shot, white plate",
+    "studio": "photorealistic food photo, dramatic side lighting, dark background, real texture, shallow depth of field",
+    "minimal": "photorealistic food photo, bright white background, flat lay, real texture, minimal props",
 }
 
 # ── 한국어 음식명 → 영어 사전 (DB 기반, 캐시 사용) ──
@@ -213,6 +213,19 @@ def _translate_prompt(korean_prompt: str) -> str:
 
     # 3. No match
     return f"Korean food dish: {prompt}, appetizing Korean cuisine"
+
+
+def _build_prompt(translated: str, style: str, reference_description: str = None, negative_prompt: str = None) -> str:
+    """최종 프롬프트 조합 - 음식 설명 우선, 스타일은 간결하게"""
+    style_suffix = STYLE_SUFFIXES.get(style, STYLE_SUFFIXES["natural"])
+    # 핵심: 음식 묘사가 최우선, 스타일은 짧게 뒤에
+    parts = [translated, style_suffix]
+    if reference_description:
+        parts.insert(1, f"style reference: {reference_description}")
+    prompt = ", ".join(parts)
+    if negative_prompt:
+        prompt += f". Avoid: {negative_prompt}"
+    return prompt
 
 
 def _get_ai_provider():
@@ -335,12 +348,7 @@ class TranslateRequest(BaseModel):
 @router.post("/translate-prompt")
 def translate_prompt(req: TranslateRequest, _admin: AuthUser = Depends(get_admin_user)):
     translated = _translate_prompt(req.prompt)
-    style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-    full_prompt = f"{translated}. {style_suffix}"
-    if req.reference_description:
-        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
-    if req.negative_prompt:
-        full_prompt += f". Avoid: {req.negative_prompt}"
+    full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
     return {"translated": translated, "full_prompt": full_prompt}
 
 
@@ -362,12 +370,7 @@ async def ai_generate_image(
         full_prompt = req.prompt
     else:
         translated = _translate_prompt(req.prompt)
-        style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-        full_prompt = f"{translated}. {style_suffix}"
-        if req.reference_description:
-            full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
-        if req.negative_prompt:
-            full_prompt += f". Avoid: {req.negative_prompt}"
+        full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
 
     try:
         from io import BytesIO
@@ -452,12 +455,7 @@ async def ai_preview_image(
         full_prompt = req.prompt
     else:
         translated = _translate_prompt(req.prompt)
-        style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-        full_prompt = f"{translated}. {style_suffix}"
-        if req.reference_description:
-            full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
-        if req.negative_prompt:
-            full_prompt += f". Avoid: {req.negative_prompt}"
+        full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
 
     try:
         if provider == "self-hosted":
