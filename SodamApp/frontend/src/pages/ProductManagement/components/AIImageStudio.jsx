@@ -215,6 +215,9 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [seed, setSeed] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [referenceImg, setReferenceImg] = useState(null);
+  const [referencePreview, setReferencePreview] = useState(null);
+  const [referenceStrength, setReferenceStrength] = useState(0.75);
   const [referenceDesc, setReferenceDesc] = useState('');
   const [translatedPrompt, setTranslatedPrompt] = useState('');
   const [showTranslation, setShowTranslation] = useState(false);
@@ -276,33 +279,52 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     setSaved(false);
 
     try {
-      const payload = {
-        prompt: useCustomEnglish && translatedPrompt.trim() ? translatedPrompt : prompt,
-        name: name || prompt.slice(0, 20),
-        category,
-        style,
-        upscale: 1,  // 미리보기는 항상 원본 크기 (빠른 응답), 업스케일은 별도 탭
-        width: 512,
-        height: 512,
-        steps: 4,
-        skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
-      };
-      if (seed) payload.seed = parseInt(seed, 10);
-      if (negativePrompt.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.negative_prompt = negativePrompt;
-      if (referenceDesc.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.reference_description = referenceDesc;
+      const finalPrompt = useCustomEnglish && translatedPrompt.trim() ? translatedPrompt : prompt;
+      let res;
 
-      // 미리보기 모드: 업스케일 없이 빠르게 생성 (DB 저장 안함)
-      const res = await axios.post(`${API_URL}/api/delivery-images/ai-preview`, payload, {
-        headers: getAuthHeaders(),
-        responseType: 'blob',
-        timeout: 120000,
-      });
+      if (referenceImg) {
+        // ── 참고이미지 있음 → img2img 모드 ──
+        const formData = new FormData();
+        formData.append('file', referenceImg);
+        formData.append('prompt', finalPrompt);
+        formData.append('strength', referenceStrength);
+        formData.append('steps', '4');
+        formData.append('style', style);
+        if (seed) formData.append('seed', seed);
+
+        res = await axios.post(`${API_URL}/api/delivery-images/img2img`, formData, {
+          headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+          responseType: 'blob',
+          timeout: 120000,
+        });
+      } else {
+        // ── 텍스트만 → t2i 모드 ──
+        const payload = {
+          prompt: finalPrompt,
+          name: name || prompt.slice(0, 20),
+          category,
+          style,
+          upscale: 1,
+          width: 512,
+          height: 512,
+          steps: 4,
+          skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
+        };
+        if (seed) payload.seed = parseInt(seed, 10);
+        if (negativePrompt.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.negative_prompt = negativePrompt;
+        if (referenceDesc.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.reference_description = referenceDesc;
+
+        res = await axios.post(`${API_URL}/api/delivery-images/ai-preview`, payload, {
+          headers: getAuthHeaders(),
+          responseType: 'blob',
+          timeout: 120000,
+        });
+      }
 
       let imageUrl;
       if (res.data instanceof Blob && res.data.type.startsWith('image/')) {
         imageUrl = URL.createObjectURL(res.data);
       } else {
-        // JSON response with URL (cloud providers)
         const text = await res.data.text();
         const json = JSON.parse(text);
         imageUrl = json.image_url;
@@ -313,6 +335,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         url: imageUrl,
         prompt: prompt,
         style,
+        ref: referenceImg ? 'img2img' : 't2i',
         time: new Date().toLocaleTimeString('ko-KR'),
       }, ...prev].slice(0, 10));
     } catch (err) {
@@ -730,17 +753,51 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     <p className="text-[11px] text-slate-500">미리보기: 512×512 (빠른 생성) · 고해상도가 필요하면 생성 후 <strong>업스케일 탭</strong>에서 확대</p>
                   </div>
 
-                  {/* 스타일 참조 설명 */}
+                  {/* 참조 이미지 (img2img) */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">스타일 참조 (선택)</label>
-                    <p className="text-[10px] text-slate-400 mb-2">원하는 분위기를 텍스트로 설명하면 프롬프트에 반영됩니다</p>
-                    <input
-                      type="text"
-                      value={referenceDesc}
-                      onChange={e => setReferenceDesc(e.target.value)}
-                      placeholder="예: 배달앱 메뉴 사진 스타일, 밝은 조명"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
-                    />
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">참조 이미지 (선택)</label>
+                    <p className="text-[10px] text-slate-400 mb-2">이미지를 올리면 해당 이미지를 기반으로 AI가 변환합니다</p>
+                    {referencePreview ? (
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <img src={referencePreview} alt="참조" className="w-full h-32 object-cover rounded-xl border border-slate-200" />
+                          <button
+                            onClick={() => { setReferenceImg(null); setReferencePreview(null); }}
+                            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 text-white hover:bg-black/70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                          <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded bg-violet-600/80 text-white text-[10px] font-bold">img2img 모드</span>
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-500 font-medium">
+                            변환 강도: <span className="text-violet-600 font-bold">{Math.round(referenceStrength * 100)}%</span>
+                            <span className="text-slate-400 ml-1">({referenceStrength <= 0.3 ? '원본 유지' : referenceStrength <= 0.6 ? '부분 변환' : '대폭 변환'})</span>
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="1.0"
+                            step="0.05"
+                            value={referenceStrength}
+                            onChange={e => setReferenceStrength(parseFloat(e.target.value))}
+                            className="w-full h-1.5 mt-1 accent-violet-500"
+                          />
+                          <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+                            <span>원본 유지</span>
+                            <span>완전 변환</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <ImageDropZone
+                        label="참조할 이미지 업로드 (드래그/붙여넣기)"
+                        onImage={({ file, dataUrl }) => {
+                          setReferenceImg(file);
+                          setReferencePreview(dataUrl);
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* 고급 설정 */}
@@ -810,7 +867,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-violet-400 animate-pulse" />
                     </div>
                     <p className="text-sm font-bold text-slate-600">AI가 이미지를 생성하고 있습니다</p>
-                    <p className="text-xs text-slate-400 mt-1">Flux.1-schnell (512×512)</p>
+                    <p className="text-xs text-slate-400 mt-1">{referenceImg ? `Flux.1-schnell img2img (강도 ${Math.round(referenceStrength * 100)}%)` : 'Flux.1-schnell (512×512)'}</p>
                   </div>
                 ) : generatedImage ? (
                   <div className="space-y-4">
