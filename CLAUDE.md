@@ -66,6 +66,31 @@ cd c:\WORK\SodamFN\SodamApp\backend && python -c "import sys; sys.path.insert(0,
 | **Admin Frontend** (React+Vite) | static | `SodamApp/frontend` | `https://sodamfn.twinverse.org` |
 | **Staff App** (React PWA) | static | `SodamApp/staff-app` | `https://sodam-staff.pages.dev` |
 
+### 환경변수 관리 (매우 중요)
+
+새 기능에서 환경변수를 사용할 때 **반드시 아래 4곳을 모두 확인/업데이트**합니다:
+
+| 파일 | 용도 | 비고 |
+|------|------|------|
+| `backend/.env` | 로컬 개발용 | 실제 값 직접 기입 |
+| `Orbitron.yaml` → backend env | 배포 백엔드 | 비밀값은 Orbitron secrets로, 고정값은 직접 기입 |
+| `Orbitron.yaml` → frontend env | 배포 프론트엔드 | `VITE_` 접두사 환경변수 |
+| `Orbitron.yaml` → postDeploy env | 배포 Staff App | `VITE_` 접두사 환경변수 |
+
+#### 절대 하면 안 되는 것
+1. `.env`에만 값을 넣고 `Orbitron.yaml`을 빈 값(`""`)으로 방치 → **배포 시 장애 발생**
+2. 프론트엔드/Staff App에서 사용하는 `VITE_*` 변수를 `Orbitron.yaml`에 누락
+
+#### 작업 완료 시 체크리스트
+새 환경변수가 추가된 작업을 완료하면 아래를 사용자에게 보고:
+```
+⚠️ 배포 환경변수 체크:
+- [ ] Orbitron.yaml backend env 업데이트 완료
+- [ ] Orbitron.yaml frontend env 업데이트 완료  
+- [ ] Orbitron.yaml postDeploy env 업데이트 완료
+- [ ] Orbitron secrets 설정 필요 여부 안내
+```
+
 ### 파일 스토리지 (매우 중요)
 
 - **모든 파일 업로드는 `services/storage_service.py` → `get_storage()`를 통해 처리**

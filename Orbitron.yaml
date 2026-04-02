@@ -44,7 +44,7 @@ services:
       - key: MEDIA_SERVER_URL
         value: "http://192.168.219.101:8200"  # Central media file server
       - key: MEDIA_API_KEY
-        value: ""  # Set via Orbitron secrets
+        value: "sodam-media-2026"  # Media server API key
       - key: SUPERADMIN_USERNAME
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD
@@ -92,6 +92,8 @@ postDeploy:
     env:
       - key: VITE_API_URL
         value: "https://sodamfn.twinverse.org"
+      - key: VITE_MEDIA_URL
+        value: "http://192.168.219.101:8200"
 
 databases:
   - name: sodam-db
