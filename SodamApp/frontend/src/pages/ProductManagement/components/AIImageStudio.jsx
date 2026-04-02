@@ -1568,7 +1568,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
               <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-6">
                 {editImage ? (
                   <div
-                    className="relative rounded-2xl shadow-lg overflow-hidden"
+                    className="relative rounded-2xl shadow-lg overflow-hidden inline-block"
                     style={{
                       backgroundImage: 'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
                       backgroundSize: '20px 20px',
@@ -1579,33 +1579,31 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       ref={imgRef}
                       src={editImage}
                       alt="편집 중"
-                      className="max-w-full max-h-[70vh] object-contain transition-all duration-200"
+                      className="block max-w-full max-h-[70vh] object-contain transition-all duration-200"
                       style={editMode === 'adjust' ? editFilterStyle : {}}
                       onLoad={(e) => {
-                        // 마스크 캔버스 크기를 이미지에 맞춤
                         if (maskCanvasRef.current) {
                           maskCanvasRef.current.width = e.target.naturalWidth;
                           maskCanvasRef.current.height = e.target.naturalHeight;
-                          maskCanvasRef.current.style.width = e.target.width + 'px';
-                          maskCanvasRef.current.style.height = e.target.height + 'px';
                         }
                       }}
                     />
-                    {/* 인페인트 마스킹 캔버스 */}
-                    {editMode === 'inpaint' && (
-                      <canvas
-                        ref={maskCanvasRef}
-                        className="absolute top-0 left-0"
-                        style={{ cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize}' height='${brushSize}'><circle cx='${brushSize/2}' cy='${brushSize/2}' r='${brushSize/2 - 1}' fill='none' stroke='red' stroke-width='2'/></svg>") ${brushSize/2} ${brushSize/2}, crosshair` }}
-                        onMouseDown={startDrawing}
-                        onMouseMove={draw}
-                        onMouseUp={stopDrawing}
-                        onMouseLeave={stopDrawing}
-                      />
-                    )}
+                    {/* 인페인트 마스킹 캔버스 — 항상 존재, inpaint 모드에서만 상호작용 */}
+                    <canvas
+                      ref={maskCanvasRef}
+                      className="absolute top-0 left-0 w-full h-full"
+                      style={{
+                        display: editMode === 'inpaint' ? 'block' : 'none',
+                        cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize}' height='${brushSize}'><circle cx='${brushSize/2}' cy='${brushSize/2}' r='${brushSize/2 - 1}' fill='none' stroke='red' stroke-width='2'/></svg>") ${brushSize/2} ${brushSize/2}, crosshair`,
+                      }}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                    />
                     {/* 인페인트 모드 표시 */}
                     {editMode === 'inpaint' && (
-                      <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-violet-600/80 text-white text-[10px] font-bold flex items-center gap-1">
+                      <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-violet-600/80 text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none">
                         <Paintbrush className="w-3 h-3" />
                         브러시 모드 — 제거할 부분을 칠하세요
                       </div>
