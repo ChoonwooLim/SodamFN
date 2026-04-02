@@ -24,8 +24,8 @@ const STYLE_OPTIONS = [
 const FOOD_PRESETS = [
   { label: '김밥 단면', prompt: '김밥, 깔끔하게 잘린 단면이 보이도록' },
   { label: '떡볶이', prompt: '떡볶이, 매콤한 소스에 쫄깃한 떡' },
-  { label: '라면', prompt: '라면, 김이 모락모락 나는 따뜻한 국물' },
-  { label: '치즈라면', prompt: '치즈라면, 노란 치즈가 녹아내리는 라면' },
+  { label: '라면', prompt: '라면, 양은냄비에 꼬불꼬불한 인스턴트 라면' },
+  { label: '치즈라면', prompt: '치즈라면, 양은냄비 인스턴트 라면 위에 노란 슬라이스 치즈' },
   { label: '순대', prompt: '순대, 잘린 단면에 당면이 보이도록' },
   { label: '주먹밥', prompt: '주먹밥, 삼각형 모양 김으로 감싸진' },
   { label: '어묵', prompt: '어묵 꼬치, 따뜻한 국물에 담긴' },

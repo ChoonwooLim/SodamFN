@@ -178,9 +178,9 @@ FOOD_TRANSLATIONS = {
     # 분식류
     "떡볶이": "Korean tteokbokki, spicy stir-fried rice cakes in red gochujang sauce",
     "치즈떡볶이": "Korean cheese tteokbokki, spicy rice cakes topped with melted mozzarella cheese",
-    "라면": "Korean ramyeon instant noodle soup with egg and green onions in spicy broth",
-    "치즈라면": "Korean cheese ramyeon, instant noodle soup topped with melted cheese slice, yellow cheese melting on spicy noodle soup",
-    "라볶이": "Korean rabokki, spicy rice cakes with ramen noodles in gochujang sauce",
+    "라면": "Korean Shin Ramyeon style instant noodles in small aluminum pot, curly yellow instant noodle in red spicy broth, with egg and chopped green onions on top, typical Korean convenience store ramyeon",
+    "치즈라면": "Korean Shin Ramyeon style instant noodles with a square yellow American cheese slice melting on top, curly yellow instant noodle in small aluminum pot, red spicy broth, Korean convenience store cheese ramyeon",
+    "라볶이": "Korean rabokki, spicy rice cakes mixed with curly yellow instant ramen noodles in gochujang sauce",
     "순대": "Korean sundae (blood sausage), sliced to show glass noodle filling, served with salt",
     "어묵": "Korean fish cake (eomuk) skewers in warm broth",
     "튀김": "Korean fried snacks (twigim), assorted tempura-style fried vegetables and seafood",
