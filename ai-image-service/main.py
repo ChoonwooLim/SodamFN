@@ -355,6 +355,43 @@ async def upscale_image(
     )
 
 
+# ── 배경 제거 엔드포인트 (rembg) ──
+@app.post("/remove-bg")
+async def remove_background(
+    file: UploadFile = File(...),
+):
+    """이미지 배경 제거 (rembg / u2net)"""
+    try:
+        from rembg import remove
+    except ImportError:
+        raise HTTPException(status_code=503, detail="rembg not installed. Run: pip install rembg[gpu]")
+
+    content = await file.read()
+    pil_image = Image.open(io.BytesIO(content)).convert("RGBA")
+
+    logger.info(f"Removing background: {pil_image.size[0]}x{pil_image.size[1]}")
+    start = time.time()
+
+    result = remove(pil_image)
+
+    elapsed = time.time() - start
+    logger.info(f"Background removed in {elapsed:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG")
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "X-Processing-Time": f"{elapsed:.2f}",
+            "X-Width": str(result.size[0]),
+            "X-Height": str(result.size[1]),
+        },
+    )
+
+
 @app.get("/health")
 def health():
     gpus = []
@@ -397,7 +434,7 @@ def root():
     return {
         "service": "Sodam AI Image Service",
         "model": "Flux.1-schnell + Real-ESRGAN",
-        "features": ["generate", "img2img", "upscale", "generate+upscale"],
+        "features": ["generate", "img2img", "upscale", "remove-bg", "generate+upscale"],
     }
 
 

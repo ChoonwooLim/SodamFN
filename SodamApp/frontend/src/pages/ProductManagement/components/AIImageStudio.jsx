@@ -4,7 +4,7 @@ import {
   RotateCw, Sun, Contrast, Save, Wand2, ArrowUpCircle,
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
-  Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search
+  Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search, Eraser
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -270,6 +270,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [saturate, setSaturate] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [editOriginal, setEditOriginal] = useState(null);
+  const [removingBg, setRemovingBg] = useState(false);
   const canvasRef = useRef(null);
 
   // ══════════════════════════════
@@ -494,6 +495,31 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     };
     img.src = editImage;
   }, [editImage, brightness, contrast, saturate, rotation]);
+
+  // 배경 제거
+  const handleRemoveBg = async () => {
+    if (!editImage) return;
+    setRemovingBg(true);
+    try {
+      // dataUrl 또는 blob URL → blob 변환
+      const res = await fetch(editImage);
+      const blob = await res.blob();
+      const formData = new FormData();
+      formData.append('file', blob, 'image.png');
+
+      const response = await axios.post(`${API_URL}/api/delivery-images/remove-bg`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 120000,
+      });
+      const resultUrl = URL.createObjectURL(response.data);
+      setEditImage(resultUrl);
+      setEditPreview(resultUrl);
+    } catch (err) {
+      alert('배경 제거 실패: ' + (err.response?.data?.detail || err.message));
+    }
+    setRemovingBg(false);
+  };
 
   // 생성된 이미지를 편집탭으로 보내기
   const sendToEdit = (imageUrl) => {
@@ -755,7 +781,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">촬영 스타일</label>
                     <div className="grid grid-cols-5 gap-1.5">
                       {STYLE_OPTIONS.map(s => (
-                        <div key={s.id} className="relative">
+                        <div key={s.id} className="relative group">
                           <button
                             onClick={() => setStyle(s.id)}
                             className={`w-full rounded-xl overflow-hidden transition-all ${
@@ -771,12 +797,9 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); setPreviewStyle(s); }}
-                            className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all opacity-0 hover:opacity-100 group-hover:opacity-100"
-                            style={{ opacity: undefined }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
-                            onMouseLeave={e => e.currentTarget.style.opacity = 0}
+                            className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-black/70 transition-all opacity-0 group-hover:opacity-100"
                           >
-                            <ZoomIn className="w-3 h-3" />
+                            <ZoomIn className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ))}
@@ -1231,6 +1254,28 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                         </div>
                       </div>
 
+                      {/* 배경 제거 */}
+                      <div className="pt-1">
+                        <button
+                          onClick={handleRemoveBg}
+                          disabled={removingBg}
+                          className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {removingBg ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              배경 제거 중...
+                            </>
+                          ) : (
+                            <>
+                              <Eraser className="w-4 h-4" />
+                              배경 제거 (AI)
+                            </>
+                          )}
+                        </button>
+                        <p className="text-[10px] text-slate-400 mt-1 text-center">AI가 배경을 자동으로 제거하여 투명 PNG로 변환합니다</p>
+                      </div>
+
                       {/* 액션 버튼 */}
                       <div className="space-y-2 pt-2">
                         <button
@@ -1256,7 +1301,14 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
               {/* 오른쪽: 이미지 미리보기 */}
               <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-6">
                 {editImage ? (
-                  <div className="bg-white rounded-2xl shadow-lg overflow-hidden max-w-full max-h-full">
+                  <div
+                    className="rounded-2xl shadow-lg overflow-hidden max-w-full max-h-full"
+                    style={{
+                      backgroundImage: 'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
+                      backgroundSize: '20px 20px',
+                      backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+                    }}
+                  >
                     <img
                       src={editImage}
                       alt="편집 중"
