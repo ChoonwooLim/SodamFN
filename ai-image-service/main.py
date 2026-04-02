@@ -1,32 +1,39 @@
 """
 소담김밥 AI 이미지 생성 서비스
 - Flux.1-schnell (최고 품질 오픈소스 모델)
-- GTX 1080 — sequential CPU offload
+- Real-ESRGAN 4x 업스케일러 (512→2048)
+- GTX 1080 x2 — 듀얼 GPU 분업 (Flux=cuda:0 offload, Upscale=cuda:1)
 - FastAPI REST API
 - 무료
 """
+import gc
 import io
 import time
 import logging
 import threading
+import numpy as np
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Optional
 from contextlib import asynccontextmanager
+from PIL import Image
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-image-service")
 
 MODEL_ID = "black-forest-labs/FLUX.1-schnell"
+UPSCALE_GPU = 1  # 업스케일은 cuda:1 사용 (Flux가 cuda:0 사용)
 
 pipe = None
+upscaler = None
 gen_lock = threading.Lock()
+upscale_lock = threading.Lock()
 
 
 def load_pipeline():
-    """Flux.1-schnell 파이프라인 로드 (sequential CPU offload)"""
+    """Flux.1-schnell 파이프라인 로드 (model CPU offload — sequential보다 빠름)"""
     global pipe
     from diffusers import FluxPipeline
 
@@ -36,20 +43,21 @@ def load_pipeline():
         mem = torch.cuda.get_device_properties(i).total_memory / 1e9
         logger.info(f"  GPU {i}: {name} ({mem:.1f}GB)")
 
-    logger.info("Loading Flux.1-schnell...")
+    logger.info("Loading Flux.1-schnell with model CPU offload...")
     start = time.time()
 
     pipe = FluxPipeline.from_pretrained(
         MODEL_ID,
         torch_dtype=torch.float16,
     )
-    pipe.enable_sequential_cpu_offload(gpu_id=0)
+    # model_cpu_offload: 서브모델 단위로 GPU 이동 (sequential보다 빠름)
+    # sequential은 레이어 하나씩 이동하여 느리고, model은 서브모델 통째로 이동
+    pipe.enable_model_cpu_offload(gpu_id=0)
 
     elapsed = time.time() - start
     logger.info(f"Pipeline loaded in {elapsed:.1f}s")
 
-    # 워밍업 (소형으로)
-    logger.info("Warming up...")
+    logger.info("Warming up (256x256, 2 steps)...")
     pipe(
         "test",
         num_inference_steps=2,
@@ -58,19 +66,64 @@ def load_pipeline():
         height=256,
         max_sequence_length=64,
     )
-    logger.info("Warmup done, ready to serve!")
+    logger.info("Warmup done!")
+    log_memory_status()
+
+
+def load_upscaler():
+    """Real-ESRGAN 4x 업스케일러 로드 (cuda:1)"""
+    global upscaler
+    try:
+        from realesrgan import RealESRGANer
+        from basicsr.archs.rrdbnet_arch import RRDBNet
+
+        logger.info(f"Loading Real-ESRGAN on cuda:{UPSCALE_GPU}...")
+
+        model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4)
+        upscaler = RealESRGANer(
+            scale=4,
+            model_path="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+            model=model,
+            tile=400,
+            tile_pad=10,
+            pre_pad=0,
+            half=True,
+            gpu_id=UPSCALE_GPU,
+        )
+        logger.info("Real-ESRGAN loaded!")
+    except Exception as e:
+        logger.warning(f"Real-ESRGAN 로드 실패 (업스케일 비활성): {e}")
+        upscaler = None
+
+
+def log_memory_status():
+    """GPU/RAM 메모리 상태 로깅"""
+    for i in range(torch.cuda.device_count()):
+        alloc = torch.cuda.memory_allocated(i) / 1e9
+        total = torch.cuda.get_device_properties(i).total_memory / 1e9
+        logger.info(f"  cuda:{i} VRAM: {alloc:.1f}GB / {total:.1f}GB")
+    try:
+        import psutil
+        ram = psutil.virtual_memory()
+        logger.info(f"  RAM: {ram.used / 1e9:.1f}GB / {ram.total / 1e9:.1f}GB ({ram.percent}%)")
+    except ImportError:
+        pass
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_pipeline()
+    load_upscaler()
     yield
-    global pipe
+    global pipe, upscaler
     del pipe
+    if upscaler is not None:
+        del upscaler
     torch.cuda.empty_cache()
+    gc.collect()
 
 
-app = FastAPI(title="Sodam AI Image Service (Flux.1-schnell)", lifespan=lifespan)
+app = FastAPI(title="Sodam AI Image Service (Flux + Upscaler)", lifespan=lifespan)
 
 
 STYLE_SUFFIXES = {
@@ -87,12 +140,31 @@ class GenerateRequest(BaseModel):
     height: int = 512
     steps: int = 4
     seed: Optional[int] = None
+    upscale: int = 1  # 1=원본, 2=2x, 4=4x
+
+
+def _upscale_image(pil_image: Image.Image, scale: int) -> Image.Image:
+    """Real-ESRGAN으로 이미지 업스케일"""
+    if upscaler is None or scale <= 1:
+        return pil_image
+
+    img_np = np.array(pil_image)
+    img_bgr = img_np[:, :, ::-1]
+
+    with upscale_lock:
+        output, _ = upscaler.enhance(img_bgr, outscale=scale)
+
+    output_rgb = output[:, :, ::-1]
+    return Image.fromarray(output_rgb)
 
 
 @app.post("/generate")
 def generate_image(req: GenerateRequest):
     if pipe is None:
         raise HTTPException(status_code=503, detail="Model not loaded yet")
+
+    if gen_lock.locked():
+        raise HTTPException(status_code=429, detail="Another generation in progress, try again shortly")
 
     style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
     full_prompt = f"{req.prompt}. {style_suffix}"
@@ -105,25 +177,43 @@ def generate_image(req: GenerateRequest):
     width = (width // 8) * 8
     height = (height // 8) * 8
 
-    logger.info(f"Generating: {req.prompt[:50]}... ({width}x{height}, {req.steps} steps)")
+    upscale = min(max(req.upscale, 1), 4)
+
+    logger.info(f"[cuda:0] Generating: {req.prompt[:50]}... ({width}x{height}, {req.steps} steps, upscale={upscale}x)")
     start = time.time()
 
     with gen_lock:
-        with torch.no_grad():
-            result = pipe(
-                full_prompt,
-                num_inference_steps=req.steps,
-                guidance_scale=0.0,
-                width=width,
-                height=height,
-                max_sequence_length=256,
-                generator=generator,
-            )
+        try:
+            with torch.no_grad():
+                result = pipe(
+                    full_prompt,
+                    num_inference_steps=req.steps,
+                    guidance_scale=0.0,
+                    width=width,
+                    height=height,
+                    max_sequence_length=256,
+                    generator=generator,
+                )
+        except torch.cuda.OutOfMemoryError:
+            torch.cuda.empty_cache()
+            gc.collect()
+            logger.error("OOM during generation! Clearing cache.")
+            raise HTTPException(status_code=507, detail="GPU out of memory, try smaller resolution")
 
-    elapsed = time.time() - start
-    logger.info(f"Generated in {elapsed:.1f}s")
-
+    gen_time = time.time() - start
     image = result.images[0]
+
+    # 업스케일 (cuda:1에서 병렬 가능)
+    if upscale > 1:
+        logger.info(f"[cuda:{UPSCALE_GPU}] Upscaling {upscale}x...")
+        up_start = time.time()
+        image = _upscale_image(image, upscale)
+        up_time = time.time() - up_start
+        logger.info(f"Upscaled to {image.size[0]}x{image.size[1]} in {up_time:.1f}s")
+
+    total_time = time.time() - start
+    logger.info(f"Total: {total_time:.1f}s (gen={gen_time:.1f}s)")
+
     buf = io.BytesIO()
     image.save(buf, format="PNG", optimize=True)
     buf.seek(0)
@@ -132,11 +222,60 @@ def generate_image(req: GenerateRequest):
         content=buf.getvalue(),
         media_type="image/png",
         headers={
-            "X-Generation-Time": f"{elapsed:.2f}",
+            "X-Generation-Time": f"{gen_time:.2f}",
+            "X-Total-Time": f"{total_time:.2f}",
             "X-Seed": str(seed),
-            "X-Width": str(width),
-            "X-Height": str(height),
+            "X-Width": str(image.size[0]),
+            "X-Height": str(image.size[1]),
+            "X-Upscale": str(upscale),
             "X-Model": "flux.1-schnell",
+        },
+    )
+
+
+@app.post("/upscale")
+async def upscale_image(
+    file: UploadFile = File(...),
+    scale: int = Form(4),
+):
+    """기존 이미지를 업스케일 (2x 또는 4x)"""
+    if upscaler is None:
+        raise HTTPException(status_code=503, detail="Upscaler not loaded")
+
+    if upscale_lock.locked():
+        raise HTTPException(status_code=429, detail="Another upscale in progress, try again shortly")
+
+    scale = min(max(scale, 2), 4)
+
+    content = await file.read()
+    pil_image = Image.open(io.BytesIO(content)).convert("RGB")
+    orig_size = pil_image.size
+
+    # 입력 이미지 크기 제한 (너무 큰 이미지 업스케일 시 OOM 방지)
+    max_input_px = 1024 * 1024  # 1MP
+    if orig_size[0] * orig_size[1] > max_input_px:
+        raise HTTPException(status_code=400, detail=f"Input image too large ({orig_size[0]}x{orig_size[1]}). Max 1024x1024.")
+
+    logger.info(f"[cuda:{UPSCALE_GPU}] Upscaling {orig_size[0]}x{orig_size[1]} → {scale}x")
+    start = time.time()
+
+    result = _upscale_image(pil_image, scale)
+
+    elapsed = time.time() - start
+    logger.info(f"Upscaled to {result.size[0]}x{result.size[1]} in {elapsed:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "X-Upscale-Time": f"{elapsed:.2f}",
+            "X-Original-Size": f"{orig_size[0]}x{orig_size[1]}",
+            "X-Output-Size": f"{result.size[0]}x{result.size[1]}",
+            "X-Scale": str(scale),
         },
     )
 
@@ -150,15 +289,31 @@ def health():
             "gpu_name": torch.cuda.get_device_name(i),
             "vram_total_gb": round(torch.cuda.get_device_properties(i).total_memory / 1e9, 1),
             "vram_used_gb": round(torch.cuda.memory_allocated(i) / 1e9, 1),
+            "role": "flux-generate" if i == 0 else "upscale",
         })
+
+    ram_info = {}
+    try:
+        import psutil
+        ram = psutil.virtual_memory()
+        ram_info = {
+            "ram_total_gb": round(ram.total / 1e9, 1),
+            "ram_used_gb": round(ram.used / 1e9, 1),
+            "ram_percent": ram.percent,
+        }
+    except ImportError:
+        pass
 
     return {
         "status": "ok" if pipe is not None else "loading",
         "model": "Flux.1-schnell",
-        "mode": "sequential-cpu-offload",
+        "upscaler": "Real-ESRGAN x4" if upscaler is not None else "not loaded",
+        "mode": "model-cpu-offload (cuda:0=flux, cuda:1=upscale)",
         "gpu_count": torch.cuda.device_count(),
         "gpus": gpus,
         "busy": gen_lock.locked(),
+        "upscaling": upscale_lock.locked(),
+        **ram_info,
     }
 
 
@@ -166,7 +321,8 @@ def health():
 def root():
     return {
         "service": "Sodam AI Image Service",
-        "model": "Flux.1-schnell",
+        "model": "Flux.1-schnell + Real-ESRGAN",
+        "features": ["generate", "upscale", "generate+upscale"],
     }
 
 
