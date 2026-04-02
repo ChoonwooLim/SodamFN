@@ -178,16 +178,16 @@ function getAuthHeaders() {
 const CATEGORIES = ['김밥류', '분식류', '주먹밥류', '음료류'];
 
 const STYLE_OPTIONS = [
-  { id: 'natural', label: '자연광', desc: '창가 자연광, 따뜻한 톤', thumb: '/style-samples/natural.webp' },
-  { id: 'studio', label: '스튜디오', desc: '다크 배경, 드라마틱 조명', thumb: '/style-samples/studio.webp' },
-  { id: 'minimal', label: '미니멀', desc: '흰 배경, 깔끔한 플랫레이', thumb: '/style-samples/minimal.webp' },
-  { id: 'overhead', label: '탑뷰', desc: '위에서 내려다본 구도', thumb: '/style-samples/overhead.webp' },
-  { id: 'angle45', label: '45도', desc: '45도 각도, 입체감 강조', thumb: '/style-samples/angle45.webp' },
-  { id: 'closeup', label: '클로즈업', desc: '음식 질감 극대화 접사', thumb: '/style-samples/closeup.webp' },
-  { id: 'steam', label: '김이모락', desc: '따끈한 김, 갓 조리된 느낌', thumb: '/style-samples/steam.webp' },
-  { id: 'delivery', label: '배달앱', desc: '배달앱 메뉴 사진 스타일', thumb: '/style-samples/delivery.webp' },
-  { id: 'casual', label: '일상', desc: '식탁 위 자연스러운 한 끼', thumb: '/style-samples/casual.webp' },
-  { id: 'premium', label: '프리미엄', desc: '고급 레스토랑 플레이팅', thumb: '/style-samples/premium.webp' },
+  { id: 'natural', label: '자연광', desc: '창가 자연광, 따뜻한 톤', thumb: '/style-samples/natural.webp', lg: '/style-samples/natural-lg.webp' },
+  { id: 'studio', label: '스튜디오', desc: '다크 배경, 드라마틱 조명', thumb: '/style-samples/studio.webp', lg: '/style-samples/studio-lg.webp' },
+  { id: 'minimal', label: '미니멀', desc: '흰 배경, 깔끔한 플랫레이', thumb: '/style-samples/minimal.webp', lg: '/style-samples/minimal-lg.webp' },
+  { id: 'overhead', label: '탑뷰', desc: '위에서 내려다본 구도', thumb: '/style-samples/overhead.webp', lg: '/style-samples/overhead-lg.webp' },
+  { id: 'angle45', label: '45도', desc: '45도 각도, 입체감 강조', thumb: '/style-samples/angle45.webp', lg: '/style-samples/angle45-lg.webp' },
+  { id: 'closeup', label: '클로즈업', desc: '음식 질감 극대화 접사', thumb: '/style-samples/closeup.webp', lg: '/style-samples/closeup-lg.webp' },
+  { id: 'steam', label: '김이모락', desc: '따끈한 김, 갓 조리된 느낌', thumb: '/style-samples/steam.webp', lg: '/style-samples/steam-lg.webp' },
+  { id: 'delivery', label: '배달앱', desc: '배달앱 메뉴 사진 스타일', thumb: '/style-samples/delivery.webp', lg: '/style-samples/delivery-lg.webp' },
+  { id: 'casual', label: '일상', desc: '식탁 위 자연스러운 한 끼', thumb: '/style-samples/casual.webp', lg: '/style-samples/casual-lg.webp' },
+  { id: 'premium', label: '프리미엄', desc: '고급 레스토랑 플레이팅', thumb: '/style-samples/premium.webp', lg: '/style-samples/premium-lg.webp' },
 ];
 
 const FOOD_PRESETS = [
@@ -768,16 +768,16 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                               style === s.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'
                             }`}>{s.label}</div>
                           </button>
-                          {/* 호버 확대 프리뷰 */}
-                          <div className="hidden group-hover:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none">
-                            <div className="bg-white rounded-2xl shadow-2xl ring-1 ring-black/10 overflow-hidden">
-                              <img src={s.thumb} alt={s.label} className="w-52 h-52 object-cover" />
-                              <div className="px-3 py-2 text-center">
-                                <div className="text-xs font-bold text-slate-700">{s.label}</div>
-                                <div className="text-[10px] text-slate-400">{s.desc}</div>
+                          {/* 호버 확대 프리뷰 - 512×512 원본 이미지 */}
+                          <div className="hidden group-hover:block fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
+                            <div className="absolute inset-0 bg-black/40" />
+                            <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
+                              <img src={s.lg} alt={s.label} className="w-80 h-80 object-cover" />
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                <div className="text-sm font-bold text-white">{s.label}</div>
+                                <div className="text-xs text-white/80">{s.desc}</div>
                               </div>
                             </div>
-                            <div className="w-3 h-3 bg-white ring-1 ring-black/10 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2" />
                           </div>
                         </div>
                       ))}
