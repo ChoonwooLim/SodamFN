@@ -110,6 +110,26 @@ app.include_router(delivery_images.router)
 from routers import worklog
 app.include_router(worklog.router, prefix="/api/superadmin")
 
+@app.get("/api/media/{path:path}")
+async def serve_media(path: str):
+    """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""
+    media_url = os.getenv("MEDIA_SERVER_URL", "")
+    if not media_url:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"detail": "Media server not configured"})
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.get(f"{media_url}/files/{path}")
+        if resp.status_code != 200:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=resp.status_code, content={"detail": "File not found"})
+    from fastapi.responses import Response
+    return Response(
+        content=resp.content,
+        media_type=resp.headers.get("content-type", "application/octet-stream"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 @app.get("/")
 def read_root():
     return {"message": "SodamFN Backend is running"}

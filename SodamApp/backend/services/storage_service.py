@@ -102,7 +102,7 @@ class StorageService:
         if self.use_r2:
             return f"{self.public_url}/{key}"
         elif self.use_media_server:
-            return f"{self.media_server_url}/files/uploads/{key}"
+            return f"/api/media/uploads/{key}"
         else:
             return f"/uploads/{key}"
     
@@ -139,7 +139,7 @@ class StorageService:
             if response.status_code != 200:
                 raise Exception(f"Media server upload failed: {response.text[:200]}")
 
-        url = f"{self.media_server_url}/files/{storage_path}"
+        url = f"/api/media/{storage_path}"
         logger.info(f"Media server upload: {key} -> {url}")
         return url
 

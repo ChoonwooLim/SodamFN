@@ -328,24 +328,19 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     if (!generatedImage || saved) return;
     setSaving(true);
     try {
-      // 생성된 이미지를 DB에 저장
-      const payload = {
-        prompt,
-        name: name || prompt.slice(0, 20),
-        category,
-        style,
-        upscale,
-        width: 512,
-        height: 512,
-        steps: 4,
-      };
-      if (seed) payload.seed = parseInt(seed, 10);
-      if (negativePrompt.trim()) payload.negative_prompt = negativePrompt;
-      if (referenceDesc.trim()) payload.reference_description = referenceDesc;
+      // 이미 생성된 이미지 blob을 바로 업로드 (재생성 없이)
+      const res = await fetch(generatedImage);
+      const blob = await res.blob();
+      const file = new File([blob], `ai_${Date.now()}.png`, { type: 'image/png' });
 
-      await axios.post(`${API_URL}/api/delivery-images/ai-generate`, payload, {
-        headers: getAuthHeaders(),
-        timeout: 200000,
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('name', name || prompt.slice(0, 20));
+      formData.append('category', category);
+
+      await axios.post(`${API_URL}/api/delivery-images/upload`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        timeout: 30000,
       });
 
       setSaved(true);

@@ -53,8 +53,7 @@ const PLATFORMS = [
 ];
 
 const CATEGORIES = ['전체', '김밥류', '분식류', '주먹밥류', '음료류'];
-const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || '';
-const IMG_BASE = MEDIA_URL ? `${MEDIA_URL}/files/products/` : '/recipes/products/';
+const IMG_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/media/products/`;
 
 function getAuthHeaders() {
   const token = localStorage.getItem('token');
@@ -128,10 +127,17 @@ export default function DeliveryImages() {
       ...img,
       image_url: IMG_BASE + img.file,
     })),
-    ...dbImages.map(img => ({
-      ...img,
-      image_url: img.image_url?.startsWith('http') ? img.image_url : `${API_URL}${img.image_url}`,
-    })),
+    ...dbImages.map(img => {
+      let url = img.image_url || '';
+      // 기존 미디어 서버 direct URL → 백엔드 프록시로 변환
+      const mediaMatch = url.match(/^https?:\/\/[^/]+\/files\/(.+)$/);
+      if (mediaMatch) {
+        url = `${API_URL}/api/media/${mediaMatch[1]}`;
+      } else if (!url.startsWith('http')) {
+        url = `${API_URL}${url}`;
+      }
+      return { ...img, image_url: url };
+    }),
   ];
 
   /* ── 필터링 ── */
