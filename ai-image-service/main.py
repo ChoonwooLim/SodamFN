@@ -37,6 +37,8 @@ upscale_lock = threading.Lock()
 def load_pipeline():
     """Flux.1-schnell 파이프라인 로드 (t2i + i2i)"""
     global pipe, img2img_pipe
+    import os
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
     from diffusers import FluxPipeline, FluxImg2ImgPipeline
 
     gpu_count = torch.cuda.device_count()
