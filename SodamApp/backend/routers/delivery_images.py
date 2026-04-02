@@ -148,12 +148,85 @@ class AIGenerateRequest(BaseModel):
     category: str = "김밥류"
     style: str = "natural"  # natural, studio, minimal
     provider: str = "replicate"  # replicate, openai
+    upscale: int = 4           # 1, 2, 4
+    width: int = 512
+    height: int = 512
+    steps: int = 4
+    seed: Optional[int] = None
+    negative_prompt: Optional[str] = None
+    reference_description: Optional[str] = None  # Text description of reference image
 
 STYLE_SUFFIXES = {
     "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
     "studio": "studio food photography, dramatic lighting, dark background, professional plating, high-end restaurant quality, shallow depth of field",
     "minimal": "minimal flat lay food photography, bright clean background, modern styling, negative space, Instagram-worthy composition",
 }
+
+# ── 한국어 음식명 → 영어 설명 사전 (Flux.1-schnell 정확도 향상) ──
+FOOD_TRANSLATIONS = {
+    # 김밥류
+    "김밥": "Korean gimbap (kimbap) sushi roll wrapped in seaweed with rice and fillings, sliced to show cross-section",
+    "참치김밥": "Korean tuna gimbap roll with tuna mayo, rice, and vegetables wrapped in seaweed, sliced cross-section view",
+    "불고기김밥": "Korean bulgogi beef gimbap roll with marinated beef, rice, and vegetables in seaweed wrap",
+    "치즈김밥": "Korean cheese gimbap roll with melted cheese, rice, and vegetables in seaweed wrap",
+    "소담김밥": "Korean premium gimbap roll with assorted fillings, rice, and vegetables in seaweed",
+    "꼬마김밥": "Korean mini gimbap (kkoma gimbap) bite-sized rolls, cute small seaweed rice rolls",
+    "스팸김밥": "Korean spam gimbap roll with grilled spam, rice, and vegetables in seaweed",
+    "야채김밥": "Korean vegetable gimbap roll with various fresh vegetables, rice, in seaweed wrap",
+    "당근라페김밥": "Korean carrot rapé gimbap with shredded carrot, rice in seaweed wrap",
+    "멸치김밥": "Korean anchovy gimbap roll with stir-fried anchovies, rice in seaweed",
+    # 분식류
+    "떡볶이": "Korean tteokbokki, spicy stir-fried rice cakes in red gochujang sauce",
+    "치즈떡볶이": "Korean cheese tteokbokki, spicy rice cakes topped with melted mozzarella cheese",
+    "라면": "Korean ramyeon instant noodle soup with egg and green onions in spicy broth",
+    "치즈라면": "Korean cheese ramyeon, instant noodle soup topped with melted cheese slice, yellow cheese melting on spicy noodle soup",
+    "라볶이": "Korean rabokki, spicy rice cakes with ramen noodles in gochujang sauce",
+    "순대": "Korean sundae (blood sausage), sliced to show glass noodle filling, served with salt",
+    "어묵": "Korean fish cake (eomuk) skewers in warm broth",
+    "튀김": "Korean fried snacks (twigim), assorted tempura-style fried vegetables and seafood",
+    "유부초밥": "Korean inari sushi (yubu chobap), seasoned fried tofu pouches stuffed with rice",
+    "삶은계란": "Korean boiled eggs, halved to show yolk, simple side dish",
+    # 주먹밥류
+    "주먹밥": "Korean rice ball (jumeokbap), triangle or round shaped onigiri-style rice ball",
+    "스팸주먹밥": "Korean spam rice ball with grilled spam inside, wrapped in seaweed",
+    "불고기주먹밥": "Korean bulgogi rice ball with marinated beef, triangle shaped",
+    "참치주먹밥": "Korean tuna mayo rice ball, triangle shaped wrapped in seaweed",
+    # 음료류
+    "생수": "bottled water, clear plastic water bottle",
+    "콜라": "Coca-Cola can or glass with ice",
+    "사이다": "Korean Chilsung Cider, clear lemon-lime soda",
+    "커피": "iced Americano coffee in clear cup",
+    # 세트메뉴
+    "소담세트": "Korean meal set with gimbap rolls, tteokbokki, and sundae on tray",
+}
+
+
+def _translate_prompt(korean_prompt: str) -> str:
+    """한국어 프롬프트를 영어로 변환하여 Flux 모델 정확도 향상"""
+    prompt = korean_prompt.strip()
+
+    # 1. Check exact match first
+    if prompt in FOOD_TRANSLATIONS:
+        return FOOD_TRANSLATIONS[prompt]
+
+    # 2. Check if any food name is contained in the prompt
+    translated_parts = []
+    remaining = prompt
+    for kr_name, en_desc in sorted(FOOD_TRANSLATIONS.items(), key=lambda x: len(x[0]), reverse=True):
+        if kr_name in remaining:
+            translated_parts.append(en_desc)
+            remaining = remaining.replace(kr_name, "", 1)
+
+    if translated_parts:
+        # Combine translations with any remaining Korean context hints
+        result = ", ".join(translated_parts)
+        remaining = remaining.strip().strip(",").strip()
+        if remaining:
+            result += f", ({remaining})"
+        return result
+
+    # 3. No match - add generic Korean food context
+    return f"Korean food dish: {prompt}, appetizing Korean cuisine"
 
 
 def _get_ai_provider():
@@ -170,21 +243,25 @@ def _get_ai_provider():
     return None, None
 
 
-async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural", upscale: int = 4) -> bytes:
+async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural", upscale: int = 4, width: int = 512, height: int = 512, steps: int = 4, seed: Optional[int] = None) -> bytes:
     """셀프호스팅 GPU 서버로 이미지 생성 (Flux.1-schnell + Real-ESRGAN 업스케일, 무료)"""
     import httpx
+
+    payload = {
+        "prompt": full_prompt,
+        "style": style,
+        "width": width,
+        "height": height,
+        "steps": steps,
+        "upscale": upscale,
+    }
+    if seed is not None:
+        payload["seed"] = seed
 
     async with httpx.AsyncClient(timeout=180.0) as client:
         response = await client.post(
             f"{server_url}/generate",
-            json={
-                "prompt": full_prompt,
-                "style": style,
-                "width": 512,
-                "height": 512,
-                "steps": 4,
-                "upscale": upscale,
-            },
+            json=payload,
         )
         if response.status_code != 200:
             raise Exception(f"GPU 서버 오류: {response.status_code} {response.text[:200]}")
@@ -276,8 +353,13 @@ async def ai_generate_image(
             detail="AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.",
         )
 
+    translated = _translate_prompt(req.prompt)
     style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
-    full_prompt = f"{req.prompt}. {style_suffix}"
+    full_prompt = f"{translated}. {style_suffix}"
+    if req.reference_description:
+        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
+    if req.negative_prompt:
+        full_prompt += f". Avoid: {req.negative_prompt}"
 
     try:
         from io import BytesIO
@@ -285,7 +367,11 @@ async def ai_generate_image(
         # 프로바이더별 이미지 생성
         if provider == "self-hosted":
             # GPU 서버에서 직접 PNG 바이너리 수신
-            image_bytes = await _generate_with_selfhosted(full_prompt, api_key, req.style)
+            image_bytes = await _generate_with_selfhosted(
+                full_prompt, api_key, req.style,
+                upscale=req.upscale, width=req.width, height=req.height,
+                steps=req.steps, seed=req.seed
+            )
             storage = get_storage()
             timestamp = int(datetime.now().timestamp() * 1000)
             storage_key = f"delivery_images/ai_{timestamp}.png"
@@ -341,6 +427,83 @@ async def ai_generate_image(
     except Exception as e:
         logger.error(f"AI image generation error ({provider}): {e}")
         raise HTTPException(status_code=500, detail=f"AI 이미지 생성 실패: {str(e)}")
+
+
+# ── AI 이미지 미리보기 (DB 저장 없이) ──
+@router.post("/ai-preview")
+async def ai_preview_image(
+    req: AIGenerateRequest,
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """AI 이미지 미리보기 (DB 저장 없이 이미지만 반환)"""
+    provider, api_key = _get_ai_provider()
+    if not provider:
+        raise HTTPException(status_code=503, detail="AI API 키가 설정되지 않았습니다.")
+
+    translated = _translate_prompt(req.prompt)
+    style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
+    full_prompt = f"{translated}. {style_suffix}"
+    if req.reference_description:
+        full_prompt = f"{translated}, similar style to: {req.reference_description}. {style_suffix}"
+    if req.negative_prompt:
+        full_prompt += f". Avoid: {req.negative_prompt}"
+
+    try:
+        if provider == "self-hosted":
+            image_bytes = await _generate_with_selfhosted(
+                full_prompt, api_key, req.style,
+                upscale=req.upscale, width=req.width, height=req.height,
+                steps=req.steps, seed=req.seed
+            )
+            from fastapi.responses import Response
+            return Response(content=image_bytes, media_type="image/png")
+        else:
+            # For cloud providers, generate and return the URL
+            if provider == "replicate":
+                url = await _generate_with_replicate(full_prompt, api_key)
+            else:
+                url = await _generate_with_openai(full_prompt, api_key)
+            return {"status": "success", "image_url": url, "provider": provider}
+    except Exception as e:
+        logger.error(f"AI preview error ({provider}): {e}")
+        raise HTTPException(status_code=500, detail=f"AI 이미지 생성 실패: {str(e)}")
+
+
+# ── 이미지 업스케일 (GPU 서버 프록시) ──
+@router.post("/upscale")
+async def upscale_image(
+    file: UploadFile = File(...),
+    scale: int = Form(4),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """이미지 업스케일 (GPU 서버 프록시)"""
+    gpu_url = os.getenv("AI_GPU_SERVER_URL")
+    if not gpu_url:
+        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+
+    import httpx
+    file_bytes = await file.read()
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{gpu_url}/upscale",
+            files={"file": (file.filename or "image.png", file_bytes, file.content_type or "image/png")},
+            data={"scale": min(max(scale, 2), 4)},
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"업스케일 실패: {response.text[:200]}")
+
+    from fastapi.responses import Response
+    return Response(
+        content=response.content,
+        media_type="image/png",
+        headers={
+            "X-Original-Size": response.headers.get("X-Original-Size", ""),
+            "X-Output-Size": response.headers.get("X-Output-Size", ""),
+            "X-Scale": response.headers.get("X-Scale", ""),
+            "X-Upscale-Time": response.headers.get("X-Upscale-Time", ""),
+        }
+    )
 
 
 # ── AI 설정 상태 확인 ──

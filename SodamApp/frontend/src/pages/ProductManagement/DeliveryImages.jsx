@@ -5,6 +5,7 @@ import {
   Image as ImageIcon, ChevronDown
 } from 'lucide-react';
 import axios from 'axios';
+import AIImageStudio from './components/AIImageStudio';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -74,21 +75,16 @@ export default function DeliveryImages() {
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiProvider, setAiProvider] = useState('');
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
+  const [showAIStudio, setShowAIStudio] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
 
   // 업로드 폼
   const [uploadName, setUploadName] = useState('');
   const [uploadCategory, setUploadCategory] = useState('김밥류');
   const [uploadFiles, setUploadFiles] = useState([]);
 
-  // AI 생성 폼
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiName, setAiName] = useState('');
-  const [aiCategory, setAiCategory] = useState('김밥류');
-  const [aiStyle, setAiStyle] = useState('natural');
+  // AI 생성 (Studio에서 처리)
 
   /* ── API에서 이미지 로드 ── */
   const loadImages = useCallback(async () => {
@@ -274,28 +270,9 @@ export default function DeliveryImages() {
     setDeleting(false);
   };
 
-  /* ── AI 이미지 생성 ── */
-  const handleAIGenerate = async () => {
-    if (!aiPrompt.trim() || !aiName.trim()) return;
-    setAiGenerating(true);
-    try {
-      const res = await axios.post(`${API_URL}/api/delivery-images/ai-generate`, {
-        prompt: aiPrompt,
-        name: aiName,
-        category: aiCategory,
-        style: aiStyle,
-      }, { headers: getAuthHeaders() });
-
-      if (res.data?.data) {
-        await loadImages();
-        setShowAIModal(false);
-        setAiPrompt('');
-        setAiName('');
-      }
-    } catch (err) {
-      alert(err.response?.data?.detail || 'AI 이미지 생성 실패');
-    }
-    setAiGenerating(false);
+  /* ── AI Studio에서 저장 시 새로고침 ── */
+  const handleAIStudioSave = () => {
+    loadImages();
   };
 
   const currentPlatform = PLATFORMS.find(p => p.id === platform);
@@ -332,7 +309,7 @@ export default function DeliveryImages() {
                 alert('AI API 키가 설정되지 않았습니다.\n백엔드 .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.');
                 return;
               }
-              setShowAIModal(true);
+              setShowAIStudio(true);
             }}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold transition-all ${
               aiEnabled
@@ -341,7 +318,7 @@ export default function DeliveryImages() {
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            AI 이미지 생성
+            AI 이미지 스튜디오
             {!aiEnabled && <span className="text-[10px] ml-1 opacity-70">(API 키 필요)</span>}
           </button>
         </div>
@@ -696,109 +673,14 @@ export default function DeliveryImages() {
       )}
 
       {/* ══════════════════════════════════════════════
-         AI 이미지 생성 모달
+         AI 이미지 스튜디오 (전문 도구)
          ══════════════════════════════════════════════ */}
-      {showAIModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => !aiGenerating && setShowAIModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="p-6 border-b border-slate-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-violet-500" />
-                  AI 이미지 생성
-                </h3>
-                <button onClick={() => !aiGenerating && setShowAIModal(false)} className="p-1 rounded-lg hover:bg-slate-100">
-                  <X className="w-5 h-5 text-slate-400" />
-                </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {aiProvider ? `${aiProvider} 기반` : 'AI'} 고품질 상품 이미지 생성
-              </p>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {/* 프롬프트 */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">이미지 설명 (프롬프트)</label>
-                <textarea
-                  value={aiPrompt}
-                  onChange={e => setAiPrompt(e.target.value)}
-                  placeholder="예: 신선한 야채와 불고기가 가득 든 김밥, 깔끔하게 잘린 단면이 보이도록"
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 resize-none"
-                />
-              </div>
-
-              {/* 상품명 */}
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">저장할 상품명</label>
-                <input
-                  type="text"
-                  value={aiName}
-                  onChange={e => setAiName(e.target.value)}
-                  placeholder="예: 불고기김밥 (AI)"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {/* 카테고리 */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">카테고리</label>
-                  <select
-                    value={aiCategory}
-                    onChange={e => setAiCategory(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 bg-white"
-                  >
-                    {CATEGORIES.filter(c => c !== '전체').map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 스타일 */}
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">촬영 스타일</label>
-                  <select
-                    value={aiStyle}
-                    onChange={e => setAiStyle(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 bg-white"
-                  >
-                    <option value="natural">자연광 스타일</option>
-                    <option value="studio">스튜디오 스타일</option>
-                    <option value="minimal">미니멀 플랫레이</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* 안내 */}
-              <div className="bg-violet-50 rounded-xl p-3">
-                <p className="text-xs text-violet-700 font-medium leading-relaxed">
-                  AI가 설명에 맞는 1024×1024 이미지를 생성합니다.
-                  생성에 10~30초 정도 소요됩니다. 생성된 이미지는 자동으로 저장됩니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowAIModal(false)}
-                disabled={aiGenerating}
-                className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleAIGenerate}
-                disabled={aiGenerating || !aiPrompt.trim() || !aiName.trim()}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all disabled:opacity-50"
-              >
-                {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {aiGenerating ? 'AI 생성 중...' : 'AI 이미지 생성'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {showAIStudio && (
+        <AIImageStudio
+          onClose={() => setShowAIStudio(false)}
+          onSave={handleAIStudioSave}
+          aiProvider={aiProvider}
+        />
       )}
 
       {/* ── 이미지 미리보기 모달 ── */}
