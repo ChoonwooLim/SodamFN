@@ -360,11 +360,11 @@ async def upscale_image(
 async def remove_background(
     file: UploadFile = File(...),
 ):
-    """이미지 배경 제거 (rembg / u2net)"""
+    """이미지 배경 제거 (rembg / u2net, CPU 전용)"""
     try:
-        from rembg import remove
+        from rembg import remove, new_session
     except ImportError:
-        raise HTTPException(status_code=503, detail="rembg not installed. Run: pip install rembg[gpu]")
+        raise HTTPException(status_code=503, detail="rembg not installed. Run: pip install rembg")
 
     content = await file.read()
     pil_image = Image.open(io.BytesIO(content)).convert("RGBA")
@@ -372,7 +372,9 @@ async def remove_background(
     logger.info(f"Removing background: {pil_image.size[0]}x{pil_image.size[1]}")
     start = time.time()
 
-    result = remove(pil_image)
+    # CPU 세션 사용 (GPU는 Flux가 점유)
+    session = new_session("u2net", providers=["CPUExecutionProvider"])
+    result = remove(pil_image, session=session)
 
     elapsed = time.time() - start
     logger.info(f"Background removed in {elapsed:.1f}s")
