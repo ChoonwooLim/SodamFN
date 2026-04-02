@@ -1,6 +1,7 @@
 """
 소담김밥 AI 이미지 생성 서비스
 - Flux.1-schnell (최고 품질 오픈소스 모델)
+- Text-to-Image + Image-to-Image 지원
 - Real-ESRGAN 4x 업스케일러 (512→2048)
 - GTX 1080 — sequential CPU offload
 - FastAPI REST API
@@ -27,15 +28,16 @@ MODEL_ID = "black-forest-labs/FLUX.1-schnell"
 UPSCALE_GPU = 1  # 업스케일은 cuda:1 사용 (Flux가 cuda:0 사용)
 
 pipe = None
+img2img_pipe = None
 upscaler = None
 gen_lock = threading.Lock()
 upscale_lock = threading.Lock()
 
 
 def load_pipeline():
-    """Flux.1-schnell 파이프라인 로드"""
-    global pipe
-    from diffusers import FluxPipeline
+    """Flux.1-schnell 파이프라인 로드 (t2i + i2i)"""
+    global pipe, img2img_pipe
+    from diffusers import FluxPipeline, FluxImg2ImgPipeline
 
     gpu_count = torch.cuda.device_count()
     for i in range(gpu_count):
@@ -50,12 +52,14 @@ def load_pipeline():
         MODEL_ID,
         torch_dtype=torch.float16,
     )
-    # model_cpu_offload: 서브모델 단위로 GPU 이동 (sequential보다 빠름)
-    # sequential은 레이어 하나씩 이동하여 느리고, model은 서브모델 통째로 이동
     pipe.enable_model_cpu_offload(gpu_id=0)
 
+    # i2i 파이프라인: 동일 모델 가중치 공유 (추가 VRAM 없음)
+    img2img_pipe = FluxImg2ImgPipeline(**pipe.components)
+    img2img_pipe.enable_model_cpu_offload(gpu_id=0)
+
     elapsed = time.time() - start
-    logger.info(f"Pipeline loaded in {elapsed:.1f}s")
+    logger.info(f"Pipeline loaded in {elapsed:.1f}s (t2i + i2i)")
 
     logger.info("Warming up...")
     try:
@@ -213,6 +217,97 @@ def generate_image(req: GenerateRequest):
     )
 
 
+# ── Image-to-Image 엔드포인트 ──
+@app.post("/img2img")
+async def img2img(
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    strength: float = Form(0.75),
+    steps: int = Form(4),
+    seed: Optional[int] = Form(None),
+    upscale: int = Form(1),
+    style: str = Form(""),
+):
+    """이미지 + 프롬프트로 새 이미지 생성 (Image-to-Image)"""
+    if img2img_pipe is None:
+        raise HTTPException(status_code=503, detail="Model not loaded yet")
+
+    if gen_lock.locked():
+        raise HTTPException(status_code=429, detail="Another generation in progress, try again shortly")
+
+    # 프롬프트에 스타일 접미사 추가
+    full_prompt = prompt
+    if style and style in STYLE_SUFFIXES:
+        full_prompt = f"{prompt}. {STYLE_SUFFIXES[style]}"
+
+    # 입력 이미지 로드 및 크기 조정
+    content = await file.read()
+    init_image = Image.open(io.BytesIO(content)).convert("RGB")
+
+    # 최대 768x768로 제한, 8의 배수로 맞춤
+    w, h = init_image.size
+    max_dim = 768
+    if w > max_dim or h > max_dim:
+        ratio = min(max_dim / w, max_dim / h)
+        w, h = int(w * ratio), int(h * ratio)
+    w = (w // 8) * 8
+    h = (h // 8) * 8
+    init_image = init_image.resize((w, h), Image.LANCZOS)
+
+    seed_val = seed or int(time.time() * 1000) % (2**32)
+    generator = torch.Generator(device="cpu").manual_seed(seed_val)
+    strength = min(max(strength, 0.1), 1.0)
+    upscale = min(max(upscale, 1), 4)
+
+    logger.info(f"Img2Img: {prompt[:50]}... ({w}x{h}, strength={strength}, {steps} steps, upscale={upscale}x)")
+    start = time.time()
+
+    with gen_lock:
+        with torch.no_grad():
+            result = img2img_pipe(
+                full_prompt,
+                image=init_image,
+                strength=strength,
+                num_inference_steps=steps,
+                guidance_scale=0.0,
+                max_sequence_length=256,
+                generator=generator,
+            )
+
+    gen_time = time.time() - start
+    image = result.images[0]
+
+    # 업스케일
+    if upscale > 1:
+        logger.info(f"Upscaling {upscale}x...")
+        up_start = time.time()
+        image = _upscale_image(image, upscale)
+        up_time = time.time() - up_start
+        logger.info(f"Upscaled to {image.size[0]}x{image.size[1]} in {up_time:.1f}s")
+
+    total_time = time.time() - start
+    logger.info(f"Img2Img total: {total_time:.1f}s (gen={gen_time:.1f}s)")
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "X-Generation-Time": f"{gen_time:.2f}",
+            "X-Total-Time": f"{total_time:.2f}",
+            "X-Seed": str(seed_val),
+            "X-Width": str(image.size[0]),
+            "X-Height": str(image.size[1]),
+            "X-Upscale": str(upscale),
+            "X-Strength": str(strength),
+            "X-Model": "flux.1-schnell-img2img",
+        },
+    )
+
+
 # ── 단독 업스케일 엔드포인트 (기존 이미지 업스케일) ──
 @app.post("/upscale")
 async def upscale_image(
@@ -280,6 +375,7 @@ def health():
     return {
         "status": "ok" if pipe is not None else "loading",
         "model": "Flux.1-schnell",
+        "img2img": "ready" if img2img_pipe is not None else "not loaded",
         "upscaler": "Real-ESRGAN x4" if upscaler is not None else "not loaded",
         "mode": "sequential-cpu-offload",
         "gpu_count": torch.cuda.device_count(),
@@ -294,7 +390,7 @@ def root():
     return {
         "service": "Sodam AI Image Service",
         "model": "Flux.1-schnell + Real-ESRGAN",
-        "features": ["generate", "upscale", "generate+upscale"],
+        "features": ["generate", "img2img", "upscale", "generate+upscale"],
     }
 
 

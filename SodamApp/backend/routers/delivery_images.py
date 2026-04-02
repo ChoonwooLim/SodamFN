@@ -515,6 +515,58 @@ async def upscale_image(
     )
 
 
+# ── Image-to-Image 생성 (GPU 서버 프록시) ──
+@router.post("/img2img")
+async def img2img_generate(
+    file: UploadFile = File(...),
+    prompt: str = Form(...),
+    strength: float = Form(0.75),
+    steps: int = Form(4),
+    seed: Optional[int] = Form(None),
+    style: str = Form(""),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """이미지 + 프롬프트로 새 이미지 생성 (Image-to-Image)"""
+    gpu_url = os.getenv("AI_GPU_SERVER_URL")
+    if not gpu_url:
+        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+
+    import httpx
+    file_bytes = await file.read()
+
+    form_data = {
+        "prompt": prompt,
+        "strength": str(min(max(strength, 0.1), 1.0)),
+        "steps": str(steps),
+        "style": style,
+        "upscale": "1",
+    }
+    if seed is not None:
+        form_data["seed"] = str(seed)
+
+    async with httpx.AsyncClient(timeout=180.0) as client:
+        response = await client.post(
+            f"{gpu_url}/img2img",
+            files={"file": (file.filename or "image.png", file_bytes, file.content_type or "image/png")},
+            data=form_data,
+        )
+        if response.status_code == 429:
+            raise HTTPException(status_code=429, detail="GPU 서버가 다른 작업 중입니다. 잠시 후 다시 시도해주세요.")
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"Img2Img 생성 실패: {response.text[:200]}")
+
+    from fastapi.responses import Response
+    return Response(
+        content=response.content,
+        media_type="image/png",
+        headers={
+            "X-Generation-Time": response.headers.get("X-Generation-Time", ""),
+            "X-Seed": response.headers.get("X-Seed", ""),
+            "X-Strength": response.headers.get("X-Strength", ""),
+        },
+    )
+
+
 # ── AI 설정 상태 확인 ──
 @router.get("/ai-status")
 def ai_status(_admin: AuthUser = Depends(get_admin_user)):
