@@ -178,20 +178,42 @@ function getAuthHeaders() {
 const CATEGORIES = ['김밥류', '분식류', '주먹밥류', '음료류'];
 
 const STYLE_OPTIONS = [
-  { id: 'natural', label: '자연광', desc: '밝고 따뜻한 자연광 촬영', icon: '☀️' },
-  { id: 'studio', label: '스튜디오', desc: '다크 배경 + 드라마틱 조명', icon: '📸' },
-  { id: 'minimal', label: '미니멀', desc: '깔끔한 플랫레이 스타일', icon: '✨' },
+  { id: 'natural', label: '자연광', desc: '창가 자연광, 따뜻한 톤', icon: '☀️' },
+  { id: 'studio', label: '스튜디오', desc: '다크 배경, 드라마틱 조명', icon: '📸' },
+  { id: 'minimal', label: '미니멀', desc: '흰 배경, 깔끔한 플랫레이', icon: '✨' },
+  { id: 'overhead', label: '탑뷰', desc: '위에서 내려다본 구도', icon: '🔽' },
+  { id: 'angle45', label: '45도', desc: '45도 각도, 입체감 강조', icon: '📐' },
+  { id: 'closeup', label: '클로즈업', desc: '음식 질감 극대화 접사', icon: '🔍' },
+  { id: 'steam', label: '김이모락', desc: '따끈한 김, 갓 조리된 느낌', icon: '♨️' },
+  { id: 'delivery', label: '배달앱', desc: '배달앱 메뉴 사진 스타일', icon: '🛵' },
+  { id: 'casual', label: '일상', desc: '식탁 위 자연스러운 한 끼', icon: '🍽️' },
+  { id: 'premium', label: '프리미엄', desc: '고급 레스토랑 플레이팅', icon: '👨‍🍳' },
 ];
 
 const FOOD_PRESETS = [
-  { label: '김밥 단면', prompt: '김밥' },
-  { label: '떡볶이', prompt: '떡볶이' },
-  { label: '라면', prompt: '라면' },
-  { label: '치즈라면', prompt: '치즈라면' },
-  { label: '순대', prompt: '순대' },
-  { label: '주먹밥', prompt: '주먹밥' },
-  { label: '어묵', prompt: '어묵' },
-  { label: '유부초밥', prompt: '유부초밥' },
+  // 김밥류
+  { label: '김밥 단면', prompt: '김밥', cat: '김밥류' },
+  { label: '참치김밥', prompt: '참치김밥', cat: '김밥류' },
+  { label: '치즈김밥', prompt: '치즈김밥', cat: '김밥류' },
+  { label: '꼬마김밥', prompt: '꼬마김밥', cat: '김밥류' },
+  // 분식류
+  { label: '떡볶이', prompt: '떡볶이', cat: '분식류' },
+  { label: '치즈떡볶이', prompt: '치즈떡볶이', cat: '분식류' },
+  { label: '순대', prompt: '순대', cat: '분식류' },
+  { label: '어묵', prompt: '어묵', cat: '분식류' },
+  { label: '라면', prompt: '라면', cat: '분식류' },
+  { label: '치즈라면', prompt: '치즈라면', cat: '분식류' },
+  { label: '라볶이', prompt: '라볶이', cat: '분식류' },
+  { label: '튀김', prompt: '튀김', cat: '분식류' },
+  // 주먹밥류
+  { label: '주먹밥', prompt: '주먹밥', cat: '주먹밥류' },
+  { label: '스팸주먹밥', prompt: '스팸주먹밥', cat: '주먹밥류' },
+  // 음료류
+  { label: '아이스커피', prompt: '커피', cat: '음료류' },
+  // 세트
+  { label: '소담세트', prompt: '소담세트', cat: '분식류' },
+  { label: '유부초밥', prompt: '유부초밥', cat: '분식류' },
+  { label: '삶은계란', prompt: '삶은계란', cat: '분식류' },
 ];
 
 const UPSCALE_OPTIONS = [
@@ -621,7 +643,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">빠른 선택</label>
                     <div className="flex flex-wrap gap-1.5">
-                      {FOOD_PRESETS.map(p => (
+                      {FOOD_PRESETS.filter(p => !p.cat || p.cat === category).map(p => (
                         <button
                           key={p.label}
                           onClick={() => { setPrompt(p.prompt); if (!name) setName(p.label); }}
@@ -730,22 +752,24 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                   {/* 스타일 */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">촬영 스타일</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-5 gap-1.5">
                       {STYLE_OPTIONS.map(s => (
                         <button
                           key={s.id}
                           onClick={() => setStyle(s.id)}
-                          className={`p-2.5 rounded-xl text-center transition-all ${
+                          title={s.desc}
+                          className={`p-2 rounded-xl text-center transition-all ${
                             style === s.id
                               ? 'bg-violet-100 ring-2 ring-violet-400 text-violet-700'
                               : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-200'
                           }`}
                         >
-                          <div className="text-lg mb-0.5">{s.icon}</div>
-                          <div className="text-xs font-bold">{s.label}</div>
+                          <div className="text-base mb-0.5">{s.icon}</div>
+                          <div className="text-[10px] font-bold leading-tight">{s.label}</div>
                         </button>
                       ))}
                     </div>
+                    <p className="text-[10px] text-slate-400 mt-1">{STYLE_OPTIONS.find(s => s.id === style)?.desc}</p>
                   </div>
 
                   {/* 해상도 안내 */}

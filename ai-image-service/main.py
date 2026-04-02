@@ -115,9 +115,16 @@ app = FastAPI(title="Sodam AI Image Service (Flux + Upscaler)", lifespan=lifespa
 
 
 STYLE_SUFFIXES = {
-    "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
-    "studio": "studio food photography, dramatic lighting, dark background, professional plating, high-end restaurant quality, shallow depth of field",
-    "minimal": "minimal flat lay food photography, bright clean background, modern styling, negative space, Instagram-worthy composition",
+    "natural": "shot on Canon EOS R5, 50mm f/1.8, natural window light, warm color temperature, real food texture with visible grain and gloss, white ceramic plate on light wood table, soft shadows, editorial food photography",
+    "studio": "shot on Sony A7R IV, 85mm f/2.8, Profoto studio strobe with softbox, dark moody background, rim light highlighting steam and texture, shallow depth of field, Michelin-star plating, commercial food photography",
+    "minimal": "shot on Fujifilm X-T5, 35mm f/2, bright diffused daylight, pure white seamless background, flat lay overhead composition, clean negative space, real food texture, catalog product photography",
+    "overhead": "shot on Canon EOS R5, 24mm f/4, directly overhead bird-eye view, natural daylight, wooden table surface, multiple dishes arranged, real food texture, editorial spread layout",
+    "angle45": "shot on Sony A7 III, 50mm f/1.4, 45-degree angle, natural side light from window, bokeh background, real food texture with oil sheen and moisture, lifestyle food photography",
+    "closeup": "shot on Canon EOS R5, 100mm macro f/2.8, extreme close-up showing food texture detail, visible steam, oil droplets, sauce gloss, grain of rice, shallow depth of field, hyper-detailed food photography",
+    "steam": "shot on Sony A7R IV, 85mm f/2, backlit steam rising from hot food, warm tungsten lighting, dark cozy background, condensation on bowl, freshly cooked moment captured, atmospheric food photography",
+    "delivery": "clean product shot for delivery app menu, shot on iPhone 15 Pro, bright even lighting, white or light gray background, no shadows, centered composition, clear and appetizing, mobile-optimized food photography",
+    "casual": "shot on Fujifilm X100V, natural ambient light, casual dining table setting with chopsticks and side dishes, lived-in warm atmosphere, slightly messy authentic Korean meal scene, lifestyle photography",
+    "premium": "shot on Phase One IQ4, 80mm f/2.8, luxury restaurant plating on black slate plate, gold accent garnish, professional food styling with tweezers, dramatic chiaroscuro lighting, fine dining editorial photography",
 }
 
 
