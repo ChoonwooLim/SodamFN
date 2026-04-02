@@ -171,11 +171,11 @@ def _get_ai_provider():
     return None, None
 
 
-async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural") -> bytes:
-    """셀프호스팅 GPU 서버로 이미지 생성 (Flux.1-schnell, 무료)"""
+async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural", upscale: int = 4) -> bytes:
+    """셀프호스팅 GPU 서버로 이미지 생성 (Flux.1-schnell + Real-ESRGAN 업스케일, 무료)"""
     import httpx
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=180.0) as client:
         response = await client.post(
             f"{server_url}/generate",
             json={
@@ -184,6 +184,7 @@ async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: st
                 "width": 512,
                 "height": 512,
                 "steps": 4,
+                "upscale": upscale,
             },
         )
         if response.status_code != 200:
