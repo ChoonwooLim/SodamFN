@@ -237,6 +237,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [seed, setSeed] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [previewStyle, setPreviewStyle] = useState(null);
   const [referenceImg, setReferenceImg] = useState(null);
   const [referencePreview, setReferencePreview] = useState(null);
   const [referenceStrength, setReferenceStrength] = useState(0.75);
@@ -752,9 +753,9 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                   {/* 스타일 */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">촬영 스타일</label>
-                    <div className="grid grid-cols-5 gap-1.5 relative">
+                    <div className="grid grid-cols-5 gap-1.5">
                       {STYLE_OPTIONS.map(s => (
-                        <div key={s.id} className="relative group">
+                        <div key={s.id} className="relative">
                           <button
                             onClick={() => setStyle(s.id)}
                             className={`w-full rounded-xl overflow-hidden transition-all ${
@@ -768,21 +769,40 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                               style === s.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'
                             }`}>{s.label}</div>
                           </button>
-                          {/* 호버 확대 프리뷰 - 512×512 원본 이미지 */}
-                          <div className="hidden group-hover:block fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
-                            <div className="absolute inset-0 bg-black/40" />
-                            <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
-                              <img src={s.lg} alt={s.label} className="w-80 h-80 object-cover" />
-                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-                                <div className="text-sm font-bold text-white">{s.label}</div>
-                                <div className="text-xs text-white/80">{s.desc}</div>
-                              </div>
-                            </div>
-                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPreviewStyle(s); }}
+                            className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/40 text-white hover:bg-black/60 transition-all opacity-0 hover:opacity-100 group-hover:opacity-100"
+                            style={{ opacity: undefined }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                            onMouseLeave={e => e.currentTarget.style.opacity = 0}
+                          >
+                            <ZoomIn className="w-3 h-3" />
+                          </button>
                         </div>
                       ))}
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">{STYLE_OPTIONS.find(s => s.id === style)?.desc}</p>
+
+                    {/* 스타일 프리뷰 모달 */}
+                    {previewStyle && (
+                      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setPreviewStyle(null)}>
+                        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+                          <img src={previewStyle.lg} alt={previewStyle.label} className="w-full aspect-square object-cover" />
+                          <div className="p-4 flex items-center justify-between">
+                            <div>
+                              <div className="text-base font-bold text-slate-800">{previewStyle.label}</div>
+                              <div className="text-sm text-slate-500">{previewStyle.desc}</div>
+                            </div>
+                            <button
+                              onClick={() => { setStyle(previewStyle.id); setPreviewStyle(null); }}
+                              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all"
+                            >
+                              이 스타일 선택
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 해상도 안내 */}
