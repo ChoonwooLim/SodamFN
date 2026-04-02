@@ -281,7 +281,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         name: name || prompt.slice(0, 20),
         category,
         style,
-        upscale,
+        upscale: 1,  // 미리보기는 항상 원본 크기 (빠른 응답), 업스케일은 별도 탭
         width: 512,
         height: 512,
         steps: 4,
@@ -291,11 +291,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
       if (negativePrompt.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.negative_prompt = negativePrompt;
       if (referenceDesc.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.reference_description = referenceDesc;
 
-      // 미리보기 모드: 이미지만 생성 (DB 저장 안함)
+      // 미리보기 모드: 업스케일 없이 빠르게 생성 (DB 저장 안함)
       const res = await axios.post(`${API_URL}/api/delivery-images/ai-preview`, payload, {
         headers: getAuthHeaders(),
         responseType: 'blob',
-        timeout: 200000,
+        timeout: 60000,
       });
 
       let imageUrl;
@@ -725,25 +725,9 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     </div>
                   </div>
 
-                  {/* 업스케일 */}
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">출력 해상도</label>
-                    <div className="flex gap-2">
-                      {UPSCALE_OPTIONS.map(o => (
-                        <button
-                          key={o.value}
-                          onClick={() => setUpscale(o.value)}
-                          className={`flex-1 py-2.5 rounded-xl text-center transition-all ${
-                            upscale === o.value
-                              ? 'bg-violet-100 ring-2 ring-violet-400 text-violet-700'
-                              : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-200'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{o.label}</div>
-                          <div className="text-[10px] text-slate-400">{o.desc}</div>
-                        </button>
-                      ))}
-                    </div>
+                  {/* 해상도 안내 */}
+                  <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <p className="text-[11px] text-slate-500">미리보기: 512×512 (빠른 생성) · 고해상도가 필요하면 생성 후 <strong>업스케일 탭</strong>에서 확대</p>
                   </div>
 
                   {/* 스타일 참조 설명 */}
@@ -804,7 +788,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     {generating ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        생성 중... (약 60~75초)
+                        생성 중... (약 10~15초)
                       </>
                     ) : (
                       <>
@@ -826,7 +810,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       <Sparkles className="absolute inset-0 m-auto w-8 h-8 text-violet-400 animate-pulse" />
                     </div>
                     <p className="text-sm font-bold text-slate-600">AI가 이미지를 생성하고 있습니다</p>
-                    <p className="text-xs text-slate-400 mt-1">Flux.1-schnell + Real-ESRGAN 업스케일</p>
+                    <p className="text-xs text-slate-400 mt-1">Flux.1-schnell (512×512)</p>
                   </div>
                 ) : generatedImage ? (
                   <div className="space-y-4">
@@ -840,7 +824,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       <div className="p-4 flex items-center justify-between">
                         <div>
                           <p className="text-sm font-bold text-slate-800">{name || prompt.slice(0, 30)}</p>
-                          <p className="text-xs text-slate-400">{STYLE_OPTIONS.find(s => s.id === style)?.label} · {UPSCALE_OPTIONS.find(o => o.value === upscale)?.desc}</p>
+                          <p className="text-xs text-slate-400">{STYLE_OPTIONS.find(s => s.id === style)?.label} · 512×512</p>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -853,11 +837,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                           </button>
                           <button
                             onClick={() => sendToUpscale(generatedImage)}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
-                            title="업스케일로 보내기"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-violet-100 text-violet-700 hover:bg-violet-200 transition-all ring-1 ring-violet-300"
+                            title="고해상도로 확대"
                           >
                             <ArrowUpCircle className="w-3.5 h-3.5" />
-                            업스케일
+                            고해상도 확대
                           </button>
                           <button
                             onClick={handleDownloadGenerated}
