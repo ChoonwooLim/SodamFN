@@ -3,9 +3,171 @@ import {
   X, Sparkles, Loader2, Upload, Download, ZoomIn, ZoomOut,
   RotateCw, Sun, Contrast, Save, Wand2, ArrowUpCircle,
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
-  Trash2, Copy, Check, Sliders, Maximize2, Undo2
+  Trash2, Copy, Check, Sliders, Maximize2, Undo2,
+  Link, Clipboard
 } from 'lucide-react';
 import axios from 'axios';
+
+/* ══════════════════════════════════════════
+   ImageDropZone - 다목적 이미지 입력 컴포넌트
+   파일 선택 / 드래그&드롭 / 붙여넣기 / URL 로드
+   ══════════════════════════════════════════ */
+function ImageDropZone({ onImage, label, accept = 'image/*', className = '' }) {
+  const fileRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [urlMode, setUrlMode] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
+  const [loading, setLoading] = useState(false);
+  const zoneRef = useRef(null);
+
+  // 공통: File → { file, dataUrl } 콜백
+  const processFile = useCallback((file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => onImage({ file, dataUrl: ev.target.result });
+    reader.readAsDataURL(file);
+  }, [onImage]);
+
+  // 파일 선택
+  const handleFileChange = (e) => {
+    processFile(e.target.files?.[0]);
+    e.target.value = '';
+  };
+
+  // 드래그 & 드롭
+  const handleDragOver = (e) => { e.preventDefault(); setDragging(true); };
+  const handleDragLeave = (e) => { e.preventDefault(); setDragging(false); };
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
+  };
+
+  // 붙여넣기 (Ctrl+V)
+  useEffect(() => {
+    const zone = zoneRef.current;
+    if (!zone) return;
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          processFile(item.getAsFile());
+          return;
+        }
+      }
+    };
+    zone.addEventListener('paste', handlePaste);
+    return () => zone.removeEventListener('paste', handlePaste);
+  }, [processFile]);
+
+  // URL 로드
+  const handleUrlLoad = async () => {
+    const url = urlValue.trim();
+    if (!url) return;
+    setLoading(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      if (!blob.type.startsWith('image/')) throw new Error('not image');
+      const file = new File([blob], 'url-image.' + (blob.type.split('/')[1] || 'png'), { type: blob.type });
+      processFile(file);
+      setUrlValue('');
+      setUrlMode(false);
+    } catch {
+      // CORS 차단 시 프록시 시도
+      try {
+        const proxyUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/delivery-images/proxy-image?url=${encodeURIComponent(url)}`;
+        const res = await fetch(proxyUrl, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+        if (!res.ok) throw new Error();
+        const blob = await res.blob();
+        const file = new File([blob], 'url-image.png', { type: blob.type || 'image/png' });
+        processFile(file);
+        setUrlValue('');
+        setUrlMode(false);
+      } catch {
+        alert('이미지를 불러올 수 없습니다. URL을 확인해주세요.');
+      }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div
+      ref={zoneRef}
+      tabIndex={0}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative ${className}`}
+    >
+      <input ref={fileRef} type="file" accept={accept} className="hidden" onChange={handleFileChange} />
+
+      <div
+        onClick={() => !urlMode && fileRef.current?.click()}
+        className={`w-full rounded-xl border-2 border-dashed transition-all flex flex-col items-center gap-2 cursor-pointer ${
+          dragging
+            ? 'border-violet-400 bg-violet-50/50 scale-[1.01]'
+            : 'border-slate-300 hover:border-violet-300 hover:bg-violet-50/30'
+        } ${urlMode ? 'py-3 px-3' : 'py-5'}`}
+      >
+        {urlMode ? (
+          <div className="w-full flex gap-2" onClick={e => e.stopPropagation()}>
+            <input
+              type="text"
+              value={urlValue}
+              onChange={e => setUrlValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleUrlLoad()}
+              placeholder="https://example.com/image.jpg"
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/30 bg-white"
+              autoFocus
+            />
+            <button
+              onClick={handleUrlLoad}
+              disabled={loading || !urlValue.trim()}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-50 transition-all flex items-center gap-1"
+            >
+              {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              로드
+            </button>
+            <button
+              onClick={() => { setUrlMode(false); setUrlValue(''); }}
+              className="px-2 py-2 rounded-lg text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <>
+            <Upload className="w-5 h-5 text-slate-400" />
+            <span className="text-xs font-medium text-slate-500">{label || '이미지를 업로드하세요'}</span>
+            <div className="flex items-center gap-3 text-[10px] text-slate-400">
+              <span>파일 선택</span>
+              <span className="w-px h-3 bg-slate-300" />
+              <span>Ctrl+V 붙여넣기</span>
+              <span className="w-px h-3 bg-slate-300" />
+              <span>드래그&드롭</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* URL 모드 토글 */}
+      {!urlMode && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setUrlMode(true); }}
+          className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400 hover:text-violet-500 transition-all mx-auto"
+        >
+          <Link className="w-3 h-3" />
+          URL로 불러오기
+        </button>
+      )}
+    </div>
+  );
+}
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 function getAuthHeaders() {
@@ -56,7 +218,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [referenceImg, setReferenceImg] = useState(null);
   const [referencePreview, setReferencePreview] = useState(null);
   const [referenceDesc, setReferenceDesc] = useState('');
-  const refInputRef = useRef(null);
 
   // ── 생성 결과 ──
   const [generating, setGenerating] = useState(false);
@@ -72,7 +233,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [upscaling, setUpscaling] = useState(false);
   const [upscaleResult, setUpscaleResult] = useState(null);
   const [upscaleInfo, setUpscaleInfo] = useState(null);
-  const upscaleInputRef = useRef(null);
 
   // ── 편집 탭 상태 ──
   const [editImage, setEditImage] = useState(null);
@@ -82,22 +242,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [saturate, setSaturate] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [editOriginal, setEditOriginal] = useState(null);
-  const editInputRef = useRef(null);
   const canvasRef = useRef(null);
 
   // ══════════════════════════════
   // 생성 탭 핸들러
   // ══════════════════════════════
-
-  const handleReferenceUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setReferenceImg(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setReferencePreview(ev.target.result);
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -197,18 +346,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   // 업스케일 탭 핸들러
   // ══════════════════════════════
 
-  const handleUpscaleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUpscaleFile(file);
-    setUpscaleResult(null);
-    setUpscaleInfo(null);
-    const reader = new FileReader();
-    reader.onload = (ev) => setUpscalePreview(ev.target.result);
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
   const handleUpscale = async () => {
     if (!upscaleFile) return;
     setUpscaling(true);
@@ -249,20 +386,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   // ══════════════════════════════
   // 편집 탭 핸들러
   // ══════════════════════════════
-
-  const handleEditFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setEditImage(ev.target.result);
-      setEditOriginal(ev.target.result);
-      setEditPreview(ev.target.result);
-      resetEditControls();
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
 
   const resetEditControls = () => {
     setBrightness(100);
@@ -497,7 +620,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                   {/* 참조 이미지 */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">참조 이미지 (선택)</label>
-                    <input ref={refInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
                     {referencePreview ? (
                       <div className="relative">
                         <img src={referencePreview} alt="참조" className="w-full h-28 object-cover rounded-xl border border-slate-200" />
@@ -516,13 +638,13 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                         />
                       </div>
                     ) : (
-                      <button
-                        onClick={() => refInputRef.current?.click()}
-                        className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 hover:border-violet-300 hover:text-violet-500 hover:bg-violet-50/30 transition-all flex flex-col items-center gap-1"
-                      >
-                        <Upload className="w-5 h-5" />
-                        <span className="text-xs font-medium">비슷한 느낌의 이미지 업로드</span>
-                      </button>
+                      <ImageDropZone
+                        label="비슷한 느낌의 이미지 업로드"
+                        onImage={({ file, dataUrl }) => {
+                          setReferenceImg(file);
+                          setReferencePreview(dataUrl);
+                        }}
+                      />
                     )}
                   </div>
 
@@ -703,17 +825,17 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     AI 업스케일러 (Real-ESRGAN)
                   </h3>
 
-                  <input ref={upscaleInputRef} type="file" accept="image/*" className="hidden" onChange={handleUpscaleFileSelect} />
-
                   {!upscalePreview ? (
-                    <button
-                      onClick={() => upscaleInputRef.current?.click()}
-                      className="w-full py-12 rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/30 transition-all flex flex-col items-center gap-2 text-slate-400"
-                    >
-                      <Upload className="w-8 h-8" />
-                      <span className="text-sm font-bold">이미지를 업로드하세요</span>
-                      <span className="text-xs">JPG, PNG, WEBP</span>
-                    </button>
+                    <ImageDropZone
+                      label="업스케일할 이미지를 업로드하세요"
+                      onImage={({ file, dataUrl }) => {
+                        setUpscaleFile(file);
+                        setUpscalePreview(dataUrl);
+                        setUpscaleResult(null);
+                        setUpscaleInfo(null);
+                      }}
+                      className="py-4"
+                    />
                   ) : (
                     <div className="space-y-4">
                       {/* 스케일 선택 */}
@@ -814,14 +936,15 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
               <div className="w-[300px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-y-auto">
                 <div className="p-5 space-y-5">
 
-                  <input ref={editInputRef} type="file" accept="image/*" className="hidden" onChange={handleEditFileSelect} />
-                  <button
-                    onClick={() => editInputRef.current?.click()}
-                    className="w-full py-3 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    이미지 선택
-                  </button>
+                  <ImageDropZone
+                    label="편집할 이미지 선택"
+                    onImage={({ file, dataUrl }) => {
+                      setEditImage(dataUrl);
+                      setEditOriginal(dataUrl);
+                      setEditPreview(dataUrl);
+                      resetEditControls();
+                    }}
+                  />
 
                   {editImage && (
                     <>

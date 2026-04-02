@@ -516,3 +516,27 @@ def ai_status(_admin: AuthUser = Depends(get_admin_user)):
         "provider": provider,
         "provider_name": {"self-hosted": "셀프호스팅 GPU (Flux.1-schnell)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
     }
+
+
+# ── 이미지 URL 프록시 (CORS 우회) ──
+@router.get("/proxy-image")
+async def proxy_image(url: str, _admin: AuthUser = Depends(get_admin_user)):
+    """외부 이미지 URL을 프록시하여 CORS 문제 없이 프론트엔드에서 로드"""
+    import httpx
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="유효하지 않은 URL")
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "")
+            if not content_type.startswith("image/"):
+                raise HTTPException(status_code=400, detail="이미지가 아닙니다")
+            from fastapi.responses import Response
+            return Response(
+                content=resp.content,
+                media_type=content_type,
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=400, detail="이미지를 불러올 수 없습니다")
