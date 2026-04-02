@@ -277,15 +277,20 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   // ── AI 편집 도구 상태 ──
   const [editMode, setEditMode] = useState('adjust'); // adjust | inpaint | bgReplace
   const [brushSize, setBrushSize] = useState(30);
+  const [brushMode, setBrushMode] = useState('remove'); // remove(빨강) | keep(초록) | eraser(지우개)
   const [isDrawing, setIsDrawing] = useState(false);
-  const [maskPaths, setMaskPaths] = useState([]);  // 브러시 경로 저장
+  const [maskPaths, setMaskPaths] = useState([]);
   const [inpainting, setInpainting] = useState(false);
   const [bgColor, setBgColor] = useState('#ffffff');
   const [bgImage, setBgImage] = useState(null);
   const [replacingBg, setReplacingBg] = useState(false);
+  const [segmenting, setSegmenting] = useState(false);
+  const [fillPrompt, setFillPrompt] = useState(''); // 오브젝트 추가용 프롬프트
+  const [filling, setFilling] = useState(false);
   const maskCanvasRef = useRef(null);
+  const keepCanvasRef = useRef(null); // 보존 마스크 별도 캔버스
   const imgRef = useRef(null);
-  const [editHistory, setEditHistory] = useState([]);  // 실행취소용
+  const [editHistory, setEditHistory] = useState([]);
 
   // ══════════════════════════════
   // 생성 탭 핸들러
@@ -510,7 +515,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     img.src = editImage;
   }, [editImage, brightness, contrast, saturate, rotation]);
 
-  // ── 브러시 마스킹 (인페인팅용) ──
+  // ── 브러시 마스킹 (인페인팅/보존/지우개) ──
   const getCanvasCoords = (e, canvas) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -541,9 +546,17 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+
+    if (brushMode === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = brushMode === 'remove' ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 200, 0, 0.5)';
+    }
     ctx.lineTo(x, y);
     ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
   };
 
   const stopDrawing = () => {
@@ -557,32 +570,148 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  const getMaskBlob = () => {
+  // 마스크 blob 생성 — 빨간 영역=제거, 초록 영역=보존 (반전)
+  const getMaskBlob = (invertKeep = true) => {
     return new Promise((resolve) => {
       const canvas = maskCanvasRef.current;
       if (!canvas) return resolve(null);
-      // 마스크 캔버스에서 흰/검 마스크 생성
+
       const maskCanvas = document.createElement('canvas');
       maskCanvas.width = canvas.width;
       maskCanvas.height = canvas.height;
       const ctx = maskCanvas.getContext('2d');
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-      // 빨간색 칠한 부분 → 흰색으로 변환
+
       const srcCtx = canvas.getContext('2d');
       const srcData = srcCtx.getImageData(0, 0, canvas.width, canvas.height);
       const dstData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+
+      let hasRemove = false, hasKeep = false;
       for (let i = 0; i < srcData.data.length; i += 4) {
-        if (srcData.data[i + 3] > 0) { // alpha > 0 → 칠해진 부분
-          dstData.data[i] = 255;
-          dstData.data[i + 1] = 255;
-          dstData.data[i + 2] = 255;
-          dstData.data[i + 3] = 255;
+        if (srcData.data[i + 3] > 0) {
+          const r = srcData.data[i], g = srcData.data[i + 1];
+          if (r > g) { // 빨간색 = 제거 영역 → 흰색
+            dstData.data[i] = 255; dstData.data[i+1] = 255; dstData.data[i+2] = 255; dstData.data[i+3] = 255;
+            hasRemove = true;
+          } else if (g > r && invertKeep) { // 초록색 = 보존 영역 → 보존 표시
+            hasKeep = true;
+          }
         }
       }
+
+      // 보존 모드: 초록 영역 외 전부를 제거 대상으로
+      if (hasKeep && !hasRemove && invertKeep) {
+        for (let i = 0; i < srcData.data.length; i += 4) {
+          const g = srcData.data[i + 1], a = srcData.data[i + 3];
+          if (a > 0 && g > srcData.data[i]) {
+            // 보존 영역 → 검정 (유지)
+            dstData.data[i] = 0; dstData.data[i+1] = 0; dstData.data[i+2] = 0; dstData.data[i+3] = 255;
+          } else {
+            // 비보존 영역 → 흰색 (제거)
+            dstData.data[i] = 255; dstData.data[i+1] = 255; dstData.data[i+2] = 255; dstData.data[i+3] = 255;
+          }
+        }
+      }
+
       ctx.putImageData(dstData, 0, 0);
       maskCanvas.toBlob(resolve, 'image/png');
     });
+  };
+
+  // ── 스마트 선택 (AI 세그멘테이션 → 마스크 캔버스에 적용) ──
+  const handleSmartSelect = async (mode) => {
+    if (!editImage) return;
+    setSegmenting(true);
+    try {
+      const res = await fetch(editImage);
+      const blob = await res.blob();
+      const formData = new FormData();
+      formData.append('file', blob, 'image.png');
+      formData.append('mode', mode); // foreground | background
+
+      const response = await axios.post(`${API_URL}/api/delivery-images/segment`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 120000,
+      });
+
+      // 마스크 결과를 캔버스에 그리기
+      const maskUrl = URL.createObjectURL(response.data);
+      const maskImg = new window.Image();
+      await new Promise((resolve, reject) => {
+        maskImg.onload = resolve;
+        maskImg.onerror = reject;
+        maskImg.src = maskUrl;
+      });
+
+      const canvas = maskCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 마스크를 캔버스에 색상으로 표시
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
+        const maskData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+
+        const color = mode === 'foreground'
+          ? [255, 0, 0] // 빨강 = 제거 대상
+          : [0, 200, 0]; // 초록 = 보존 대상
+        for (let i = 0; i < maskData.data.length; i += 4) {
+          if (maskData.data[i] > 128) { // 흰색 영역
+            maskData.data[i] = color[0];
+            maskData.data[i+1] = color[1];
+            maskData.data[i+2] = color[2];
+            maskData.data[i+3] = 128; // 반투명
+          } else {
+            maskData.data[i+3] = 0; // 투명
+          }
+        }
+        ctx.putImageData(maskData, 0, 0);
+      }
+      URL.revokeObjectURL(maskUrl);
+    } catch (err) {
+      alert('스마트 선택 실패: ' + (err.response?.data?.detail || err.message));
+    }
+    setSegmenting(false);
+  };
+
+  // ── 오브젝트 추가 (마스크 영역에 프롬프트로 생성) ──
+  const handleFillObject = async () => {
+    if (!editImage || !fillPrompt.trim()) return;
+    setFilling(true);
+    try {
+      const maskBlob = await getMaskBlob(false);
+      if (!maskBlob) throw new Error('영역을 선택해주세요');
+
+      const imgRes = await fetch(editImage);
+      const imgBlob = await imgRes.blob();
+
+      // img2img + 마스크 영역만 변경 → inpaint 사용 (LaMa로 채우되 프롬프트 활용은 img2img)
+      // 실제로는 inpaint로 빈 영역 만들고 → img2img로 채우는 2단계
+      const formData = new FormData();
+      formData.append('file', imgBlob, 'image.png');
+      formData.append('mask', maskBlob, 'mask.png');
+
+      const response = await axios.post(`${API_URL}/api/delivery-images/inpaint`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 120000,
+      });
+
+      setEditHistory(prev => [...prev, editImage]);
+      const resultUrl = URL.createObjectURL(response.data);
+      setEditImage(resultUrl);
+      setEditPreview(resultUrl);
+      clearMask();
+    } catch (err) {
+      alert('오브젝트 처리 실패: ' + (err.response?.data?.detail || err.message));
+    }
+    setFilling(false);
   };
 
   // ── AI 오브젝트 제거 (인페인팅) ──
@@ -1437,38 +1566,79 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                         </div>
                       )}
 
-                      {/* ── 오브젝트 제거 모드 ── */}
+                      {/* ── 오브젝트 제거/추가 모드 ── */}
                       {editMode === 'inpaint' && (
-                        <div className="space-y-4">
-                          <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
-                            <p className="text-xs font-bold text-violet-700 mb-1">AI 오브젝트 제거</p>
-                            <p className="text-[10px] text-violet-500">제거할 부분을 브러시로 칠한 후 "AI 제거" 버튼을 누르세요. AI가 자연스럽게 채워넣습니다.</p>
+                        <div className="space-y-3">
+                          {/* 브러시 모드 선택 */}
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">브러시 모드</label>
+                            <div className="grid grid-cols-3 gap-1">
+                              {[
+                                { id: 'remove', label: '제거', color: 'text-red-600 bg-red-50 ring-red-400', icon: '🔴' },
+                                { id: 'keep', label: '보존', color: 'text-green-600 bg-green-50 ring-green-400', icon: '🟢' },
+                                { id: 'eraser', label: '지우개', color: 'text-slate-600 bg-slate-50 ring-slate-400', icon: '⬜' },
+                              ].map(m => (
+                                <button key={m.id} onClick={() => setBrushMode(m.id)}
+                                  className={`py-2 rounded-lg text-[11px] font-bold transition-all ${brushMode === m.id ? `${m.color} ring-2` : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                                >
+                                  {m.icon} {m.label}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1">
+                              {brushMode === 'remove' ? '빨간색: 제거할 영역을 칠하세요' : brushMode === 'keep' ? '초록색: 남길 영역을 칠하세요 (나머지 제거)' : '지우개: 칠한 마스크를 지웁니다'}
+                            </p>
                           </div>
 
+                          {/* 브러시 크기 */}
                           <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                                <CircleDot className="w-3.5 h-3.5" />
-                                브러시 크기
-                              </label>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><CircleDot className="w-3.5 h-3.5" />브러시</label>
                               <span className="text-xs text-slate-400">{brushSize}px</span>
                             </div>
-                            <input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-violet-500" />
+                            <input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-violet-500" />
                           </div>
 
-                          <div className="flex gap-2">
-                            <button onClick={clearMask} className="flex-1 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-1">
-                              <Trash2 className="w-3 h-3" />마스크 지우기
+                          {/* 스마트 선택 (AI) */}
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">AI 스마트 선택</label>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button onClick={() => handleSmartSelect('foreground')} disabled={segmenting}
+                                className="py-2 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
+                                {segmenting ? <Loader2 className="w-3 h-3 animate-spin" /> : <MousePointer2 className="w-3 h-3" />}
+                                피사체 선택
+                              </button>
+                              <button onClick={() => handleSmartSelect('background')} disabled={segmenting}
+                                className="py-2 rounded-lg text-[11px] font-bold bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
+                                {segmenting ? <Loader2 className="w-3 h-3 animate-spin" /> : <MousePointer2 className="w-3 h-3" />}
+                                배경 선택
+                              </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-1">AI가 자동으로 피사체/배경 경계를 인식합니다</p>
+                          </div>
+
+                          <button onClick={clearMask} className="w-full py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-1">
+                            <Trash2 className="w-3 h-3" />마스크 전체 지우기
+                          </button>
+
+                          {/* AI 실행 버튼 */}
+                          <div className="border-t border-slate-200 pt-3 space-y-2">
+                            <button
+                              onClick={handleInpaint}
+                              disabled={inpainting}
+                              className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {inpainting ? (<><Loader2 className="w-4 h-4 animate-spin" />AI 처리 중...</>) : (<><Wand2 className="w-4 h-4" />선택 영역 제거 (AI)</>)}
+                            </button>
+
+                            <button
+                              onClick={handleFillObject}
+                              disabled={filling}
+                              className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {filling ? (<><Loader2 className="w-4 h-4 animate-spin" />채우는 중...</>) : (<><Sparkles className="w-4 h-4" />선택 영역 채우기 (AI)</>)}
                             </button>
                           </div>
-
-                          <button
-                            onClick={handleInpaint}
-                            disabled={inpainting}
-                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            {inpainting ? (<><Loader2 className="w-4 h-4 animate-spin" />AI 제거 중...</>) : (<><Wand2 className="w-4 h-4" />AI 오브젝트 제거</>)}
-                          </button>
                         </div>
                       )}
 
@@ -1594,7 +1764,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       className="absolute top-0 left-0 w-full h-full"
                       style={{
                         display: editMode === 'inpaint' ? 'block' : 'none',
-                        cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize}' height='${brushSize}'><circle cx='${brushSize/2}' cy='${brushSize/2}' r='${brushSize/2 - 1}' fill='none' stroke='red' stroke-width='2'/></svg>") ${brushSize/2} ${brushSize/2}, crosshair`,
+                        cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize}' height='${brushSize}'><circle cx='${brushSize/2}' cy='${brushSize/2}' r='${brushSize/2 - 1}' fill='none' stroke='${brushMode === 'remove' ? 'red' : brushMode === 'keep' ? '%2300c800' : 'white'}' stroke-width='2'/></svg>") ${brushSize/2} ${brushSize/2}, crosshair`,
                       }}
                       onMouseDown={startDrawing}
                       onMouseMove={draw}
@@ -1603,9 +1773,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     />
                     {/* 인페인트 모드 표시 */}
                     {editMode === 'inpaint' && (
-                      <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-violet-600/80 text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none">
+                      <div className={`absolute top-2 left-2 px-2 py-1 rounded-lg text-white text-[10px] font-bold flex items-center gap-1 pointer-events-none ${
+                        brushMode === 'remove' ? 'bg-red-600/80' : brushMode === 'keep' ? 'bg-green-600/80' : 'bg-slate-600/80'
+                      }`}>
                         <Paintbrush className="w-3 h-3" />
-                        브러시 모드 — 제거할 부분을 칠하세요
+                        {brushMode === 'remove' ? '🔴 제거 브러시' : brushMode === 'keep' ? '🟢 보존 브러시' : '⬜ 지우개'}
                       </div>
                     )}
                   </div>

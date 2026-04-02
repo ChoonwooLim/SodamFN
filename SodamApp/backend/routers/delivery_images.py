@@ -606,6 +606,38 @@ async def remove_background(
     )
 
 
+# ── AI 세그멘테이션 (스마트 선택, GPU 서버 프록시) ──
+@router.post("/segment")
+async def segment_image(
+    file: UploadFile = File(...),
+    mode: str = Form("foreground"),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """AI로 피사체/배경 마스크 추출 (스마트 선택)"""
+    gpu_url = os.getenv("AI_GPU_SERVER_URL")
+    if not gpu_url:
+        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+
+    import httpx
+    file_bytes = await file.read()
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{gpu_url}/segment",
+            files={"file": (file.filename or "image.png", file_bytes, "image/png")},
+            data={"mode": mode},
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"세그멘테이션 실패: {response.text[:200]}")
+
+    from fastapi.responses import Response
+    return Response(
+        content=response.content,
+        media_type="image/png",
+        headers={"X-Processing-Time": response.headers.get("X-Processing-Time", "")},
+    )
+
+
 # ── AI 인페인팅 (오브젝트 제거, GPU 서버 프록시) ──
 @router.post("/inpaint")
 async def inpaint_image(

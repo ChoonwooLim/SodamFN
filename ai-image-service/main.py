@@ -407,6 +407,50 @@ async def remove_background(
     )
 
 
+# ── AI 세그멘테이션 (스마트 선택 / 로토 마스크) ──
+@app.post("/segment")
+async def segment_image(
+    file: UploadFile = File(...),
+    mode: str = Form("foreground"),  # foreground | background
+):
+    """이미지에서 피사체/배경 마스크 추출 (rembg 기반 스마트 선택)"""
+    try:
+        from rembg import remove, new_session
+    except ImportError:
+        raise HTTPException(status_code=503, detail="rembg not installed")
+
+    content = await file.read()
+    pil_image = Image.open(io.BytesIO(content)).convert("RGBA")
+
+    logger.info(f"Segmenting: {pil_image.size[0]}x{pil_image.size[1]}, mode={mode}")
+    start = time.time()
+
+    session = new_session("u2net", providers=["CPUExecutionProvider"])
+    result = remove(pil_image, session=session, only_mask=True)
+
+    # result는 L모드 마스크 (흰=피사체, 검=배경)
+    if mode == "background":
+        # 배경 선택: 마스크 반전
+        import PIL.ImageOps
+        result = PIL.ImageOps.invert(result)
+
+    elapsed = time.time() - start
+    logger.info(f"Segmentation done in {elapsed:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG")
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "X-Processing-Time": f"{elapsed:.2f}",
+            "X-Mode": mode,
+        },
+    )
+
+
 # ── AI 인페인팅 (오브젝트 제거) ──
 inpaint_lock = threading.Lock()
 
@@ -498,7 +542,7 @@ def root():
     return {
         "service": "Sodam AI Image Service",
         "model": "Flux.1-schnell + Real-ESRGAN",
-        "features": ["generate", "img2img", "upscale", "remove-bg", "inpaint", "generate+upscale"],
+        "features": ["generate", "img2img", "upscale", "remove-bg", "segment", "inpaint", "generate+upscale"],
     }
 
 
