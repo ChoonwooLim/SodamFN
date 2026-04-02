@@ -1,7 +1,7 @@
 """
 배달앱 이미지 관리 API
 - CRUD: 이미지 목록, 업로드, 삭제
-- AI: OpenAI DALL-E 기반 이미지 생성
+- AI: 셀프호스팅 GPU (Flux.1-schnell) > Replicate > OpenAI 폴백
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from routers.auth import get_admin_user
@@ -171,16 +171,16 @@ def _get_ai_provider():
     return None, None
 
 
-async def _generate_with_selfhosted(full_prompt: str, server_url: str) -> bytes:
-    """셀프호스팅 GPU 서버로 이미지 생성 (SD 1.5 + LCM-LoRA, ~2초, 무료)"""
+async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural") -> bytes:
+    """셀프호스팅 GPU 서버로 이미지 생성 (Flux.1-schnell, 무료)"""
     import httpx
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(
             f"{server_url}/generate",
             json={
                 "prompt": full_prompt,
-                "style": "natural",
+                "style": style,
                 "width": 512,
                 "height": 512,
                 "steps": 4,
@@ -248,11 +248,11 @@ async def _generate_with_replicate(full_prompt: str, api_token: str) -> str:
 
 
 async def _generate_with_openai(full_prompt: str, api_key: str) -> str:
-    """OpenAI DALL-E 3로 이미지 생성 (비용: $0.04/장)"""
-    from openai import OpenAI
+    """OpenAI DALL-E 3로 이미지 생성 (비용: $0.04/장) — 비동기"""
+    from openai import AsyncOpenAI
 
-    client = OpenAI(api_key=api_key)
-    response = client.images.generate(
+    client = AsyncOpenAI(api_key=api_key)
+    response = await client.images.generate(
         model="dall-e-3",
         prompt=full_prompt,
         size="1024x1024",
@@ -285,7 +285,7 @@ async def ai_generate_image(
         # 프로바이더별 이미지 생성
         if provider == "self-hosted":
             # GPU 서버에서 직접 PNG 바이너리 수신
-            image_bytes = await _generate_with_selfhosted(full_prompt, api_key)
+            image_bytes = await _generate_with_selfhosted(full_prompt, api_key, req.style)
             storage = get_storage()
             timestamp = int(datetime.now().timestamp() * 1000)
             storage_key = f"delivery_images/ai_{timestamp}.png"
@@ -351,5 +351,5 @@ def ai_status(_admin: AuthUser = Depends(get_admin_user)):
         "status": "success",
         "ai_enabled": provider is not None,
         "provider": provider,
-        "provider_name": {"self-hosted": "셀프호스팅 GPU (SD 1.5 + LCM)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
+        "provider_name": {"self-hosted": "셀프호스팅 GPU (Flux.1-schnell)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
     }

@@ -1,12 +1,11 @@
 """
 소담김밥 AI 이미지 생성 서비스
-- SD 1.5 + LCM-LoRA on 듀얼 GTX 1080 (cuda:0 + cuda:1)
-- 라운드로빈 로드밸런싱 → 동시 2건 처리
+- Flux.1-schnell (최고 품질 오픈소스 모델)
+- GTX 1080 — sequential CPU offload
 - FastAPI REST API
-- ~2초 생성, 무료
+- 무료
 """
 import io
-import os
 import time
 import logging
 import threading
@@ -20,94 +19,60 @@ from contextlib import asynccontextmanager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-image-service")
 
-# ── 설정 ──
-DEVICES = ["cuda:0", "cuda:1"]
-MODEL_ID = "runwayml/stable-diffusion-v1-5"
-LCM_LORA_ID = "latent-consistency/lcm-lora-sdv1-5"
+MODEL_ID = "black-forest-labs/FLUX.1-schnell"
 
-# 듀얼 GPU 파이프라인 + 락
-pipes = {}       # {device_str: pipeline}
-locks = {}       # {device_str: threading.Lock}
-_round_robin = 0
-_rr_lock = threading.Lock()
+pipe = None
+gen_lock = threading.Lock()
 
 
-def load_pipeline(device: str):
-    """SD 1.5 + LCM-LoRA 파이프라인 로드 (GPU 1장)"""
-    from diffusers import StableDiffusionPipeline, LCMScheduler
+def load_pipeline():
+    """Flux.1-schnell 파이프라인 로드 (sequential CPU offload)"""
+    global pipe
+    from diffusers import FluxPipeline
 
-    logger.info(f"Loading SD 1.5 on {device}...")
+    gpu_count = torch.cuda.device_count()
+    for i in range(gpu_count):
+        name = torch.cuda.get_device_name(i)
+        mem = torch.cuda.get_device_properties(i).total_memory / 1e9
+        logger.info(f"  GPU {i}: {name} ({mem:.1f}GB)")
+
+    logger.info("Loading Flux.1-schnell...")
     start = time.time()
 
-    pipe = StableDiffusionPipeline.from_pretrained(
+    pipe = FluxPipeline.from_pretrained(
         MODEL_ID,
         torch_dtype=torch.float16,
-        safety_checker=None,
-        requires_safety_checker=False,
     )
-
-    pipe.load_lora_weights(LCM_LORA_ID)
-    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-    pipe = pipe.to(device)
-    pipe.enable_attention_slicing()
+    pipe.enable_sequential_cpu_offload(gpu_id=0)
 
     elapsed = time.time() - start
-    logger.info(f"[{device}] Pipeline loaded in {elapsed:.1f}s")
+    logger.info(f"Pipeline loaded in {elapsed:.1f}s")
 
-    # 워밍업
-    logger.info(f"[{device}] Warming up...")
-    _ = pipe("test", num_inference_steps=4, guidance_scale=1.0, width=512, height=512)
-    logger.info(f"[{device}] Ready!")
-
-    return pipe
-
-
-def load_all_pipelines():
-    """듀얼 GPU 모두에 파이프라인 로드"""
-    for dev in DEVICES:
-        idx = int(dev.split(":")[1])
-        if idx < torch.cuda.device_count():
-            pipes[dev] = load_pipeline(dev)
-            locks[dev] = threading.Lock()
-            logger.info(f"[{dev}] {torch.cuda.get_device_name(idx)} — VRAM {torch.cuda.get_device_properties(idx).total_memory / 1e9:.1f}GB")
-        else:
-            logger.warning(f"[{dev}] GPU not available, skipping")
-
-    if not pipes:
-        raise RuntimeError("No GPU available!")
-    logger.info(f"Total {len(pipes)} GPUs loaded: {list(pipes.keys())}")
-
-
-def get_next_gpu():
-    """라운드로빈으로 다음 GPU 선택 (유휴 GPU 우선)"""
-    global _round_robin
-    devices = list(pipes.keys())
-
-    # 유휴 GPU가 있으면 우선 사용
-    for dev in devices:
-        if not locks[dev].locked():
-            return dev
-
-    # 모두 사용 중이면 라운드로빈
-    with _rr_lock:
-        dev = devices[_round_robin % len(devices)]
-        _round_robin += 1
-    return dev
+    # 워밍업 (소형으로)
+    logger.info("Warming up...")
+    pipe(
+        "test",
+        num_inference_steps=2,
+        guidance_scale=0.0,
+        width=256,
+        height=256,
+        max_sequence_length=64,
+    )
+    logger.info("Warmup done, ready to serve!")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_all_pipelines()
+    load_pipeline()
     yield
-    for dev, pipe in pipes.items():
-        del pipe
+    global pipe
+    del pipe
     torch.cuda.empty_cache()
 
 
-app = FastAPI(title="Sodam AI Image Service (Dual GPU)", lifespan=lifespan)
+app = FastAPI(title="Sodam AI Image Service (Flux.1-schnell)", lifespan=lifespan)
 
 
-# ── 스타일 프리셋 ──
 STYLE_SUFFIXES = {
     "natural": "professional food photography, natural lighting, appetizing presentation, top-down angle, Korean restaurant style, clean white plate background",
     "studio": "studio food photography, dramatic lighting, dark background, professional plating, high-end restaurant quality, shallow depth of field",
@@ -121,51 +86,42 @@ class GenerateRequest(BaseModel):
     width: int = 512
     height: int = 512
     steps: int = 4
-    guidance_scale: float = 1.0
     seed: Optional[int] = None
 
 
 @app.post("/generate")
 def generate_image(req: GenerateRequest):
-    """이미지 생성 → PNG 바이너리 반환 (듀얼 GPU 로드밸런싱)"""
-    if not pipes:
+    if pipe is None:
         raise HTTPException(status_code=503, detail="Model not loaded yet")
 
-    device = get_next_gpu()
-    pipe = pipes[device]
-    lock = locks[device]
-
-    # 스타일 적용
     style_suffix = STYLE_SUFFIXES.get(req.style, STYLE_SUFFIXES["natural"])
     full_prompt = f"{req.prompt}. {style_suffix}"
 
-    # 시드 설정
     seed = req.seed or int(time.time() * 1000) % (2**32)
-    generator = torch.Generator(device=device).manual_seed(seed)
+    generator = torch.Generator(device="cpu").manual_seed(seed)
 
-    # 해상도 제한 (VRAM 보호)
     width = min(req.width, 768)
     height = min(req.height, 768)
     width = (width // 8) * 8
     height = (height // 8) * 8
 
-    logger.info(f"[{device}] Generating: {req.prompt[:50]}... ({width}x{height}, {req.steps} steps)")
+    logger.info(f"Generating: {req.prompt[:50]}... ({width}x{height}, {req.steps} steps)")
     start = time.time()
 
-    with lock:
+    with gen_lock:
         with torch.no_grad():
             result = pipe(
                 full_prompt,
-                negative_prompt="blurry, bad quality, distorted, ugly, watermark, text, logo",
                 num_inference_steps=req.steps,
-                guidance_scale=req.guidance_scale,
+                guidance_scale=0.0,
                 width=width,
                 height=height,
+                max_sequence_length=256,
                 generator=generator,
             )
 
     elapsed = time.time() - start
-    logger.info(f"[{device}] Generated in {elapsed:.1f}s")
+    logger.info(f"Generated in {elapsed:.1f}s")
 
     image = result.images[0]
     buf = io.BytesIO()
@@ -180,29 +136,29 @@ def generate_image(req: GenerateRequest):
             "X-Seed": str(seed),
             "X-Width": str(width),
             "X-Height": str(height),
-            "X-GPU": device,
+            "X-Model": "flux.1-schnell",
         },
     )
 
 
 @app.get("/health")
 def health():
-    gpu_list = []
-    for dev in pipes:
-        idx = int(dev.split(":")[1])
-        gpu_list.append({
-            "device": dev,
-            "gpu_name": torch.cuda.get_device_name(idx),
-            "vram_total_gb": round(torch.cuda.get_device_properties(idx).total_memory / 1e9, 1),
-            "vram_used_gb": round(torch.cuda.memory_allocated(idx) / 1e9, 1),
-            "busy": locks[dev].locked(),
+    gpus = []
+    for i in range(torch.cuda.device_count()):
+        gpus.append({
+            "device": f"cuda:{i}",
+            "gpu_name": torch.cuda.get_device_name(i),
+            "vram_total_gb": round(torch.cuda.get_device_properties(i).total_memory / 1e9, 1),
+            "vram_used_gb": round(torch.cuda.memory_allocated(i) / 1e9, 1),
         })
 
     return {
-        "status": "ok" if pipes else "loading",
-        "model": MODEL_ID,
-        "gpu_count": len(pipes),
-        "gpus": gpu_list,
+        "status": "ok" if pipe is not None else "loading",
+        "model": "Flux.1-schnell",
+        "mode": "sequential-cpu-offload",
+        "gpu_count": torch.cuda.device_count(),
+        "gpus": gpus,
+        "busy": gen_lock.locked(),
     }
 
 
@@ -210,9 +166,7 @@ def health():
 def root():
     return {
         "service": "Sodam AI Image Service",
-        "model": "SD 1.5 + LCM-LoRA",
-        "gpus": len(pipes),
-        "devices": list(pipes.keys()),
+        "model": "Flux.1-schnell",
     }
 
 
