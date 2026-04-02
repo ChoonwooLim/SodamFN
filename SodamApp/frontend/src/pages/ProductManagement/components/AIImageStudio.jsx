@@ -178,16 +178,16 @@ function getAuthHeaders() {
 const CATEGORIES = ['김밥류', '분식류', '주먹밥류', '음료류'];
 
 const STYLE_OPTIONS = [
-  { id: 'natural', label: '자연광', desc: '창가 자연광, 따뜻한 톤', icon: '☀️' },
-  { id: 'studio', label: '스튜디오', desc: '다크 배경, 드라마틱 조명', icon: '📸' },
-  { id: 'minimal', label: '미니멀', desc: '흰 배경, 깔끔한 플랫레이', icon: '✨' },
-  { id: 'overhead', label: '탑뷰', desc: '위에서 내려다본 구도', icon: '🔽' },
-  { id: 'angle45', label: '45도', desc: '45도 각도, 입체감 강조', icon: '📐' },
-  { id: 'closeup', label: '클로즈업', desc: '음식 질감 극대화 접사', icon: '🔍' },
-  { id: 'steam', label: '김이모락', desc: '따끈한 김, 갓 조리된 느낌', icon: '♨️' },
-  { id: 'delivery', label: '배달앱', desc: '배달앱 메뉴 사진 스타일', icon: '🛵' },
-  { id: 'casual', label: '일상', desc: '식탁 위 자연스러운 한 끼', icon: '🍽️' },
-  { id: 'premium', label: '프리미엄', desc: '고급 레스토랑 플레이팅', icon: '👨‍🍳' },
+  { id: 'natural', label: '자연광', desc: '창가 자연광, 따뜻한 톤', thumb: '/style-samples/natural.webp' },
+  { id: 'studio', label: '스튜디오', desc: '다크 배경, 드라마틱 조명', thumb: '/style-samples/studio.webp' },
+  { id: 'minimal', label: '미니멀', desc: '흰 배경, 깔끔한 플랫레이', thumb: '/style-samples/minimal.webp' },
+  { id: 'overhead', label: '탑뷰', desc: '위에서 내려다본 구도', thumb: '/style-samples/overhead.webp' },
+  { id: 'angle45', label: '45도', desc: '45도 각도, 입체감 강조', thumb: '/style-samples/angle45.webp' },
+  { id: 'closeup', label: '클로즈업', desc: '음식 질감 극대화 접사', thumb: '/style-samples/closeup.webp' },
+  { id: 'steam', label: '김이모락', desc: '따끈한 김, 갓 조리된 느낌', thumb: '/style-samples/steam.webp' },
+  { id: 'delivery', label: '배달앱', desc: '배달앱 메뉴 사진 스타일', thumb: '/style-samples/delivery.webp' },
+  { id: 'casual', label: '일상', desc: '식탁 위 자연스러운 한 끼', thumb: '/style-samples/casual.webp' },
+  { id: 'premium', label: '프리미엄', desc: '고급 레스토랑 플레이팅', thumb: '/style-samples/premium.webp' },
 ];
 
 const FOOD_PRESETS = [
@@ -758,14 +758,16 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                           key={s.id}
                           onClick={() => setStyle(s.id)}
                           title={s.desc}
-                          className={`p-2 rounded-xl text-center transition-all ${
+                          className={`rounded-xl overflow-hidden transition-all ${
                             style === s.id
-                              ? 'bg-violet-100 ring-2 ring-violet-400 text-violet-700'
-                              : 'bg-white border border-slate-200 text-slate-600 hover:border-violet-200'
+                              ? 'ring-2 ring-violet-500 ring-offset-1'
+                              : 'ring-1 ring-slate-200 hover:ring-violet-300'
                           }`}
                         >
-                          <div className="text-base mb-0.5">{s.icon}</div>
-                          <div className="text-[10px] font-bold leading-tight">{s.label}</div>
+                          <img src={s.thumb} alt={s.label} className="w-full aspect-square object-cover" loading="lazy" />
+                          <div className={`py-1 text-[10px] font-bold text-center ${
+                            style === s.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'
+                          }`}>{s.label}</div>
                         </button>
                       ))}
                     </div>
