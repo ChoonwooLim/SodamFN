@@ -752,23 +752,34 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                   {/* 스타일 */}
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">촬영 스타일</label>
-                    <div className="grid grid-cols-5 gap-1.5">
+                    <div className="grid grid-cols-5 gap-1.5 relative">
                       {STYLE_OPTIONS.map(s => (
-                        <button
-                          key={s.id}
-                          onClick={() => setStyle(s.id)}
-                          title={s.desc}
-                          className={`rounded-xl overflow-hidden transition-all ${
-                            style === s.id
-                              ? 'ring-2 ring-violet-500 ring-offset-1'
-                              : 'ring-1 ring-slate-200 hover:ring-violet-300'
-                          }`}
-                        >
-                          <img src={s.thumb} alt={s.label} className="w-full aspect-square object-cover" loading="lazy" />
-                          <div className={`py-1 text-[10px] font-bold text-center ${
-                            style === s.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'
-                          }`}>{s.label}</div>
-                        </button>
+                        <div key={s.id} className="relative group">
+                          <button
+                            onClick={() => setStyle(s.id)}
+                            className={`w-full rounded-xl overflow-hidden transition-all ${
+                              style === s.id
+                                ? 'ring-2 ring-violet-500 ring-offset-1'
+                                : 'ring-1 ring-slate-200 hover:ring-violet-300'
+                            }`}
+                          >
+                            <img src={s.thumb} alt={s.label} className="w-full aspect-square object-cover" loading="lazy" />
+                            <div className={`py-1 text-[10px] font-bold text-center ${
+                              style === s.id ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'
+                            }`}>{s.label}</div>
+                          </button>
+                          {/* 호버 확대 프리뷰 */}
+                          <div className="hidden group-hover:block absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none">
+                            <div className="bg-white rounded-2xl shadow-2xl ring-1 ring-black/10 overflow-hidden">
+                              <img src={s.thumb} alt={s.label} className="w-52 h-52 object-cover" />
+                              <div className="px-3 py-2 text-center">
+                                <div className="text-xs font-bold text-slate-700">{s.label}</div>
+                                <div className="text-[10px] text-slate-400">{s.desc}</div>
+                              </div>
+                            </div>
+                            <div className="w-3 h-3 bg-white ring-1 ring-black/10 rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2" />
+                          </div>
+                        </div>
                       ))}
                     </div>
                     <p className="text-[10px] text-slate-400 mt-1">{STYLE_OPTIONS.find(s => s.id === style)?.desc}</p>
