@@ -312,7 +312,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         formData.append('file', referenceImg);
         formData.append('prompt', finalPrompt);
         formData.append('strength', referenceStrength);
-        formData.append('steps', '4');
+        formData.append('steps', '2');
         formData.append('style', style);
         if (seed) formData.append('seed', seed);
 
@@ -331,7 +331,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
           upscale: 1,
           width: 512,
           height: 512,
-          steps: 4,
+          steps: 2,
           skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
         };
         if (seed) payload.seed = parseInt(seed, 10);
@@ -925,7 +925,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     {generating ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        생성 중... (약 60초)
+                        생성 중... (약 30초)
                       </>
                     ) : (
                       <>
