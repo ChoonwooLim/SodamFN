@@ -407,6 +407,55 @@ async def remove_background(
     )
 
 
+# ── AI 인페인팅 (오브젝트 제거) ──
+inpaint_lock = threading.Lock()
+
+@app.post("/inpaint")
+async def inpaint_image(
+    file: UploadFile = File(...),
+    mask: UploadFile = File(...),
+):
+    """이미지에서 마스크 영역을 AI로 자연스럽게 제거 (LaMa)"""
+    try:
+        from simple_lama_inpainting import SimpleLama
+    except ImportError:
+        raise HTTPException(status_code=503, detail="simple-lama-inpainting not installed")
+
+    img_bytes = await file.read()
+    mask_bytes = await mask.read()
+
+    pil_image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    pil_mask = Image.open(io.BytesIO(mask_bytes)).convert("L")
+
+    # 마스크 크기를 이미지에 맞춤
+    if pil_mask.size != pil_image.size:
+        pil_mask = pil_mask.resize(pil_image.size, Image.NEAREST)
+
+    logger.info(f"Inpainting: {pil_image.size[0]}x{pil_image.size[1]}")
+    start = time.time()
+
+    with inpaint_lock:
+        lama = SimpleLama()
+        result = lama(pil_image, pil_mask)
+
+    elapsed = time.time() - start
+    logger.info(f"Inpainting done in {elapsed:.1f}s")
+
+    buf = io.BytesIO()
+    result.save(buf, format="PNG")
+    buf.seek(0)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={
+            "X-Processing-Time": f"{elapsed:.2f}",
+            "X-Width": str(result.size[0]),
+            "X-Height": str(result.size[1]),
+        },
+    )
+
+
 @app.get("/health")
 def health():
     gpus = []
@@ -449,7 +498,7 @@ def root():
     return {
         "service": "Sodam AI Image Service",
         "model": "Flux.1-schnell + Real-ESRGAN",
-        "features": ["generate", "img2img", "upscale", "remove-bg", "generate+upscale"],
+        "features": ["generate", "img2img", "upscale", "remove-bg", "inpaint", "generate+upscale"],
     }
 
 

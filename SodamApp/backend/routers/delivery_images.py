@@ -606,6 +606,43 @@ async def remove_background(
     )
 
 
+# ── AI 인페인팅 (오브젝트 제거, GPU 서버 프록시) ──
+@router.post("/inpaint")
+async def inpaint_image(
+    file: UploadFile = File(...),
+    mask: UploadFile = File(...),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """마스크 영역을 AI로 자연스럽게 제거 (LaMa inpainting)"""
+    gpu_url = os.getenv("AI_GPU_SERVER_URL")
+    if not gpu_url:
+        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+
+    import httpx
+    file_bytes = await file.read()
+    mask_bytes = await mask.read()
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{gpu_url}/inpaint",
+            files={
+                "file": (file.filename or "image.png", file_bytes, "image/png"),
+                "mask": ("mask.png", mask_bytes, "image/png"),
+            },
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail=f"인페인팅 실패: {response.text[:200]}")
+
+    from fastapi.responses import Response
+    return Response(
+        content=response.content,
+        media_type="image/png",
+        headers={
+            "X-Processing-Time": response.headers.get("X-Processing-Time", ""),
+        },
+    )
+
+
 # ── AI 설정 상태 확인 ──
 @router.get("/ai-status")
 def ai_status(_admin: AuthUser = Depends(get_admin_user)):

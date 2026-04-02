@@ -4,7 +4,8 @@ import {
   RotateCw, Sun, Contrast, Save, Wand2, ArrowUpCircle,
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
-  Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search, Eraser
+  Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search, Eraser,
+  Paintbrush, Palette, CircleDot, MousePointer2
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -273,6 +274,19 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const [removingBg, setRemovingBg] = useState(false);
   const canvasRef = useRef(null);
 
+  // ── AI 편집 도구 상태 ──
+  const [editMode, setEditMode] = useState('adjust'); // adjust | inpaint | bgReplace
+  const [brushSize, setBrushSize] = useState(30);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [maskPaths, setMaskPaths] = useState([]);  // 브러시 경로 저장
+  const [inpainting, setInpainting] = useState(false);
+  const [bgColor, setBgColor] = useState('#ffffff');
+  const [bgImage, setBgImage] = useState(null);
+  const [replacingBg, setReplacingBg] = useState(false);
+  const maskCanvasRef = useRef(null);
+  const imgRef = useRef(null);
+  const [editHistory, setEditHistory] = useState([]);  // 실행취소용
+
   // ══════════════════════════════
   // 생성 탭 핸들러
   // ══════════════════════════════
@@ -496,6 +510,187 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
     img.src = editImage;
   }, [editImage, brightness, contrast, saturate, rotation]);
 
+  // ── 브러시 마스킹 (인페인팅용) ──
+  const getCanvasCoords = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const startDrawing = (e) => {
+    if (editMode !== 'inpaint') return;
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    setIsDrawing(true);
+    const { x, y } = getCanvasCoords(e, canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing || editMode !== 'inpaint') return;
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    const { x, y } = getCanvasCoords(e, canvas);
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearMask = () => {
+    const canvas = maskCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const getMaskBlob = () => {
+    return new Promise((resolve) => {
+      const canvas = maskCanvasRef.current;
+      if (!canvas) return resolve(null);
+      // 마스크 캔버스에서 흰/검 마스크 생성
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = canvas.width;
+      maskCanvas.height = canvas.height;
+      const ctx = maskCanvas.getContext('2d');
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+      // 빨간색 칠한 부분 → 흰색으로 변환
+      const srcCtx = canvas.getContext('2d');
+      const srcData = srcCtx.getImageData(0, 0, canvas.width, canvas.height);
+      const dstData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+      for (let i = 0; i < srcData.data.length; i += 4) {
+        if (srcData.data[i + 3] > 0) { // alpha > 0 → 칠해진 부분
+          dstData.data[i] = 255;
+          dstData.data[i + 1] = 255;
+          dstData.data[i + 2] = 255;
+          dstData.data[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(dstData, 0, 0);
+      maskCanvas.toBlob(resolve, 'image/png');
+    });
+  };
+
+  // ── AI 오브젝트 제거 (인페인팅) ──
+  const handleInpaint = async () => {
+    if (!editImage) return;
+    setInpainting(true);
+    try {
+      const maskBlob = await getMaskBlob();
+      if (!maskBlob) throw new Error('마스크를 그려주세요');
+
+      const imgRes = await fetch(editImage);
+      const imgBlob = await imgRes.blob();
+
+      const formData = new FormData();
+      formData.append('file', imgBlob, 'image.png');
+      formData.append('mask', maskBlob, 'mask.png');
+
+      const response = await axios.post(`${API_URL}/api/delivery-images/inpaint`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 120000,
+      });
+
+      setEditHistory(prev => [...prev, editImage]);
+      const resultUrl = URL.createObjectURL(response.data);
+      setEditImage(resultUrl);
+      setEditPreview(resultUrl);
+      clearMask();
+    } catch (err) {
+      alert('오브젝트 제거 실패: ' + (err.response?.data?.detail || err.message));
+    }
+    setInpainting(false);
+  };
+
+  // ── 배경 교체 ──
+  const handleBgReplace = async () => {
+    if (!editImage) return;
+    setReplacingBg(true);
+    try {
+      // 1. 배경 제거
+      const imgRes = await fetch(editImage);
+      const imgBlob = await imgRes.blob();
+      const formData = new FormData();
+      formData.append('file', imgBlob, 'image.png');
+
+      const response = await axios.post(`${API_URL}/api/delivery-images/remove-bg`, formData, {
+        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob',
+        timeout: 120000,
+      });
+
+      // 2. 투명 이미지에 새 배경 합성
+      const fgUrl = URL.createObjectURL(response.data);
+      const fgImg = new window.Image();
+      fgImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        fgImg.onload = resolve;
+        fgImg.onerror = reject;
+        fgImg.src = fgUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = fgImg.width;
+      canvas.height = fgImg.height;
+      const ctx = canvas.getContext('2d');
+
+      // 배경 이미지 또는 단색
+      if (bgImage) {
+        const bgImg = new window.Image();
+        bgImg.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          bgImg.onload = resolve;
+          bgImg.onerror = reject;
+          bgImg.src = bgImage;
+        });
+        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // 전경 합성
+      ctx.drawImage(fgImg, 0, 0);
+      URL.revokeObjectURL(fgUrl);
+
+      canvas.toBlob(blob => {
+        setEditHistory(prev => [...prev, editImage]);
+        const resultUrl = URL.createObjectURL(blob);
+        setEditImage(resultUrl);
+        setEditPreview(resultUrl);
+        setReplacingBg(false);
+      }, 'image/png');
+    } catch (err) {
+      alert('배경 교체 실패: ' + (err.response?.data?.detail || err.message));
+      setReplacingBg(false);
+    }
+  };
+
+  // ── 실행 취소 ──
+  const handleUndo = () => {
+    if (editHistory.length === 0) return;
+    const prev = editHistory[editHistory.length - 1];
+    setEditHistory(h => h.slice(0, -1));
+    setEditImage(prev);
+    setEditPreview(prev);
+    clearMask();
+  };
+
   // 배경 제거
   const handleRemoveBg = async () => {
     if (!editImage) return;
@@ -512,6 +707,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
         responseType: 'blob',
         timeout: 120000,
       });
+      setEditHistory(prev => [...prev, editImage]);
       const resultUrl = URL.createObjectURL(response.data);
       setEditImage(resultUrl);
       setEditPreview(resultUrl);
@@ -1166,7 +1362,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
             <div className="flex-1 overflow-hidden flex">
               {/* 왼쪽: 편집 도구 */}
               <div className="w-[300px] shrink-0 border-r border-slate-200 bg-slate-50 overflow-y-auto">
-                <div className="p-5 space-y-5">
+                <div className="p-4 space-y-4">
 
                   <ImageDropZone
                     label="편집할 이미지 선택"
@@ -1175,122 +1371,192 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                       setEditOriginal(dataUrl);
                       setEditPreview(dataUrl);
                       resetEditControls();
+                      setEditHistory([]);
+                      clearMask();
                     }}
                   />
 
                   {editImage && (
                     <>
-                      {/* 밝기 */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                            <Sun className="w-3.5 h-3.5" />
-                            밝기
-                          </label>
-                          <span className="text-xs text-slate-400">{brightness}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="50" max="150" value={brightness}
-                          onChange={e => setBrightness(Number(e.target.value))}
-                          className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-amber-500"
-                        />
+                      {/* 편집 모드 탭 */}
+                      <div className="flex gap-1 p-1 bg-slate-200 rounded-xl">
+                        {[
+                          { id: 'adjust', label: '보정', icon: Sliders },
+                          { id: 'inpaint', label: '제거', icon: Paintbrush },
+                          { id: 'bgReplace', label: '배경', icon: Palette },
+                        ].map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => setEditMode(m.id)}
+                            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-bold transition-all ${
+                              editMode === m.id
+                                ? 'bg-white text-slate-800 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                            }`}
+                          >
+                            <m.icon className="w-3.5 h-3.5" />
+                            {m.label}
+                          </button>
+                        ))}
                       </div>
 
-                      {/* 대비 */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                            <Contrast className="w-3.5 h-3.5" />
-                            대비
-                          </label>
-                          <span className="text-xs text-slate-400">{contrast}%</span>
+                      {/* ── 보정 모드 ── */}
+                      {editMode === 'adjust' && (
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Sun className="w-3.5 h-3.5" />밝기</label>
+                              <span className="text-xs text-slate-400">{brightness}%</span>
+                            </div>
+                            <input type="range" min="50" max="150" value={brightness} onChange={e => setBrightness(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-amber-500" />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Contrast className="w-3.5 h-3.5" />대비</label>
+                              <span className="text-xs text-slate-400">{contrast}%</span>
+                            </div>
+                            <input type="range" min="50" max="150" value={contrast} onChange={e => setContrast(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-blue-500" />
+                          </div>
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" />채도</label>
+                              <span className="text-xs text-slate-400">{saturate}%</span>
+                            </div>
+                            <input type="range" min="0" max="200" value={saturate} onChange={e => setSaturate(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-emerald-500" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><RotateCw className="w-3.5 h-3.5" />회전</label>
+                            <div className="flex gap-2 mt-2">
+                              {[0, 90, 180, 270].map(deg => (
+                                <button key={deg} onClick={() => setRotation(deg)}
+                                  className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${rotation === deg ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                >{deg}°</button>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <input
-                          type="range"
-                          min="50" max="150" value={contrast}
-                          onChange={e => setContrast(Number(e.target.value))}
-                          className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-blue-500"
-                        />
-                      </div>
+                      )}
 
-                      {/* 채도 */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" />
-                            채도
-                          </label>
-                          <span className="text-xs text-slate-400">{saturate}%</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0" max="200" value={saturate}
-                          onChange={e => setSaturate(Number(e.target.value))}
-                          className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-emerald-500"
-                        />
-                      </div>
+                      {/* ── 오브젝트 제거 모드 ── */}
+                      {editMode === 'inpaint' && (
+                        <div className="space-y-4">
+                          <div className="p-3 rounded-xl bg-violet-50 border border-violet-200">
+                            <p className="text-xs font-bold text-violet-700 mb-1">AI 오브젝트 제거</p>
+                            <p className="text-[10px] text-violet-500">제거할 부분을 브러시로 칠한 후 "AI 제거" 버튼을 누르세요. AI가 자연스럽게 채워넣습니다.</p>
+                          </div>
 
-                      {/* 회전 */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
-                          <RotateCw className="w-3.5 h-3.5" />
-                          회전
-                        </label>
-                        <div className="flex gap-2">
-                          {[0, 90, 180, 270].map(deg => (
-                            <button
-                              key={deg}
-                              onClick={() => setRotation(deg)}
-                              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
-                                rotation === deg
-                                  ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400'
-                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                              }`}
-                            >
-                              {deg}°
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                                <CircleDot className="w-3.5 h-3.5" />
+                                브러시 크기
+                              </label>
+                              <span className="text-xs text-slate-400">{brushSize}px</span>
+                            </div>
+                            <input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-2 rounded-full appearance-none bg-slate-200 accent-violet-500" />
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button onClick={clearMask} className="flex-1 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-1">
+                              <Trash2 className="w-3 h-3" />마스크 지우기
                             </button>
-                          ))}
+                          </div>
+
+                          <button
+                            onClick={handleInpaint}
+                            disabled={inpainting}
+                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {inpainting ? (<><Loader2 className="w-4 h-4 animate-spin" />AI 제거 중...</>) : (<><Wand2 className="w-4 h-4" />AI 오브젝트 제거</>)}
+                          </button>
                         </div>
-                      </div>
+                      )}
 
-                      {/* 배경 제거 */}
-                      <div className="pt-1">
-                        <button
-                          onClick={handleRemoveBg}
-                          disabled={removingBg}
-                          className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {removingBg ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              배경 제거 중...
-                            </>
-                          ) : (
-                            <>
-                              <Eraser className="w-4 h-4" />
-                              배경 제거 (AI)
-                            </>
-                          )}
-                        </button>
-                        <p className="text-[10px] text-slate-400 mt-1 text-center">AI가 배경을 자동으로 제거하여 투명 PNG로 변환합니다</p>
-                      </div>
+                      {/* ── 배경 교체 모드 ── */}
+                      {editMode === 'bgReplace' && (
+                        <div className="space-y-4">
+                          <div className="p-3 rounded-xl bg-pink-50 border border-pink-200">
+                            <p className="text-xs font-bold text-pink-700 mb-1">AI 배경 처리</p>
+                            <p className="text-[10px] text-pink-500">배경을 자동으로 제거하거나, 새로운 배경으로 교체합니다.</p>
+                          </div>
 
-                      {/* 액션 버튼 */}
-                      <div className="space-y-2 pt-2">
-                        <button
-                          onClick={handleResetEdit}
-                          className="w-full py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                        >
-                          <Undo2 className="w-3.5 h-3.5" />
-                          초기화
-                        </button>
+                          {/* 배경 제거 */}
+                          <button
+                            onClick={handleRemoveBg}
+                            disabled={removingBg}
+                            className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600 shadow-lg shadow-pink-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {removingBg ? (<><Loader2 className="w-4 h-4 animate-spin" />배경 제거 중...</>) : (<><Eraser className="w-4 h-4" />배경 제거 (투명)</>)}
+                          </button>
+
+                          <div className="border-t border-slate-200 pt-4">
+                            <p className="text-xs font-bold text-slate-500 mb-2">배경 교체</p>
+
+                            {/* 색상 선택 */}
+                            <div className="mb-3">
+                              <label className="text-[10px] text-slate-400 mb-1 block">단색 배경</label>
+                              <div className="flex gap-2 items-center">
+                                {['#ffffff', '#f1f5f9', '#1e293b', '#000000', '#fef3c7', '#dcfce7', '#dbeafe'].map(c => (
+                                  <button key={c} onClick={() => { setBgColor(c); setBgImage(null); }}
+                                    className={`w-7 h-7 rounded-full border-2 transition-all ${bgColor === c && !bgImage ? 'border-violet-500 scale-110' : 'border-slate-300'}`}
+                                    style={{ backgroundColor: c }}
+                                  />
+                                ))}
+                                <input type="color" value={bgColor} onChange={e => { setBgColor(e.target.value); setBgImage(null); }}
+                                  className="w-7 h-7 rounded-full cursor-pointer border-0"
+                                />
+                              </div>
+                            </div>
+
+                            {/* 배경 이미지 업로드 */}
+                            <div className="mb-3">
+                              <label className="text-[10px] text-slate-400 mb-1 block">이미지 배경</label>
+                              <ImageDropZone
+                                label="배경 이미지 (선택)"
+                                onImage={({ dataUrl }) => setBgImage(dataUrl)}
+                                className="!p-2 !text-[10px]"
+                              />
+                              {bgImage && (
+                                <div className="mt-1 flex items-center gap-2">
+                                  <img src={bgImage} alt="bg" className="w-10 h-10 rounded object-cover" />
+                                  <button onClick={() => setBgImage(null)} className="text-[10px] text-red-400 hover:text-red-600">제거</button>
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={handleBgReplace}
+                              disabled={replacingBg}
+                              className="w-full py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {replacingBg ? (<><Loader2 className="w-4 h-4 animate-spin" />배경 교체 중...</>) : (<><Palette className="w-4 h-4" />배경 교체</>)}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 공통 액션 */}
+                      <div className="space-y-2 pt-3 border-t border-slate-200">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleUndo}
+                            disabled={editHistory.length === 0}
+                            className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5 disabled:opacity-30"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />실행취소
+                          </button>
+                          <button
+                            onClick={handleResetEdit}
+                            className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 transition-all flex items-center justify-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />초기화
+                          </button>
+                        </div>
                         <button
                           onClick={handleExportEdit}
                           className="w-full py-2.5 rounded-xl text-xs font-bold bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2"
                         >
-                          <Download className="w-3.5 h-3.5" />
-                          편집 이미지 다운로드
+                          <Download className="w-3.5 h-3.5" />편집 이미지 다운로드
                         </button>
                       </div>
                     </>
@@ -1298,11 +1564,11 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                 </div>
               </div>
 
-              {/* 오른쪽: 이미지 미리보기 */}
+              {/* 오른쪽: 이미지 미리보기 + 마스킹 캔버스 */}
               <div className="flex-1 overflow-auto bg-slate-100 flex items-center justify-center p-6">
                 {editImage ? (
                   <div
-                    className="rounded-2xl shadow-lg overflow-hidden max-w-full max-h-full"
+                    className="relative rounded-2xl shadow-lg overflow-hidden"
                     style={{
                       backgroundImage: 'linear-gradient(45deg, #e2e8f0 25%, transparent 25%), linear-gradient(-45deg, #e2e8f0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e2e8f0 75%), linear-gradient(-45deg, transparent 75%, #e2e8f0 75%)',
                       backgroundSize: '20px 20px',
@@ -1310,11 +1576,40 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     }}
                   >
                     <img
+                      ref={imgRef}
                       src={editImage}
                       alt="편집 중"
                       className="max-w-full max-h-[70vh] object-contain transition-all duration-200"
-                      style={editFilterStyle}
+                      style={editMode === 'adjust' ? editFilterStyle : {}}
+                      onLoad={(e) => {
+                        // 마스크 캔버스 크기를 이미지에 맞춤
+                        if (maskCanvasRef.current) {
+                          maskCanvasRef.current.width = e.target.naturalWidth;
+                          maskCanvasRef.current.height = e.target.naturalHeight;
+                          maskCanvasRef.current.style.width = e.target.width + 'px';
+                          maskCanvasRef.current.style.height = e.target.height + 'px';
+                        }
+                      }}
                     />
+                    {/* 인페인트 마스킹 캔버스 */}
+                    {editMode === 'inpaint' && (
+                      <canvas
+                        ref={maskCanvasRef}
+                        className="absolute top-0 left-0"
+                        style={{ cursor: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='${brushSize}' height='${brushSize}'><circle cx='${brushSize/2}' cy='${brushSize/2}' r='${brushSize/2 - 1}' fill='none' stroke='red' stroke-width='2'/></svg>") ${brushSize/2} ${brushSize/2}, crosshair` }}
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                      />
+                    )}
+                    {/* 인페인트 모드 표시 */}
+                    {editMode === 'inpaint' && (
+                      <div className="absolute top-2 left-2 px-2 py-1 rounded-lg bg-violet-600/80 text-white text-[10px] font-bold flex items-center gap-1">
+                        <Paintbrush className="w-3 h-3" />
+                        브러시 모드 — 제거할 부분을 칠하세요
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center text-slate-400">
