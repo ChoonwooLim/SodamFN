@@ -5,7 +5,7 @@
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from routers.auth import get_admin_user
-from models import User as AuthUser, DeliveryImage
+from models import User as AuthUser, DeliveryImage, FoodTranslation
 from sqlmodel import Session, select
 from database import get_session
 from pydantic import BaseModel
@@ -163,70 +163,55 @@ STYLE_SUFFIXES = {
     "minimal": "minimal flat lay food photography, bright clean background, modern styling, negative space, Instagram-worthy composition",
 }
 
-# ── 한국어 음식명 → 영어 설명 사전 (Flux.1-schnell 정확도 향상) ──
-FOOD_TRANSLATIONS = {
-    # 김밥류
-    "김밥": "Korean gimbap (kimbap) sushi roll wrapped in seaweed with rice and fillings, sliced to show cross-section",
-    "참치김밥": "Korean tuna gimbap roll with tuna mayo, rice, and vegetables wrapped in seaweed, sliced cross-section view",
-    "불고기김밥": "Korean bulgogi beef gimbap roll with marinated beef, rice, and vegetables in seaweed wrap",
-    "치즈김밥": "Korean cheese gimbap roll with melted cheese, rice, and vegetables in seaweed wrap",
-    "소담김밥": "Korean premium gimbap roll with assorted fillings, rice, and vegetables in seaweed",
-    "꼬마김밥": "Korean mini gimbap (kkoma gimbap) bite-sized rolls, cute small seaweed rice rolls",
-    "스팸김밥": "Korean spam gimbap roll with grilled spam, rice, and vegetables in seaweed",
-    "야채김밥": "Korean vegetable gimbap roll with various fresh vegetables, rice, in seaweed wrap",
-    "당근라페김밥": "Korean carrot rapé gimbap with shredded carrot, rice in seaweed wrap",
-    "멸치김밥": "Korean anchovy gimbap roll with stir-fried anchovies, rice in seaweed",
-    # 분식류
-    "떡볶이": "Korean tteokbokki, spicy stir-fried rice cakes in red gochujang sauce",
-    "치즈떡볶이": "Korean cheese tteokbokki, spicy rice cakes topped with melted mozzarella cheese",
-    "라면": "Korean Shin Ramyeon style instant noodles in small aluminum pot, curly yellow instant noodle in red spicy broth, with egg and chopped green onions on top, typical Korean convenience store ramyeon",
-    "치즈라면": "Korean Shin Ramyeon style instant noodles with a square yellow American cheese slice melting on top, curly yellow instant noodle in small aluminum pot, red spicy broth, Korean convenience store cheese ramyeon",
-    "라볶이": "Korean rabokki, spicy rice cakes mixed with curly yellow instant ramen noodles in gochujang sauce",
-    "순대": "Korean sundae (blood sausage), sliced to show glass noodle filling, served with salt",
-    "어묵": "Korean fish cake (eomuk) skewers in warm broth",
-    "튀김": "Korean fried snacks (twigim), assorted tempura-style fried vegetables and seafood",
-    "유부초밥": "Korean inari sushi (yubu chobap), seasoned fried tofu pouches stuffed with rice",
-    "삶은계란": "Korean boiled eggs, halved to show yolk, simple side dish",
-    # 주먹밥류
-    "주먹밥": "Korean rice ball (jumeokbap), triangle or round shaped onigiri-style rice ball",
-    "스팸주먹밥": "Korean spam rice ball with grilled spam inside, wrapped in seaweed",
-    "불고기주먹밥": "Korean bulgogi rice ball with marinated beef, triangle shaped",
-    "참치주먹밥": "Korean tuna mayo rice ball, triangle shaped wrapped in seaweed",
-    # 음료류
-    "생수": "bottled water, clear plastic water bottle",
-    "콜라": "Coca-Cola can or glass with ice",
-    "사이다": "Korean Chilsung Cider, clear lemon-lime soda",
-    "커피": "iced Americano coffee in clear cup",
-    # 세트메뉴
-    "소담세트": "Korean meal set with gimbap rolls, tteokbokki, and sundae on tray",
-}
+# ── 한국어 음식명 → 영어 사전 (DB 기반, 캐시 사용) ──
+_translation_cache: dict = {}
+_cache_ts: float = 0
+
+def _load_translations() -> dict:
+    """DB에서 번역 사전 로드 (60초 캐시)"""
+    global _translation_cache, _cache_ts
+    import time
+    now = time.time()
+    if _translation_cache and (now - _cache_ts) < 60:
+        return _translation_cache
+    try:
+        from database import engine
+        with Session(engine) as session:
+            rows = session.exec(
+                select(FoodTranslation).where(FoodTranslation.is_active == True)
+            ).all()
+            _translation_cache = {r.korean: r.english for r in rows}
+            _cache_ts = now
+    except Exception as e:
+        logger.warning(f"번역 사전 로드 실패, 캐시 사용: {e}")
+    return _translation_cache
 
 
 def _translate_prompt(korean_prompt: str) -> str:
     """한국어 프롬프트를 영어로 변환하여 Flux 모델 정확도 향상"""
+    translations = _load_translations()
     prompt = korean_prompt.strip()
 
-    # 1. Check exact match first
-    if prompt in FOOD_TRANSLATIONS:
-        return FOOD_TRANSLATIONS[prompt]
+    # 1. Exact match
+    if prompt in translations:
+        return translations[prompt]
 
-    # 2. Check if any food name is contained in the prompt
+    # 2. Partial match (longest-first)
     translated_parts = []
     remaining = prompt
-    for kr_name, en_desc in sorted(FOOD_TRANSLATIONS.items(), key=lambda x: len(x[0]), reverse=True):
+    for kr_name, en_desc in sorted(translations.items(), key=lambda x: len(x[0]), reverse=True):
         if kr_name in remaining:
             translated_parts.append(en_desc)
             remaining = remaining.replace(kr_name, "", 1)
 
     if translated_parts:
-        # Combine translations with any remaining Korean context hints
         result = ", ".join(translated_parts)
         remaining = remaining.strip().strip(",").strip()
         if remaining:
             result += f", ({remaining})"
         return result
 
-    # 3. No match - add generic Korean food context
+    # 3. No match
     return f"Korean food dish: {prompt}, appetizing Korean cuisine"
 
 
@@ -566,3 +551,102 @@ async def proxy_image(url: str, _admin: AuthUser = Depends(get_admin_user)):
             )
     except httpx.HTTPError:
         raise HTTPException(status_code=400, detail="이미지를 불러올 수 없습니다")
+
+
+# ══════════════════════════════════════════
+# 음식 번역 사전 관리 CRUD
+# ══════════════════════════════════════════
+
+class FoodTranslationCreate(BaseModel):
+    korean: str
+    english: str
+    category: str = "기타"
+
+class FoodTranslationUpdate(BaseModel):
+    korean: Optional[str] = None
+    english: Optional[str] = None
+    category: Optional[str] = None
+    is_active: Optional[bool] = None
+
+@router.get("/translations")
+def list_translations(
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    rows = session.exec(
+        select(FoodTranslation).order_by(FoodTranslation.category, FoodTranslation.korean)
+    ).all()
+    return [
+        {
+            "id": r.id, "korean": r.korean, "english": r.english,
+            "category": r.category, "is_active": r.is_active,
+            "created_at": r.created_at.isoformat(), "updated_at": r.updated_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+@router.post("/translations")
+def create_translation(
+    body: FoodTranslationCreate,
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    existing = session.exec(
+        select(FoodTranslation).where(FoodTranslation.korean == body.korean.strip())
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"'{body.korean}' 항목이 이미 존재합니다")
+    entry = FoodTranslation(
+        korean=body.korean.strip(),
+        english=body.english.strip(),
+        category=body.category,
+    )
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    _invalidate_translation_cache()
+    return {"id": entry.id, "korean": entry.korean, "english": entry.english, "category": entry.category}
+
+@router.put("/translations/{tid}")
+def update_translation(
+    tid: int,
+    body: FoodTranslationUpdate,
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    entry = session.get(FoodTranslation, tid)
+    if not entry:
+        raise HTTPException(status_code=404, detail="항목을 찾을 수 없습니다")
+    if body.korean is not None:
+        entry.korean = body.korean.strip()
+    if body.english is not None:
+        entry.english = body.english.strip()
+    if body.category is not None:
+        entry.category = body.category
+    if body.is_active is not None:
+        entry.is_active = body.is_active
+    entry.updated_at = datetime.now()
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    _invalidate_translation_cache()
+    return {"id": entry.id, "korean": entry.korean, "english": entry.english, "category": entry.category, "is_active": entry.is_active}
+
+@router.delete("/translations/{tid}")
+def delete_translation(
+    tid: int,
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    entry = session.get(FoodTranslation, tid)
+    if not entry:
+        raise HTTPException(status_code=404, detail="항목을 찾을 수 없습니다")
+    session.delete(entry)
+    session.commit()
+    _invalidate_translation_cache()
+    return {"status": "deleted", "id": tid}
+
+def _invalidate_translation_cache():
+    global _translation_cache, _cache_ts
+    _translation_cache = {}
+    _cache_ts = 0

@@ -4,7 +4,7 @@ import {
   RotateCw, Sun, Contrast, Save, Wand2, ArrowUpCircle,
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
-  Link, Clipboard, Languages, Eye, EyeOff
+  Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -485,10 +485,69 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   // 탭 컨텐츠
   // ══════════════════════════════
 
+  // ══════════════════════════════
+  // 번역 사전 탭 핸들러
+  // ══════════════════════════════
+  const [dictItems, setDictItems] = useState([]);
+  const [dictLoading, setDictLoading] = useState(false);
+  const [dictSearch, setDictSearch] = useState('');
+  const [dictForm, setDictForm] = useState({ korean: '', english: '', category: '기타' });
+  const [dictEditing, setDictEditing] = useState(null); // id being edited
+  const DICT_CATEGORIES = ['김밥류', '분식류', '주먹밥류', '음료류', '세트메뉴', '기타'];
+
+  const loadDict = async () => {
+    setDictLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/api/delivery-images/translations`, { headers: getAuthHeaders() });
+      setDictItems(res.data);
+    } catch { /* ignore */ }
+    setDictLoading(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'dictionary') loadDict();
+  }, [activeTab]);
+
+  const handleDictSave = async () => {
+    if (!dictForm.korean.trim() || !dictForm.english.trim()) return;
+    try {
+      if (dictEditing) {
+        await axios.put(`${API_URL}/api/delivery-images/translations/${dictEditing}`, dictForm, { headers: getAuthHeaders() });
+      } else {
+        await axios.post(`${API_URL}/api/delivery-images/translations`, dictForm, { headers: getAuthHeaders() });
+      }
+      setDictForm({ korean: '', english: '', category: '기타' });
+      setDictEditing(null);
+      loadDict();
+    } catch (err) {
+      alert(err.response?.data?.detail || '저장 실패');
+    }
+  };
+
+  const handleDictDelete = async (id) => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    try {
+      await axios.delete(`${API_URL}/api/delivery-images/translations/${id}`, { headers: getAuthHeaders() });
+      loadDict();
+    } catch { alert('삭제 실패'); }
+  };
+
+  const handleDictToggle = async (item) => {
+    try {
+      await axios.put(`${API_URL}/api/delivery-images/translations/${item.id}`, { is_active: !item.is_active }, { headers: getAuthHeaders() });
+      loadDict();
+    } catch { /* ignore */ }
+  };
+
+  const filteredDict = dictItems.filter(d =>
+    !dictSearch || d.korean.includes(dictSearch) || d.english.toLowerCase().includes(dictSearch.toLowerCase()) || d.category.includes(dictSearch)
+  );
+
   const tabs = [
     { id: 'generate', label: 'AI 생성', icon: Wand2 },
     { id: 'upscale', label: '업스케일', icon: ArrowUpCircle },
     { id: 'edit', label: '편집', icon: Pencil },
+    { id: 'dictionary', label: '번역 사전', icon: BookOpen },
   ];
 
   return (
@@ -1139,6 +1198,158 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
                     <p className="text-xs text-slate-400 mt-1">왼쪽에서 이미지를 업로드하거나, 생성 탭에서 보내기</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════
+              번역 사전 탭
+              ═══════════════════════════════ */}
+          {activeTab === 'dictionary' && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-4xl mx-auto space-y-5">
+
+                {/* 추가/수정 폼 */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-emerald-500" />
+                    {dictEditing ? '항목 수정' : '새 항목 추가'}
+                  </h3>
+                  <div className="grid grid-cols-[1fr_2fr_auto] gap-3 items-end">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">한국어</label>
+                      <input
+                        type="text"
+                        value={dictForm.korean}
+                        onChange={e => setDictForm({ ...dictForm, korean: e.target.value })}
+                        placeholder="치즈라면"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">영어 설명</label>
+                      <input
+                        type="text"
+                        value={dictForm.english}
+                        onChange={e => setDictForm({ ...dictForm, english: e.target.value })}
+                        placeholder="Korean cheese instant noodles with..."
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 bg-white"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={dictForm.category}
+                        onChange={e => setDictForm({ ...dictForm, category: e.target.value })}
+                        className="px-3 py-2.5 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      >
+                        {DICT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <button
+                        onClick={handleDictSave}
+                        disabled={!dictForm.korean.trim() || !dictForm.english.trim()}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        {dictEditing ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                        {dictEditing ? '수정' : '추가'}
+                      </button>
+                      {dictEditing && (
+                        <button
+                          onClick={() => { setDictEditing(null); setDictForm({ korean: '', english: '', category: '기타' }); }}
+                          className="px-3 py-2.5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                        >
+                          취소
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 검색 + 통계 */}
+                <div className="flex items-center justify-between">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={dictSearch}
+                      onChange={e => setDictSearch(e.target.value)}
+                      placeholder="검색..."
+                      className="pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 bg-white w-64"
+                    />
+                  </div>
+                  <div className="text-xs text-slate-400">
+                    총 <span className="font-bold text-slate-600">{dictItems.length}</span>개 항목
+                    {dictItems.filter(d => !d.is_active).length > 0 && (
+                      <span className="ml-2 text-amber-500">({dictItems.filter(d => !d.is_active).length}개 비활성)</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* 사전 목록 */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                  {dictLoading ? (
+                    <div className="p-12 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">로딩 중...</p>
+                    </div>
+                  ) : filteredDict.length === 0 ? (
+                    <div className="p-12 text-center text-slate-400">
+                      <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">항목이 없습니다</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 w-24">카테고리</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 w-32">한국어</th>
+                          <th className="text-left px-4 py-3 text-xs font-bold text-slate-500">영어 설명</th>
+                          <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 w-16">상태</th>
+                          <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 w-24">작업</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredDict.map(item => (
+                          <tr key={item.id} className={`border-b border-slate-100 hover:bg-slate-50/50 transition-all ${!item.is_active ? 'opacity-50' : ''}`}>
+                            <td className="px-4 py-3">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">{item.category}</span>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-800">{item.korean}</td>
+                            <td className="px-4 py-3 text-xs text-slate-500 max-w-xs truncate" title={item.english}>{item.english}</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => handleDictToggle(item)}
+                                className={`w-8 h-5 rounded-full transition-all relative ${item.is_active ? 'bg-emerald-400' : 'bg-slate-300'}`}
+                              >
+                                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${item.is_active ? 'left-3.5' : 'left-0.5'}`} />
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    setDictEditing(item.id);
+                                    setDictForm({ korean: item.korean, english: item.english, category: item.category });
+                                  }}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 transition-all"
+                                  title="수정"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDictDelete(item.id)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                                  title="삭제"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </div>
             </div>
           )}

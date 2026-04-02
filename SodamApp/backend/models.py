@@ -97,6 +97,16 @@ class DeliveryImage(SQLModel, table=True):
     source: str = "upload"  # upload, ai_generated, static
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+class FoodTranslation(SQLModel, table=True):
+    """음식명 한→영 번역 사전 (AI 이미지 생성 프롬프트용)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    korean: str = Field(index=True, sa_column_kwargs={"unique": True})
+    english: str
+    category: str = "기타"
+    is_active: bool = True
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 class Expense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
