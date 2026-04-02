@@ -82,7 +82,7 @@ export default function Onboarding({ onComplete }) {
             {currentStep === 'welcome' && (
                 <div style={styles.stepContent}>
                     <div style={styles.logoCircle}>
-                        <img src="/sodam-logo-white.png" alt="소담" style={{ width: 56, height: 56, objectFit: 'contain' }}
+                        <img src="/sodam-logo-white.webp" alt="소담" style={{ width: 56, height: 56, objectFit: 'contain' }}
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
                     </div>

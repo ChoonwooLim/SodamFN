@@ -106,12 +106,15 @@ class Expense(SQLModel, table=True):
     payment_method: str = "Card"
     description: Optional[str] = None
     
-    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id", index=True)
     vendor: Optional[Vendor] = Relationship(back_populates="expenses")
 
 class Revenue(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_revenue_business_date", "business_id", "date"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
-    date: datetime.date
+    date: datetime.date = Field(index=True)
     channel: str # Store, Coupang, Baemin
     amount: int
     description: Optional[str] = None
@@ -206,6 +209,9 @@ class Staff(SQLModel, table=True):
 # --- Finance (Card Sales) ---
 
 class CardSalesApproval(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_cardsalesapproval_business_date", "business_id", "approval_date"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     approval_date: datetime.date = Field(index=True) # 승인일자
@@ -220,6 +226,9 @@ class CardSalesApproval(SQLModel, table=True):
     shop_name: Optional[str] = None # 가맹점명 (from Excel)
 
 class CardPayment(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_cardpayment_business_date", "business_id", "payment_date"),
+    )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     payment_date: datetime.date = Field(index=True) # 입금일자

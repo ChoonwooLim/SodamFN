@@ -129,17 +129,16 @@ def bulk_delete(
     _admin: AuthUser = Depends(get_admin_user),
     bid=Depends(get_bid_from_token),
 ):
-    deleted = 0
     storage = get_storage()
-    for img_id in req.ids:
-        img = session.get(DeliveryImage, img_id)
-        if img:
-            if img.storage_key:
-                storage.delete_file(img.storage_key)
-            session.delete(img)
-            deleted += 1
+    images = session.exec(
+        select(DeliveryImage).where(DeliveryImage.id.in_(req.ids))
+    ).all()
+    for img in images:
+        if img.storage_key:
+            storage.delete_file(img.storage_key)
+        session.delete(img)
     session.commit()
-    return {"status": "success", "deleted": deleted}
+    return {"status": "success", "deleted": len(images)}
 
 
 # ── AI 이미지 생성 ──

@@ -3,5 +3,9 @@
     "allow": [
       "Bash(sort echo:*)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true
   }
 }

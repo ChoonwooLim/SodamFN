@@ -102,7 +102,7 @@ export default function LandingPage() {
                     </motion.div>
 
                     <motion.div className="hero-logo" variants={fadeUp}>
-                        <img src="/sodam-logo-white.png" alt="소담김밥 로고" className="hero-logo-img" />
+                        <img src="/sodam-logo-white.webp" alt="소담김밥 로고" className="hero-logo-img" />
                     </motion.div>
 
                     <motion.h1 className="hero-title" variants={fadeUp}>
@@ -366,7 +366,7 @@ export default function LandingPage() {
             <footer className="landing-footer">
                 <div className="footer-content">
                     <div className="footer-brand">
-                        <img src="/sodam-logo.png" alt="소담김밥" className="footer-logo" />
+                        <img src="/sodam-logo.webp" alt="소담김밥" className="footer-logo" />
                         <span>소담김밥</span>
                     </div>
                     <div className="footer-address">
