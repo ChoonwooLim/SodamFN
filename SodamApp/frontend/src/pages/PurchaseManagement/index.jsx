@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, ShoppingBag, UploadCloud, RotateCcw, X, Search, Filter, Wallet, ArrowRightLeft, CheckSquare, Square, ChevronDown, ChevronUp, FileSpreadsheet, Camera } from 'lucide-react';
 import api from '../../api';
+import { formatNumber, getWeekday } from '../../utils/format';
 import UploadHistoryList from '../../components/UploadHistoryList';
 import './PurchaseManagement.css';
 
@@ -18,8 +19,6 @@ const CARD_COLORS = {
     '현대카드': { bg: '#f3f4f6', text: '#1f2937', border: '#d1d5db' },
     '기타': { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
 };
-
-import { formatNumber, getWeekday } from '../../utils/format';
 import { EXPENSE_CATEGORIES } from '../../utils/constants';
 
 
@@ -1066,7 +1065,7 @@ export default function PurchaseManagement() {
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-xs text-slate-400 font-semibold">💰 금액</span>
-                                                <span className="text-sm font-extrabold text-blue-600">{(ocrResult.total_amount || 0).toLocaleString()}원</span>
+                                                <span className="text-sm font-extrabold text-blue-600">{formatNumber(ocrResult.total_amount || 0)}원</span>
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <span className="text-xs text-slate-400 font-semibold">📅 날짜</span>
@@ -1083,7 +1082,7 @@ export default function PurchaseManagement() {
                                                         {ocrResult.items.map((item, i) => (
                                                             <div key={i} className="flex justify-between text-xs">
                                                                 <span className="text-slate-600">{item.name}</span>
-                                                                <span className="font-bold text-slate-700 tabular-nums">{item.amount?.toLocaleString()}원</span>
+                                                                <span className="font-bold text-slate-700 tabular-nums">{formatNumber(item.amount)}원</span>
                                                             </div>
                                                         ))}
                                                     </div>

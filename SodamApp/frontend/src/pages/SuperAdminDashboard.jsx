@@ -7,6 +7,7 @@ import {
     FileText, CheckCircle2, XCircle, Clock3, UserPlus
 } from 'lucide-react';
 import api from '../api';
+import { formatNumber } from '../utils/format';
 
 const TABS = [
     { key: 'stores', label: '매장 관리', icon: Building2 },
@@ -227,7 +228,7 @@ export default function SuperAdminDashboard() {
         }
     };
 
-    const fmt = (n) => (n || 0).toLocaleString();
+    const fmt = (n) => formatNumber(n || 0);
 
     const handleApproveApplication = async () => {
         if (!approvalForm.admin_username || !approvalForm.admin_password) {

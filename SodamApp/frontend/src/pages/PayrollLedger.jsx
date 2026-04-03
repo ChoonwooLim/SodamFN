@@ -7,10 +7,11 @@ import {
   BarChart3, TrendingUp, RefreshCw
 } from 'lucide-react';
 import api from '../api';
+import { formatNumber } from '../utils/format';
 import PayrollStatement from '../components/PayrollStatement';
 import AttendanceInput from '../components/AttendanceInput';
 
-const fmt = (v) => (v || 0).toLocaleString();
+const fmt = (v) => formatNumber(v || 0);
 
 export default function PayrollLedger() {
   const navigate = useNavigate();

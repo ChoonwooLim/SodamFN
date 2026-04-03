@@ -241,7 +241,7 @@ export default function DeliveryAppDashboard() {
                   매출 {fmt(ct.total_sales)}원 · 수수료 <span style={{ color: '#ef4444', fontWeight: 700 }}>{ct.fee_rate || 0}%</span>
                 </div>
                 <div style={S.chMetaSub}>
-                  {(ct.order_count || 0).toLocaleString()}건 · 비중 {pct(salesPct)}%
+                  {formatNumber(ct.order_count || 0)}건 · 비중 {pct(salesPct)}%
                 </div>
                 {/* Sales bar */}
                 <div style={{ height: 6, background: '#f1f5f9', borderRadius: 3, marginTop: 8, overflow: 'hidden' }}>
