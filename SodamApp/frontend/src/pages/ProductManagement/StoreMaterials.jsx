@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Store, Sparkles, Image as ImageIcon, Megaphone, Music, Mic,
-  Download, Play, Pause, Square, Loader2, ChevronRight,
+  Download, Play, Pause, Loader2, ChevronRight,
   X, Check, RefreshCw, Volume2, Wand2, AlertCircle,
   Truck, Clock, Gift, Star, Heart, Users, Percent,
   Camera, MessageCircle, Award, Zap, Package, Edit3,
-  Sun, Moon, Coffee, Headphones, Guitar,
+  Sun, Moon, Coffee, Headphones, Guitar, Pencil, Maximize2,
 } from 'lucide-react';
 import api from '../../api';
+import AIImageStudio from './components/AIImageStudio';
 
 /* ───────────────────────────────────
    아이콘 매핑
@@ -27,7 +28,6 @@ const ICON_MAP = {
   music: Music, 'music-2': Music, headphones: Headphones, guitar: Guitar,
   'trending-up': Zap, sunrise: Sun,
 };
-
 const getIcon = (name) => ICON_MAP[name] || Sparkles;
 
 /* ───────────────────────────────────
@@ -42,6 +42,100 @@ const TABS = [
 ];
 
 /* ───────────────────────────────────
+   프리셋 썸네일 컴포넌트
+   - 각 카테고리별 고유 시각 프리뷰
+─────────────────────────────────── */
+const THUMB_PATTERNS = {
+  // 포스터: 세로 포스터 프레임
+  poster: (color, Icon, idx) => (
+    <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}18, ${color}08)` }}>
+      {/* 포스터 프레임 */}
+      <div className="absolute inset-2 rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-1" style={{ borderColor: `${color}30` }}>
+        <div className="w-8 h-1 rounded-full" style={{ backgroundColor: `${color}40` }} />
+        <Icon className="w-6 h-6 mt-1" style={{ color: `${color}90` }} />
+        <div className="w-10 h-0.5 rounded-full mt-1" style={{ backgroundColor: `${color}25` }} />
+        <div className="w-7 h-0.5 rounded-full" style={{ backgroundColor: `${color}20` }} />
+      </div>
+      {/* 코너 장식 */}
+      <div className="absolute top-0 right-0 w-6 h-6 rounded-bl-xl" style={{ backgroundColor: `${color}15` }} />
+      <div className="absolute bottom-0 left-0 w-4 h-4 rounded-tr-lg" style={{ backgroundColor: `${color}10` }} />
+    </div>
+  ),
+  // SNS: 폰 프레임 / 정사각형
+  sns: (color, Icon, idx) => (
+    <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}15, ${color}05)` }}>
+      {/* 폰 프레임 */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-14 rounded-lg border-2 flex flex-col items-center justify-center" style={{ borderColor: `${color}40` }}>
+        <div className="w-3 h-0.5 rounded-full mb-1" style={{ backgroundColor: `${color}30` }} />
+        <Icon className="w-4 h-4" style={{ color: `${color}80` }} />
+        <div className="flex gap-0.5 mt-1.5">
+          <div className="w-1 h-1 rounded-full" style={{ backgroundColor: `${color}30` }} />
+          <div className="w-1 h-1 rounded-full" style={{ backgroundColor: `${color}50` }} />
+          <div className="w-1 h-1 rounded-full" style={{ backgroundColor: `${color}30` }} />
+        </div>
+      </div>
+      {/* 하트/좋아요 */}
+      <Heart className="absolute top-2 right-2 w-3 h-3" style={{ color: `${color}40` }} />
+      <MessageCircle className="absolute bottom-2 right-2 w-3 h-3" style={{ color: `${color}30` }} />
+    </div>
+  ),
+  // 배달앱: 가로 배너
+  delivery: (color, Icon, idx) => (
+    <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}12, ${color}05)` }}>
+      {/* 가로 배너 프레임 */}
+      <div className="absolute inset-x-2 top-3 h-8 rounded-lg border flex items-center px-2 gap-1.5" style={{ borderColor: `${color}35`, backgroundColor: `${color}08` }}>
+        <Icon className="w-4 h-4 shrink-0" style={{ color: `${color}70` }} />
+        <div className="flex-1 space-y-1">
+          <div className="w-full h-1 rounded-full" style={{ backgroundColor: `${color}25` }} />
+          <div className="w-2/3 h-1 rounded-full" style={{ backgroundColor: `${color}15` }} />
+        </div>
+      </div>
+      {/* 별점 */}
+      <div className="absolute bottom-2.5 left-2.5 flex gap-0.5">
+        {[...Array(5)].map((_, i) => (
+          <Star key={i} className="w-2 h-2" style={{ color: i < 4 ? `${color}50` : `${color}20` }} fill={i < 4 ? `${color}50` : 'none'} />
+        ))}
+      </div>
+      <Truck className="absolute bottom-2 right-2 w-3.5 h-3.5" style={{ color: `${color}30` }} />
+    </div>
+  ),
+  // 나레이션: 음파/마이크
+  tts: (color, Icon, idx) => (
+    <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}12, ${color}06)` }}>
+      <Icon className="w-6 h-6" style={{ color: `${color}60` }} />
+      {/* 음파 */}
+      <div className="absolute bottom-3 left-0 right-0 flex items-end justify-center gap-[2px] h-4 px-4">
+        {[...Array(16)].map((_, i) => {
+          const h = 3 + Math.sin((i + idx) * 0.7) * 8 + Math.random() * 4;
+          return <div key={i} className="w-[3px] rounded-full" style={{ height: `${h}px`, backgroundColor: `${color}${i % 3 === 0 ? '50' : '25'}` }} />;
+        })}
+      </div>
+    </div>
+  ),
+  // 음악: 노트/이퀄라이저
+  music: (color, Icon, idx) => (
+    <div className="relative w-full aspect-[3/2] rounded-xl overflow-hidden flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${color}12, ${color}06)` }}>
+      {/* 이퀄라이저 바 */}
+      <div className="flex items-end gap-[3px] h-10">
+        {[...Array(9)].map((_, i) => {
+          const h = 6 + Math.sin((i + idx * 2) * 0.9) * 14 + Math.random() * 8;
+          return <div key={i} className="w-[4px] rounded-full transition-all" style={{ height: `${h}px`, backgroundColor: `${color}${50 - i * 3}` }} />;
+        })}
+      </div>
+      {/* 음표 */}
+      <Music className="absolute top-2 right-2 w-3 h-3" style={{ color: `${color}30` }} />
+      <Icon className="absolute bottom-2 left-2 w-3.5 h-3.5" style={{ color: `${color}35` }} />
+    </div>
+  ),
+};
+
+function PresetThumbnail({ preset, tabId, index }) {
+  const Icon = getIcon(preset.icon);
+  const renderer = THUMB_PATTERNS[tabId] || THUMB_PATTERNS.poster;
+  return renderer(preset.color, Icon, index);
+}
+
+/* ───────────────────────────────────
    메인 컴포넌트
 ─────────────────────────────────── */
 export default function StoreMaterials() {
@@ -53,14 +147,21 @@ export default function StoreMaterials() {
   // 생성 관련
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [generating, setGenerating] = useState(false);
-  const [result, setResult] = useState(null);  // { type, url, blob }
+  const [result, setResult] = useState(null);
   const [customText, setCustomText] = useState('');
   const [storeName, setStoreName] = useState('소담김밥');
   const [selectedVoice, setSelectedVoice] = useState('ko-KR-SunHiNeural');
   const [ttsSpeed, setTtsSpeed] = useState('+0%');
   const [musicDuration, setMusicDuration] = useState(30);
 
-  // 오디오 플레이어
+  // 편집 모드 (AIImageStudio)
+  const [showEditor, setShowEditor] = useState(false);
+  const [editImageUrl, setEditImageUrl] = useState(null);
+
+  // 생성 히스토리
+  const [history, setHistory] = useState([]);
+
+  // 오디오
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -68,7 +169,7 @@ export default function StoreMaterials() {
 
   /* ── 프리셋 + AI 상태 로드 ── */
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       try {
         const [presetsRes, statusRes] = await Promise.all([
           api.get('/promotions/presets'),
@@ -81,8 +182,7 @@ export default function StoreMaterials() {
       } finally {
         setLoading(false);
       }
-    };
-    load();
+    })();
   }, []);
 
   /* ── 탭 변경 시 리셋 ── */
@@ -96,8 +196,7 @@ export default function StoreMaterials() {
 
   /* ── 이미지 생성 ── */
   const generateImage = useCallback(async (preset) => {
-    setGenerating(true);
-    setResult(null);
+    setGenerating(true); setResult(null);
     try {
       const resp = await api.post('/promotions/generate-image', {
         preset_id: preset.id,
@@ -106,18 +205,15 @@ export default function StoreMaterials() {
       }, { responseType: 'blob', timeout: 200000 });
       const url = URL.createObjectURL(resp.data);
       setResult({ type: 'image', url, blob: resp.data });
+      setHistory(prev => [{ type: 'image', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message;
-      setResult({ type: 'error', message: msg });
-    } finally {
-      setGenerating(false);
-    }
-  }, [customText, storeName]);
+      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
+    } finally { setGenerating(false); }
+  }, [customText, storeName, activeTab]);
 
   /* ── TTS 생성 ── */
   const generateTTS = useCallback(async (preset) => {
-    setGenerating(true);
-    setResult(null);
+    setGenerating(true); setResult(null);
     try {
       const resp = await api.post('/promotions/generate-tts', {
         preset_id: preset.id,
@@ -128,18 +224,15 @@ export default function StoreMaterials() {
       }, { responseType: 'blob', timeout: 60000 });
       const url = URL.createObjectURL(resp.data);
       setResult({ type: 'audio', url, blob: resp.data, format: 'mp3' });
+      setHistory(prev => [{ type: 'audio', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message;
-      setResult({ type: 'error', message: msg });
-    } finally {
-      setGenerating(false);
-    }
-  }, [customText, storeName, selectedVoice, ttsSpeed]);
+      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
+    } finally { setGenerating(false); }
+  }, [customText, storeName, selectedVoice, ttsSpeed, activeTab]);
 
   /* ── 음악 생성 ── */
   const generateMusic = useCallback(async (preset) => {
-    setGenerating(true);
-    setResult(null);
+    setGenerating(true); setResult(null);
     try {
       const resp = await api.post('/promotions/generate-music', {
         preset_id: preset.id,
@@ -148,24 +241,18 @@ export default function StoreMaterials() {
       }, { responseType: 'blob', timeout: 360000 });
       const url = URL.createObjectURL(resp.data);
       setResult({ type: 'audio', url, blob: resp.data, format: 'wav' });
+      setHistory(prev => [{ type: 'audio', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message;
-      setResult({ type: 'error', message: msg });
-    } finally {
-      setGenerating(false);
-    }
-  }, [customText, musicDuration]);
+      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
+    } finally { setGenerating(false); }
+  }, [customText, musicDuration, activeTab]);
 
   /* ── 생성 핸들러 ── */
   const handleGenerate = useCallback(() => {
     if (!selectedPreset || generating) return;
-    if (['poster', 'sns', 'delivery'].includes(activeTab)) {
-      generateImage(selectedPreset);
-    } else if (activeTab === 'tts') {
-      generateTTS(selectedPreset);
-    } else if (activeTab === 'music') {
-      generateMusic(selectedPreset);
-    }
+    if (['poster', 'sns', 'delivery'].includes(activeTab)) generateImage(selectedPreset);
+    else if (activeTab === 'tts') generateTTS(selectedPreset);
+    else if (activeTab === 'music') generateMusic(selectedPreset);
   }, [selectedPreset, generating, activeTab, generateImage, generateTTS, generateMusic]);
 
   /* ── 다운로드 ── */
@@ -178,23 +265,23 @@ export default function StoreMaterials() {
     a.click();
   }, [result, selectedPreset]);
 
+  /* ── 편집 모드 열기 ── */
+  const openEditor = useCallback(() => {
+    if (result?.type === 'image' && result.url) {
+      setEditImageUrl(result.url);
+      setShowEditor(true);
+    }
+  }, [result]);
+
   /* ── 오디오 토글 ── */
   const toggleAudio = useCallback(() => {
     if (!audioRef.current || !result?.url) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.src = result.url;
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
+    if (isPlaying) { audioRef.current.pause(); setIsPlaying(false); }
+    else { audioRef.current.src = result.url; audioRef.current.play(); setIsPlaying(true); }
   }, [isPlaying, result]);
 
-  /* ── 현재 탭 프리셋 가져오기 ── */
   const currentPresets = presets?.[activeTab] || [];
 
-  /* ── AI 서비스 상태 뱃지 ── */
   const getServiceStatus = () => {
     if (!aiStatus) return null;
     if (['poster', 'sns', 'delivery'].includes(activeTab)) return aiStatus.gpu;
@@ -217,8 +304,17 @@ export default function StoreMaterials() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* 숨겨진 오디오 요소 */}
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+
+      {/* ── AIImageStudio 편집 모달 ── */}
+      {showEditor && (
+        <AIImageStudio
+          onClose={() => { setShowEditor(false); setEditImageUrl(null); }}
+          onSave={() => { setShowEditor(false); }}
+          aiProvider="Flux.1-schnell"
+          initialImage={editImageUrl}
+        />
+      )}
 
       {/* ── 히어로 헤더 ── */}
       <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 text-white px-4 sm:px-8 py-6 sm:py-8">
@@ -232,7 +328,6 @@ export default function StoreMaterials() {
               <p className="text-slate-400 text-sm">포스터, SNS, 나레이션, 배경음악을 AI가 자동 생성합니다</p>
             </div>
           </div>
-          {/* AI 상태 표시 */}
           {aiStatus && (
             <div className="flex gap-3 mt-4 ml-14 flex-wrap">
               {[
@@ -254,21 +349,17 @@ export default function StoreMaterials() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
 
-        {/* ── 탭 네비게이션 ── */}
+        {/* ── 탭 ── */}
         <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
           {TABS.map(tab => {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'bg-white shadow-lg border border-slate-200 scale-[1.02]'
+                  isActive ? 'bg-white shadow-lg border border-slate-200 scale-[1.02]'
                     : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
-                }`}
-              >
+                }`}>
                 <TabIcon className="w-4 h-4" style={isActive ? { color: tab.color } : {}} />
                 <span style={isActive ? { color: tab.color } : {}}>{tab.label}</span>
               </button>
@@ -276,7 +367,6 @@ export default function StoreMaterials() {
           })}
         </div>
 
-        {/* ── 탭 설명 + 서비스 상태 ── */}
         <div className="flex items-center justify-between mb-5">
           <p className="text-slate-500 text-sm">{currentTab.desc}</p>
           {serviceStatus && !serviceStatus.online && (
@@ -287,47 +377,49 @@ export default function StoreMaterials() {
           )}
         </div>
 
-        {/* ── 메인 레이아웃: 프리셋 그리드 + 결과 패널 ── */}
+        {/* ── 메인 레이아웃 ── */}
         <div className="flex gap-6 flex-col lg:flex-row">
 
-          {/* ── 왼쪽: 프리셋 그리드 ── */}
-          <div className={`${selectedPreset ? 'lg:w-[55%]' : 'w-full'} transition-all`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {/* ── 왼쪽: 프리셋 그리드 (썸네일 포함) ── */}
+          <div className={`${selectedPreset ? 'lg:w-[58%]' : 'w-full'} transition-all`}>
+            <div className={`grid ${selectedPreset ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'} gap-3`}>
               {currentPresets.map((preset, idx) => {
                 const Icon = getIcon(preset.icon);
                 const isSelected = selectedPreset?.id === preset.id;
                 return (
                   <button
                     key={preset.id}
-                    onClick={() => {
-                      setSelectedPreset(preset);
-                      setResult(null);
-                      setCustomText('');
-                      setIsPlaying(false);
-                    }}
-                    className={`group relative text-left p-4 rounded-2xl border-2 transition-all duration-200 ${
+                    onClick={() => { setSelectedPreset(preset); setResult(null); setCustomText(''); setIsPlaying(false); }}
+                    className={`group relative text-left rounded-2xl border-2 overflow-hidden transition-all duration-200 ${
                       isSelected
                         ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10 scale-[1.02]'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
                     }`}
-                    style={{ animationDelay: `${idx * 0.03}s` }}
                   >
-                    {/* 아이콘 */}
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
-                      style={{ backgroundColor: `${preset.color}15` }}
-                    >
-                      <Icon className="w-5 h-5" style={{ color: preset.color }} />
+                    {/* 썸네일 영역 */}
+                    <PresetThumbnail preset={preset} tabId={activeTab} index={idx} />
+
+                    {/* 텍스트 영역 */}
+                    <div className="p-3 pt-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: `${preset.color}15` }}>
+                          <Icon className="w-3 h-3" style={{ color: preset.color }} />
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-800 truncate">{preset.name}</h3>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 ml-7">{preset.desc}</p>
                     </div>
-                    {/* 텍스트 */}
-                    <h3 className="text-sm font-bold text-slate-800 mb-1">{preset.name}</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{preset.desc}</p>
+
                     {/* 선택 체크 */}
                     {isSelected && (
-                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow-md">
                         <Check className="w-3.5 h-3.5 text-white" />
                       </div>
                     )}
+
+                    {/* 호버 오버레이 */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                   </button>
                 );
               })}
@@ -336,9 +428,9 @@ export default function StoreMaterials() {
 
           {/* ── 오른쪽: 생성 패널 ── */}
           {selectedPreset && (
-            <div className="lg:w-[45%] space-y-4">
-              {/* 패널 헤더 */}
+            <div className="lg:w-[42%] space-y-4 lg:sticky lg:top-4 lg:self-start">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                {/* 패널 헤더 */}
                 <div className={`bg-gradient-to-r ${currentTab.gradient} p-4 text-white`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -356,59 +448,45 @@ export default function StoreMaterials() {
                 </div>
 
                 <div className="p-4 space-y-4">
-
-                  {/* ── 공통: 매장명 ── */}
+                  {/* 공통: 매장명 */}
                   {['poster', 'sns', 'delivery', 'tts'].includes(activeTab) && (
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1.5">매장명</label>
-                      <input
-                        type="text"
-                        value={storeName}
-                        onChange={e => setStoreName(e.target.value)}
+                      <input type="text" value={storeName} onChange={e => setStoreName(e.target.value)}
                         placeholder="소담김밥"
-                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                      />
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                     </div>
                   )}
 
-                  {/* ── 이미지: 커스텀 프롬프트 ── */}
+                  {/* 이미지: 추가 설명 */}
                   {['poster', 'sns', 'delivery'].includes(activeTab) && (
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1.5">
                         추가 설명 <span className="text-slate-400 font-normal">(선택)</span>
                       </label>
-                      <textarea
-                        value={customText}
-                        onChange={e => setCustomText(e.target.value)}
+                      <textarea value={customText} onChange={e => setCustomText(e.target.value)}
                         placeholder="예: 참치김밥 신메뉴, 가을 분위기, 할인율 30%..."
                         rows={2}
-                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                      />
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                     </div>
                   )}
 
-                  {/* ── TTS: 나레이션 텍스트 ── */}
+                  {/* TTS 옵션 */}
                   {activeTab === 'tts' && (
                     <>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                          나레이션 텍스트
-                        </label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">나레이션 텍스트</label>
                         <textarea
                           value={customText || selectedPreset.script?.replace(/\{store_name\}/g, storeName) || ''}
                           onChange={e => setCustomText(e.target.value)}
                           rows={4}
-                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                        />
+                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5">음성</label>
-                          <select
-                            value={selectedVoice}
-                            onChange={e => setSelectedVoice(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          >
+                          <select value={selectedVoice} onChange={e => setSelectedVoice(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                             <option value="ko-KR-SunHiNeural">선희 (여성)</option>
                             <option value="ko-KR-HyunsuMultilingualNeural">현수 (남성)</option>
                             <option value="ko-KR-InJoonNeural">인준 (남성)</option>
@@ -416,11 +494,8 @@ export default function StoreMaterials() {
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-600 mb-1.5">속도</label>
-                          <select
-                            value={ttsSpeed}
-                            onChange={e => setTtsSpeed(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                          >
+                          <select value={ttsSpeed} onChange={e => setTtsSpeed(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30">
                             <option value="-20%">느리게</option>
                             <option value="-10%">약간 느리게</option>
                             <option value="+0%">보통</option>
@@ -432,38 +507,25 @@ export default function StoreMaterials() {
                     </>
                   )}
 
-                  {/* ── 음악: 옵션 ── */}
+                  {/* 음악 옵션 */}
                   {activeTab === 'music' && (
                     <>
                       <div>
                         <label className="block text-xs font-bold text-slate-600 mb-1.5">
                           추가 설명 <span className="text-slate-400 font-normal">(선택)</span>
                         </label>
-                        <textarea
-                          value={customText}
-                          onChange={e => setCustomText(e.target.value)}
+                        <textarea value={customText} onChange={e => setCustomText(e.target.value)}
                           placeholder="예: 좀 더 빠른 템포, 피아노 위주..."
                           rows={2}
-                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
-                        />
+                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
-                          길이: {musicDuration}초
-                        </label>
-                        <input
-                          type="range"
-                          min={10}
-                          max={60}
-                          step={5}
-                          value={musicDuration}
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">길이: {musicDuration}초</label>
+                        <input type="range" min={10} max={60} step={5} value={musicDuration}
                           onChange={e => setMusicDuration(Number(e.target.value))}
-                          className="w-full h-2 rounded-full bg-slate-200 accent-purple-500"
-                        />
+                          className="w-full h-2 rounded-full bg-slate-200 accent-purple-500" />
                         <div className="flex justify-between text-xs text-slate-400 mt-1">
-                          <span>10초</span>
-                          <span>30초</span>
-                          <span>60초</span>
+                          <span>10초</span><span>30초</span><span>60초</span>
                         </div>
                       </div>
                       {selectedPreset.tags && (
@@ -478,28 +540,20 @@ export default function StoreMaterials() {
                     </>
                   )}
 
-                  {/* ── 생성 버튼 ── */}
-                  <button
-                    onClick={handleGenerate}
-                    disabled={generating || (serviceStatus && !serviceStatus.online)}
+                  {/* 생성 버튼 */}
+                  <button onClick={handleGenerate} disabled={generating || (serviceStatus && !serviceStatus.online)}
                     className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-all ${
-                      generating
-                        ? 'bg-slate-400 cursor-wait'
+                      generating ? 'bg-slate-400 cursor-wait'
                         : `bg-gradient-to-r ${currentTab.gradient} hover:opacity-90 shadow-lg active:scale-[0.98]`
-                    }`}
-                  >
+                    }`}>
                     {generating ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         {activeTab === 'music' ? '음악 작곡 중... (최대 5분)' :
-                         activeTab === 'tts' ? '나레이션 생성 중...' :
-                         '이미지 생성 중... (30~60초)'}
+                         activeTab === 'tts' ? '나레이션 생성 중...' : '이미지 생성 중... (30~60초)'}
                       </>
                     ) : (
-                      <>
-                        <Wand2 className="w-4 h-4" />
-                        AI 생성하기
-                      </>
+                      <><Wand2 className="w-4 h-4" /> AI 생성하기</>
                     )}
                   </button>
                 </div>
@@ -520,34 +574,49 @@ export default function StoreMaterials() {
                   {/* 이미지 결과 */}
                   {result.type === 'image' && (
                     <div>
-                      <div className="bg-slate-100 p-2">
+                      <div className="relative bg-slate-100 p-2 group">
                         <img src={result.url} alt="생성된 이미지" className="w-full rounded-xl object-contain max-h-[500px]" />
+                        {/* 이미지 위 퀵 액션 */}
+                        <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={openEditor} title="편집"
+                            className="w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-all">
+                            <Pencil className="w-4 h-4 text-slate-700" />
+                          </button>
+                          <button onClick={() => window.open(result.url, '_blank')} title="전체화면"
+                            className="w-9 h-9 rounded-full bg-white/90 shadow-lg flex items-center justify-center hover:bg-white transition-all">
+                            <Maximize2 className="w-4 h-4 text-slate-700" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="p-4 flex gap-2">
-                        <button onClick={handleDownload}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-all">
-                          <Download className="w-4 h-4" />
-                          다운로드
+                      <div className="p-4 space-y-2">
+                        {/* 편집 버튼 (메인) */}
+                        <button onClick={openEditor}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-purple-500/20">
+                          <Pencil className="w-4 h-4" />
+                          편집 스튜디오에서 수정하기
                         </button>
-                        <button onClick={handleGenerate} disabled={generating}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-all">
-                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
-                          재생성
-                        </button>
+                        <div className="flex gap-2">
+                          <button onClick={handleDownload}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-all">
+                            <Download className="w-4 h-4" /> 다운로드
+                          </button>
+                          <button onClick={handleGenerate} disabled={generating}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-all">
+                            <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> 재생성
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* 오디오 결과 (TTS / Music) */}
+                  {/* 오디오 결과 */}
                   {result.type === 'audio' && (
                     <div className="p-5">
                       <div className={`relative rounded-2xl p-6 bg-gradient-to-br ${currentTab.gradient} text-white mb-4`}>
                         <div className="flex items-center gap-4">
                           <button onClick={toggleAudio}
                             className="w-14 h-14 rounded-full bg-white/25 backdrop-blur flex items-center justify-center hover:bg-white/35 transition-all active:scale-95">
-                            {isPlaying ?
-                              <Pause className="w-6 h-6 text-white" /> :
-                              <Play className="w-6 h-6 text-white ml-0.5" />}
+                            {isPlaying ? <Pause className="w-6 h-6 text-white" /> : <Play className="w-6 h-6 text-white ml-0.5" />}
                           </button>
                           <div className="flex-1 min-w-0">
                             <p className="font-bold truncate">{selectedPreset.name}</p>
@@ -557,7 +626,6 @@ export default function StoreMaterials() {
                           </div>
                           <Volume2 className="w-5 h-5 text-white/50" />
                         </div>
-                        {/* 웨이브 애니메이션 */}
                         {isPlaying && (
                           <div className="flex items-end gap-0.5 absolute bottom-3 right-4 h-5">
                             {[...Array(5)].map((_, i) => (
@@ -570,32 +638,55 @@ export default function StoreMaterials() {
                       <div className="flex gap-2">
                         <button onClick={handleDownload}
                           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-all">
-                          <Download className="w-4 h-4" />
-                          다운로드
+                          <Download className="w-4 h-4" /> 다운로드
                         </button>
                         <button onClick={handleGenerate} disabled={generating}
                           className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-all">
-                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
-                          재생성
+                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} /> 재생성
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
               )}
+
+              {/* ── 최근 히스토리 ── */}
+              {history.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <h4 className="text-xs font-bold text-slate-500 mb-3">최근 생성 기록</h4>
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                    {history.slice(0, 8).map((item, i) => (
+                      <div key={i} className="shrink-0">
+                        {item.type === 'image' ? (
+                          <button onClick={() => { setResult({ type: 'image', url: item.url }); }}
+                            className="w-14 h-14 rounded-xl overflow-hidden border-2 border-slate-200 hover:border-blue-400 transition-all">
+                            <img src={item.url} alt="" className="w-full h-full object-cover" />
+                          </button>
+                        ) : (
+                          <button onClick={() => {
+                            setResult({ type: 'audio', url: item.url, format: item.tab === 'tts' ? 'mp3' : 'wav' });
+                          }}
+                            className="w-14 h-14 rounded-xl bg-slate-100 border-2 border-slate-200 hover:border-blue-400 flex items-center justify-center transition-all">
+                            {item.tab === 'tts' ? <Mic className="w-4 h-4 text-blue-400" /> : <Music className="w-4 h-4 text-purple-400" />}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* ── 선택 안내 (프리셋 미선택 시) ── */}
+        {/* ── 프리셋 미선택 안내 ── */}
         {!selectedPreset && currentPresets.length > 0 && (
           <div className="mt-8 text-center py-10 bg-white rounded-2xl border border-slate-200">
             <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${currentTab.gradient} flex items-center justify-center mx-auto mb-4 shadow-lg`}>
               {(() => { const I = currentTab.icon; return <I className="w-7 h-7 text-white" />; })()}
             </div>
             <h3 className="text-lg font-bold text-slate-700 mb-2">프리셋을 선택해주세요</h3>
-            <p className="text-sm text-slate-500 mb-1">위 프리셋 카드 중 하나를 클릭하면</p>
-            <p className="text-sm text-slate-500">AI가 자동으로 생성을 시작합니다</p>
+            <p className="text-sm text-slate-500">위 프리셋 카드 중 하나를 클릭하면 AI가 자동 생성합니다</p>
             <div className="flex items-center justify-center gap-1 mt-4 text-xs text-slate-400">
               <ChevronRight className="w-4 h-4" />
               <span>{currentPresets.length}개의 프리셋 사용 가능</span>

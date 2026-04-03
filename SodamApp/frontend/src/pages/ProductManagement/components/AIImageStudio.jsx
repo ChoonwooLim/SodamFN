@@ -226,8 +226,8 @@ const UPSCALE_OPTIONS = [
 /* ══════════════════════════════════════════
    AI Image Studio - 전문 이미지 생성/편집 도구
    ══════════════════════════════════════════ */
-export default function AIImageStudio({ onClose, onSave, aiProvider }) {
-  const [activeTab, setActiveTab] = useState('generate'); // generate | upscale | edit
+export default function AIImageStudio({ onClose, onSave, aiProvider, initialImage }) {
+  const [activeTab, setActiveTab] = useState(initialImage ? 'edit' : 'generate'); // generate | upscale | edit
 
   // ── 생성 탭 상태 ──
   const [prompt, setPrompt] = useState('');
@@ -291,6 +291,16 @@ export default function AIImageStudio({ onClose, onSave, aiProvider }) {
   const keepCanvasRef = useRef(null); // 보존 마스크 별도 캔버스
   const imgRef = useRef(null);
   const [editHistory, setEditHistory] = useState([]);
+
+  // ── initialImage가 전달되면 편집 탭에 자동 로드 ──
+  useEffect(() => {
+    if (initialImage) {
+      setEditPreview(initialImage);
+      setEditOriginal(initialImage);
+      setEditImage('initial');
+      setActiveTab('edit');
+    }
+  }, [initialImage]);
 
   // ══════════════════════════════
   // 생성 탭 핸들러
