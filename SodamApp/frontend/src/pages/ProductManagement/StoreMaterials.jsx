@@ -1,411 +1,608 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Store, Upload, Download, Trash2, Eye, Search,
-  FileText, Image as ImageIcon, Film, File,
-  FolderOpen, Plus, X, Grid3x3, List
+  Store, Sparkles, Image as ImageIcon, Megaphone, Music, Mic,
+  Download, Play, Pause, Square, Loader2, ChevronRight,
+  X, Check, RefreshCw, Volume2, Wand2, AlertCircle,
+  Truck, Clock, Gift, Star, Heart, Users, Percent,
+  Camera, MessageCircle, Award, Zap, Package, Edit3,
+  Sun, Moon, Coffee, Headphones, Guitar,
 } from 'lucide-react';
+import api from '../../api';
 
-/* ── 탭 정의 ── */
+/* ───────────────────────────────────
+   아이콘 매핑
+─────────────────────────────────── */
+const ICON_MAP = {
+  sparkles: Sparkles, percent: Percent, leaf: Sparkles, party: Gift, package: Package,
+  'shopping-bag': Store, users: Users, gift: Gift, clock: Clock, truck: Truck,
+  'plus-circle': Zap, star: Star, instagram: Camera, smartphone: Camera,
+  'play-circle': Play, 'message-circle': MessageCircle, 'edit-3': Edit3,
+  youtube: Play, calendar: Clock, heart: Heart, camera: Camera, smile: Users,
+  award: Award, 'shopping-cart': Store, bike: Truck, utensils: Store,
+  bell: Megaphone, ticket: Percent, zap: Zap, repeat: RefreshCw,
+  'message-square': MessageCircle, layers: Package, sun: Sun,
+  home: Store, 'book-open': Edit3, megaphone: Megaphone, hand: Users,
+  snowflake: Sparkles, book: Edit3, shield: Check, list: Edit3,
+  coffee: Coffee, 'battery-charging': Zap, moon: Moon, 'party-popper': Gift,
+  music: Music, 'music-2': Music, headphones: Headphones, guitar: Guitar,
+  'trending-up': Zap, sunrise: Sun,
+};
+
+const getIcon = (name) => ICON_MAP[name] || Sparkles;
+
+/* ───────────────────────────────────
+   탭 정의
+─────────────────────────────────── */
 const TABS = [
-  { id: 'signs', label: '매장 사인물', icon: Store, color: '#f59e0b', desc: '간판, 배너, 포스터, 입간판' },
-  { id: 'training', label: '교육 자료', icon: FileText, color: '#3b82f6', desc: '직원 교육용 매뉴얼, 가이드' },
-  { id: 'naver', label: '네이버플레이스', icon: ImageIcon, color: '#2db400', desc: '네이버 플레이스 등록용 사진' },
-  { id: 'etc', label: '기타', icon: File, color: '#64748b', desc: '기타 인쇄물, 홍보물' },
+  { id: 'poster', label: '포스터/배너', icon: ImageIcon, color: '#f59e0b', gradient: 'from-amber-500 to-orange-500', desc: 'AI가 매장 포스터와 배너를 자동 생성합니다' },
+  { id: 'sns', label: 'SNS 콘텐츠', icon: Camera, gradient: 'from-pink-500 to-rose-500', color: '#ec4899', desc: '인스타그램, 유튜브, 블로그용 이미지를 만들어보세요' },
+  { id: 'delivery', label: '배달앱 배너', icon: Truck, gradient: 'from-teal-500 to-cyan-500', color: '#14b8a6', desc: '쿠팡이츠, 배민, 요기요 배너를 한 번에' },
+  { id: 'tts', label: '나레이션', icon: Mic, gradient: 'from-blue-500 to-indigo-500', color: '#3b82f6', desc: '자연스러운 한국어 음성으로 나레이션을 생성하세요' },
+  { id: 'music', label: '배경음악', icon: Music, gradient: 'from-purple-500 to-violet-500', color: '#8b5cf6', desc: 'AI가 매장 분위기에 맞는 배경음악을 작곡합니다' },
 ];
 
-/* ── 파일 타입 아이콘/색상 ── */
-const getFileType = (name) => {
-  const ext = name.split('.').pop().toLowerCase();
-  if (['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext)) return { type: 'image', Icon: ImageIcon, color: '#8b5cf6' };
-  if (['mp4','mov','avi','webm'].includes(ext)) return { type: 'video', Icon: Film, color: '#ef4444' };
-  if (['pdf'].includes(ext)) return { type: 'pdf', Icon: FileText, color: '#f59e0b' };
-  return { type: 'file', Icon: File, color: '#64748b' };
-};
-
-/* ── 포맷 파일 사이즈 ── */
-const fmtSize = (bytes) => {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-};
-
+/* ───────────────────────────────────
+   메인 컴포넌트
+─────────────────────────────────── */
 export default function StoreMaterials() {
-  const [activeTab, setActiveTab] = useState('signs');
-  const [files, setFiles] = useState({
-    signs: [],
-    training: [],
-    naver: [],
-    etc: [],
-  });
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
-  const [previewFile, setPreviewFile] = useState(null);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef(null);
+  const [activeTab, setActiveTab] = useState('poster');
+  const [presets, setPresets] = useState(null);
+  const [aiStatus, setAiStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // 생성 관련
+  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [result, setResult] = useState(null);  // { type, url, blob }
+  const [customText, setCustomText] = useState('');
+  const [storeName, setStoreName] = useState('소담김밥');
+  const [selectedVoice, setSelectedVoice] = useState('ko-KR-SunHiNeural');
+  const [ttsSpeed, setTtsSpeed] = useState('+0%');
+  const [musicDuration, setMusicDuration] = useState(30);
+
+  // 오디오 플레이어
+  const audioRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const currentTab = TABS.find(t => t.id === activeTab);
-  const currentFiles = files[activeTab] || [];
 
-  /* ── 필터 ── */
-  const filtered = currentFiles.filter(f =>
-    !search || f.name.toLowerCase().includes(search.toLowerCase())
-  );
+  /* ── 프리셋 + AI 상태 로드 ── */
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [presetsRes, statusRes] = await Promise.all([
+          api.get('/promotions/presets'),
+          api.get('/promotions/ai-status').catch(() => ({ data: null })),
+        ]);
+        setPresets(presetsRes.data);
+        setAiStatus(statusRes.data);
+      } catch (err) {
+        console.error('프리셋 로드 실패:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
-  /* ── 파일 업로드 처리 ── */
-  const handleFiles = useCallback((fileList) => {
-    const newFiles = Array.from(fileList).map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      size: file.size,
-      lastModified: new Date(file.lastModified).toLocaleDateString('ko-KR'),
-      url: URL.createObjectURL(file),
-      rawFile: file,
-    }));
-
-    setFiles(prev => ({
-      ...prev,
-      [activeTab]: [...prev[activeTab], ...newFiles],
-    }));
+  /* ── 탭 변경 시 리셋 ── */
+  useEffect(() => {
+    setSelectedPreset(null);
+    setResult(null);
+    setCustomText('');
+    setIsPlaying(false);
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
   }, [activeTab]);
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
-  }, [handleFiles]);
+  /* ── 이미지 생성 ── */
+  const generateImage = useCallback(async (preset) => {
+    setGenerating(true);
+    setResult(null);
+    try {
+      const resp = await api.post('/promotions/generate-image', {
+        preset_id: preset.id,
+        custom_prompt: customText || undefined,
+        store_name: storeName || undefined,
+      }, { responseType: 'blob', timeout: 200000 });
+      const url = URL.createObjectURL(resp.data);
+      setResult({ type: 'image', url, blob: resp.data });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setResult({ type: 'error', message: msg });
+    } finally {
+      setGenerating(false);
+    }
+  }, [customText, storeName]);
 
-  const handleDragOver = (e) => { e.preventDefault(); setDragOver(true); };
-  const handleDragLeave = () => setDragOver(false);
+  /* ── TTS 생성 ── */
+  const generateTTS = useCallback(async (preset) => {
+    setGenerating(true);
+    setResult(null);
+    try {
+      const resp = await api.post('/promotions/generate-tts', {
+        preset_id: preset.id,
+        custom_text: customText || undefined,
+        store_name: storeName,
+        voice: selectedVoice,
+        speed: ttsSpeed,
+      }, { responseType: 'blob', timeout: 60000 });
+      const url = URL.createObjectURL(resp.data);
+      setResult({ type: 'audio', url, blob: resp.data, format: 'mp3' });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setResult({ type: 'error', message: msg });
+    } finally {
+      setGenerating(false);
+    }
+  }, [customText, storeName, selectedVoice, ttsSpeed]);
 
-  /* ── 파일 삭제 ── */
-  const removeFile = useCallback((id) => {
-    setFiles(prev => ({
-      ...prev,
-      [activeTab]: prev[activeTab].filter(f => f.id !== id),
-    }));
-    if (previewFile?.id === id) setPreviewFile(null);
-  }, [activeTab, previewFile]);
+  /* ── 음악 생성 ── */
+  const generateMusic = useCallback(async (preset) => {
+    setGenerating(true);
+    setResult(null);
+    try {
+      const resp = await api.post('/promotions/generate-music', {
+        preset_id: preset.id,
+        custom_prompt: customText || undefined,
+        duration: musicDuration,
+      }, { responseType: 'blob', timeout: 360000 });
+      const url = URL.createObjectURL(resp.data);
+      setResult({ type: 'audio', url, blob: resp.data, format: 'wav' });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message;
+      setResult({ type: 'error', message: msg });
+    } finally {
+      setGenerating(false);
+    }
+  }, [customText, musicDuration]);
 
-  /* ── 파일 다운로드 ── */
-  const downloadFile = (file) => {
+  /* ── 생성 핸들러 ── */
+  const handleGenerate = useCallback(() => {
+    if (!selectedPreset || generating) return;
+    if (['poster', 'sns', 'delivery'].includes(activeTab)) {
+      generateImage(selectedPreset);
+    } else if (activeTab === 'tts') {
+      generateTTS(selectedPreset);
+    } else if (activeTab === 'music') {
+      generateMusic(selectedPreset);
+    }
+  }, [selectedPreset, generating, activeTab, generateImage, generateTTS, generateMusic]);
+
+  /* ── 다운로드 ── */
+  const handleDownload = useCallback(() => {
+    if (!result || result.type === 'error') return;
     const a = document.createElement('a');
-    a.href = file.url;
-    a.download = file.name;
+    a.href = result.url;
+    const ext = result.type === 'image' ? 'png' : result.format || 'mp3';
+    a.download = `${selectedPreset?.name || 'promo'}_${Date.now()}.${ext}`;
     a.click();
-  };
+  }, [result, selectedPreset]);
 
-  /* ── 미리보기 렌더 ── */
-  const renderPreview = (file) => {
-    const { type } = getFileType(file.name);
-    if (type === 'image') {
-      return <img src={file.url} alt={file.name} className="w-full h-full object-cover" />;
+  /* ── 오디오 토글 ── */
+  const toggleAudio = useCallback(() => {
+    if (!audioRef.current || !result?.url) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.src = result.url;
+      audioRef.current.play();
+      setIsPlaying(true);
     }
-    if (type === 'video') {
-      return (
-        <video src={file.url} className="w-full h-full object-cover" muted>
-          <source src={file.url} />
-        </video>
-      );
-    }
-    const { Icon, color } = getFileType(file.name);
+  }, [isPlaying, result]);
+
+  /* ── 현재 탭 프리셋 가져오기 ── */
+  const currentPresets = presets?.[activeTab] || [];
+
+  /* ── AI 서비스 상태 뱃지 ── */
+  const getServiceStatus = () => {
+    if (!aiStatus) return null;
+    if (['poster', 'sns', 'delivery'].includes(activeTab)) return aiStatus.gpu;
+    if (activeTab === 'tts') return aiStatus.tts;
+    if (activeTab === 'music') return aiStatus.music;
+    return null;
+  };
+  const serviceStatus = getServiceStatus();
+
+  if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-slate-100">
-        <Icon className="w-10 h-10" style={{ color }} />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">AI 스튜디오 로딩 중...</p>
+        </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* ── 헤더 ── */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white px-4 sm:px-8 py-6 sm:py-8">
-        <div className="max-w-6xl mx-auto">
+      {/* 숨겨진 오디오 요소 */}
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+
+      {/* ── 히어로 헤더 ── */}
+      <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 text-white px-4 sm:px-8 py-6 sm:py-8">
+        <div className="max-w-7xl mx-auto">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <Store className="w-5 h-5 text-amber-400" />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/25">
+              <Wand2 className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">매장 홍보물</h1>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight">AI 홍보물 제작 스튜디오</h1>
+              <p className="text-slate-400 text-sm">포스터, SNS, 나레이션, 배경음악을 AI가 자동 생성합니다</p>
+            </div>
           </div>
-          <p className="text-slate-400 text-sm ml-[52px]">사인물, 교육자료, 네이버플레이스 사진을 관리하세요</p>
+          {/* AI 상태 표시 */}
+          {aiStatus && (
+            <div className="flex gap-3 mt-4 ml-14 flex-wrap">
+              {[
+                { label: '이미지', status: aiStatus.gpu?.online },
+                { label: 'TTS', status: aiStatus.tts?.online },
+                { label: '음악', status: aiStatus.music?.online },
+              ].map(s => (
+                <span key={s.label} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
+                  s.status ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.status ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                  {s.label} {s.status ? 'ON' : 'OFF'}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6 space-y-5">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
 
-        {/* ── 탭 ── */}
-        <div className="flex gap-2 flex-wrap">
+        {/* ── 탭 네비게이션 ── */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
           {TABS.map(tab => {
             const TabIcon = tab.icon;
             const isActive = activeTab === tab.id;
-            const count = files[tab.id]?.length || 0;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
                   isActive
                     ? 'bg-white shadow-lg border border-slate-200 scale-[1.02]'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
                 }`}
               >
                 <TabIcon className="w-4 h-4" style={isActive ? { color: tab.color } : {}} />
                 <span style={isActive ? { color: tab.color } : {}}>{tab.label}</span>
-                {count > 0 && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-500'
-                  }`}>
-                    {count}
-                  </span>
-                )}
               </button>
             );
           })}
         </div>
 
-        {/* ── 업로드 드롭존 ── */}
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onClick={() => fileInputRef.current?.click()}
-          className={`relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all ${
-            dragOver
-              ? 'border-blue-400 bg-blue-50 scale-[1.01]'
-              : 'border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50'
-          }`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,video/*,.pdf"
-            className="hidden"
-            onChange={e => { if (e.target.files.length) handleFiles(e.target.files); e.target.value = ''; }}
-          />
-          <Upload className={`w-8 h-8 mx-auto mb-3 ${dragOver ? 'text-blue-500' : 'text-slate-400'}`} />
-          <p className="text-sm font-bold text-slate-700 mb-1">
-            파일을 드래그하거나 클릭하여 업로드
-          </p>
-          <p className="text-xs text-slate-500">
-            {currentTab.desc} · 이미지(JPG/PNG), PDF, 영상(MP4) 지원
-          </p>
+        {/* ── 탭 설명 + 서비스 상태 ── */}
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-slate-500 text-sm">{currentTab.desc}</p>
+          {serviceStatus && !serviceStatus.online && (
+            <span className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
+              <AlertCircle className="w-3.5 h-3.5" />
+              AI 서비스 오프라인
+            </span>
+          )}
         </div>
 
-        {/* ── 검색/보기 바 ── */}
-        {currentFiles.length > 0 && (
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="파일명 검색..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-              />
-            </div>
-            <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`}
-              >
-                <Grid3x3 className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-400'}`}
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-            <span className="text-xs text-slate-500 font-medium">{filtered.length}개 파일</span>
-          </div>
-        )}
+        {/* ── 메인 레이아웃: 프리셋 그리드 + 결과 패널 ── */}
+        <div className="flex gap-6 flex-col lg:flex-row">
 
-        {/* ── 파일 그리드 ── */}
-        {filtered.length > 0 ? (
-          viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {filtered.map(file => {
-                const { Icon, color } = getFileType(file.name);
+          {/* ── 왼쪽: 프리셋 그리드 ── */}
+          <div className={`${selectedPreset ? 'lg:w-[55%]' : 'w-full'} transition-all`}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {currentPresets.map((preset, idx) => {
+                const Icon = getIcon(preset.icon);
+                const isSelected = selectedPreset?.id === preset.id;
                 return (
-                  <div
-                    key={file.id}
-                    className="group relative bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md hover:border-slate-300 transition-all"
+                  <button
+                    key={preset.id}
+                    onClick={() => {
+                      setSelectedPreset(preset);
+                      setResult(null);
+                      setCustomText('');
+                      setIsPlaying(false);
+                    }}
+                    className={`group relative text-left p-4 rounded-2xl border-2 transition-all duration-200 ${
+                      isSelected
+                        ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-500/10 scale-[1.02]'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                    }`}
+                    style={{ animationDelay: `${idx * 0.03}s` }}
                   >
-                    {/* 썸네일 */}
-                    <div className="aspect-square overflow-hidden">
-                      {renderPreview(file)}
+                    {/* 아이콘 */}
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110"
+                      style={{ backgroundColor: `${preset.color}15` }}
+                    >
+                      <Icon className="w-5 h-5" style={{ color: preset.color }} />
                     </div>
-
-                    {/* 파일 정보 */}
-                    <div className="p-3">
-                      <p className="text-sm font-bold text-slate-800 truncate" title={file.name}>
-                        {file.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Icon className="w-3 h-3" style={{ color }} />
-                        <span className="text-xs text-slate-500">{fmtSize(file.size)}</span>
-                        <span className="text-xs text-slate-400">{file.lastModified}</span>
+                    {/* 텍스트 */}
+                    <h3 className="text-sm font-bold text-slate-800 mb-1">{preset.name}</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">{preset.desc}</p>
+                    {/* 선택 체크 */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                        <Check className="w-3.5 h-3.5 text-white" />
                       </div>
-                    </div>
-
-                    {/* 호버 액션 */}
-                    <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all">
-                      <button
-                        onClick={() => setPreviewFile(file)}
-                        className="w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-slate-600" />
-                      </button>
-                      <button
-                        onClick={() => downloadFile(file)}
-                        className="w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white"
-                      >
-                        <Download className="w-3.5 h-3.5 text-blue-600" />
-                      </button>
-                      <button
-                        onClick={() => removeFile(file.id)}
-                        className="w-7 h-7 rounded-full bg-white/90 shadow flex items-center justify-center hover:bg-white"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
+                    )}
+                  </button>
                 );
               })}
             </div>
-          ) : (
-            /* ── 리스트 뷰 ── */
-            <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
-              {filtered.map(file => {
-                const { Icon, color } = getFileType(file.name);
-                return (
-                  <div key={file.id} className="flex items-center gap-4 p-3 hover:bg-slate-50 transition-all">
-                    <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0">
-                      {renderPreview(file)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800 truncate">{file.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Icon className="w-3 h-3" style={{ color }} />
-                        <span className="text-xs text-slate-500">{fmtSize(file.size)}</span>
-                        <span className="text-xs text-slate-400">{file.lastModified}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-1.5 shrink-0">
-                      <button onClick={() => setPreviewFile(file)} className="p-2 rounded-lg hover:bg-slate-100 transition-all">
-                        <Eye className="w-4 h-4 text-slate-500" />
-                      </button>
-                      <button onClick={() => downloadFile(file)} className="p-2 rounded-lg hover:bg-slate-100 transition-all">
-                        <Download className="w-4 h-4 text-blue-500" />
-                      </button>
-                      <button onClick={() => removeFile(file.id)} className="p-2 rounded-lg hover:bg-slate-100 transition-all">
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : currentFiles.length === 0 ? (
-          /* ── 빈 상태 ── */
-          <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-            <FolderOpen className="w-14 h-14 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-base font-bold text-slate-700 mb-1">{currentTab.label} 파일이 없습니다</h3>
-            <p className="text-sm text-slate-500 mb-4">{currentTab.desc}를 업로드해보세요</p>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-              style={{ background: currentTab.color }}
-            >
-              <Plus className="w-4 h-4" />
-              파일 업로드
-            </button>
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-bold">검색 결과가 없습니다</p>
+
+          {/* ── 오른쪽: 생성 패널 ── */}
+          {selectedPreset && (
+            <div className="lg:w-[45%] space-y-4">
+              {/* 패널 헤더 */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className={`bg-gradient-to-r ${currentTab.gradient} p-4 text-white`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {(() => { const I = getIcon(selectedPreset.icon); return <I className="w-5 h-5" />; })()}
+                      <div>
+                        <h3 className="font-bold">{selectedPreset.name}</h3>
+                        <p className="text-white/80 text-xs">{selectedPreset.desc}</p>
+                      </div>
+                    </div>
+                    <button onClick={() => { setSelectedPreset(null); setResult(null); }}
+                      className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 transition-all">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-4">
+
+                  {/* ── 공통: 매장명 ── */}
+                  {['poster', 'sns', 'delivery', 'tts'].includes(activeTab) && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">매장명</label>
+                      <input
+                        type="text"
+                        value={storeName}
+                        onChange={e => setStoreName(e.target.value)}
+                        placeholder="소담김밥"
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* ── 이미지: 커스텀 프롬프트 ── */}
+                  {['poster', 'sns', 'delivery'].includes(activeTab) && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                        추가 설명 <span className="text-slate-400 font-normal">(선택)</span>
+                      </label>
+                      <textarea
+                        value={customText}
+                        onChange={e => setCustomText(e.target.value)}
+                        placeholder="예: 참치김밥 신메뉴, 가을 분위기, 할인율 30%..."
+                        rows={2}
+                        className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* ── TTS: 나레이션 텍스트 ── */}
+                  {activeTab === 'tts' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                          나레이션 텍스트
+                        </label>
+                        <textarea
+                          value={customText || selectedPreset.script?.replace(/\{store_name\}/g, storeName) || ''}
+                          onChange={e => setCustomText(e.target.value)}
+                          rows={4}
+                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1.5">음성</label>
+                          <select
+                            value={selectedVoice}
+                            onChange={e => setSelectedVoice(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                          >
+                            <option value="ko-KR-SunHiNeural">선희 (여성)</option>
+                            <option value="ko-KR-HyunsuMultilingualNeural">현수 (남성)</option>
+                            <option value="ko-KR-InJoonNeural">인준 (남성)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1.5">속도</label>
+                          <select
+                            value={ttsSpeed}
+                            onChange={e => setTtsSpeed(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                          >
+                            <option value="-20%">느리게</option>
+                            <option value="-10%">약간 느리게</option>
+                            <option value="+0%">보통</option>
+                            <option value="+10%">약간 빠르게</option>
+                            <option value="+20%">빠르게</option>
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* ── 음악: 옵션 ── */}
+                  {activeTab === 'music' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                          추가 설명 <span className="text-slate-400 font-normal">(선택)</span>
+                        </label>
+                        <textarea
+                          value={customText}
+                          onChange={e => setCustomText(e.target.value)}
+                          placeholder="예: 좀 더 빠른 템포, 피아노 위주..."
+                          rows={2}
+                          className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                          길이: {musicDuration}초
+                        </label>
+                        <input
+                          type="range"
+                          min={10}
+                          max={60}
+                          step={5}
+                          value={musicDuration}
+                          onChange={e => setMusicDuration(Number(e.target.value))}
+                          className="w-full h-2 rounded-full bg-slate-200 accent-purple-500"
+                        />
+                        <div className="flex justify-between text-xs text-slate-400 mt-1">
+                          <span>10초</span>
+                          <span>30초</span>
+                          <span>60초</span>
+                        </div>
+                      </div>
+                      {selectedPreset.tags && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedPreset.tags.split(', ').map(tag => (
+                            <span key={tag} className="px-2 py-0.5 rounded-full bg-slate-100 text-xs text-slate-500 font-medium">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* ── 생성 버튼 ── */}
+                  <button
+                    onClick={handleGenerate}
+                    disabled={generating || (serviceStatus && !serviceStatus.online)}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-all ${
+                      generating
+                        ? 'bg-slate-400 cursor-wait'
+                        : `bg-gradient-to-r ${currentTab.gradient} hover:opacity-90 shadow-lg active:scale-[0.98]`
+                    }`}
+                  >
+                    {generating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {activeTab === 'music' ? '음악 작곡 중... (최대 5분)' :
+                         activeTab === 'tts' ? '나레이션 생성 중...' :
+                         '이미지 생성 중... (30~60초)'}
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="w-4 h-4" />
+                        AI 생성하기
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── 결과 표시 ── */}
+              {result && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  {/* 에러 */}
+                  {result.type === 'error' && (
+                    <div className="p-6 text-center">
+                      <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                      <p className="text-sm font-bold text-red-600 mb-1">생성 실패</p>
+                      <p className="text-xs text-slate-500">{result.message}</p>
+                    </div>
+                  )}
+
+                  {/* 이미지 결과 */}
+                  {result.type === 'image' && (
+                    <div>
+                      <div className="bg-slate-100 p-2">
+                        <img src={result.url} alt="생성된 이미지" className="w-full rounded-xl object-contain max-h-[500px]" />
+                      </div>
+                      <div className="p-4 flex gap-2">
+                        <button onClick={handleDownload}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-all">
+                          <Download className="w-4 h-4" />
+                          다운로드
+                        </button>
+                        <button onClick={handleGenerate} disabled={generating}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-all">
+                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+                          재생성
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 오디오 결과 (TTS / Music) */}
+                  {result.type === 'audio' && (
+                    <div className="p-5">
+                      <div className={`relative rounded-2xl p-6 bg-gradient-to-br ${currentTab.gradient} text-white mb-4`}>
+                        <div className="flex items-center gap-4">
+                          <button onClick={toggleAudio}
+                            className="w-14 h-14 rounded-full bg-white/25 backdrop-blur flex items-center justify-center hover:bg-white/35 transition-all active:scale-95">
+                            {isPlaying ?
+                              <Pause className="w-6 h-6 text-white" /> :
+                              <Play className="w-6 h-6 text-white ml-0.5" />}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold truncate">{selectedPreset.name}</p>
+                            <p className="text-white/70 text-xs mt-0.5">
+                              {activeTab === 'tts' ? '나레이션' : '배경음악'} · {result.format?.toUpperCase()}
+                            </p>
+                          </div>
+                          <Volume2 className="w-5 h-5 text-white/50" />
+                        </div>
+                        {/* 웨이브 애니메이션 */}
+                        {isPlaying && (
+                          <div className="flex items-end gap-0.5 absolute bottom-3 right-4 h-5">
+                            {[...Array(5)].map((_, i) => (
+                              <div key={i} className="w-1 bg-white/60 rounded-full animate-pulse"
+                                style={{ height: `${8 + Math.random() * 12}px`, animationDelay: `${i * 0.1}s`, animationDuration: '0.6s' }} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={handleDownload}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-bold hover:bg-blue-600 transition-all">
+                          <Download className="w-4 h-4" />
+                          다운로드
+                        </button>
+                        <button onClick={handleGenerate} disabled={generating}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-200 transition-all">
+                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+                          재생성
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── 선택 안내 (프리셋 미선택 시) ── */}
+        {!selectedPreset && currentPresets.length > 0 && (
+          <div className="mt-8 text-center py-10 bg-white rounded-2xl border border-slate-200">
+            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${currentTab.gradient} flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+              {(() => { const I = currentTab.icon; return <I className="w-7 h-7 text-white" />; })()}
+            </div>
+            <h3 className="text-lg font-bold text-slate-700 mb-2">프리셋을 선택해주세요</h3>
+            <p className="text-sm text-slate-500 mb-1">위 프리셋 카드 중 하나를 클릭하면</p>
+            <p className="text-sm text-slate-500">AI가 자동으로 생성을 시작합니다</p>
+            <div className="flex items-center justify-center gap-1 mt-4 text-xs text-slate-400">
+              <ChevronRight className="w-4 h-4" />
+              <span>{currentPresets.length}개의 프리셋 사용 가능</span>
+            </div>
           </div>
         )}
-
-        {/* AI 도우미 (Phase 2 placeholder) */}
-        <div className="bg-gradient-to-br from-slate-50 to-amber-50 rounded-2xl border border-slate-200 p-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-3">
-            <Store className="w-6 h-6 text-amber-500" />
-          </div>
-          <h3 className="text-base font-bold text-slate-800 mb-1">AI 홍보물 제작</h3>
-          <p className="text-sm text-slate-500 mb-3">AI가 매장 특성에 맞는 사인물, 배너, 포스터를 자동 생성합니다</p>
-          <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-200 text-slate-500 text-sm font-bold">
-            준비 중
-          </span>
-        </div>
       </div>
-
-      {/* ── 미리보기 모달 ── */}
-      {previewFile && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-          onClick={() => setPreviewFile(null)}
-        >
-          <div
-            className="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* 미리보기 본문 */}
-            <div className="max-h-[70vh] overflow-auto bg-slate-100">
-              {(() => {
-                const { type } = getFileType(previewFile.name);
-                if (type === 'image') {
-                  return <img src={previewFile.url} alt={previewFile.name} className="w-full object-contain" />;
-                }
-                if (type === 'video') {
-                  return <video src={previewFile.url} controls className="w-full" />;
-                }
-                if (type === 'pdf') {
-                  return (
-                    <iframe
-                      src={previewFile.url}
-                      className="w-full h-[70vh]"
-                      title={previewFile.name}
-                    />
-                  );
-                }
-                return (
-                  <div className="flex items-center justify-center h-64">
-                    <p className="text-slate-500">미리보기를 지원하지 않는 파일입니다</p>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* 하단 바 */}
-            <div className="p-4 flex items-center justify-between border-t border-slate-200">
-              <div>
-                <p className="text-base font-bold text-slate-800">{previewFile.name}</p>
-                <p className="text-xs text-slate-500">{fmtSize(previewFile.size)} · {previewFile.lastModified}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => downloadFile(previewFile)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold bg-blue-500 text-white hover:bg-blue-600 transition-all"
-                >
-                  <Download className="w-4 h-4" />
-                  다운로드
-                </button>
-                <button
-                  onClick={() => setPreviewFile(null)}
-                  className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
