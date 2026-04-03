@@ -5,7 +5,8 @@
       "Bash(ssh choon@192.168.219.101 \"echo connected && which python3 && pip list 2>/dev/null | grep rembg\")",
       "Bash(sshpass -p 'Jiyeon71391796!' ssh -o StrictHostKeyChecking=no stevenlim@192.168.219.101 \"echo connected && hostname && which python3\")",
       "Bash(pacman -S sshpass)",
-      "Bash(choco list:*)"
+      "Bash(choco list:*)",
+      "Bash(ping -n 1 192.168.219.101)"
     ]
   },
   "enabledPlugins": {
