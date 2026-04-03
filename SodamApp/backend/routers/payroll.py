@@ -92,10 +92,19 @@ def get_monthly_attendance(staff_id: int, month: str, bid = Depends(get_bid_from
 def save_monthly_attendance(req: AttendanceSaveRequest, bid = Depends(get_bid_from_token)):
     service = DatabaseService()
     try:
+        # 벌크 조회 (N+1 → 1 쿼리)
+        dates = [datetime.strptime(dh.date, "%Y-%m-%d").date() for dh in req.daily_hours]
+        existing = service.session.exec(
+            select(Attendance).where(
+                Attendance.staff_id == req.staff_id,
+                Attendance.date.in_(dates)
+            )
+        ).all()
+        existing_map = {r.date: r for r in existing}
+
         for dh in req.daily_hours:
             d = datetime.strptime(dh.date, "%Y-%m-%d").date()
-            stmt = select(Attendance).where(Attendance.staff_id == req.staff_id, Attendance.date == d)
-            record = service.session.exec(stmt).first()
+            record = existing_map.get(d)
             if record:
                 record.total_hours = dh.hours
                 record.status = dh.status

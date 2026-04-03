@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '../api';
+import { formatNumber, formatCurrency } from '../utils/format';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, TrendingDown, Wallet, Users, BarChart3, ShoppingBag, LayoutDashboard } from 'lucide-react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
-const fmtWon = (v) => `${Number(v).toLocaleString('ko-KR')}원`;
+const fmtWon = (v) => formatCurrency(v);
 const fmtWonProfit = (v) => [fmtWon(v), '이익'];
 
 export default function Dashboard() {
@@ -109,8 +110,8 @@ export default function Dashboard() {
 
     const formatKRW = (v) => {
         if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
-        if (Math.abs(v) >= 10000) return `${Math.round(v / 10000).toLocaleString()}만`;
-        return v.toLocaleString();
+        if (Math.abs(v) >= 10000) return `${formatNumber(Math.round(v / 10000))}만`;
+        return formatNumber(v);
     };
 
     const formatDate = (date) => date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
@@ -277,7 +278,7 @@ export default function Dashboard() {
                                     <div className="text-[10px] text-slate-400">{item.item || '기타'}</div>
                                 </div>
                             </div>
-                            <span className="text-[13px] font-bold text-slate-800">{item.amount.toLocaleString()}원</span>
+                            <span className="text-[13px] font-bold text-slate-800">{formatCurrency(item.amount)}</span>
                         </div>
                     )) : (
                         <div className="py-6 text-center text-slate-400 text-[13px]">거래 내역이 없습니다</div>
@@ -302,7 +303,7 @@ export default function Dashboard() {
                             </div>
                             <span className={`text-[13px] font-extrabold ${
                                 row.highlight ? (profit >= 0 ? 'text-emerald-300' : 'text-red-300') : 'text-white'
-                            }`}>{row.value.toLocaleString()}원</span>
+                            }`}>{formatCurrency(row.value)}</span>
                         </div>
                     ))}
                     <div className="text-right text-[11px] text-slate-500 mt-1">마진율 {marginRate}%</div>
@@ -367,7 +368,7 @@ export default function Dashboard() {
                             </span>
                         </div>
                         <p className="text-xs font-semibold text-white/70">이번 달 매출</p>
-                        <h3 className="text-2xl font-black text-white mt-1.5">{revenue.toLocaleString()}<span className="text-sm font-medium ml-0.5">원</span></h3>
+                        <h3 className="text-2xl font-black text-white mt-1.5">{formatNumber(revenue)}<span className="text-sm font-medium ml-0.5">원</span></h3>
                     </div>
 
                     {/* Profit Card */}
@@ -379,7 +380,7 @@ export default function Dashboard() {
                             <span className="text-xs font-semibold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg">마진 {marginRate}%</span>
                         </div>
                         <p className="text-xs font-semibold text-slate-400">순이익</p>
-                        <h3 className={`text-2xl font-black mt-1.5 ${profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{profit.toLocaleString()}<span className="text-sm font-medium ml-0.5">원</span></h3>
+                        <h3 className={`text-2xl font-black mt-1.5 ${profit >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatNumber(profit)}<span className="text-sm font-medium ml-0.5">원</span></h3>
                     </div>
 
                     {/* Staff Card */}
@@ -402,7 +403,7 @@ export default function Dashboard() {
                             </div>
                         </div>
                         <p className="text-xs font-semibold text-slate-400">이번 달 총 지출</p>
-                        <h3 className="text-2xl font-black text-slate-800 mt-1.5">{expense.toLocaleString()}<span className="text-sm font-medium ml-0.5">원</span></h3>
+                        <h3 className="text-2xl font-black text-slate-800 mt-1.5">{formatNumber(expense)}<span className="text-sm font-medium ml-0.5">원</span></h3>
                     </div>
                 </div>
 
@@ -466,7 +467,7 @@ export default function Dashboard() {
                                         <div className="w-2.5 h-2.5 rounded-full" style={{ background: CHART_COLORS[i % 5] }} />
                                         <span className="text-slate-500">{entry.name}</span>
                                     </div>
-                                    <span className="font-bold text-slate-800">{entry.value.toLocaleString()}원</span>
+                                    <span className="font-bold text-slate-800">{formatCurrency(entry.value)}</span>
                                 </div>
                             ))}
                         </div>
@@ -497,7 +498,7 @@ export default function Dashboard() {
                                         <p className="text-[11px] text-slate-400 mt-0.5">{item.item || '기타'}</p>
                                     </div>
                                 </div>
-                                <span className="text-sm font-bold text-slate-700">{item.amount.toLocaleString()}원</span>
+                                <span className="text-sm font-bold text-slate-700">{formatCurrency(item.amount)}</span>
                             </div>
                         )) : <div className="py-10 text-center text-slate-400">거래 내역이 없습니다</div>}
                     </div>
@@ -521,7 +522,7 @@ export default function Dashboard() {
                                             <div className={`w-2 h-2 rounded-full ${row.dotClass}`} />
                                             <span className="text-sm font-semibold text-slate-200">{row.label}</span>
                                         </div>
-                                        <span className={`text-base font-extrabold ${row.valueClass}`}>{row.value.toLocaleString()}원</span>
+                                        <span className={`text-base font-extrabold ${row.valueClass}`}>{formatCurrency(row.value)}</span>
                                     </div>
                                 ))}
                             </div>

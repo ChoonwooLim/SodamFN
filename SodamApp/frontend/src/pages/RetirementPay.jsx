@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wallet, UserMinus, Calendar, AlertCircle, CheckCircle, Clock, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { formatNumber, formatCurrency } from '../utils/format';
 
 export default function RetirementPay() {
     const [data, setData] = useState([]);
@@ -152,14 +153,14 @@ export default function RetirementPay() {
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: '#334155', fontWeight: 600 }}>
                                             {item.under_one_year ? (
-                                                <span style={{ color: '#d97706' }}>환입 대상<br/><span style={{fontSize:11}}>({(item.pl_accrued||0).toLocaleString()}원)</span></span>
-                                            ) : item.accrued_amount > 0 ? `${item.accrued_amount.toLocaleString()}원` : '-'}
+                                                <span style={{ color: '#d97706' }}>환입 대상<br/><span style={{fontSize:11}}>({formatCurrency(item.pl_accrued||0)})</span></span>
+                                            ) : item.accrued_amount > 0 ? formatCurrency(item.accrued_amount) : '-'}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: item.paid_amount > 0 ? '#16a34a' : '#94a3b8', fontWeight: 700 }}>
-                                            {item.paid_amount > 0 ? `${item.paid_amount.toLocaleString()}원` : '-'}
+                                            {item.paid_amount > 0 ? formatCurrency(item.paid_amount) : '-'}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: item.difference > 0 ? '#dc2626' : item.difference < 0 ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
-                                            {item.difference !== 0 ? `${item.difference > 0 ? '+' : ''}${item.difference.toLocaleString()}원` : '-'}
+                                            {item.difference !== 0 ? `${item.difference > 0 ? '+' : ''}${formatNumber(item.difference)}원` : '-'}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>{statusBadge(item.status)}</td>
                                         <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -194,13 +195,13 @@ export default function RetirementPay() {
                                 <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
                                     <td colSpan={4} style={{ padding: '12px', fontWeight: 800, color: '#1e293b' }}>합계</td>
                                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
-                                        {data.reduce((a, c) => a + c.accrued_amount, 0).toLocaleString()}원
+                                        {formatCurrency(data.reduce((a, c) => a + c.accrued_amount, 0))}
                                     </td>
                                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
-                                        {data.reduce((a, c) => a + c.paid_amount, 0).toLocaleString()}원
+                                        {formatCurrency(data.reduce((a, c) => a + c.paid_amount, 0))}
                                     </td>
                                     <td style={{ padding: '12px', textAlign: 'right', fontWeight: 800 }}>
-                                        {data.reduce((a, c) => a + c.difference, 0).toLocaleString()}원
+                                        {formatCurrency(data.reduce((a, c) => a + c.difference, 0))}
                                     </td>
                                     <td colSpan={2}></td>
                                 </tr>
@@ -242,7 +243,7 @@ export default function RetirementPay() {
                                 <span style={{ color: '#d97706', fontWeight: 700 }}>⚠️ 1년 미만 근무 → 법적 퇴직금 없음</span>
                                 {showModal.pl_accrued > 0 && (
                                     <div style={{ color: '#1e293b', fontSize: 12, marginTop: 4 }}>
-                                        P/L 적립액: <b>{showModal.pl_accrued.toLocaleString()}원</b> → 등록 시 <b style={{color:'#2563eb'}}>자동 환입</b> 처리
+                                        P/L 적립액: <b>{formatCurrency(showModal.pl_accrued)}</b> → 등록 시 <b style={{color:'#2563eb'}}>자동 환입</b> 처리
                                     </div>
                                 )}
                                 <div style={{ color: '#64748b', fontSize: 11, marginTop: 4 }}>실제 지급하는 경우 아래에 금액을 입력하세요 (선택)</div>
@@ -251,13 +252,13 @@ export default function RetirementPay() {
                             <div style={{ padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, marginBottom: 16 }}>
                                 <div style={{ color: '#16a34a', fontWeight: 800, fontSize: 14, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                                     <span>💰 법적 퇴직금</span>
-                                    <span>{showModal.accrued_amount.toLocaleString()}원</span>
+                                    <span>{formatCurrency(showModal.accrued_amount)}</span>
                                 </div>
                                 {showModal.breakdown && (
                                     <div style={{ fontSize: 11, color: '#475569', background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                             <span>최근 3개월 급여총액:</span>
-                                            <b>{showModal.breakdown.total_gross_3m?.toLocaleString()} 원</b>
+                                            <b>{formatNumber(showModal.breakdown.total_gross_3m)} 원</b>
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                             <span>정산 기준 일수 (3개월):</span>
@@ -265,12 +266,12 @@ export default function RetirementPay() {
                                         </div>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                                             <span>1일 평균임금:</span>
-                                            <b style={{color: '#7c3aed'}}>{showModal.breakdown.daily_wage?.toLocaleString()} 원</b>
+                                            <b style={{color: '#7c3aed'}}>{formatNumber(showModal.breakdown.daily_wage)} 원</b>
                                         </div>
                                         <div style={{ borderTop: '1px dashed #cbd5e1', margin: '6px 0' }} />
                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                             <span>산정식:</span>
-                                            <span>{showModal.breakdown.daily_wage?.toLocaleString()} × 30일 × ({showModal.work_days}일 / 365)</span>
+                                            <span>{formatNumber(showModal.breakdown.daily_wage)} × 30일 × ({showModal.work_days}일 / 365)</span>
                                         </div>
                                     </div>
                                 )}

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Upload, FileUp, CreditCard, DollarSign, Calendar, TrendingUp, PieChart as PieIcon, List, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '../api';
+import { formatCurrency } from '../utils/format';
 
-const fmtWon = (v) => `${Number(v).toLocaleString('ko-KR')}원`;
+const fmtWon = (v) => formatCurrency(v);
 
 export default function CardSales() {
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -138,7 +139,7 @@ export default function CardSales() {
                                 <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><TrendingUp size={20} /></div>
                             </div>
                             <div className="text-2xl font-black text-slate-800">
-                                {stats.daily_trend.reduce((acc, cur) => acc + cur.total, 0).toLocaleString()}원
+                                {formatCurrency(stats.daily_trend.reduce((acc, cur) => acc + cur.total, 0))}
                             </div>
                             <div className="text-xs text-slate-400 mt-1 font-medium">승인 건수 {stats.daily_trend.reduce((acc, cur) => acc + cur.count, 0)}건</div>
                         </div>
@@ -149,9 +150,9 @@ export default function CardSales() {
                                 <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg"><DollarSign size={20} /></div>
                             </div>
                             <div className="text-2xl font-black text-slate-800">
-                                {payments.reduce((acc, cur) => acc + cur.net_deposit, 0).toLocaleString()}원
+                                {formatCurrency(payments.reduce((acc, cur) => acc + cur.net_deposit, 0))}
                             </div>
-                            <div className="text-xs text-slate-400 mt-1 font-medium">수수료 {payments.reduce((acc, cur) => acc + cur.fees, 0).toLocaleString()}원 차감</div>
+                            <div className="text-xs text-slate-400 mt-1 font-medium">수수료 {formatCurrency(payments.reduce((acc, cur) => acc + cur.fees, 0))} 차감</div>
                         </div>
 
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -251,13 +252,13 @@ export default function CardSales() {
                                                             {p.card_corp}
                                                         </td>
                                                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
-                                                            {(p.sales_amount || 0).toLocaleString()}원
+                                                            {formatCurrency(p.sales_amount || 0)}
                                                         </td>
                                                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#ef4444', fontWeight: 600 }}>
-                                                            {(p.fees || 0).toLocaleString()}원
+                                                            {formatCurrency(p.fees || 0)}
                                                         </td>
                                                         <td style={{ padding: '10px 12px', textAlign: 'right', color: '#334155' }}>
-                                                            {(p.net_deposit || 0).toLocaleString()}원
+                                                            {formatCurrency(p.net_deposit || 0)}
                                                         </td>
                                                         <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                                             <span style={{
@@ -276,13 +277,13 @@ export default function CardSales() {
                                         <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
                                             <td style={{ padding: '10px 12px', fontWeight: 800, color: '#1e293b' }}>합계</td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
-                                                {payments.reduce((a, c) => a + (c.sales_amount || 0), 0).toLocaleString()}원
+                                                {formatCurrency(payments.reduce((a, c) => a + (c.sales_amount || 0), 0))}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#ef4444' }}>
-                                                {payments.reduce((a, c) => a + (c.fees || 0), 0).toLocaleString()}원
+                                                {formatCurrency(payments.reduce((a, c) => a + (c.fees || 0), 0))}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#1e293b' }}>
-                                                {payments.reduce((a, c) => a + (c.net_deposit || 0), 0).toLocaleString()}원
+                                                {formatCurrency(payments.reduce((a, c) => a + (c.net_deposit || 0), 0))}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                                 <span style={{

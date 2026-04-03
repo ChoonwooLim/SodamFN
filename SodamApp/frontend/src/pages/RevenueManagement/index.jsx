@@ -811,7 +811,7 @@ export default function RevenueManagement() {
                 const maxDayTotal = Math.max(...byDay.map(d => d.total || 0), 1);
                 const fmtShort = (v) => {
                     if (v >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
-                    if (v >= 10000) return `${Math.round(v / 10000).toLocaleString('ko-KR')}만`;
+                    if (v >= 10000) return `${formatNumber(Math.round(v / 10000))}만`;
                     return formatNumber(v);
                 };
 
@@ -1510,7 +1510,7 @@ export default function RevenueManagement() {
                                 { label: '📊 총 주문매출', value: formatNumber(grandSales), unit: '원', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
                                 { label: '🧾 총 수수료', value: '-' + formatNumber(grandFees), unit: '원', color: 'text-rose-500', bg: 'bg-white border-slate-100' },
                                 { label: '💰 실 정산금', value: formatNumber(grandSettle), unit: '원', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
-                                { label: '📦 총 주문수', value: grandOrders.toLocaleString(), unit: '건', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
+                                { label: '📦 총 주문수', value: formatNumber(grandOrders), unit: '건', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
                                 { label: '📈 평균 수수료율', value: grandFeeRate, unit: '%', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
                             ].map((card, i) => (
                                 <div key={i} className={`rounded-2xl p-5 shadow-sm border card-animate ${card.bg}`} style={{ animationDelay: `${i * 0.05}s` }}>
@@ -1532,7 +1532,7 @@ export default function RevenueManagement() {
                                             매출 {formatNumber(ct.total_sales)}원 · 수수료 {ct.fee_rate}%
                                         </div>
                                         <div className="text-[13px] text-slate-400 mt-1">
-                                            {ct.order_count.toLocaleString()}건
+                                            {formatNumber(ct.order_count)}건
                                         </div>
                                     </div>
                                 );
@@ -2075,7 +2075,7 @@ export default function RevenueManagement() {
                                                 )}
                                             </div>
                                             <div style={{ fontSize: 11, color: '#64748b' }}>
-                                                {item.count}건 · {Number(item.total_amount).toLocaleString()}원
+                                                {item.count}건 · {formatNumber(item.total_amount)}원
                                             </div>
                                         </div>
                                         <select
@@ -2136,24 +2136,24 @@ export default function RevenueManagement() {
                                         if (d.bank_summary) {
                                             const bs = d.bank_summary;
                                             let msg = `🏦 은행 입금내역 분석 완료 (${bs.period})\n\n`;
-                                            msg += `💳 카드매출: ${Number(bs.card_sales).toLocaleString()}원\n`;
-                                            msg += `💰 카드입금: ${Number(bs.card_deposit).toLocaleString()}원\n`;
-                                            msg += `📊 카드수수료: ${Number(bs.card_fee).toLocaleString()}원 (${bs.card_fee_rate}%)\n\n`;
+                                            msg += `💳 카드매출: ${formatNumber(bs.card_sales)}원\n`;
+                                            msg += `💰 카드입금: ${formatNumber(bs.card_deposit)}원\n`;
+                                            msg += `📊 카드수수료: ${formatNumber(bs.card_fee)}원 (${bs.card_fee_rate}%)\n\n`;
                                             if (bs.card_companies && bs.card_companies.length > 0) {
                                                 msg += `\n💳 카드사별 수수료:\n`;
                                                 msg += `${'카드사'.padEnd(8)} ${'매출'.padStart(12)} ${'입금'.padStart(12)} ${'수수료'.padStart(10)} ${'%'.padStart(6)}\n`;
                                                 bs.card_companies.forEach(cc => {
-                                                    msg += `${cc.company.padEnd(8)} ${Number(cc.sales).toLocaleString().padStart(12)} ${Number(cc.deposit).toLocaleString().padStart(12)} ${Number(cc.fee).toLocaleString().padStart(10)} ${cc.rate}%\n`;
+                                                    msg += `${cc.company.padEnd(8)} ${formatNumber(cc.sales).padStart(12)} ${formatNumber(cc.deposit).padStart(12)} ${formatNumber(cc.fee).padStart(10)} ${cc.rate}%\n`;
                                                 });
                                             }
                                             if (bs.cash_sales_count > 0) {
-                                                msg += `\n💵 현금매출: ${bs.cash_sales_count}건 / ${Number(bs.cash_sales_total).toLocaleString()}원 → 매출 저장 ✅\n`;
+                                                msg += `\n💵 현금매출: ${bs.cash_sales_count}건 / ${formatNumber(bs.cash_sales_total)}원 → 매출 저장 ✅\n`;
                                             }
                                             if (bs.categories) {
                                                 msg += `\n📋 전체 분류:\n`;
                                                 Object.entries(bs.categories).forEach(([k, v]) => {
                                                     const saved = k === '현금매출' ? ' ✅저장' : '';
-                                                    msg += `  ${k}: ${v.count}건 / ${Number(v.amount).toLocaleString()}원${saved}\n`;
+                                                    msg += `  ${k}: ${v.count}건 / ${formatNumber(v.amount)}원${saved}\n`;
                                                 });
                                             }
                                             alert(msg);

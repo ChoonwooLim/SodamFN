@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Save, FileText, User, CreditCard, Calendar, CheckSquare, Upload, Eye, Printer, Edit2, Trash2, MessageSquare, Wallet, CheckCircle, AlertCircle, ShieldCheck, UserPlus, X } from 'lucide-react';
 import api from '../api';
+import { formatNumber } from '../utils/format';
 import PayrollStatement from '../components/PayrollStatement';
 import AttendanceInput from '../components/AttendanceInput';
 
@@ -409,7 +410,7 @@ export default function StaffDetail() {
         const wage = formData.contract_type === '정규직'
             ? formData.monthly_salary
             : formData.hourly_wage;
-        const formattedWage = wage ? Number(wage).toLocaleString() : '';
+        const formattedWage = wage ? formatNumber(wage) : '';
 
         const bonusInfo = formData.bonus_enabled
             ? `있음 (${formData.bonus_amount || ''})`
@@ -756,7 +757,7 @@ export default function StaffDetail() {
                                         <input
                                             type="text"
                                             name="hourly_wage"
-                                            value={formData.hourly_wage ? Number(formData.hourly_wage).toLocaleString() : ''}
+                                            value={formData.hourly_wage ? formatNumber(formData.hourly_wage) : ''}
                                             onChange={handleChange}
                                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                                         />
@@ -767,7 +768,7 @@ export default function StaffDetail() {
                                         <input
                                             type="text"
                                             name="monthly_salary"
-                                            value={formData.monthly_salary ? Number(formData.monthly_salary).toLocaleString() : ''}
+                                            value={formData.monthly_salary ? formatNumber(formData.monthly_salary) : ''}
                                             onChange={handleChange}
                                             className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-blue-500 outline-none font-bold"
                                         />
@@ -784,7 +785,7 @@ export default function StaffDetail() {
                                                 <input
                                                     type="text"
                                                     name="insurance_base_salary"
-                                                    value={formData.insurance_base_salary ? Number(formData.insurance_base_salary).toLocaleString() : ''}
+                                                    value={formData.insurance_base_salary ? formatNumber(formData.insurance_base_salary) : ''}
                                                     onChange={handleChange}
                                                     className="w-full p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-right pr-9 focus:ring-2 focus:ring-amber-500 outline-none font-bold"
                                                     placeholder="0 (미입력시 총급여 기준)"
@@ -799,10 +800,10 @@ export default function StaffDetail() {
                                                         if (resp.data.status === 'success') {
                                                             const { insurance_base_salary, method, breakdown } = resp.data.data;
                                                             const details = Object.entries(breakdown)
-                                                                .map(([k, v]) => `${k}: ${typeof v === 'number' ? v.toLocaleString() : v}`)
+                                                                .map(([k, v]) => `${k}: ${typeof v === 'number' ? formatNumber(v) : v}`)
                                                                 .join('\n');
                                                             if (window.confirm(
-                                                                `[${method}]\n\n${details}\n\n산출 보수월액: ${insurance_base_salary.toLocaleString()}원\n\n적용하시겠습니까?`
+                                                                `[${method}]\n\n${details}\n\n산출 보수월액: ${formatNumber(insurance_base_salary)}원\n\n적용하시겠습니까?`
                                                             )) {
                                                                 setFormData(prev => ({ ...prev, insurance_base_salary }));
                                                             }
@@ -833,7 +834,7 @@ export default function StaffDetail() {
                                                     }
                                                     const baseSalary = Math.round(total / months / 1000) * 1000;
                                                     if (window.confirm(
-                                                        `[통보서 기준]\n\n보수총액: ${total.toLocaleString()}원\n근무월수: ${months}개월\n\n산출 보수월액: ${baseSalary.toLocaleString()}원\n\n적용하시겠습니까?`
+                                                        `[통보서 기준]\n\n보수총액: ${formatNumber(total)}원\n근무월수: ${months}개월\n\n산출 보수월액: ${formatNumber(baseSalary)}원\n\n적용하시겠습니까?`
                                                     )) {
                                                         setFormData(prev => ({ ...prev, insurance_base_salary: baseSalary }));
                                                     }
@@ -1185,10 +1186,10 @@ export default function StaffDetail() {
                                         {payrolls.map((pay) => (
                                             <tr key={pay.id} className="hover:bg-slate-50 border-b border-slate-50 transition-colors">
                                                 <td className="p-4 text-sm font-bold text-slate-800">{pay.month}</td>
-                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.base_pay || 0).toLocaleString()}</td>
-                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{(pay.bonus || 0).toLocaleString()}</td>
-                                                <td className="p-4 text-sm text-right text-red-400 font-mono">-{(pay.deductions || 0).toLocaleString()}</td>
-                                                <td className="p-4 text-sm text-right text-indigo-600 font-bold font-mono">{(pay.total_pay || 0).toLocaleString()}</td>
+                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{formatNumber(pay.base_pay || 0)}</td>
+                                                <td className="p-4 text-sm text-right text-slate-600 font-mono">{formatNumber(pay.bonus || 0)}</td>
+                                                <td className="p-4 text-sm text-right text-red-400 font-mono">-{formatNumber(pay.deductions || 0)}</td>
+                                                <td className="p-4 text-sm text-right text-indigo-600 font-bold font-mono">{formatNumber(pay.total_pay || 0)}</td>
                                                 <td className="p-4 text-center">
                                                     {pay.transfer_status === '완료' ? (
                                                         <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">이체완료</span>
@@ -1226,19 +1227,19 @@ export default function StaffDetail() {
                                         <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                                             <div className="flex justify-between bg-white rounded-lg px-3 py-2">
                                                 <span className="text-slate-500">기본급</span>
-                                                <span className="font-bold font-mono text-slate-700">{(pay.base_pay || 0).toLocaleString()}</span>
+                                                <span className="font-bold font-mono text-slate-700">{formatNumber(pay.base_pay || 0)}</span>
                                             </div>
                                             <div className="flex justify-between bg-white rounded-lg px-3 py-2">
                                                 <span className="text-slate-500">{formData.contract_type === '정규직' ? '추가수당' : '주휴수당'}</span>
-                                                <span className="font-bold font-mono text-slate-700">{(pay.bonus || 0).toLocaleString()}</span>
+                                                <span className="font-bold font-mono text-slate-700">{formatNumber(pay.bonus || 0)}</span>
                                             </div>
                                             <div className="flex justify-between bg-white rounded-lg px-3 py-2">
                                                 <span className="text-red-400">공제액</span>
-                                                <span className="font-bold font-mono text-red-400">-{(pay.deductions || 0).toLocaleString()}</span>
+                                                <span className="font-bold font-mono text-red-400">-{formatNumber(pay.deductions || 0)}</span>
                                             </div>
                                             <div className="flex justify-between bg-white rounded-lg px-3 py-2">
                                                 <span className="text-indigo-500">실수령</span>
-                                                <span className="font-bold font-mono text-indigo-600">{(pay.total_pay || 0).toLocaleString()}</span>
+                                                <span className="font-bold font-mono text-indigo-600">{formatNumber(pay.total_pay || 0)}</span>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
@@ -1324,7 +1325,7 @@ export default function StaffDetail() {
                                             newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
                                             newContent = newContent.replace(/{phone}/g, formData.phone || "");
                                             const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
-                                            newContent = newContent.replace(/{wage}/g, wage ? wage.toLocaleString() : "");
+                                            newContent = newContent.replace(/{wage}/g, wage ? formatNumber(wage) : "");
                                             setContractForm(prev => ({ ...prev, content: newContent }));
                                         }}
                                         className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"

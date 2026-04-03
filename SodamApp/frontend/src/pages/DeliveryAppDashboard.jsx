@@ -6,8 +6,9 @@ import {
   CheckCircle, FileSpreadsheet
 } from 'lucide-react';
 import api from '../api';
+import { formatNumber } from '../utils/format';
 
-const fmt = (v) => (v || 0).toLocaleString('ko-KR');
+const fmt = (v) => formatNumber(v || 0);
 const pct = (v) => (v || 0).toFixed(1);
 
 const CHANNELS = [

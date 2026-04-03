@@ -8,7 +8,7 @@ from datetime import date
 from typing import Optional, List
 from models import DailyExpense, Vendor, MonthlyProfitLoss, Staff
 from sqlmodel import Session, select, func, or_, and_
-from database import engine
+from database import get_session
 from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter()
@@ -38,147 +38,144 @@ def _pl_totals(record):
     return {"revenue": rev, "expense": exp, "profit": profit, "margin": margin}
 
 @router.get("/dashboard")
-def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def get_dashboard_data(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     try:
-        with Session(engine) as session:
-            # --- Current month P/L ---
-            q = apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
-            record = session.exec(q.where(
-                MonthlyProfitLoss.year == year,
-                MonthlyProfitLoss.month == month
-            )).first()
-            current = _pl_totals(record)
+        # --- Current month P/L ---
+        q = apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
+        record = session.exec(q.where(
+            MonthlyProfitLoss.year == year,
+            MonthlyProfitLoss.month == month
+        )).first()
+        current = _pl_totals(record)
 
-            # --- Previous month for growth ---
-            prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
-            prev_record = session.exec(apply_bid_filter(
-                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
-            ).where(
-                MonthlyProfitLoss.year == prev_y,
-                MonthlyProfitLoss.month == prev_m
-            )).first()
-            prev = _pl_totals(prev_record)
-            growth = round(((current["revenue"] - prev["revenue"]) / prev["revenue"] * 100), 1) if prev["revenue"] > 0 else 0
+        # --- Previous month for growth ---
+        prev_y, prev_m = (year - 1, 12) if month == 1 else (year, month - 1)
+        prev_record = session.exec(apply_bid_filter(
+            select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+        ).where(
+            MonthlyProfitLoss.year == prev_y,
+            MonthlyProfitLoss.month == prev_m
+        )).first()
+        prev = _pl_totals(prev_record)
+        growth = round(((current["revenue"] - prev["revenue"]) / prev["revenue"] * 100), 1) if prev["revenue"] > 0 else 0
 
-            # --- 6-Month Trend ---
-            monthly_trend = []
-            cy, cm = year, month
-            trend_months = []
-            for _ in range(6):
-                trend_months.append((cy, cm))
-                if cm == 1:
-                    cy -= 1; cm = 12
-                else:
-                    cm -= 1
-            trend_months.reverse()
+        # --- 6-Month Trend ---
+        monthly_trend = []
+        cy, cm = year, month
+        trend_months = []
+        for _ in range(6):
+            trend_months.append((cy, cm))
+            if cm == 1:
+                cy -= 1; cm = 12
+            else:
+                cm -= 1
+        trend_months.reverse()
 
-            month_conditions = [and_(MonthlyProfitLoss.year == y, MonthlyProfitLoss.month == m) for y, m in trend_months]
-            trend_records = session.exec(apply_bid_filter(
-                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
-            ).where(
-                or_(*month_conditions)
-            )).all()
-            
-            trend_map = {(r.year, r.month): r for r in trend_records}
+        month_conditions = [and_(MonthlyProfitLoss.year == y, MonthlyProfitLoss.month == m) for y, m in trend_months]
+        trend_records = session.exec(apply_bid_filter(
+            select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+        ).where(
+            or_(*month_conditions)
+        )).all()
 
-            for y, m in trend_months:
-                rec = trend_map.get((y, m))
-                t = _pl_totals(rec)
-                monthly_trend.append({"month": f"{m}월", **t})
+        trend_map = {(r.year, r.month): r for r in trend_records}
 
-            # --- Staff count ---
-            staff_q = apply_bid_filter(select(func.count(Staff.id)), Staff, bid)
-            staff_count = session.exec(staff_q.where(Staff.status == "재직")).one() or 0
-            names_q = apply_bid_filter(select(Staff.name), Staff, bid)
-            staff_names = session.exec(names_q.where(Staff.status == "재직").order_by(
-                (Staff.role == "대표이사").desc(), Staff.id
-            ).limit(5)).all()
+        for y, m in trend_months:
+            rec = trend_map.get((y, m))
+            t = _pl_totals(rec)
+            monthly_trend.append({"month": f"{m}월", **t})
 
-            # --- Business Name ---
-            from models import Business
-            business_name = "소담김밥"
-            if bid:
-                b = session.get(Business, bid)
-                if b and b.name:
-                    business_name = b.name
+        # --- Staff count ---
+        staff_q = apply_bid_filter(select(func.count(Staff.id)), Staff, bid)
+        staff_count = session.exec(staff_q.where(Staff.status == "재직")).one() or 0
+        names_q = apply_bid_filter(select(Staff.name), Staff, bid)
+        staff_names = session.exec(names_q.where(Staff.status == "재직").order_by(
+            (Staff.role == "대표이사").desc(), Staff.id
+        ).limit(5)).all()
 
-            return {
-                "status": "success",
-                "data": {
-                    "business_name": business_name,
-                    "year": year,
-                    "month": f"{month}월",
-                    "revenue": current["revenue"],
-                    "expense": current["expense"],
-                    "net_profit": current["profit"],
-                    "margin_rate": current["margin"],
-                    "revenue_growth": growth,
-                    "monthly_trend": monthly_trend,
-                    "staff_count": staff_count,
-                    "staff_names": list(staff_names),
-                }
+        # --- Business Name ---
+        from models import Business
+        business_name = "소담김밥"
+        if bid:
+            b = session.get(Business, bid)
+            if b and b.name:
+                business_name = b.name
+
+        return {
+            "status": "success",
+            "data": {
+                "business_name": business_name,
+                "year": year,
+                "month": f"{month}월",
+                "revenue": current["revenue"],
+                "expense": current["expense"],
+                "net_profit": current["profit"],
+                "margin_rate": current["margin"],
+                "revenue_growth": growth,
+                "monthly_trend": monthly_trend,
+                "staff_count": staff_count,
+                "staff_names": list(staff_names),
             }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/revenue")
-def get_revenue_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def get_revenue_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """Return revenue breakdown from MonthlyProfitLoss for pie chart."""
     try:
-        with Session(engine) as session:
-            record = session.exec(apply_bid_filter(
-                select(MonthlyProfitLoss), MonthlyProfitLoss, bid
-            ).where(
-                MonthlyProfitLoss.year == year,
-                MonthlyProfitLoss.month == month
-            )).first()
+        record = session.exec(apply_bid_filter(
+            select(MonthlyProfitLoss), MonthlyProfitLoss, bid
+        ).where(
+            MonthlyProfitLoss.year == year,
+            MonthlyProfitLoss.month == month
+        )).first()
 
-            LABELS = {
-                "revenue_store": "매장매출",
-                "revenue_coupang": "쿠팡 매출",
-                "revenue_baemin": "배민 매출",
-                "revenue_yogiyo": "요기요 매출",
-                "revenue_ddangyo": "땡겨요 매출",
-            }
-            data = []
-            for key, label in LABELS.items():
-                val = (getattr(record, key, 0) or 0) if record else 0
-                if val > 0:
-                    data.append({"name": label, "value": val})
-            return {"status": "success", "data": data}
+        LABELS = {
+            "revenue_store": "매장매출",
+            "revenue_coupang": "쿠팡 매출",
+            "revenue_baemin": "배민 매출",
+            "revenue_yogiyo": "요기요 매출",
+            "revenue_ddangyo": "땡겨요 매출",
+        }
+        data = []
+        for key, label in LABELS.items():
+            val = (getattr(record, key, 0) or 0) if record else 0
+            if val > 0:
+                data.append({"name": label, "value": val})
+        return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/analytics/cost")
-def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """Return top 5 vendors by expense from DailyExpense table."""
     try:
-        with Session(engine) as session:
-            import calendar
-            start_date = date(year, month, 1)
-            _, last_day = calendar.monthrange(year, month)
-            end_date = date(year, month, last_day)
+        import calendar
+        start_date = date(year, month, 1)
+        _, last_day = calendar.monthrange(year, month)
+        end_date = date(year, month, last_day)
 
-            stmt = (
-                select(
-                    Vendor.name,
-                    func.sum(DailyExpense.amount),
-                    Vendor.category,
-                )
-                .join(Vendor, DailyExpense.vendor_id == Vendor.id)
-                .where(
-                    DailyExpense.date >= start_date,
-                    DailyExpense.date <= end_date,
-                )
-                .group_by(Vendor.id)
-                .order_by(func.sum(DailyExpense.amount).desc())
-                .limit(5)
+        stmt = (
+            select(
+                Vendor.name,
+                func.sum(DailyExpense.amount),
+                Vendor.category,
             )
-            if bid is not None:
-                stmt = stmt.where(DailyExpense.business_id == bid)
-            results = session.exec(stmt).all()
-            data = [{"vendor": r[0], "amount": r[1], "item": r[2] or "기타"} for r in results]
-            return {"status": "success", "data": data}
+            .join(Vendor, DailyExpense.vendor_id == Vendor.id)
+            .where(
+                DailyExpense.date >= start_date,
+                DailyExpense.date <= end_date,
+            )
+            .group_by(Vendor.id)
+            .order_by(func.sum(DailyExpense.amount).desc())
+            .limit(5)
+        )
+        if bid is not None:
+            stmt = stmt.where(DailyExpense.business_id == bid)
+        results = session.exec(stmt).all()
+        data = [{"vendor": r[0], "amount": r[1], "item": r[2] or "기타"} for r in results]
+        return {"status": "success", "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -230,27 +227,15 @@ def delete_vendor(vendor_name: str, _admin: User = Depends(get_admin_user), bid 
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/vendors/id/{vendor_id}")
-def delete_vendor_by_id(vendor_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def delete_vendor_by_id(vendor_id: int, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     try:
-        from sqlmodel import Session, select
-        from database import engine
-        from models import Vendor
-        
-        with Session(engine) as session:
-            vendor = session.get(Vendor, vendor_id)
-            if not vendor:
-                raise HTTPException(status_code=404, detail="Vendor not found")
-            
-            # Delete associated expenses? Or handle logic?
-            # Existing delete_vendor logic in DatabaseService handles expense deletion/unlinking.
-            # Let's replicate or reuse DatabaseService logic if possible, but simpler to just do it here for now.
-            
-            # Ideally use service, but service.delete_vendor takes name.
-            # Let's just do direct deletion.
-            
-            session.delete(vendor)
-            session.commit()
-            return {"status": "success"}
+        vendor = session.get(Vendor, vendor_id)
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
+
+        session.delete(vendor)
+        session.commit()
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -265,82 +250,76 @@ class VendorPatch(BaseModel):
     business_reg_number: str = None
 
 @router.patch("/vendors/{vendor_id}")
-def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """Update vendor by ID - supports name change"""
     try:
         print(f"[PATCH VENDOR] ID: {vendor_id}, Payload: {payload}")
-        from sqlmodel import Session, select
-        from database import engine
-        from models import Vendor
-        
-        with Session(engine) as session:
-            vendor = session.get(Vendor, vendor_id)
-            if not vendor:
-                print(f"[PATCH VENDOR] Vendor {vendor_id} not found")
-                return {"status": "error", "message": "Vendor not found"}
-            
-            if payload.name is not None:
-                vendor.name = payload.name
-            if payload.item is not None:
-                vendor.item = payload.item
-            if payload.category is not None:
-                vendor.category = payload.category
-            if payload.vendor_type is not None:
-                vendor.vendor_type = payload.vendor_type
-            if payload.order_index is not None:
-                vendor.order_index = payload.order_index
-            if payload.phone is not None:
-                vendor.phone = payload.phone
-            if payload.address is not None:
-                vendor.address = payload.address
-            if payload.business_reg_number is not None:
-                vendor.business_reg_number = payload.business_reg_number
-            
-            session.add(vendor)
-            session.commit()
-            print(f"[PATCH VENDOR] Success: {vendor.name}")
-            
-        # --- Auto Sync P/L if category changed (in separate session) ---
+        vendor = session.get(Vendor, vendor_id)
+        if not vendor:
+            print(f"[PATCH VENDOR] Vendor {vendor_id} not found")
+            return {"status": "error", "message": "Vendor not found"}
+
+        if payload.name is not None:
+            vendor.name = payload.name
+        if payload.item is not None:
+            vendor.item = payload.item
         if payload.category is not None:
-            with Session(engine) as sync_session:
-                # Find all expenses linked to this vendor
-                expenses = sync_session.exec(
-                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == vendor_id)
-                ).all()
-                
-                # ─── 매입 내역(DailyExpense) 카테고리도 동기화 ───
-                updated_expenses = 0
-                for exp in expenses:
-                    if exp.category != payload.category:
-                        exp.category = payload.category
-                        sync_session.add(exp)
-                        updated_expenses += 1
-                
-                if updated_expenses > 0:
-                    sync_session.commit()
-                    print(f"[PATCH VENDOR] Updated {updated_expenses} expenses to category '{payload.category}'")
-                
-                # AI 학습: 이 벤더의 모든 거래처명에 대해 카테고리 규칙 학습
-                from services.smart_classifier import learn_rule
-                vendor_names = set(e.vendor_name for e in expenses)
-                for vname in vendor_names:
-                    learn_rule(
-                        original_name=vname,
-                        bid=bid,
-                        category=payload.category,
-                        source="vendor_patch",
-                        session=sync_session,
-                    )
-                
-                affected_months = set((e.date.year, e.date.month) for e in expenses)
-                
-                print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor category change")
-                for y, m in affected_months:
-                    try:
-                        sync_all_expenses(y, m, sync_session, bid)
-                    except Exception as sync_err:
-                        print(f"[SYNC P/L] Error for {y}-{m}: {sync_err}")
-                sync_session.commit()
+            vendor.category = payload.category
+        if payload.vendor_type is not None:
+            vendor.vendor_type = payload.vendor_type
+        if payload.order_index is not None:
+            vendor.order_index = payload.order_index
+        if payload.phone is not None:
+            vendor.phone = payload.phone
+        if payload.address is not None:
+            vendor.address = payload.address
+        if payload.business_reg_number is not None:
+            vendor.business_reg_number = payload.business_reg_number
+
+        session.add(vendor)
+        session.commit()
+        print(f"[PATCH VENDOR] Success: {vendor.name}")
+
+        # --- Auto Sync P/L if category changed ---
+        if payload.category is not None:
+            # Find all expenses linked to this vendor
+            expenses = session.exec(
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == vendor_id)
+            ).all()
+
+            # ─── 매입 내역(DailyExpense) 카테고리도 동기화 ───
+            updated_expenses = 0
+            for exp in expenses:
+                if exp.category != payload.category:
+                    exp.category = payload.category
+                    session.add(exp)
+                    updated_expenses += 1
+
+            if updated_expenses > 0:
+                session.commit()
+                print(f"[PATCH VENDOR] Updated {updated_expenses} expenses to category '{payload.category}'")
+
+            # AI 학습: 이 벤더의 모든 거래처명에 대해 카테고리 규칙 학습
+            from services.smart_classifier import learn_rule
+            vendor_names = set(e.vendor_name for e in expenses)
+            for vname in vendor_names:
+                learn_rule(
+                    original_name=vname,
+                    bid=bid,
+                    category=payload.category,
+                    source="vendor_patch",
+                    session=session,
+                )
+
+            affected_months = set((e.date.year, e.date.month) for e in expenses)
+
+            print(f"[SYNC P/L] Triggering sync for {len(affected_months)} months due to Vendor category change")
+            for y, m in affected_months:
+                try:
+                    sync_all_expenses(y, m, session, bid)
+                except Exception as sync_err:
+                    print(f"[SYNC P/L] Error for {y}-{m}: {sync_err}")
+            session.commit()
         # -----------------------------------------
 
         return {"status": "success"}
@@ -355,69 +334,64 @@ class VendorMergeRequest(BaseModel):
     source_ids: List[int]
 
 @router.post("/vendors/{target_id}/merge")
-def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def merge_vendors(target_id: int, payload: VendorMergeRequest, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """Merge multiple vendors into one target vendor.
-    
+
     All DailyExpense records from source vendors will be updated
     to point to the target vendor, then source vendors are deleted.
     """
     try:
-        from sqlmodel import Session, select
-        from database import engine
-        from models import Vendor, DailyExpense
-        
-        with Session(engine) as session:
-            # 1. Get target vendor
-            target = session.get(Vendor, target_id)
-            if not target:
-                raise HTTPException(status_code=404, detail="Target vendor not found")
-            
-            # 2. Validate source IDs
-            if target_id in payload.source_ids:
-                raise HTTPException(status_code=400, detail="Target vendor cannot be in source list")
-            
-            merged_count = 0
-            deleted_vendors = []
-            
-            for source_id in payload.source_ids:
-                source = session.get(Vendor, source_id)
-                if not source:
-                    continue
-                
-                # 3. Update all DailyExpense records
-                expenses = session.exec(
-                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == source_id)
-                ).all()
-                
-                for expense in expenses:
-                    expense.vendor_id = target_id
-                    expense.vendor_name = target.name
-                    session.add(expense)
-                    merged_count += 1
-                
-                # 4. AI 학습: 소스 거래처명 → 타겟 거래처명 매핑 학습
-                from services.smart_classifier import learn_rule
-                learn_rule(
-                    original_name=source.name,
-                    bid=bid,
-                    mapped_vendor_name=target.name,
-                    category=target.category,
-                    source="vendor_merge",
-                    session=session,
-                )
-                
-                # 5. Delete source vendor
-                deleted_vendors.append(source.name)
-                session.delete(source)
-            
-            session.commit()
-            
-            return {
-                "status": "success",
-                "merged_expenses": merged_count,
-                "deleted_vendors": deleted_vendors,
-                "target_vendor": target.name
-            }
+        # 1. Get target vendor
+        target = session.get(Vendor, target_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="Target vendor not found")
+
+        # 2. Validate source IDs
+        if target_id in payload.source_ids:
+            raise HTTPException(status_code=400, detail="Target vendor cannot be in source list")
+
+        merged_count = 0
+        deleted_vendors = []
+
+        for source_id in payload.source_ids:
+            source = session.get(Vendor, source_id)
+            if not source:
+                continue
+
+            # 3. Update all DailyExpense records
+            expenses = session.exec(
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == source_id)
+            ).all()
+
+            for expense in expenses:
+                expense.vendor_id = target_id
+                expense.vendor_name = target.name
+                session.add(expense)
+                merged_count += 1
+
+            # 4. AI 학습: 소스 거래처명 → 타겟 거래처명 매핑 학습
+            from services.smart_classifier import learn_rule
+            learn_rule(
+                original_name=source.name,
+                bid=bid,
+                mapped_vendor_name=target.name,
+                category=target.category,
+                source="vendor_merge",
+                session=session,
+            )
+
+            # 5. Delete source vendor
+            deleted_vendors.append(source.name)
+            session.delete(source)
+
+        session.commit()
+
+        return {
+            "status": "success",
+            "merged_expenses": merged_count,
+            "deleted_vendors": deleted_vendors,
+            "target_vendor": target.name
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -440,121 +414,116 @@ class UncategorizedMergeRequest(BaseModel):
     category: str = "other"
 
 @router.post("/vendors/merge-uncategorized")
-def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+def merge_uncategorized_vendors(payload: UncategorizedMergeRequest, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """
     Merge uncategorized vendors (by name) into a target vendor.
     1. Find or create target vendor.
     2. Update DailyExpense records with matching names to point to target vendor.
     """
     try:
-        from sqlmodel import Session, select
-        from database import engine
-        from models import Vendor, DailyExpense
-        
-        with Session(engine) as session:
-            # 1. Find or create target vendor
-            # Check if target vendor exists by name
-            target_vendor = session.exec(
-                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == payload.target_name)
-            ).first()
-            
-            if not target_vendor:
-                # Create new vendor
-                # Determine vendor_type based on category (heuristic)
-                # This could be improved if frontend sends vendor_type
-                vendor_type = "expense" 
-                if payload.category in ["delivery", "store", "other_revenue"]:
-                     vendor_type = "revenue"
-                
-                target_vendor = Vendor(
-                    name=payload.target_name,
-                    category=payload.category,
-                    vendor_type=vendor_type
-                )
-                session.add(target_vendor)
-                session.commit()
-                session.refresh(target_vendor)
-            
-            merged_count = 0
-            
-            # 2. Update DailyExpenses
-            # We look for expenses that have vendor_name in source_names
-            # And preferably vendor_id IS NULL (but user might want to merge even if some have IDs?)
-            # The prompt implies merging "uncategorized" which usually means no ID.
-            # But let's be safe and update by name mainly.
-            
-            for src_name in payload.source_names:
-                # Skip if source is same as target
-                if src_name == payload.target_name:
-                    continue
-                
-                # AI 학습: 소스 이름 → 타겟 이름 매핑
-                from services.smart_classifier import learn_rule
-                learn_rule(
-                    original_name=src_name,
-                    bid=bid,
-                    mapped_vendor_name=target_vendor.name,
-                    category=payload.category,
-                    source="vendor_merge",
-                    session=session,
-                )
-                    
-                expenses = session.exec(
-                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_name == src_name)
-                ).all()
-                
-                for expense in expenses:
-                    expense.vendor_id = target_vendor.id
-                    expense.vendor_name = target_vendor.name
-                    session.add(expense)
-                    merged_count += 1
-            
-            # 3. Delete source Vendors if they exist
-            # Since these are "uncategorized" vendors appearing in the list, they likely exist in Vendor table.
-            for src_name in payload.source_names:
-                if src_name == payload.target_name:
-                    continue
-                    
-                source_vendors = session.exec(
-                    apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == src_name)
-                ).all()
-                
-                for sv in source_vendors:
-                    session.delete(sv)
+        # 1. Find or create target vendor
+        # Check if target vendor exists by name
+        target_vendor = session.exec(
+            apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == payload.target_name)
+        ).first()
 
-            # Also update expenses for target_name itself if they have no ID
-            target_expenses = session.exec(
-                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
-                    DailyExpense.vendor_name == payload.target_name,
-                    DailyExpense.vendor_id == None
-                )
-            ).all()
-            for expense in target_expenses:
-                expense.vendor_id = target_vendor.id
-                session.add(expense)
-            
+        if not target_vendor:
+            # Create new vendor
+            # Determine vendor_type based on category (heuristic)
+            # This could be improved if frontend sends vendor_type
+            vendor_type = "expense"
+            if payload.category in ["delivery", "store", "other_revenue"]:
+                 vendor_type = "revenue"
+
+            target_vendor = Vendor(
+                name=payload.target_name,
+                category=payload.category,
+                vendor_type=vendor_type
+            )
+            session.add(target_vendor)
             session.commit()
-            
-            # --- Auto Sync P/L after Merge ---
-            # All merged expenses now belong to target_vendor. 
-            # We need to sync months where target_vendor has expenses.
-            # (Fetching again to cover freshly updated/merged ones)
-            all_target_expenses = session.exec(
-                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == target_vendor.id)
+            session.refresh(target_vendor)
+
+        merged_count = 0
+
+        # 2. Update DailyExpenses
+        # We look for expenses that have vendor_name in source_names
+        # And preferably vendor_id IS NULL (but user might want to merge even if some have IDs?)
+        # The prompt implies merging "uncategorized" which usually means no ID.
+        # But let's be safe and update by name mainly.
+
+        for src_name in payload.source_names:
+            # Skip if source is same as target
+            if src_name == payload.target_name:
+                continue
+
+            # AI 학습: 소스 이름 → 타겟 이름 매핑
+            from services.smart_classifier import learn_rule
+            learn_rule(
+                original_name=src_name,
+                bid=bid,
+                mapped_vendor_name=target_vendor.name,
+                category=payload.category,
+                source="vendor_merge",
+                session=session,
+            )
+
+            expenses = session.exec(
+                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_name == src_name)
             ).all()
-            affected_months = set((e.date.year, e.date.month) for e in all_target_expenses)
-            
-            print(f"[SYNC P/L MERGE] Syncing {len(affected_months)} months for {target_vendor.name}")
-            for y, m in affected_months:
-                sync_all_expenses(y, m, session, bid)
-            # ---------------------------------
-            
-            return {
-                "status": "success",
-                "merged_expenses": merged_count,
-                "target_vendor": target_vendor.name,
-                "target_id": target_vendor.id
-            }
-            
+
+            for expense in expenses:
+                expense.vendor_id = target_vendor.id
+                expense.vendor_name = target_vendor.name
+                session.add(expense)
+                merged_count += 1
+
+        # 3. Delete source Vendors if they exist
+        # Since these are "uncategorized" vendors appearing in the list, they likely exist in Vendor table.
+        for src_name in payload.source_names:
+            if src_name == payload.target_name:
+                continue
+
+            source_vendors = session.exec(
+                apply_bid_filter(select(Vendor), Vendor, bid).where(Vendor.name == src_name)
+            ).all()
+
+            for sv in source_vendors:
+                session.delete(sv)
+
+        # Also update expenses for target_name itself if they have no ID
+        target_expenses = session.exec(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                DailyExpense.vendor_name == payload.target_name,
+                DailyExpense.vendor_id == None
+            )
+        ).all()
+        for expense in target_expenses:
+            expense.vendor_id = target_vendor.id
+            session.add(expense)
+
+        session.commit()
+
+        # --- Auto Sync P/L after Merge ---
+        # All merged expenses now belong to target_vendor.
+        # We need to sync months where target_vendor has expenses.
+        # (Fetching again to cover freshly updated/merged ones)
+        all_target_expenses = session.exec(
+            apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.vendor_id == target_vendor.id)
+        ).all()
+        affected_months = set((e.date.year, e.date.month) for e in all_target_expenses)
+
+        print(f"[SYNC P/L MERGE] Syncing {len(affected_months)} months for {target_vendor.name}")
+        for y, m in affected_months:
+            sync_all_expenses(y, m, session, bid)
+        # ---------------------------------
+
+        return {
+            "status": "success",
+            "merged_expenses": merged_count,
+            "target_vendor": target_vendor.name,
+            "target_id": target_vendor.id
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
