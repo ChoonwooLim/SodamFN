@@ -291,6 +291,8 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
   const keepCanvasRef = useRef(null); // 보존 마스크 별도 캔버스
   const imgRef = useRef(null);
   const [editHistory, setEditHistory] = useState([]);
+  const rafIdRef = useRef(null); // rAF throttle for smooth brush drawing
+  const lastDrawPosRef = useRef(null); // 마지막 드로잉 좌표 (rAF용)
 
   // ── initialImage가 전달되면 편집 탭에 자동 로드 ──
   useEffect(() => {
@@ -301,6 +303,13 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
       setActiveTab('edit');
     }
   }, [initialImage]);
+
+  // ── rAF / Blob URL 정리 ──
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
 
   // ══════════════════════════════
   // 생성 탭 핸들러
@@ -542,35 +551,47 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
     if (!canvas) return;
     setIsDrawing(true);
     const { x, y } = getCanvasCoords(e, canvas);
+    lastDrawPosRef.current = { x, y };
     const ctx = canvas.getContext('2d');
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
 
+  // rAF-throttled draw — 고해상도 이미지에서도 부드러운 브러시 드로잉
   const draw = (e) => {
     if (!isDrawing || editMode !== 'inpaint') return;
     const canvas = maskCanvasRef.current;
     if (!canvas) return;
     const { x, y } = getCanvasCoords(e, canvas);
-    const ctx = canvas.getContext('2d');
-    ctx.lineWidth = brushSize;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    lastDrawPosRef.current = { x, y };
 
-    if (brushMode === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-    } else {
+    if (rafIdRef.current) return; // 이전 프레임 대기 중이면 스킵
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const pos = lastDrawPosRef.current;
+      if (!pos) return;
+      const ctx = canvas.getContext('2d');
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (brushMode === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = brushMode === 'remove' ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 200, 0, 0.5)';
+      }
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
       ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = brushMode === 'remove' ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 200, 0, 0.5)';
-    }
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.globalCompositeOperation = 'source-over';
+    });
   };
 
   const stopDrawing = () => {
     setIsDrawing(false);
+    if (rafIdRef.current) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+    lastDrawPosRef.current = null;
   };
 
   const clearMask = () => {

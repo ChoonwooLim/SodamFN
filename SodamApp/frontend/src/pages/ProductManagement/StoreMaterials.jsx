@@ -8,6 +8,7 @@ import {
   Sun, Moon, Coffee, Headphones, Guitar, Pencil, Maximize2,
 } from 'lucide-react';
 import api from '../../api';
+import useToast from '../../hooks/useToast';
 import AIImageStudio from './components/AIImageStudio';
 
 /* ───────────────────────────────────
@@ -139,6 +140,7 @@ function PresetThumbnail({ preset, tabId, index }) {
    메인 컴포넌트
 ─────────────────────────────────── */
 export default function StoreMaterials() {
+  const showToast = useToast();
   const [activeTab, setActiveTab] = useState('poster');
   const [presets, setPresets] = useState(null);
   const [aiStatus, setAiStatus] = useState(null);
@@ -226,7 +228,9 @@ export default function StoreMaterials() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({ detail: response.statusText }));
-        setResult({ type: 'error', message: err.detail || '서버 오류' });
+        const msg = err.detail || '서버 오류';
+        setResult({ type: 'error', message: msg });
+        showToast(msg, 'error');
         setGenerating(false);
         setProgress(0);
         setProgressMessage('');
@@ -267,18 +271,22 @@ export default function StoreMaterials() {
               setResult({ type: 'audio', url: data.file_url, format: data.file_format });
             }
             setHistory(prev => [data, ...prev].slice(0, 30));
+            showToast('생성 완료! 서버에 자동 저장되었습니다', 'success');
           } else if (evType === 'error') {
             setResult({ type: 'error', message: data.message });
+            showToast(data.message || '생성 실패', 'error');
           }
         }
       }
     } catch (err) {
-      setResult({ type: 'error', message: err.message || '네트워크 오류' });
+      const msg = err.message || '네트워크 오류가 발생했습니다';
+      setResult({ type: 'error', message: msg });
+      showToast(msg, 'error');
     } finally {
       setGenerating(false);
       setTimeout(() => { setProgress(0); setProgressMessage(''); }, 2000);
     }
-  }, []);
+  }, [showToast]);
 
   /* ── 히스토리 항목 삭제 ── */
   const deleteHistoryItem = useCallback(async (id) => {
@@ -655,12 +663,17 @@ export default function StoreMaterials() {
               {/* ── 결과 표시 ── */}
               {result && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                  {/* 에러 */}
+                  {/* 에러 + 재시도 */}
                   {result.type === 'error' && (
                     <div className="p-6 text-center">
                       <AlertCircle className="w-10 h-10 text-red-400 mx-auto mb-3" />
                       <p className="text-sm font-bold text-red-600 mb-1">생성 실패</p>
-                      <p className="text-xs text-slate-500">{result.message}</p>
+                      <p className="text-xs text-slate-500 mb-4">{result.message}</p>
+                      <button onClick={handleGenerate} disabled={generating}
+                        className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all bg-gradient-to-r ${currentTab.gradient} hover:opacity-90 shadow-lg active:scale-[0.98]`}>
+                        <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+                        다시 시도
+                      </button>
                     </div>
                   )}
 

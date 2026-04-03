@@ -4,6 +4,9 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { TrendingUp, TrendingDown, Wallet, Users, BarChart3, ShoppingBag, LayoutDashboard } from 'lucide-react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
+const fmtWon = (v) => `${Number(v).toLocaleString('ko-KR')}원`;
+const fmtWonProfit = (v) => [fmtWon(v), '이익'];
+
 export default function Dashboard() {
     const [dashData, setDashData] = useState(null);
     const [revenueData, setRevenueData] = useState([]);
@@ -207,7 +210,7 @@ export default function Dashboard() {
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={8} />
                                     <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => formatKRW(v)} />
-                                    <Tooltip formatter={v => [`${v.toLocaleString()}원`, '이익']} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: 10, fontSize: 12 }} />
+                                    <Tooltip formatter={fmtWonProfit} contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', padding: 10, fontSize: 12 }} />
                                     <Area type="monotone" dataKey="profit" stroke="#3B82F6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorProfit)" isAnimationActive={false} />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -423,7 +426,7 @@ export default function Dashboard() {
                                         <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
                                         <YAxis tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => formatKRW(v)} />
                                         <Tooltip
-                                            formatter={v => [`${v.toLocaleString()}원`, '이익']}
+                                            formatter={fmtWonProfit}
                                             contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.08)', padding: 14 }}
                                             labelStyle={{ color: '#64748b' }}
                                             itemStyle={{ color: '#3B82F6' }}
@@ -446,7 +449,7 @@ export default function Dashboard() {
                                         <Pie data={revenueData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value" isAnimationActive={false}>
                                             {revenueData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % 5]} />)}
                                         </Pie>
-                                        <Tooltip formatter={v => `${v.toLocaleString()}원`} contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+                                        <Tooltip formatter={fmtWon} contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
                                     </PieChart>
                                 </ResponsiveContainer>
                             ) : <div className="h-full flex items-center justify-center text-slate-400">데이터가 없습니다</div>}

@@ -68,7 +68,7 @@ services:
     type: static
     rootDir: SodamApp/frontend
     build:
-      command: "npm install && npm install terser -D && npm run build"
+      command: "npm install && npm run build"
     publish: ./dist
     env:
       - key: VITE_API_URL
@@ -90,7 +90,6 @@ postDeploy:
     command: |
       cd SodamApp/staff-app
       npm install
-      npm install terser -D
       npm run build
       npx wrangler pages deploy dist --project-name sodam-staff --branch main --commit-dirty=true --commit-message="Auto Deploy"
     env:

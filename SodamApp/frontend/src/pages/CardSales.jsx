@@ -3,6 +3,8 @@ import { Upload, FileUp, CreditCard, DollarSign, Calendar, TrendingUp, PieChart 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '../api';
 
+const fmtWon = (v) => `${Number(v).toLocaleString('ko-KR')}원`;
+
 export default function CardSales() {
     const [activeTab, setActiveTab] = useState('dashboard');
     const [loading, setLoading] = useState(false);
@@ -182,7 +184,7 @@ export default function CardSales() {
                                         <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
                                         <Tooltip
                                             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                            formatter={(value) => `${value.toLocaleString()}원`}
+                                            formatter={fmtWon}
                                         />
                                         <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                                     </BarChart>
@@ -210,7 +212,7 @@ export default function CardSales() {
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip formatter={(value) => `${value.toLocaleString()}원`} />
+                                        <Tooltip formatter={fmtWon} />
                                         <Legend />
                                     </PieChart>
                                 </ResponsiveContainer>

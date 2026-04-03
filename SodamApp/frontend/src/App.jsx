@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import ErrorBoundary from './components/ErrorBoundary';
+import { ToastProvider } from './hooks/useToast';
 import './styles/mobile-ux.css';
 
 // Lazy Load Pages
@@ -128,6 +129,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
+        <ToastProvider>
         <Layout>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -193,6 +195,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </Layout>
+        </ToastProvider>
       </ErrorBoundary>
     </BrowserRouter>
   );
