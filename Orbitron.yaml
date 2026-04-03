@@ -40,7 +40,7 @@ services:
       - key: REPLICATE_API_TOKEN
         value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
       - key: AI_GPU_SERVER_URL
-        value: "http://192.168.219.101:8100"  # Self-hosted GPU AI image generation
+        value: "http://192.168.219.100:8100"  # Windows PC RTX 3090 AI service
       - key: MEDIA_SERVER_URL
         value: "http://192.168.219.101:8200"  # Central media file server
       - key: MEDIA_API_KEY
