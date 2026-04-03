@@ -158,8 +158,13 @@ export default function StoreMaterials() {
   const [showEditor, setShowEditor] = useState(false);
   const [editImageUrl, setEditImageUrl] = useState(null);
 
-  // 생성 히스토리
+  // SSE 진행 상태
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+
+  // 영구 히스토리 (서버 저장)
   const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   // 오디오
   const audioRef = useRef(null);
@@ -167,7 +172,19 @@ export default function StoreMaterials() {
 
   const currentTab = TABS.find(t => t.id === activeTab);
 
-  /* ── 프리셋 + AI 상태 로드 ── */
+  /* ── 프리셋 + AI 상태 + 히스토리 로드 ── */
+  const loadHistory = useCallback(async (cat) => {
+    setHistoryLoading(true);
+    try {
+      const res = await api.get('/promotions/history', { params: { category: cat || undefined, limit: 30 } });
+      setHistory(res.data);
+    } catch (err) {
+      console.error('히스토리 로드 실패:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
@@ -177,12 +194,100 @@ export default function StoreMaterials() {
         ]);
         setPresets(presetsRes.data);
         setAiStatus(statusRes.data);
+        // 전체 히스토리 로드
+        const histRes = await api.get('/promotions/history', { params: { limit: 30 } });
+        setHistory(histRes.data);
       } catch (err) {
-        console.error('프리셋 로드 실패:', err);
+        console.error('초기 로드 실패:', err);
       } finally {
         setLoading(false);
       }
     })();
+  }, []);
+
+  /* ── SSE 스트리밍 생성 헬퍼 ── */
+  const streamGenerate = useCallback(async (endpoint, body) => {
+    setGenerating(true);
+    setResult(null);
+    setProgress(0);
+    setProgressMessage('준비 중...');
+
+    const API_BASE = import.meta.env.VITE_API_URL || '';
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const viewAsBid = localStorage.getItem('view_as_business_id');
+    if (viewAsBid) headers['X-View-As-Business'] = viewAsBid;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/promotions/${endpoint}`, {
+        method: 'POST', headers, body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ detail: response.statusText }));
+        setResult({ type: 'error', message: err.detail || '서버 오류' });
+        setGenerating(false);
+        setProgress(0);
+        setProgressMessage('');
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          if (!part.trim()) continue;
+          const lines = part.split('\n');
+          let evType = '', evData = '';
+          for (const line of lines) {
+            if (line.startsWith('event: ')) evType = line.slice(7);
+            else if (line.startsWith('data: ')) evData = line.slice(6);
+          }
+          if (!evType || !evData) continue;
+          const data = JSON.parse(evData);
+
+          if (evType === 'progress') {
+            setProgress(data.progress || 0);
+            setProgressMessage(data.message || '');
+          } else if (evType === 'complete') {
+            setProgress(100);
+            setProgressMessage('완료!');
+            if (data.content_type === 'image') {
+              setResult({ type: 'image', url: data.file_url });
+            } else {
+              setResult({ type: 'audio', url: data.file_url, format: data.file_format });
+            }
+            setHistory(prev => [data, ...prev].slice(0, 30));
+          } else if (evType === 'error') {
+            setResult({ type: 'error', message: data.message });
+          }
+        }
+      }
+    } catch (err) {
+      setResult({ type: 'error', message: err.message || '네트워크 오류' });
+    } finally {
+      setGenerating(false);
+      setTimeout(() => { setProgress(0); setProgressMessage(''); }, 2000);
+    }
+  }, []);
+
+  /* ── 히스토리 항목 삭제 ── */
+  const deleteHistoryItem = useCallback(async (id) => {
+    try {
+      await api.delete(`/promotions/history/${id}`);
+      setHistory(prev => prev.filter(h => h.id !== id));
+    } catch (err) {
+      console.error('삭제 실패:', err);
+    }
   }, []);
 
   /* ── 탭 변경 시 리셋 ── */
@@ -194,58 +299,34 @@ export default function StoreMaterials() {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
   }, [activeTab]);
 
-  /* ── 이미지 생성 ── */
+  /* ── 이미지 생성 (SSE 스트리밍 + 자동 저장) ── */
   const generateImage = useCallback(async (preset) => {
-    setGenerating(true); setResult(null);
-    try {
-      const resp = await api.post('/promotions/generate-image', {
-        preset_id: preset.id,
-        custom_prompt: customText || undefined,
-        store_name: storeName || undefined,
-      }, { responseType: 'blob', timeout: 200000 });
-      const url = URL.createObjectURL(resp.data);
-      setResult({ type: 'image', url, blob: resp.data });
-      setHistory(prev => [{ type: 'image', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
-    } catch (err) {
-      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
-    } finally { setGenerating(false); }
-  }, [customText, storeName, activeTab]);
+    await streamGenerate('generate-image-stream', {
+      preset_id: preset.id,
+      custom_prompt: customText || undefined,
+      store_name: storeName || undefined,
+    });
+  }, [customText, storeName, streamGenerate]);
 
-  /* ── TTS 생성 ── */
+  /* ── TTS 생성 (SSE 스트리밍 + 자동 저장) ── */
   const generateTTS = useCallback(async (preset) => {
-    setGenerating(true); setResult(null);
-    try {
-      const resp = await api.post('/promotions/generate-tts', {
-        preset_id: preset.id,
-        custom_text: customText || undefined,
-        store_name: storeName,
-        voice: selectedVoice,
-        speed: ttsSpeed,
-      }, { responseType: 'blob', timeout: 60000 });
-      const url = URL.createObjectURL(resp.data);
-      setResult({ type: 'audio', url, blob: resp.data, format: 'mp3' });
-      setHistory(prev => [{ type: 'audio', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
-    } catch (err) {
-      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
-    } finally { setGenerating(false); }
-  }, [customText, storeName, selectedVoice, ttsSpeed, activeTab]);
+    await streamGenerate('generate-tts-stream', {
+      preset_id: preset.id,
+      custom_text: customText || undefined,
+      store_name: storeName,
+      voice: selectedVoice,
+      speed: ttsSpeed,
+    });
+  }, [customText, storeName, selectedVoice, ttsSpeed, streamGenerate]);
 
-  /* ── 음악 생성 ── */
+  /* ── 음악 생성 (SSE 스트리밍 + 자동 저장) ── */
   const generateMusic = useCallback(async (preset) => {
-    setGenerating(true); setResult(null);
-    try {
-      const resp = await api.post('/promotions/generate-music', {
-        preset_id: preset.id,
-        custom_prompt: customText || undefined,
-        duration: musicDuration,
-      }, { responseType: 'blob', timeout: 360000 });
-      const url = URL.createObjectURL(resp.data);
-      setResult({ type: 'audio', url, blob: resp.data, format: 'wav' });
-      setHistory(prev => [{ type: 'audio', url, preset: preset.name, tab: activeTab, time: new Date() }, ...prev].slice(0, 20));
-    } catch (err) {
-      setResult({ type: 'error', message: err.response?.data?.detail || err.message });
-    } finally { setGenerating(false); }
-  }, [customText, musicDuration, activeTab]);
+    await streamGenerate('generate-music-stream', {
+      preset_id: preset.id,
+      custom_prompt: customText || undefined,
+      duration: musicDuration,
+    });
+  }, [customText, musicDuration, streamGenerate]);
 
   /* ── 생성 핸들러 ── */
   const handleGenerate = useCallback(() => {
@@ -547,15 +628,27 @@ export default function StoreMaterials() {
                         : `bg-gradient-to-r ${currentTab.gradient} hover:opacity-90 shadow-lg active:scale-[0.98]`
                     }`}>
                     {generating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        {activeTab === 'music' ? '음악 작곡 중... (최대 5분)' :
-                         activeTab === 'tts' ? '나레이션 생성 중...' : '이미지 생성 중... (30~60초)'}
-                      </>
+                      <><Loader2 className="w-4 h-4 animate-spin" /> {progressMessage || 'AI 생성 중...'}</>
                     ) : (
                       <><Wand2 className="w-4 h-4" /> AI 생성하기</>
                     )}
                   </button>
+
+                  {/* SSE 진행률 바 */}
+                  {generating && progress > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${currentTab.gradient} transition-all duration-500 ease-out`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500 font-medium">{progressMessage}</span>
+                        <span className="text-slate-400 font-bold tabular-nums">{progress}%</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -650,26 +743,35 @@ export default function StoreMaterials() {
                 </div>
               )}
 
-              {/* ── 최근 히스토리 ── */}
+              {/* ── 최근 히스토리 (서버 영구 저장) ── */}
               {history.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-4">
-                  <h4 className="text-xs font-bold text-slate-500 mb-3">최근 생성 기록</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold text-slate-500">저장된 제작물</h4>
+                    <span className="text-[10px] text-slate-400">{history.length}개</span>
+                  </div>
                   <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                    {history.slice(0, 8).map((item, i) => (
-                      <div key={i} className="shrink-0">
-                        {item.type === 'image' ? (
-                          <button onClick={() => { setResult({ type: 'image', url: item.url }); }}
+                    {history.slice(0, 10).map((item) => (
+                      <div key={item.id} className="shrink-0 relative group">
+                        {item.content_type === 'image' ? (
+                          <button onClick={() => { setResult({ type: 'image', url: item.file_url }); }}
                             className="w-14 h-14 rounded-xl overflow-hidden border-2 border-slate-200 hover:border-blue-400 transition-all">
-                            <img src={item.url} alt="" className="w-full h-full object-cover" />
+                            <img src={item.file_url} alt={item.preset_name} className="w-full h-full object-cover" />
                           </button>
                         ) : (
                           <button onClick={() => {
-                            setResult({ type: 'audio', url: item.url, format: item.tab === 'tts' ? 'mp3' : 'wav' });
+                            setResult({ type: 'audio', url: item.file_url, format: item.file_format });
                           }}
-                            className="w-14 h-14 rounded-xl bg-slate-100 border-2 border-slate-200 hover:border-blue-400 flex items-center justify-center transition-all">
-                            {item.tab === 'tts' ? <Mic className="w-4 h-4 text-blue-400" /> : <Music className="w-4 h-4 text-purple-400" />}
+                            className="w-14 h-14 rounded-xl bg-slate-100 border-2 border-slate-200 hover:border-blue-400 flex flex-col items-center justify-center gap-0.5 transition-all">
+                            {item.category === 'tts' ? <Mic className="w-3.5 h-3.5 text-blue-400" /> : <Music className="w-3.5 h-3.5 text-purple-400" />}
+                            <span className="text-[8px] text-slate-400 truncate w-12 text-center">{item.preset_name}</span>
                           </button>
                         )}
+                        {/* 삭제 버튼 */}
+                        <button onClick={(e) => { e.stopPropagation(); deleteHistoryItem(item.id); }}
+                          className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white items-center justify-center text-[8px] hidden group-hover:flex shadow">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
                       </div>
                     ))}
                   </div>

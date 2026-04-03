@@ -107,6 +107,20 @@ class FoodTranslation(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+class PromoContent(SQLModel, table=True):
+    """AI 홍보물 제작 결과물 (이미지/나레이션/음악)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    category: str = "poster"  # poster, sns, delivery, tts, music
+    preset_id: str = ""
+    preset_name: str = ""
+    content_type: str = "image"  # image, audio
+    file_url: str = ""
+    storage_key: Optional[str] = None
+    file_format: str = "png"  # png, mp3, wav
+    file_size: int = 0
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 class Expense(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
