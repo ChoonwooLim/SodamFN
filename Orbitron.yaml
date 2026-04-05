@@ -20,7 +20,7 @@ services:
       command: "gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 300 --bind 0.0.0.0:$PORT"
     env:
       - key: DATABASE_URL
-        value: "postgresql://devuser:devpass123@localhost:5432/sodamfn"
+        value: "postgresql://devuser:devpass123@192.168.219.101:5432/sodamfn"
       - key: SECRET_KEY
         generate: true
       - key: FRONTEND_URL

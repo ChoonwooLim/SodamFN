@@ -132,6 +132,35 @@ async def serve_media(path: str):
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
+@app.get("/api/health")
+def health_check():
+    """배포 환경 진단용 health 엔드포인트"""
+    from database import DATABASE_URL
+    from sqlmodel import Session, text
+    from database import engine
+    # DB URL 마스킹 (비밀번호 숨김)
+    masked_url = DATABASE_URL
+    if "@" in masked_url:
+        prefix = masked_url.split("://")[0]
+        after_at = masked_url.split("@")[1]
+        masked_url = f"{prefix}://***:***@{after_at}"
+    # DB 연결 테스트
+    db_ok = False
+    db_error = None
+    try:
+        with Session(engine) as s:
+            s.exec(text("SELECT 1"))
+            db_ok = True
+    except Exception as e:
+        db_error = str(e)
+    return {
+        "status": "ok" if db_ok else "error",
+        "database_url": masked_url,
+        "database_connected": db_ok,
+        "database_error": db_error,
+        "superadmin_configured": bool(os.getenv("SUPERADMIN_PASSWORD")),
+    }
+
 @app.get("/")
 def read_root():
     return {"message": "SodamFN Backend is running"}
