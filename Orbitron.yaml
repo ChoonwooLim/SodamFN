@@ -20,7 +20,7 @@ services:
       command: "gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 300 --bind 0.0.0.0:$PORT"
     env:
       - key: DATABASE_URL
-        from: database.sodam-db.connectionString
+        value: "postgresql://devuser:devpass123@localhost:5432/sodamfn"
       - key: SECRET_KEY
         generate: true
       - key: FRONTEND_URL
@@ -52,7 +52,7 @@ services:
       - key: SUPERADMIN_USERNAME
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD
-        value: ""  # Set via Orbitron secrets
+        value: "admin1234"
     healthCheck:
       path: /api/health
       interval: 30
@@ -98,8 +98,5 @@ postDeploy:
       - key: VITE_MEDIA_URL
         value: "http://192.168.219.101:8200"
 
-databases:
-  - name: sodam-db
-    engine: postgres
-    region: ap-northeast-2
-    plan: starter
+# Database: 로컬 PostgreSQL 직접 연결 (192.168.219.101:5432/sodamfn)
+# Orbitron 관리형 DB 대신 기존 PostgreSQL 서버 사용
