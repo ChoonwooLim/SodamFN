@@ -324,7 +324,7 @@ export default function PurchaseManagement() {
             <div className="max-w-6xl mx-auto px-6 pt-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <ShoppingBag size={20} className="text-white" />
                         </div>
                         <div>
@@ -343,10 +343,10 @@ export default function PurchaseManagement() {
             {/* ── Summary Cards ── */}
             <div className="max-w-6xl mx-auto px-6">
                 <div className="grid grid-cols-5 gap-3 mb-5">
-                    <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl p-4 shadow-sm border border-slate-200 card-animate">
-                        <div className="text-[11px] text-slate-400 font-semibold">💰 사업용 총 매입</div>
-                        <div className="text-lg font-extrabold text-slate-800 mt-1">{formatNumber(businessTotal)}원</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5">개인가계부 제외</div>
+                    <div className="rounded-2xl p-4 shadow-sm card-animate" style={{ background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)' }}>
+                        <div className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>💰 사업용 총 매입</div>
+                        <div className="text-lg font-extrabold mt-1 text-white">{formatNumber(businessTotal)}원</div>
+                        <div className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>개인가계부 제외</div>
                     </div>
                     <div className="bg-white rounded-2xl p-4 shadow-sm border border-amber-200 card-animate cursor-pointer hover:shadow-md transition-shadow" style={{ animationDelay: '0.05s' }} onClick={() => setViewMode('household')}>
                         <div className="text-[11px] text-amber-500 font-semibold">👤 개인가계부</div>
@@ -383,7 +383,7 @@ export default function PurchaseManagement() {
                     ].map(v => (
                         <button key={v.id}
                             className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
-                                viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-white/60'
                             }`}
                             onClick={() => setViewMode(v.id)}
                         >{v.label}</button>
@@ -523,7 +523,7 @@ export default function PurchaseManagement() {
                         </div>
                         <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100 bg-slate-50/50">
                             <button className="px-5 py-2.5 rounded-xl bg-slate-200 text-slate-600 text-sm font-bold border-none cursor-pointer hover:bg-slate-300 transition-colors" onClick={() => setShowModal(false)}>취소</button>
-                            <button className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm font-bold border-none cursor-pointer shadow-md shadow-orange-500/20 hover:shadow-lg transition-all" onClick={handleSubmit}>
+                            <button className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white text-sm font-bold border-none cursor-pointer shadow-md shadow-amber-500/30 hover:shadow-lg transition-all" onClick={handleSubmit}>
                                 {modalMode === 'add' ? '추가' : '저장'}
                             </button>
                         </div>

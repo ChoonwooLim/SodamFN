@@ -16,8 +16,8 @@ export function UploadView({
                     display: 'flex', gap: 6, marginBottom: 14,
                 }}>
                     {[
-                        { id: 'camera', label: '📷 촬영/이미지', bg: 'linear-gradient(135deg, #1e2d3b, #2d4a5e)' },
-                        { id: 'excel', label: '📄 문서 업로드', bg: 'linear-gradient(135deg, #1e3a2d, #2d5e4a)' },
+                        { id: 'camera', label: '📷 촬영/이미지', bg: 'linear-gradient(135deg, #134e4a, #1e3a3a)' },
+                        { id: 'excel', label: '📄 문서 업로드', bg: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
                         { id: 'history', label: '🔄 취소/기록', bg: 'linear-gradient(135deg, #1e293b, #334155)' },
                     ].map(t => (
                         <button key={t.id} onClick={() => setUploadTab(t.id)} style={{
@@ -77,8 +77,8 @@ export function UploadView({
                                     <div style={{
                                         width: 56, height: 56, borderRadius: 16, margin: '0 auto 12px',
                                         background: uploadTab === 'camera'
-                                            ? 'linear-gradient(135deg, #1e2d3b, #2d4a5e)'
-                                            : 'linear-gradient(135deg, #1e3a2d, #2d5e4a)',
+                                            ? 'linear-gradient(135deg, #134e4a, #1e3a3a)'
+                                            : 'linear-gradient(135deg, #3b82f6, #2563eb)',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     }}>
                                         {uploadTab === 'camera' ? <Camera size={24} color="#f1f5f9" /> : <UploadCloud size={24} color="#f1f5f9" />}
@@ -109,9 +109,9 @@ export function UploadView({
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
                 <div className="flex gap-2 mb-4">
                     {[
-                        { id: 'camera', label: '촬영/이미지', icon: <Camera size={16} />, gradient: 'from-cyan-600 to-cyan-700' },
-                        { id: 'excel', label: '문서 업로드', icon: <FileSpreadsheet size={16} />, gradient: 'from-emerald-600 to-emerald-700' },
-                        { id: 'history', label: '취소/기록', icon: <RotateCcw size={16} />, gradient: 'from-slate-600 to-slate-700' },
+                        { id: 'camera', label: '촬영/이미지', icon: <Camera size={16} />, gradient: 'from-teal-700 to-teal-900' },
+                        { id: 'excel', label: '문서 업로드', icon: <FileSpreadsheet size={16} />, gradient: 'from-blue-500 to-blue-600' },
+                        { id: 'history', label: '취소/기록', icon: <RotateCcw size={16} />, gradient: 'from-slate-700 to-slate-800' },
                     ].map(t => (
                         <button key={t.id}
                             className={`flex items-center gap-1.5 px-4 py-2 border-none text-sm font-semibold cursor-pointer rounded-xl transition-all ${
@@ -143,7 +143,7 @@ export function UploadView({
                         ) : (
                             <>
                                 <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br ${
-                                    uploadTab === 'camera' ? 'from-cyan-600 to-cyan-700' : 'from-emerald-600 to-emerald-700'
+                                    uploadTab === 'camera' ? 'from-teal-700 to-teal-900' : 'from-blue-500 to-blue-600'
                                 } shadow-lg`}>
                                     {uploadTab === 'camera' ? <Camera size={32} className="text-white" /> : <UploadCloud size={32} className="text-white" />}
                                 </div>

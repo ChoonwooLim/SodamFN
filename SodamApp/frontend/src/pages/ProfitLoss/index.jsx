@@ -315,14 +315,14 @@ export default function ProfitLoss() {
         };
 
         const kpiCards = [
-            { label: '전월 매출', value: formatNumber(prevRevenue) + '원', icon: '💰', color: 'blue', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/20' },
-            { label: '전월 지출', value: formatNumber(prevExpense) + '원', icon: '📤', color: 'rose', gradient: 'from-rose-500 to-rose-600', shadow: 'shadow-rose-500/20' },
-            { label: '전월 순이익', value: formatNumber(prevProfit) + '원', icon: prevProfit >= 0 ? '📈' : '📉', color: 'emerald', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/20', valueColor: prevProfit >= 0 ? 'text-emerald-600' : 'text-rose-500' },
-            { label: '전월 마진율', value: prevMargin + '%', icon: '🎯', color: 'amber', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/20', valueColor: Number(prevMargin) >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+            { label: '전월 매출', value: formatNumber(prevRevenue) + '원', icon: '💰', color: 'amber', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/30' },
+            { label: '전월 지출', value: formatNumber(prevExpense) + '원', icon: '📤', color: 'rose', gradient: 'from-rose-500 to-rose-600', shadow: 'shadow-rose-500/30' },
+            { label: '전월 순이익', value: formatNumber(prevProfit) + '원', icon: prevProfit >= 0 ? '📈' : '📉', color: 'teal', gradient: 'from-teal-700 to-teal-900', shadow: 'shadow-teal-700/30', valueColor: prevProfit >= 0 ? 'text-emerald-600' : 'text-rose-500' },
+            { label: '전월 마진율', value: prevMargin + '%', icon: '🎯', color: 'slate', gradient: 'from-slate-700 to-slate-800', shadow: 'shadow-slate-700/30', valueColor: Number(prevMargin) >= 0 ? 'text-emerald-600' : 'text-rose-500' },
         ];
 
         return (
-            <div className="max-w-[900px]">
+            <div className="max-w-[1170px] mx-auto">
                 {/* Key Metric Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
                     {kpiCards.map((card, i) => (
@@ -361,50 +361,119 @@ export default function ProfitLoss() {
                     </div>
                 </div>
 
-                {/* Monthly Trend */}
+                {/* Monthly Trend — SVG Line Chart (data-zoomed Y-axis) */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.25s' }}>
                     <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs text-white">📊</span>
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-xs text-white">📊</span>
                         월별 매출/지출 추이
                     </h3>
-                    {activeMonths.length > 0 ? (
-                        <div className="flex gap-1 items-end h-[160px] px-1">
-                            {monthSummaries.map(m => (
-                                <div className="flex-1 flex flex-col items-center gap-1" key={m.month}>
-                                    <div className="flex-1 w-full flex gap-0.5 items-end min-h-[100px]">
-                                        <div
-                                            className="flex-1 bg-blue-500 rounded-t min-h-[2px] transition-all duration-300"
-                                            style={{ height: `${(m.revenue / maxMonthValue) * 100}%` }}
-                                            title={`매출 ${formatNumber(m.revenue)}`}
-                                        />
-                                        <div
-                                            className="flex-1 bg-rose-400 rounded-t min-h-[2px] transition-all duration-300 opacity-70"
-                                            style={{ height: `${(m.expense / maxMonthValue) * 100}%` }}
-                                            title={`지출 ${formatNumber(m.expense)}`}
-                                        />
-                                    </div>
-                                    <span className="text-[10px] text-slate-400 font-semibold">{m.month}월</span>
-                                    {m.profit !== 0 && (
-                                        <span className={`text-[9px] font-bold ${m.profit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {m.profit >= 0 ? '+' : ''}{(m.profit / 10000).toFixed(0)}만
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
+                    {activeMonths.length > 0 ? (() => {
+                        // Data-zoomed scale: use min/max of actual values so month-to-month variation is visible
+                        const allVals = activeMonths.flatMap(m => [m.revenue, m.expense]);
+                        const dataMin = Math.min(...allVals);
+                        const dataMax = Math.max(...allVals);
+                        const pad = (dataMax - dataMin) * 0.15 || dataMax * 0.1 || 1;
+                        const yMin = Math.max(0, dataMin - pad);
+                        const yMax = dataMax + pad;
+
+                        // SVG viewBox dimensions
+                        const W = 800, H = 260;
+                        const P = { t: 20, r: 24, b: 36, l: 64 };
+                        const iw = W - P.l - P.r;
+                        const ih = H - P.t - P.b;
+                        const n = activeMonths.length;
+                        const xStep = n > 1 ? iw / (n - 1) : 0;
+                        const xAt = (i) => P.l + (n > 1 ? i * xStep : iw / 2);
+                        const yAt = (v) => P.t + ih - ((v - yMin) / (yMax - yMin || 1)) * ih;
+                        const fmtAxis = (v) => v >= 100000000 ? `${(v / 100000000).toFixed(1)}억` : v >= 10000 ? `${Math.round(v / 10000).toLocaleString()}만` : v.toLocaleString();
+
+                        // Y-axis ticks (5 levels)
+                        const ticks = Array.from({ length: 5 }, (_, i) => yMin + ((yMax - yMin) * i) / 4);
+
+                        // Build path strings
+                        const revPath = activeMonths.map((m, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(m.revenue)}`).join(' ');
+                        const expPath = activeMonths.map((m, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(m.expense)}`).join(' ');
+
+                        // Area fill for profit band between revenue and expense
+                        const areaPath = n > 1
+                            ? `${activeMonths.map((m, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(m.revenue)}`).join(' ')} ${[...activeMonths].reverse().map((m, i) => `L${xAt(n - 1 - i)},${yAt(m.expense)}`).join(' ')} Z`
+                            : '';
+
+                        return (
+                            <div className="w-full overflow-x-auto">
+                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" style={{ minWidth: 560 }}>
+                                    <defs>
+                                        <linearGradient id="profitBand" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#134e4a" stopOpacity="0.22" />
+                                            <stop offset="100%" stopColor="#134e4a" stopOpacity="0.03" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    {/* Grid lines + Y-axis labels */}
+                                    {ticks.map((t, i) => (
+                                        <g key={i}>
+                                            <line x1={P.l} y1={yAt(t)} x2={W - P.r} y2={yAt(t)} stroke="#f1f5f9" strokeWidth="1" strokeDasharray={i === 0 ? '' : '3,3'} />
+                                            <text x={P.l - 8} y={yAt(t) + 4} textAnchor="end" fontSize="11" fill="#94a3b8" fontWeight="600">
+                                                {fmtAxis(t)}
+                                            </text>
+                                        </g>
+                                    ))}
+
+                                    {/* Profit band (area between revenue & expense) */}
+                                    {n > 1 && <path d={areaPath} fill="url(#profitBand)" />}
+
+                                    {/* Expense line */}
+                                    <path d={expPath} fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+                                    {/* Revenue line */}
+                                    <path d={revPath} fill="none" stroke="#1e3a3a" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
+                                    {/* Data points + month labels + profit labels */}
+                                    {activeMonths.map((m, i) => {
+                                        const cx = xAt(i);
+                                        const ryY = yAt(m.revenue);
+                                        const exY = yAt(m.expense);
+                                        const profitPos = m.profit >= 0;
+                                        return (
+                                            <g key={m.month}>
+                                                {/* Expense dot */}
+                                                <circle cx={cx} cy={exY} r="4" fill="#fff" stroke="#ef4444" strokeWidth="2">
+                                                    <title>{`${m.month}월 지출: ${formatNumber(m.expense)}원`}</title>
+                                                </circle>
+                                                {/* Revenue dot */}
+                                                <circle cx={cx} cy={ryY} r="4" fill="#fff" stroke="#1e3a3a" strokeWidth="2">
+                                                    <title>{`${m.month}월 매출: ${formatNumber(m.revenue)}원`}</title>
+                                                </circle>
+                                                {/* Month label */}
+                                                <text x={cx} y={H - P.b + 18} textAnchor="middle" fontSize="11" fill="#64748b" fontWeight="700">
+                                                    {m.month}월
+                                                </text>
+                                                {/* Profit label */}
+                                                {m.profit !== 0 && (
+                                                    <text x={cx} y={H - P.b + 32} textAnchor="middle" fontSize="10" fill={profitPos ? '#10b981' : '#f43f5e'} fontWeight="700">
+                                                        {profitPos ? '+' : ''}{(m.profit / 10000).toFixed(0)}만
+                                                    </text>
+                                                )}
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                            </div>
+                        );
+                    })() : (
                         <div className="text-slate-400 text-center py-6 text-sm">데이터가 없습니다</div>
                     )}
                     <div className="flex justify-center gap-4 mt-3 text-xs text-slate-500">
-                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />매출</span>
-                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-400 inline-block" />지출</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#1e3a3a' }} />매출</span>
+                        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#ef4444' }} />지출</span>
+                        <span className="text-slate-400">· Y축: 실제 데이터 범위 확대</span>
                     </div>
                 </div>
 
                 {/* Expense Breakdown */}
                 <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate" style={{ animationDelay: '0.3s' }}>
                     <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center text-xs text-white">💸</span>
+                        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-rose-500 to-rose-600 flex items-center justify-center text-xs text-white">💸</span>
                         지출 항목별 비중 (연간)
                     </h3>
                     <div className="flex flex-col gap-2.5">
@@ -1312,9 +1381,9 @@ export default function ProfitLoss() {
         <div className="min-h-screen bg-slate-50">
             <div className="max-w-[1720px] mx-auto px-4 xl:px-6 pt-8 pb-32">
                 {/* Page Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="max-w-[1170px] mx-auto flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <BarChart3 size={20} className="text-white" />
                         </div>
                         <div>
@@ -1323,21 +1392,21 @@ export default function ProfitLoss() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
-                        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer text-sm transition-colors flex items-center justify-center">◀</button>
+                        <button onClick={() => setYear(y => y - 1)} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer text-sm transition-colors flex items-center justify-center">◀</button>
                         <span className="text-base font-bold text-slate-700 min-w-[60px] text-center">{year}년</span>
-                        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 rounded-lg bg-blue-500 hover:bg-blue-600 text-white border-none cursor-pointer text-sm transition-colors flex items-center justify-center">▶</button>
+                        <button onClick={() => setYear(y => y + 1)} className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 border-none cursor-pointer text-sm transition-colors flex items-center justify-center">▶</button>
                     </div>
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl flex-wrap">
+                <div className="max-w-[1170px] mx-auto flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl flex-wrap">
                     {MAIN_TABS.map(tab => (
                         <button
                             key={tab.id}
                             className={`px-5 py-2.5 border-none text-sm font-semibold cursor-pointer rounded-xl transition-all whitespace-nowrap ${
                                 activeTab === tab.id
                                     ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20'
-                                    : 'bg-transparent text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                                    : 'bg-transparent text-slate-500 hover:bg-white/60 hover:text-slate-700'
                             }`}
                             onClick={() => { setActiveTab(tab.id); setOpenDropdown(null); }}
                         >

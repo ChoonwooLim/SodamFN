@@ -30,7 +30,7 @@ export function DeliveryAppView({ isMobile, plYear, deliveryAppData }) {
     return (
         <div className="max-w-6xl mx-auto px-6">
             <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center text-xs text-white">🛵</span>
+                <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-xs text-white">🛵</span>
                 배달앱 정산 분석 — {plYear}년
             </h3>
 

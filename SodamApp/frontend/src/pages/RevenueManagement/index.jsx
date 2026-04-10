@@ -299,7 +299,7 @@ export default function RevenueManagement() {
             <div className="max-w-6xl mx-auto px-6 pt-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <TrendingUp size={20} className="text-white" />
                         </div>
                         <div>
@@ -328,10 +328,10 @@ export default function RevenueManagement() {
                 <div className="max-w-6xl mx-auto px-6">
                     <div className="grid grid-cols-4 gap-3 mb-5">
                         {[
-                            { label: '💵 현금매출', value: formatNumber(summary.by_category?.cash || 0) + '원', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/20' },
-                            { label: '💳 카드매출', value: formatNumber(summary.by_category?.card || 0) + '원', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/20' },
-                            { label: '🛵 배달앱매출', value: formatNumber(summary.by_category?.delivery || 0) + '원', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/20' },
-                            { label: '💰 총 매출', value: formatNumber(summary.total || 0) + '원', gradient: 'from-slate-700 to-slate-800', shadow: 'shadow-slate-700/20', highlight: true },
+                            { label: '💵 현금매출', value: formatNumber(summary.by_category?.cash || 0) + '원', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/30' },
+                            { label: '💳 카드매출', value: formatNumber(summary.by_category?.card || 0) + '원', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/30' },
+                            { label: '🛵 배달앱매출', value: formatNumber(summary.by_category?.delivery || 0) + '원', gradient: 'from-amber-500 to-amber-600', shadow: 'shadow-amber-500/30' },
+                            { label: '💰 총 매출', value: formatNumber(summary.total || 0) + '원', gradient: 'from-teal-700 to-teal-900', shadow: 'shadow-teal-700/30', highlight: true },
                         ].map((card, i) => (
                             <div key={i} className={`bg-white rounded-2xl p-4 shadow-sm border card-animate hover:shadow-md transition-shadow ${card.highlight ? 'border-slate-300 bg-gradient-to-br from-slate-50 to-white' : 'border-slate-100'}`} style={{ animationDelay: `${i * 0.05}s` }}>
                                 <div className="flex items-center gap-3">
@@ -362,7 +362,7 @@ export default function RevenueManagement() {
                             <button
                                 key={t.id}
                                 className={`px-3 py-1.5 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all ${
-                                    tab === t.id ? 'bg-slate-800 text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                    tab === t.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-white/60'
                                 }`}
                                 onClick={() => setTab(t.id)}
                             >
@@ -381,7 +381,7 @@ export default function RevenueManagement() {
                             ].map(v => (
                                 <button key={v.id}
                                     className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
-                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-white/60'
                                     }`}
                                     onClick={() => setViewMode(v.id)}
                                 >{v.label}</button>
@@ -399,7 +399,7 @@ export default function RevenueManagement() {
                             ].map(v => (
                                 <button key={v.id}
                                     className={`px-4 py-2 border-none text-xs font-semibold cursor-pointer rounded-lg transition-all whitespace-nowrap ${
-                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-slate-200'
+                                        viewMode === v.id ? 'bg-slate-900 text-white shadow-md shadow-slate-900/20' : 'bg-transparent text-slate-500 hover:bg-white/60'
                                     }`}
                                     onClick={() => setViewMode(v.id)}
                                 >{v.label}</button>

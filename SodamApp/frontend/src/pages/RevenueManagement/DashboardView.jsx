@@ -26,13 +26,13 @@ export function MobileDashboard({ summary }) {
         <div style={{ padding: '0 16px 80px', marginTop: 16 }}>
             {/* ── Hero: 총 매출 ── */}
             <div className="card-animate" style={{
-                background: 'linear-gradient(135deg, #134e4a, #1e3a3a)',
+                background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)',
                 borderRadius: 20, padding: '24px 20px', textAlign: 'center',
-                marginBottom: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                marginBottom: 14, boxShadow: '0 4px 20px rgba(19,78,74,0.25)',
             }}>
-                <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>총 매출</div>
-                <div style={{ fontSize: 32, fontWeight: 900, color: '#f1f5f9', letterSpacing: -1 }}>
-                    {fmtShort(totalAmt)}<span style={{ fontSize: 16, fontWeight: 600, color: '#94a3b8' }}>원</span>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', fontWeight: 700, marginBottom: 4 }}>총 매출</div>
+                <div style={{ fontSize: 32, fontWeight: 900, color: 'white', letterSpacing: -1 }}>
+                    {fmtShort(totalAmt)}<span style={{ fontSize: 16, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>원</span>
                 </div>
             </div>
 
@@ -83,7 +83,7 @@ export function MobileDashboard({ summary }) {
                             <div style={{ height: 6, background: '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
                                 <div style={{
                                     height: '100%', borderRadius: 3,
-                                    background: ch.key === 'cash' ? '#1e3a3a' : ch.key === 'card' ? '#3d7b7b' : '#7fb5b5',
+                                    background: ch.key === 'cash' ? '#059669' : ch.key === 'card' ? '#3b82f6' : '#f59e0b',
                                     width: `${pct}%`, transition: 'width 0.5s',
                                 }} />
                             </div>
@@ -131,9 +131,9 @@ export function MobileDashboard({ summary }) {
                     <div style={{ color: '#94a3b8', padding: 24, textAlign: 'center', fontSize: 12 }}>데이터가 없습니다</div>
                 )}
                 <div style={{ display: 'flex', gap: 14, justifyContent: 'center', marginTop: 10, fontSize: 11, color: '#64748b' }}>
-                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#1e3a3a', marginRight: 4 }} />현금</span>
-                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#3d7b7b', marginRight: 4 }} />카드</span>
-                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#7fb5b5', marginRight: 4 }} />배달앱</span>
+                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#059669', marginRight: 4 }} />현금</span>
+                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#3b82f6', marginRight: 4 }} />카드</span>
+                    <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#f59e0b', marginRight: 4 }} />배달앱</span>
                 </div>
             </div>
 
@@ -146,9 +146,9 @@ export function MobileDashboard({ summary }) {
                 <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '8px 12px', borderRadius: 10, marginBottom: 12,
-                    background: 'linear-gradient(135deg, #1e293b, #334155)',
+                    background: 'linear-gradient(135deg, #e2e8f0, #cbd5e1)',
                 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>🏆 TOP {byVendor.length} 거래처</span>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#475569' }}>🏆 TOP {byVendor.length} 거래처</span>
                 </div>
                 {byVendor.length > 0 ? byVendor.map((v, i) => (
                     <div key={v.name} style={{
@@ -159,8 +159,8 @@ export function MobileDashboard({ summary }) {
                         <span style={{
                             width: 22, height: 22, borderRadius: 6, display: 'flex',
                             alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800,
-                            background: i < 3 ? 'linear-gradient(135deg, #1e293b, #334155)' : '#f1f5f9',
-                            color: i < 3 ? '#f1f5f9' : '#64748b',
+                            background: i < 3 ? 'linear-gradient(135deg, #fde68a, #fcd34d)' : '#f1f5f9',
+                            color: i < 3 ? '#92400e' : '#64748b',
                         }}>{i + 1}</span>
                         <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: '#334155' }}>{v.name}</span>
                         <span style={{ fontSize: 10 }}>
@@ -186,9 +186,9 @@ export function DesktopDashboard({ summary }) {
     const maxDayTotal = Math.max(...byDay.map(d => d.total || 0), 1);
 
     const CHANNELS = [
-        { key: 'cash', label: '현금매출', icon: '💵', color: '#1e3a3a', amount: cashAmt },
-        { key: 'card', label: '카드매출', icon: '💳', color: '#3d7b7b', amount: cardAmt },
-        { key: 'delivery', label: '배달앱매출', icon: '🛵', color: '#7fb5b5', amount: deliveryAmt },
+        { key: 'cash', label: '현금매출', icon: '💵', color: '#059669', amount: cashAmt },
+        { key: 'card', label: '카드매출', icon: '💳', color: '#3b82f6', amount: cardAmt },
+        { key: 'delivery', label: '배달앱매출', icon: '🛵', color: '#f59e0b', amount: deliveryAmt },
     ];
 
     return (
@@ -196,7 +196,7 @@ export function DesktopDashboard({ summary }) {
             {/* Channel Breakdown */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate">
                 <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-600 to-teal-700 flex items-center justify-center text-xs text-white">📊</span>
+                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-xs text-white">📊</span>
                     채널별 매출 비중
                 </h3>
                 <div className="flex flex-col gap-3">
@@ -220,24 +220,24 @@ export function DesktopDashboard({ summary }) {
             {/* Daily Revenue Chart */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.1s' }}>
                 <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-xs text-white">📈</span>
+                    <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-700 to-teal-900 flex items-center justify-center text-xs text-white">📈</span>
                     일별 매출 추이
                 </h3>
                 {byDay.length > 0 ? (
-                    <div className="flex gap-0.5 items-end h-[160px] px-1">
+                    <div className="flex gap-0.5 items-end h-[180px] px-1">
                         {byDay.map(d => {
                             const dayNum = d.date.split('-')[2];
                             return (
-                                <div className="flex-1 flex flex-col items-center gap-1" key={d.date}>
-                                    <div className="flex-1 w-full flex flex-col justify-end min-h-[100px]">
+                                <div className="flex-1 flex flex-col items-center gap-1 h-full min-w-0" key={d.date}>
+                                    <div className="w-full flex flex-col justify-end overflow-hidden rounded-t-sm" style={{ height: 160 }}>
                                         {d.delivery > 0 && (
-                                            <div className="w-full rounded-t-sm transition-all duration-300" style={{ height: `${(d.delivery / maxDayTotal) * 100}%`, background: '#7fb5b5' }} title={`배달 ${formatNumber(d.delivery)}`} />
+                                            <div className="w-full transition-all duration-300" style={{ height: `${(d.delivery / maxDayTotal) * 100}%`, background: '#f59e0b' }} title={`배달 ${formatNumber(d.delivery)}`} />
                                         )}
                                         {d.card > 0 && (
-                                            <div className="w-full transition-all duration-300" style={{ height: `${(d.card / maxDayTotal) * 100}%`, background: '#3d7b7b' }} title={`카드 ${formatNumber(d.card)}`} />
+                                            <div className="w-full transition-all duration-300" style={{ height: `${(d.card / maxDayTotal) * 100}%`, background: '#3b82f6' }} title={`카드 ${formatNumber(d.card)}`} />
                                         )}
                                         {d.cash > 0 && (
-                                            <div className="w-full rounded-b-sm transition-all duration-300" style={{ height: `${(d.cash / maxDayTotal) * 100}%`, background: '#1e3a3a' }} title={`현금 ${formatNumber(d.cash)}`} />
+                                            <div className="w-full transition-all duration-300" style={{ height: `${(d.cash / maxDayTotal) * 100}%`, background: '#059669' }} title={`현금 ${formatNumber(d.cash)}`} />
                                         )}
                                     </div>
                                     <span className="text-[9px] text-slate-400 font-semibold">{dayNum}</span>
@@ -249,9 +249,9 @@ export function DesktopDashboard({ summary }) {
                     <div className="text-slate-400 text-center py-6 text-sm">데이터가 없습니다</div>
                 )}
                 <div className="flex justify-center gap-4 mt-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#1e3a3a' }} />현금</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#3d7b7b' }} />카드</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#7fb5b5' }} />배달앱</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#059669' }} />현금</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#3b82f6' }} />카드</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: '#f59e0b' }} />배달앱</span>
                 </div>
             </div>
 
@@ -264,7 +264,7 @@ export function DesktopDashboard({ summary }) {
                 <div className="flex flex-col">
                     {byVendor.length > 0 ? byVendor.map((v, i) => (
                         <div className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-b-0" key={v.name}>
-                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
+                            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${i < 3 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500'}`}>{i + 1}</span>
                             <span className="text-sm font-semibold text-slate-700 flex-1">{v.name}</span>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
                                 v.category === 'cash' ? 'bg-emerald-50 text-emerald-600' :

@@ -196,7 +196,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                     {topVendors.map((v, i) => (
                         <div key={v.name} className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-slate-50 transition-colors">
                             <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-extrabold shrink-0 ${
-                                i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-sm' : 'bg-slate-100 text-slate-500'
+                                i < 3 ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500'
                             }`}>{i + 1}</span>
                             <span className="text-sm font-semibold text-slate-700 flex-1 truncate">{v.name}</span>
                             <span className="text-[11px] text-slate-400 font-medium">{v.count}건</span>

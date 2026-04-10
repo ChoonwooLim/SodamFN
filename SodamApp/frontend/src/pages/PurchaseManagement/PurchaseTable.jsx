@@ -92,7 +92,7 @@ export function PurchaseTable({
                 </div>
                 <div className="flex items-center gap-3">
                     <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">총 {filteredData.length}건</span>
-                    <button className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-xs font-bold px-4 py-2 rounded-xl border-none cursor-pointer shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all" onClick={openAddModal}>
+                    <button className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-bold px-4 py-2 rounded-xl border-none cursor-pointer shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-500/30 transition-all" onClick={openAddModal}>
                         <Plus size={16} /> {isHouseholdMode ? '생활비 추가' : '매입 추가'}
                     </button>
                 </div>
@@ -147,7 +147,7 @@ export function PurchaseTable({
                                             const catInfo = EXPENSE_CATEGORIES.find(c => c.id === item.category) || EXPENSE_CATEGORIES[5];
 
                                             return (
-                                                <div key={item.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${selectedIds.has(item.id) ? 'bg-orange-50/50' : 'hover:bg-slate-50/50'}`}>
+                                                <div key={item.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${selectedIds.has(item.id) ? 'bg-amber-50/50' : 'hover:bg-slate-50/50'}`}>
                                                     <label className="cursor-pointer shrink-0" onClick={e => e.stopPropagation()}>
                                                         <input
                                                             type="checkbox"
