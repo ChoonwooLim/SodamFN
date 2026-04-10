@@ -101,10 +101,17 @@ def sync_all_expenses(year: int, month: int, session: Session, business_id: int 
     if pl_record:
         # Get all fields that SHOULD be updated by this function
         managed_fields = set(CATEGORY_TO_PL_FIELD.values())
-        # expense_labor, expense_retirement, expense_insurance, expense_insurance_employee, expense_tax_employee는 별도 관리 (sync_labor_cost)
-        excluded_fields = {'expense_labor', 'expense_retirement', 'expense_insurance', 'expense_insurance_employee', 'expense_tax_employee'}
+        # 별도 관리되는 필드 — sync_all_expenses에서 건드리지 않음:
+        #  - expense_labor/retirement/insurance*/tax_employee: sync_labor_cost (급여대장)
+        #  - expense_delivery_fee: sync_delivery_revenue_to_pl (DeliveryRevenue.total_fees)
+        #  - expense_card_fee: 은행 입금내역 업로드 시 (card_sales - card_deposit)
+        excluded_fields = {
+            'expense_labor', 'expense_retirement',
+            'expense_insurance', 'expense_insurance_employee', 'expense_tax_employee',
+            'expense_delivery_fee', 'expense_card_fee',
+        }
         managed_fields -= excluded_fields
-        
+
         for field in managed_fields:
             if field in category_totals:
                 setattr(pl_record, field, category_totals[field])
