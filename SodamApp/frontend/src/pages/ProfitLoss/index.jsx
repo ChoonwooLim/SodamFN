@@ -1310,7 +1310,7 @@ export default function ProfitLoss() {
     // ═══════════════════════════════════════════
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-6xl mx-auto px-6 pt-8 pb-32">
+            <div className="max-w-[1720px] mx-auto px-4 xl:px-6 pt-8 pb-32">
                 {/* Page Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-3">
