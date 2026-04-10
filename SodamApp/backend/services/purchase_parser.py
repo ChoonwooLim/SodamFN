@@ -320,13 +320,13 @@ def parse_shinhan_bank_pdf(filepath: str) -> List[Dict]:
 
                     category = classify_category(vendor_name, '')
 
-                    # ④ 임차료 월초 날짜 조정
+                    # ④ 임차료 월초 날짜 조정 (월초 1~7일 → 전월 말일, 긴 연휴 대응)
                     if category == '임차료' and use_date:
                         if isinstance(use_date, str):
                             d = datetime.strptime(use_date, '%Y-%m-%d').date()
                         else:
                             d = use_date
-                        if d.day <= 5:
+                        if d.day <= 7:
                             first_of_month = d.replace(day=1)
                             last_of_prev = first_of_month - timedelta(days=1)
                             use_date = str(last_of_prev)
@@ -432,15 +432,16 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
         category = classify_category(vendor_name, '')
 
         # ④ 임차료 월초 날짜 조정 (발생주의)
-        # 임대료/관리비가 월초(1~5일)에 결제된 경우 → 전월 말일로 이동
-        # (휴일로 인해 이체일이 밀린 경우 대응)
+        # 임대료/관리비가 월초(1~7일)에 결제된 경우 → 전월 말일로 이동
+        # - 월말이 주말/공휴일이면 다음 영업일로 이체 지연 (설날/추석 최대 5~6일 연휴 대응)
+        # - 기존 5일 → 7일로 확장하여 긴 연휴로 인한 누락 방지
         if category == '임차료' and use_date:
             # use_date may be a date object or string
             if isinstance(use_date, str):
                 d = datetime.strptime(use_date, '%Y-%m-%d').date()
             else:
                 d = use_date
-            if d.day <= 5:  # 월초 1~5일
+            if d.day <= 7:  # 월초 1~7일
                 # 전월 말일로 이동
                 first_of_month = d.replace(day=1)
                 last_of_prev = first_of_month - timedelta(days=1)

@@ -306,18 +306,43 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
                 vendor_by_name[vendor_name] = vendor
                 vendor_created_count += 1
 
-            # Duplicate check: same date + vendor + amount
-            existing = session.exec(
-                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
-                    DailyExpense.date == date_obj,
-                    DailyExpense.vendor_id == vendor.id,
-                    DailyExpense.amount == amount,
-                )
-            ).first()
-
-            if existing:
-                skipped_count += 1
-                continue
+            # Duplicate check
+            # ── 임차료 특별 처리 ──
+            # 월말이 휴일일 때 다음달 초로 이월 출금되는 경우 중복/누락 방지를 위해
+            # 같은 vendor + 같은 년월 + 카테고리 '임차료' 조합은 1건만 허용
+            # (금액이 달라도 — 발생주의 조정 후 동일 월에 중복 등록 방지)
+            if category == '임차료':
+                import calendar as _cal
+                month_start = date_obj.replace(day=1)
+                last_day = _cal.monthrange(date_obj.year, date_obj.month)[1]
+                month_end = date_obj.replace(day=last_day)
+                existing = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date >= month_start,
+                        DailyExpense.date <= month_end,
+                        DailyExpense.vendor_id == vendor.id,
+                        DailyExpense.category == '임차료',
+                    )
+                ).first()
+                if existing:
+                    # 금액이 다르면 경고 로그 (수동 확인 필요)
+                    if existing.amount != amount:
+                        print(f"[임차료 중복경고] vendor={vendor.name} {date_obj.year}-{date_obj.month:02d}: "
+                              f"기존 {existing.amount:,}원(id={existing.id}) vs 신규 {amount:,}원 → skip")
+                    skipped_count += 1
+                    continue
+            else:
+                # 일반 중복 체크 (date + vendor + amount 완전 일치)
+                existing = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date == date_obj,
+                        DailyExpense.vendor_id == vendor.id,
+                        DailyExpense.amount == amount,
+                    )
+                ).first()
+                if existing:
+                    skipped_count += 1
+                    continue
 
             # Store card company in note for tracking
             note_parts = []
@@ -615,17 +640,40 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
                 vendor_created_count += 1
 
             # Duplicate check
-            existing = session.exec(
-                apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
-                    DailyExpense.date == date_obj,
-                    DailyExpense.vendor_id == vendor.id,
-                    DailyExpense.amount == amount,
-                )
-            ).first()
+            # ── 임차료 특별 처리 ──
+            # 월말이 휴일일 때 다음달 초로 이월 출금되는 경우 중복/누락 방지를 위해
+            # 같은 vendor + 같은 년월 + 카테고리 '임차료' 조합은 1건만 허용
+            if category == '임차료':
+                import calendar as _cal
+                month_start = date_obj.replace(day=1)
+                last_day = _cal.monthrange(date_obj.year, date_obj.month)[1]
+                month_end = date_obj.replace(day=last_day)
+                existing = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date >= month_start,
+                        DailyExpense.date <= month_end,
+                        DailyExpense.vendor_id == vendor.id,
+                        DailyExpense.category == '임차료',
+                    )
+                ).first()
+                if existing:
+                    if existing.amount != amount:
+                        print(f"[임차료 중복경고] vendor={vendor.name} {date_obj.year}-{date_obj.month:02d}: "
+                              f"기존 {existing.amount:,}원(id={existing.id}) vs 신규 {amount:,}원 → skip")
+                    skipped_count += 1
+                    continue
+            else:
+                existing = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date == date_obj,
+                        DailyExpense.vendor_id == vendor.id,
+                        DailyExpense.amount == amount,
+                    )
+                ).first()
 
-            if existing:
-                skipped_count += 1
-                continue
+                if existing:
+                    skipped_count += 1
+                    continue
 
             note_parts = []
             if rec.get('card_company'):
