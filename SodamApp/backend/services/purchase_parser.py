@@ -466,44 +466,90 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
 
 
 def parse_hyundai(filepath: str) -> List[Dict]:
-    """Parse 현대카드 이용내역 (HTML-as-xls format)."""
+    """Parse 현대카드 이용내역 (HTML-as-xls format).
+
+    현대카드 웹 다운로드 파일은 HTML 테이블을 .xls 확장자로 저장한 형태이며,
+    pandas read_html 사용 시 다단 컬럼 헤더가 생성될 수 있음
+    (e.g. ('실시간 이용내역', '이용내역', '이용일')).
+    """
     dfs = pd.read_html(filepath, encoding='utf-8')
     if len(dfs) < 1:
         return []
 
     df = dfs[0]
 
-    # Find header row (contains '이용일자' or '가맹점명')
+    # Flatten multi-level columns: take the deepest (most specific) level
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = [str(c[-1]) for c in df.columns]
+    else:
+        df.columns = [str(c) for c in df.columns]
+
+    # Some variants put field names inside the first data rows instead of headers
+    # → detect a row that contains both a date-like and amount-like header keyword
     header_idx = None
     for i in range(min(5, len(df))):
         row_vals = [str(v) for v in df.iloc[i].values]
-        if any('이용일자' in v for v in row_vals):
+        has_date = any(('이용일' in v) or ('이용일자' in v) for v in row_vals)
+        has_amount = any('이용금액' in v for v in row_vals)
+        if has_date and has_amount:
             header_idx = i
             break
 
     if header_idx is not None:
-        df.columns = df.iloc[header_idx].values
+        df.columns = [str(v) for v in df.iloc[header_idx].values]
         df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+    # Column name resolution (supports both 이용일 / 이용일자 variants)
+    def _find_col(candidates):
+        for c in candidates:
+            if c in df.columns:
+                return c
+        return None
+
+    date_col = _find_col(['이용일자', '이용일', '승인일', '승인일자', '거래일자', '매출일자'])
+    vendor_col = _find_col(['가맹점명', '가맹점', '상호'])
+    amount_col = _find_col(['이용금액', '승인금액', '결제금액', '금액'])
+    approval_col = _find_col(['승인번호', '거래번호'])
+    business_col = _find_col(['이용분야', '분야', '업종', '가맹점업종'])
+    cancel_col = _find_col(['취소여부', '취소구분', '취소일'])
+    # '승인구분' (전표접수/취소) is a transaction status, not a category
+    status_col = _find_col(['승인구분', '거래구분'])
+
+    if not date_col or not vendor_col or not amount_col:
+        return []
 
     records = []
     for _, row in df.iterrows():
-        use_date = _normalize_date(row.get('이용일자'))
+        use_date = _normalize_date(row.get(date_col))
         if not use_date:
             continue
 
-        vendor_name = str(row.get('가맹점명', '')).strip()
+        vendor_name = str(row.get(vendor_col, '')).strip()
         if not vendor_name or vendor_name == 'nan':
             continue
 
-        amount = _clean_amount(row.get('이용금액', 0))
+        # Hyundai: summary rows at bottom start with '-' or contain 소계/합계
+        if vendor_name.startswith('-') or '소계' in vendor_name or '합계' in vendor_name:
+            continue
+
+        amount = _clean_amount(row.get(amount_col, 0))
         if amount == 0:
             continue
 
-        business_type = str(row.get('분야', ''))
+        business_type = str(row.get(business_col, '')) if business_col else ''
+        approval_no = str(row.get(approval_col, '')) if approval_col else ''
 
-        # Hyundai: summary rows at bottom start with '-'
-        if vendor_name.startswith('-') or '소계' in vendor_name or '합계' in vendor_name:
-            continue
+        # Cancellation detection: if 취소여부/취소일 column has a value (not '-' / empty)
+        # OR if 승인구분 column indicates cancellation (e.g. '취소')
+        is_cancelled = False
+        if cancel_col:
+            cancel_val = str(row.get(cancel_col, '')).strip()
+            if cancel_val and cancel_val not in ('-', 'nan', ''):
+                is_cancelled = True
+        if not is_cancelled and status_col:
+            status_val = str(row.get(status_col, '')).strip()
+            if '취소' in status_val:
+                is_cancelled = True
 
         records.append({
             'date': use_date,
@@ -511,9 +557,9 @@ def parse_hyundai(filepath: str) -> List[Dict]:
             'amount': amount,
             'category': classify_category(vendor_name, business_type),
             'card_company': '현대카드',
-            'approval_no': str(row.get('승인번호', '')),
+            'approval_no': approval_no,
             'business_type': business_type,
-            'is_cancelled': False,
+            'is_cancelled': is_cancelled,
         })
 
     return records

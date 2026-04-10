@@ -235,10 +235,41 @@ def _build_prompt(translated: str, style: str, reference_description: str = None
     return prompt
 
 
+# ── GPU 서버 도달 가능성 체크 (30초 캐시) ──
+_gpu_reachable_cache: dict = {"url": None, "ok": False, "ts": 0.0}
+
+def _is_gpu_server_reachable(url: str, timeout: float = 1.5) -> bool:
+    """GPU 서버 TCP 연결 가능 여부 확인 (30초 캐시). 환경변수만 세팅하고 서버가 꺼져있을 때 self-hosted로 잘못 라우팅되는 것을 방지."""
+    import time
+    import socket
+    from urllib.parse import urlparse
+
+    now = time.time()
+    if _gpu_reachable_cache["url"] == url and (now - _gpu_reachable_cache["ts"]) < 30:
+        return _gpu_reachable_cache["ok"]
+
+    ok = False
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        if host:
+            with socket.create_connection((host, port), timeout=timeout):
+                ok = True
+    except (OSError, ValueError) as e:
+        logger.info(f"GPU 서버 도달 불가 ({url}): {e}")
+
+    _gpu_reachable_cache["url"] = url
+    _gpu_reachable_cache["ok"] = ok
+    _gpu_reachable_cache["ts"] = now
+    return ok
+
+
 def _get_ai_provider():
-    """사용 가능한 AI 이미지 생성 프로바이더 확인 (우선순위: self-hosted > replicate > openai)"""
+    """사용 가능한 AI 이미지 생성 프로바이더 확인 (우선순위: self-hosted > replicate > openai).
+    self-hosted는 TCP 도달 가능할 때만 선택되며, 불가 시 자동으로 다음 프로바이더로 폴백한다."""
     gpu_server_url = os.getenv("AI_GPU_SERVER_URL")
-    if gpu_server_url:
+    if gpu_server_url and _is_gpu_server_reachable(gpu_server_url):
         return "self-hosted", gpu_server_url
     replicate_token = os.getenv("REPLICATE_API_TOKEN")
     openai_key = os.getenv("OPENAI_API_KEY")
@@ -368,10 +399,12 @@ async def ai_generate_image(
 ):
     provider, api_key = _get_ai_provider()
     if not provider:
-        raise HTTPException(
-            status_code=503,
-            detail="AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.",
-        )
+        gpu_url = os.getenv("AI_GPU_SERVER_URL")
+        if gpu_url:
+            detail = f"GPU 서버({gpu_url})에 연결할 수 없고 폴백 API 키도 없습니다. GPU 서버를 시작하거나 .env에 REPLICATE_API_TOKEN / OPENAI_API_KEY를 추가해주세요."
+        else:
+            detail = "AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요."
+        raise HTTPException(status_code=503, detail=detail)
 
     if req.skip_translation:
         full_prompt = req.prompt
@@ -456,7 +489,12 @@ async def ai_preview_image(
     """AI 이미지 미리보기 (DB 저장 없이 이미지만 반환)"""
     provider, api_key = _get_ai_provider()
     if not provider:
-        raise HTTPException(status_code=503, detail="AI API 키가 설정되지 않았습니다.")
+        gpu_url = os.getenv("AI_GPU_SERVER_URL")
+        if gpu_url:
+            detail = f"GPU 서버({gpu_url})에 연결할 수 없고 폴백 API 키도 없습니다. GPU 서버를 시작하거나 .env에 REPLICATE_API_TOKEN / OPENAI_API_KEY를 추가해주세요."
+        else:
+            detail = "AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요."
+        raise HTTPException(status_code=503, detail=detail)
 
     if req.skip_translation:
         full_prompt = req.prompt
@@ -679,11 +717,16 @@ async def inpaint_image(
 @router.get("/ai-status")
 def ai_status(_admin: AuthUser = Depends(get_admin_user)):
     provider, _ = _get_ai_provider()
+    gpu_url = os.getenv("AI_GPU_SERVER_URL")
+    gpu_configured = bool(gpu_url)
+    gpu_reachable = bool(gpu_url and _is_gpu_server_reachable(gpu_url))
     return {
         "status": "success",
         "ai_enabled": provider is not None,
         "provider": provider,
         "provider_name": {"self-hosted": "셀프호스팅 GPU (Flux.1-schnell)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
+        "gpu_configured": gpu_configured,
+        "gpu_reachable": gpu_reachable,
     }
 
 

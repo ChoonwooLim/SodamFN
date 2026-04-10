@@ -25,7 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ai-image-service")
 
 MODEL_ID = "black-forest-labs/FLUX.1-schnell"
-UPSCALE_GPU = 1  # 업스케일은 cuda:1 사용 (Flux가 cuda:0 사용)
+# GPU가 2개 이상이면 업스케일을 cuda:1로 분리, 아니면 cuda:0 공유
+UPSCALE_GPU = 1 if torch.cuda.device_count() >= 2 else 0
 
 pipe = None
 img2img_pipe = None
