@@ -192,7 +192,7 @@ export function DesktopDashboard({ summary }) {
     ];
 
     return (
-        <div className="max-w-[900px] mx-auto px-6">
+        <div className="max-w-6xl mx-auto px-6">
             {/* Channel Breakdown */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate">
                 <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
