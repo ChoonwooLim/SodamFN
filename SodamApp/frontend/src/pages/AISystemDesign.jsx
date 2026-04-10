@@ -357,8 +357,8 @@ export default function AISystemDesign() {
 
             {/* Footer */}
             <div className="mt-8 text-center text-slate-500 text-xs">
-              <p>이 문서는 <code className="text-slate-400">docs/superpowers/specs/2026-04-11-ai-gateway-phase1-design.md</code> 의 스냅샷입니다.</p>
-              <p className="mt-1">원본이 수정되면 <code className="text-slate-400">frontend/src/content/</code> 로 다시 복사해야 합니다.</p>
+              <p>원본: <code className="text-slate-400">docs/superpowers/specs/2026-04-11-ai-gateway-phase1-design.md</code></p>
+              <p className="mt-1">Vite dev/build 시 <code className="text-slate-400">vite-plugin-sync-docs</code> 가 자동 동기화합니다.</p>
             </div>
           </main>
         </div>

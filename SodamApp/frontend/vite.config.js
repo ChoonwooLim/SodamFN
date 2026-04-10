@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import syncDocs from './vite-plugin-sync-docs.js'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), syncDocs()],
   server: {
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
