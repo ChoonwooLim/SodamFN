@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Rocket, CheckCircle, Clock, Lock, ArrowRight, Zap, Shield, TrendingUp, Users, FileText, CreditCard, Building2, Calculator, BarChart3, Globe } from 'lucide-react';
+import { Rocket, CheckCircle, Clock, Lock, ArrowRight, Zap, Shield, TrendingUp, Users, Calculator, Globe, Sparkles, Target, Layers } from 'lucide-react';
 
 const phases = [
     {
@@ -279,44 +279,106 @@ export default function DevelopmentRoadmap() {
     const navigate = useNavigate();
     const [expandedPhase, setExpandedPhase] = useState(1);
 
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
-                {/* Header */}
-                <header className="mb-8">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20 cursor-pointer" onClick={() => navigate(-1)}>
-                            <Rocket size={20} className="text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-white tracking-tight">
-                                셈<span className="text-amber-400">하나</span> 개발 로드맵
-                            </h1>
-                            <p className="text-xs text-slate-400 mt-0.5">하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼</p>
-                        </div>
-                    </div>
+    // 전체 진행률 계산
+    const overallStats = phases.reduce((acc, phase) => {
+        phase.modules.forEach(mod => {
+            mod.items.forEach(item => {
+                acc.total++;
+                if (item.done) acc.done++;
+            });
+        });
+        return acc;
+    }, { total: 0, done: 0 });
+    const overallProgress = overallStats.total > 0 ? Math.round((overallStats.done / overallStats.total) * 100) : 0;
 
-                    {/* Vision Banner */}
-                    <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl p-6 md:p-8 shadow-xl">
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 bg-blue-500/20 rounded-xl">
-                                <Rocket size={28} className="text-blue-400" />
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+            {/* ── Hero Header ── */}
+            <div className="relative overflow-hidden border-b border-slate-800/80">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-violet-500/15 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-amber-500/10 via-transparent to-transparent pointer-events-none" />
+
+                <div className="relative max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
+                    <div className="flex items-start gap-4 md:gap-6">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 flex items-center justify-center shadow-2xl shadow-violet-500/30 hover:scale-105 transition-transform"
+                            aria-label="뒤로"
+                        >
+                            <Rocket className="w-7 h-7 md:w-8 md:h-8 text-white" />
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold mb-2">
+                                <Sparkles className="w-4 h-4" />
+                                <span className="uppercase tracking-wider">Development Roadmap</span>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold mb-2">비전: 소규모 사업자를 위한 올인원 경영관리 플랫폼</h2>
-                                <p className="text-slate-300 text-sm leading-relaxed">
-                                    세무사·노무사 없이도 급여 정산, 세금 신고, 노무 관리, 재무 분석까지 —
-                                    <strong>셈하나</strong>가 소규모 사업자의 <strong>경영 파트너</strong>가 되겠습니다.
-                                </p>
-                                <div className="flex flex-wrap gap-2 mt-4">
-                                    {['세무 자동화', '노무 관리', '재무 분석', 'SaaS 플랫폼'].map(tag => (
-                                        <span key={tag} className="px-3 py-1 bg-white/10 rounded-full text-xs font-medium">{tag}</span>
-                                    ))}
+
+                            <h1 className="text-3xl md:text-5xl font-black text-white leading-tight mb-3">
+                                <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-amber-200 bg-clip-text text-transparent">
+                                    셈하나 개발 로드맵
+                                </span>
+                            </h1>
+                            <p className="text-slate-300 text-base md:text-lg max-w-3xl leading-relaxed">
+                                하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼으로 가는 5단계 여정
+                            </p>
+
+                            {/* 메타 카드 */}
+                            <div className="mt-5 flex flex-wrap gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300 text-xs font-medium">
+                                    <Layers className="w-3.5 h-3.5 text-violet-400" />
+                                    {phases.length} Phases
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300 text-xs font-medium">
+                                    <Target className="w-3.5 h-3.5 text-amber-400" />
+                                    {overallStats.total}개 목표
+                                </span>
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 text-xs font-medium">
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                    {overallStats.done}개 완료 ({overallProgress}%)
+                                </span>
+                            </div>
+
+                            {/* 전체 진행률 바 */}
+                            <div className="mt-5 max-w-2xl">
+                                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
+                                    <span>전체 진행률</span>
+                                    <span className="font-bold text-white">{overallProgress}%</span>
+                                </div>
+                                <div className="h-2 bg-slate-800/80 rounded-full overflow-hidden border border-slate-700/40">
+                                    <div
+                                        className="h-full rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-amber-400 shadow-lg shadow-violet-500/30 transition-all duration-700"
+                                        style={{ width: `${overallProgress}%` }}
+                                    />
                                 </div>
                             </div>
                         </div>
                     </div>
-                </header>
+                </div>
+            </div>
+
+            <div className="max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12 pb-32">
+                {/* Vision Banner */}
+                <div className="relative rounded-3xl bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 backdrop-blur border border-slate-700/60 p-6 md:p-8 shadow-2xl mb-8 overflow-hidden">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="relative flex items-start gap-4">
+                        <div className="p-3.5 bg-gradient-to-br from-blue-500/30 to-cyan-500/20 border border-blue-400/30 rounded-2xl shadow-lg shadow-blue-500/20">
+                            <Target size={28} className="text-blue-300" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg md:text-xl font-bold text-white mb-2">비전: 소규모 사업자를 위한 올인원 경영관리 플랫폼</h2>
+                            <p className="text-slate-300 text-sm md:text-[15px] leading-relaxed">
+                                세무사·노무사 없이도 급여 정산, 세금 신고, 노무 관리, 재무 분석까지 —
+                                <strong className="text-white"> 셈하나</strong>가 소규모 사업자의 <strong className="text-white">경영 파트너</strong>가 되겠습니다.
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                {['세무 자동화', '노무 관리', '재무 분석', 'SaaS 플랫폼'].map(tag => (
+                                    <span key={tag} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-slate-200">{tag}</span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Phase Cards */}
                 <div className="space-y-4 mb-8">

@@ -11,10 +11,10 @@ export default function UserManual() {
         <div className="manual-page">
             <div className="manual-inner">
             <div className="manual-header">
-                <div className="header-icon"><BookOpen size={20} /></div>
+                <div className="header-icon"><BookOpen size={30} /></div>
                 <div className="header-text">
                     <h1>사용 매뉴얼</h1>
-                    <p>셈하나 관리 시스템의 주요 기능 사용법</p>
+                    <p>셈하나 관리 시스템의 주요 기능 사용법 — 회원가입부터 업로드·체크리스트·FAQ까지 전체 가이드</p>
                 </div>
             </div>
 
