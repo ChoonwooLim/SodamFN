@@ -11,6 +11,7 @@ from database import get_session
 from models import Vendor, DailyExpense, UploadHistory, User
 from routers.auth import get_admin_user
 from tenant_filter import get_bid_from_token, apply_bid_filter
+from services.excluded_vendors import should_skip_expense
 
 router = APIRouter()
 
@@ -277,6 +278,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
         skipped_count = 0
         vendor_created_count = 0
         processed_months = set()
+        skipped_payroll_dups: list[str] = []  # 급여 중복으로 자동 제외된 항목 기록
 
         # Build vendor lookup
         vendors = session.exec(apply_bid_filter(select(Vendor), Vendor, bid)).all()
@@ -289,6 +291,13 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
             category = rec['category']
 
             if amount <= 0:
+                continue
+
+            # 급여 중복/블랙리스트 체크 (직원급여 이중지급 방지)
+            skip, reason = should_skip_expense(session, bid, vendor_name, amount, date_obj)
+            if skip:
+                skipped_count += 1
+                skipped_payroll_dups.append(f"{date_obj} {vendor_name} {amount:,}원 — {reason}")
                 continue
 
             # Find or create vendor
@@ -394,6 +403,7 @@ async def upload_purchase_excel(file: UploadFile = File(...), _admin: User = Dep
             "auto_classified": auto_classified_count,
             "upload_id": upload_id,
             "total_parsed": len(records),
+            "skipped_payroll_dups": skipped_payroll_dups,
         }
 
     except ValueError as ve:
@@ -596,6 +606,8 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
         vendor_by_name = {v.name: v for v in vendors}
         vendor_by_id = {v.id: v for v in vendors}
 
+        skipped_payroll_dups: list[str] = []
+
         for rec in records:
             vendor_name = rec['vendor_name']
             date_str = rec['date']
@@ -608,6 +620,13 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
             try:
                 date_obj = datetime.strptime(str(date_str)[:10], "%Y-%m-%d").date()
             except:
+                continue
+
+            # 급여 중복/블랙리스트 체크 (직원급여 이중지급 방지)
+            skip, reason = should_skip_expense(session, bid, vendor_name, amount, date_obj)
+            if skip:
+                skipped_count += 1
+                skipped_payroll_dups.append(f"{date_obj} {vendor_name} {amount:,}원 — {reason}")
                 continue
 
             # Apply vendor decision
@@ -719,6 +738,7 @@ async def upload_purchase_confirm(payload: ConfirmUploadPayload, _admin: User = 
             "skipped": skipped_count,
             "vendors_created": vendor_created_count,
             "upload_id": upload_id,
+            "skipped_payroll_dups": skipped_payroll_dups,
         }
 
     except Exception as e:

@@ -24,17 +24,18 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
     from sqlmodel import select
     from models import Vendor, DailyExpense, UploadHistory
     from services.profit_loss_service import sync_all_expenses
-    
+    from services.excluded_vendors import should_skip_expense
+
     try:
         content = await file.read()
         service = ExcelService("dummy_path")
         result = service.parse_upload(content)
-        
+
         if result.get("status") == "error":
             return result
-        
+
         expenses_data = result.get("data", [])
-        
+
         # --- Create Upload History Record ---
         session = session
         if True:  # was: with Session(engine) as session:
@@ -49,10 +50,11 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
             session.commit()
             session.refresh(upload_history)
             upload_id = upload_history.id
-        
+
         inserted_count = 0
         vendor_created_count = 0
         processed_months = set()
+        skipped_payroll_dups: list[str] = []
         
         # Phase 1: Insert data
         session = session
@@ -65,14 +67,20 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                 if item['amount'] > 0:
                     item_name = item['item'] or "미지정"
                     category = item['category'] or "기타"
-                    
+
                     # Parse date
                     date_str = item['date']
                     try:
                         date_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
                     except:
                         continue
-                    
+
+                    # 급여 중복/블랙리스트 체크 (직원급여 이중지급 방지)
+                    skip, reason = should_skip_expense(session, bid, item_name, item['amount'], date_obj)
+                    if skip:
+                        skipped_payroll_dups.append(f"{date_obj} {item_name} {item['amount']:,}원 — {reason}")
+                        continue
+
                     # Find or create vendor
                     vendor = vendor_by_name.get(item_name)
                     
@@ -126,11 +134,12 @@ async def upload_expense_excel(file: UploadFile = File(...), _admin: User = Depe
                 sync_session.commit()
             
         return {
-            "status": "success", 
+            "status": "success",
             "message": f"{inserted_count}건의 지출 내역이 저장되었습니다. (신규 거래처 {vendor_created_count}개 생성)",
             "count": inserted_count,
             "vendors_created": vendor_created_count,
-            "upload_id": upload_id
+            "upload_id": upload_id,
+            "skipped_payroll_dups": skipped_payroll_dups,
         }
             
     except Exception as e:
