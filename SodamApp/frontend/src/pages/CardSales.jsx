@@ -73,7 +73,7 @@ export default function CardSales() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-6xl mx-auto px-6 py-8 pb-32 space-y-6">
+            <div className="max-w-6xl mx-auto px-6 pt-8 pb-32">
             <header className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
@@ -108,13 +108,13 @@ export default function CardSales() {
             </header>
 
             {msg && (
-                <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-bold animate-pulse">
+                <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl flex items-center gap-2 text-sm font-bold animate-pulse mb-5">
                     <AlertCircle size={16} /> {msg}
                 </div>
             )}
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-5">
                 {['dashboard', 'upload'].map((tab) => (
                     <button
                         key={tab}
@@ -130,10 +130,10 @@ export default function CardSales() {
             </div>
 
             {activeTab === 'dashboard' ? (
-                <div className="space-y-6">
+                <div className="space-y-5">
                     {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="rounded-2xl p-6 shadow-sm" style={{ background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="rounded-2xl p-5 shadow-sm" style={{ background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
                             <div className="flex items-center justify-between mb-4">
                                 <span className="font-bold text-sm" style={{ color: 'rgba(255,255,255,0.8)' }}>기간 내 총 매출</span>
                                 <div className="p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.15)', color: 'white' }}><TrendingUp size={20} /></div>
@@ -144,7 +144,7 @@ export default function CardSales() {
                             <div className="text-xs mt-1 font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>승인 건수 {stats.daily_trend.reduce((acc, cur) => acc + cur.count, 0)}건</div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-slate-500 font-bold text-sm">입금 예정/완료</span>
                                 <div className="p-2 rounded-lg" style={{ background: '#ccfbf1', color: '#134e4a' }}><DollarSign size={20} /></div>
@@ -155,7 +155,7 @@ export default function CardSales() {
                             <div className="text-xs text-slate-400 mt-1 font-medium">수수료 {formatCurrency(payments.reduce((acc, cur) => acc + cur.fees, 0))} 차감</div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <div className="flex items-center justify-between mb-4">
                                 <span className="text-slate-500 font-bold text-sm">평균 수수료율</span>
                                 <div className="p-2 rounded-lg" style={{ background: '#fef3c7', color: '#d97706' }}><PieIcon size={20} /></div>
@@ -168,9 +168,9 @@ export default function CardSales() {
                     </div>
 
                     {/* Charts */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <TrendingUp size={18} style={{ color: '#134e4a' }} /> 일별 매출 추이
                             </h3>
                             <div className="h-80 w-full">
@@ -193,8 +193,8 @@ export default function CardSales() {
                             </div>
                         </div>
 
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                            <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <PieIcon size={18} style={{ color: '#d97706' }} /> 카드사별 점유율
                             </h3>
                             <div className="h-80 w-full">
@@ -223,7 +223,7 @@ export default function CardSales() {
 
                     {/* Card Company Fee Breakdown Table */}
                     {payments.length > 0 && (
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                                 <List size={18} style={{ color: '#134e4a' }} /> 카드사별 수수료 상세
                             </h3>
@@ -304,7 +304,7 @@ export default function CardSales() {
                     )}
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Sales Upload */}
                     <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-center space-y-4">
                         <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)', boxShadow: '0 4px 14px rgba(19,78,74,0.25)' }}>

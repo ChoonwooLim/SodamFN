@@ -322,7 +322,7 @@ export default function PurchaseManagement() {
         <div className="purchase-page min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
             {/* ── Header ── */}
             <div className="max-w-6xl mx-auto px-6 pt-8">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <ShoppingBag size={20} className="text-white" />
@@ -342,7 +342,7 @@ export default function PurchaseManagement() {
 
             {/* ── Summary Cards ── */}
             <div className="max-w-6xl mx-auto px-6">
-                <div className="grid grid-cols-5 gap-3 mb-5">
+                <div className="grid grid-cols-5 gap-3 mb-6">
                     <div className="rounded-2xl p-4 shadow-sm card-animate" style={{ background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)' }}>
                         <div className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>💰 사업용 총 매입</div>
                         <div className="text-lg font-extrabold mt-1 text-white">{formatNumber(businessTotal)}원</div>

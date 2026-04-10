@@ -322,9 +322,9 @@ export default function ProfitLoss() {
         ];
 
         return (
-            <div className="max-w-[1170px] mx-auto">
+            <div>
                 {/* Key Metric Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                     {kpiCards.map((card, i) => (
                         <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate hover:shadow-md transition-shadow" style={{ animationDelay: `${i * 0.05}s` }}>
                             <div className="flex items-center gap-3">
@@ -341,7 +341,7 @@ export default function ProfitLoss() {
                 </div>
 
                 {/* Annual Summary */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.2s' }}>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-5 card-animate" style={{ animationDelay: '0.2s' }}>
                     <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-xs text-white">📅</span>
                         {year}년 연간 요약
@@ -362,7 +362,7 @@ export default function ProfitLoss() {
                 </div>
 
                 {/* Monthly Trend — SVG Line Chart (data-zoomed Y-axis) */}
-                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-4 card-animate" style={{ animationDelay: '0.25s' }}>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 mb-5 card-animate" style={{ animationDelay: '0.25s' }}>
                     <h3 className="text-[15px] font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-xs text-white">📊</span>
                         월별 매출/지출 추이
@@ -1379,9 +1379,9 @@ export default function ProfitLoss() {
     // ═══════════════════════════════════════════
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-[1720px] mx-auto px-4 xl:px-6 pt-8 pb-32">
+            <div className="max-w-6xl mx-auto px-6 pt-8 pb-32">
                 {/* Page Header */}
-                <div className="max-w-[1170px] mx-auto flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <BarChart3 size={20} className="text-white" />
@@ -1399,7 +1399,7 @@ export default function ProfitLoss() {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="max-w-[1170px] mx-auto flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl flex-wrap">
+                <div className="flex gap-1 mb-5 bg-slate-100 p-1 rounded-xl flex-wrap">
                     {MAIN_TABS.map(tab => (
                         <button
                             key={tab.id}

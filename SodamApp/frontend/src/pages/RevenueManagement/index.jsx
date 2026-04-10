@@ -297,7 +297,7 @@ export default function RevenueManagement() {
         <div className="revenue-page min-h-screen bg-slate-50 pb-16 overflow-x-hidden">
             {/* ── Header ── */}
             <div className="max-w-6xl mx-auto px-6 pt-8">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
                             <TrendingUp size={20} className="text-white" />
@@ -326,7 +326,7 @@ export default function RevenueManagement() {
             {/* ── Summary Cards (desktop only) ── */}
             {!isMobile && (
                 <div className="max-w-6xl mx-auto px-6">
-                    <div className="grid grid-cols-4 gap-3 mb-5">
+                    <div className="grid grid-cols-4 gap-3 mb-6">
                         {[
                             { label: '💵 현금매출', value: formatNumber(summary.by_category?.cash || 0) + '원', gradient: 'from-emerald-500 to-emerald-600', shadow: 'shadow-emerald-500/30' },
                             { label: '💳 카드매출', value: formatNumber(summary.by_category?.card || 0) + '원', gradient: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-500/30' },
