@@ -393,47 +393,53 @@ export default function PurchaseManagement() {
 
             {/* ═══ DASHBOARD VIEW ═══ */}
             {viewMode === 'dashboard' && (
-                <PurchaseSummary
-                    categoryData={categoryData}
-                    cardData={cardData}
-                    bankData={bankData}
-                    topVendors={topVendors}
-                    summary={summary}
-                />
+                <div className="max-w-6xl mx-auto px-6">
+                    <PurchaseSummary
+                        categoryData={categoryData}
+                        cardData={cardData}
+                        bankData={bankData}
+                        topVendors={topVendors}
+                        summary={summary}
+                    />
+                </div>
             )}
 
             {/* ═══ LIST / HOUSEHOLD VIEW ═══ */}
             {(viewMode === 'list' || viewMode === 'household') && (
-                <PurchaseTable
-                    viewMode={viewMode}
-                    year={year}
-                    month={month}
-                    loading={loading}
-                    filteredData={filteredData}
-                    sortedDates={sortedDates}
-                    groupedByDate={groupedByDate}
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    filterCategory={filterCategory}
-                    setFilterCategory={setFilterCategory}
-                    selectedIds={selectedIds}
-                    toggleSelect={toggleSelect}
-                    toggleSelectDay={toggleSelectDay}
-                    collapsedDates={collapsedDates}
-                    toggleDateCollapse={toggleDateCollapse}
-                    openAddModal={openAddModal}
-                    openEditModal={openEditModal}
-                    handleDelete={handleDelete}
-                    toggleCategory={toggleCategory}
-                    handleBatchCategory={handleBatchCategory}
-                    handleBatchDelete={handleBatchDelete}
-                    setSelectedIds={setSelectedIds}
-                />
+                <div className="max-w-6xl mx-auto px-6">
+                    <PurchaseTable
+                        viewMode={viewMode}
+                        year={year}
+                        month={month}
+                        loading={loading}
+                        filteredData={filteredData}
+                        sortedDates={sortedDates}
+                        groupedByDate={groupedByDate}
+                        searchTerm={searchTerm}
+                        setSearchTerm={setSearchTerm}
+                        filterCategory={filterCategory}
+                        setFilterCategory={setFilterCategory}
+                        selectedIds={selectedIds}
+                        toggleSelect={toggleSelect}
+                        toggleSelectDay={toggleSelectDay}
+                        collapsedDates={collapsedDates}
+                        toggleDateCollapse={toggleDateCollapse}
+                        openAddModal={openAddModal}
+                        openEditModal={openEditModal}
+                        handleDelete={handleDelete}
+                        toggleCategory={toggleCategory}
+                        handleBatchCategory={handleBatchCategory}
+                        handleBatchDelete={handleBatchDelete}
+                        setSelectedIds={setSelectedIds}
+                    />
+                </div>
             )}
 
             {/* ═══ UPLOAD VIEW ═══ */}
             {viewMode === 'upload' && (
-                <UploadPanel fetchData={fetchData} />
+                <div className="max-w-6xl mx-auto px-6">
+                    <UploadPanel fetchData={fetchData} />
+                </div>
             )}
 
             {/* ═══ ADD/EDIT MODAL ═══ */}
