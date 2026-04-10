@@ -112,13 +112,23 @@ def apply_rules(records: List[Dict], bid: int, session: Optional[Session] = None
             
             key = vendor_name.lower()
             rule = exact_map.get(key)
-            
+
             # 부분 매칭 시도 (정확 매칭 없을 때)
+            # 과도한 오매칭 방지:
+            #  - 최소 6글자 이상 rule만 부분 매칭 허용 (짧은 키워드로 인한 우연 매칭 차단)
+            #  - rule이 record vendor_name의 substring인 경우만 (단방향)
+            #  - rule 전체 길이의 60% 이상이 일치 확신 필요 없음 — 길이 6+는 보수적 기준
             if not rule:
+                best_match = None
+                best_len = 0
                 for r in rules:
-                    if r.original_name.strip().lower() in key or key in r.original_name.strip().lower():
-                        rule = r
-                        break
+                    ro = r.original_name.strip().lower()
+                    if len(ro) < 6:  # 짧은 키워드는 부분 매칭 배제
+                        continue
+                    if ro in key and len(ro) > best_len:
+                        best_match = r
+                        best_len = len(ro)
+                rule = best_match
             
             if rule:
                 changed = False
