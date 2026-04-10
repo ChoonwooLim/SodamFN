@@ -602,7 +602,7 @@ async def upload_revenue_excel(
                 
                 # Calculate card fee: compare card sales from DB vs card+pay deposits
                 card_deposit_total = totals.get('카드입금', {}).get('amount', 0) + totals.get('페이입금', {}).get('amount', 0)
-                
+
                 # Get card sales for the same month from DailyExpense
                 target_year = summary_info.get('year', datetime.datetime.now().year)
                 target_month = summary_info.get('month', datetime.datetime.now().month)
@@ -610,7 +610,7 @@ async def upload_revenue_excel(
                 last_day = calendar.monthrange(target_year, target_month)[1]
                 start_d = datetime.date(target_year, target_month, 1)
                 end_d = datetime.date(target_year, target_month, last_day)
-                
+
                 card_sales = session.exec(
                     apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
                         DailyExpense.date >= start_d,
@@ -620,7 +620,53 @@ async def upload_revenue_excel(
                     )
                 ).all()
                 card_sales_total = sum(e.amount for e in card_sales)
-                card_fee = card_sales_total - card_deposit_total if card_sales_total > 0 else 0
+
+                # ── Card fee 계산 (T+2 입금지연 보정) ──
+                # 문제: 카드사는 매출일 T+1~T+2일 뒤 입금 → 월말 매출이 다음달 입금에 포함됨.
+                #      월별 매출 변동이 크면 naive 계산(sales - deposit)이 음수/비정상값 발생.
+                # 해결:
+                #   1차: shifted window (start-2 ~ end-2) 로 카드 매출 집계 → 은행 입금 실제 기간과 매칭
+                #   2차: 그래도 비정상(음수 또는 매출의 3% 초과)이면 표준 요율 1.9% 추정치 사용
+                from datetime import timedelta as _td
+                shifted_start = start_d - _td(days=2)
+                shifted_end = end_d - _td(days=2)
+                card_sales_shifted = session.exec(
+                    apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+                        DailyExpense.date >= shifted_start,
+                        DailyExpense.date <= shifted_end,
+                        DailyExpense.payment_method == 'Card',
+                        DailyExpense.category == 'store',
+                    )
+                ).all()
+                card_sales_shifted_total = sum(e.amount for e in card_sales_shifted)
+
+                raw_fee = card_sales_total - card_deposit_total
+                shifted_fee = card_sales_shifted_total - card_deposit_total
+
+                STANDARD_FEE_RATE = 0.019  # 1.9% (한국 카드사 평균 요율)
+                MAX_REASONABLE_RATE = 0.03  # 3% — 초과 시 계산 오류로 간주
+
+                def _is_reasonable(fee, sales):
+                    if sales <= 0:
+                        return fee == 0
+                    return 0 <= fee <= sales * MAX_REASONABLE_RATE
+
+                if _is_reasonable(raw_fee, card_sales_total):
+                    card_fee = raw_fee
+                    fee_method = "direct"
+                elif _is_reasonable(shifted_fee, card_sales_shifted_total):
+                    card_fee = shifted_fee
+                    fee_method = "shifted_t+2"
+                elif card_sales_total > 0:
+                    # 최종 fallback: 표준 요율 추정
+                    card_fee = int(card_sales_total * STANDARD_FEE_RATE)
+                    fee_method = f"estimated_{STANDARD_FEE_RATE*100:.1f}%"
+                else:
+                    card_fee = 0
+                    fee_method = "no_sales"
+
+                print(f"[Card Fee] {target_year}-{target_month:02d} method={fee_method} "
+                      f"raw={raw_fee:,} shifted={shifted_fee:,} final={card_fee:,}")
                 
                 # Per-card-company breakdown
                 # Map vendor names in DB to card company names
