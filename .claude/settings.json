@@ -6,7 +6,8 @@
       "Bash(sshpass -p 'Jiyeon71391796!' ssh -o StrictHostKeyChecking=no stevenlim@192.168.219.101 \"echo connected && hostname && which python3\")",
       "Bash(pacman -S sshpass)",
       "Bash(choco list:*)",
-      "Bash(ping -n 1 192.168.219.101)"
+      "Bash(ping -n 1 192.168.219.101)",
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"c:\\\\WORK\\\\SodamFN\\\\docs\\\\superpowers\\\\specs\\\\ai-gateway-phase1-infra\\\\test-gemma4.ps1\")"
     ]
   },
   "enabledPlugins": {
