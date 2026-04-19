@@ -46,7 +46,7 @@ const GuestDashboard = React.lazy(() => import('./pages/GuestDashboard'));
 const StoreApplicationForm = React.lazy(() => import('./pages/StoreApplicationForm'));
 const RetirementPay = React.lazy(() => import('./pages/RetirementPay'));
 const RetirementPayCalc = React.lazy(() => import('./pages/RetirementPayCalc'));
-const PayrollLedger = React.lazy(() => import('./pages/PayrollLedger'));
+// PayrollLedger merged into StaffDetail PayrollTab — route redirects to /employees
 const DeliveryAppDashboard = React.lazy(() => import('./pages/DeliveryAppDashboard'));
 const MoreMenu = React.lazy(() => import('./pages/MoreMenu'));
 const DesignPlan = React.lazy(() => import('./pages/DesignPlan'));
@@ -180,7 +180,7 @@ export default function App() {
               <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
               <Route path="/retirement-calc" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
-              <Route path="/hr/payroll-ledger" element={<ProtectedRoute adminOnly><PayrollLedger /></ProtectedRoute>} />
+              <Route path="/hr/payroll-ledger" element={<Navigate to="/employees" replace />} />
               <Route path="/more" element={<ProtectedRoute adminOnly><MoreMenu /></ProtectedRoute>} />
               <Route path="/design-plan" element={<ProtectedRoute adminOnly><DesignPlan /></ProtectedRoute>} />
               <Route path="/ai-system-design" element={<ProtectedRoute adminOnly><AISystemDesign /></ProtectedRoute>} />

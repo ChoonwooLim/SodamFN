@@ -12,7 +12,7 @@ import DocumentTab from './DocumentTab';
 const TABS = [
     { key: 'basic', label: '기본정보', icon: User },
     { key: 'attendance', label: '근태관리', icon: Calendar },
-    { key: 'payroll', label: '급여내역', icon: CreditCard },
+    { key: 'payroll', label: '급여대장', icon: CreditCard },
     { key: 'contract', label: '전자계약', icon: FileText },
     { key: 'document', label: '서류관리', icon: Upload },
 ];
@@ -542,18 +542,14 @@ export default function StaffDetail() {
 
                 {activeTab === 'payroll' && (
                     <PayrollTab
+                        id={id}
                         formData={formData}
                         payrolls={payrolls}
                         selectedPayroll={selectedPayroll}
                         setSelectedPayroll={setSelectedPayroll}
                         handleSendPayrollStatement={handleSendPayrollStatement}
                         handleExecuteTransfer={handleExecuteTransfer}
-                        isBizAccountModalOpen={isBizAccountModalOpen}
-                        setIsBizAccountModalOpen={setIsBizAccountModalOpen}
-                        bizAccountForm={bizAccountForm}
-                        setBizAccountForm={setBizAccountForm}
-                        fetchBizAccount={fetchBizAccount}
-                        handleUpdateBizAccount={handleUpdateBizAccount}
+                        fetchStaffDetail={fetchStaffDetail}
                     />
                 )}
 
