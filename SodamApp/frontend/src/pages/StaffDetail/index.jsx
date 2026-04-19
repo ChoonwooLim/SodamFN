@@ -560,7 +560,9 @@ export default function StaffDetail() {
                 {activeTab === 'contract' && (
                     <ContractTab
                         formData={formData}
+                        setFormData={setFormData}
                         handleChange={handleChange}
+                        id={id}
                         contracts={contracts}
                         contractForm={contractForm}
                         setContractForm={setContractForm}
