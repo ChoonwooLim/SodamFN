@@ -692,6 +692,7 @@ export default function StaffDetail() {
                         documents={documents}
                         handleFileUpload={handleFileUpload}
                         handleDeleteDocument={handleDeleteDocument}
+                        staffId={id}
                     />
                 )}
 

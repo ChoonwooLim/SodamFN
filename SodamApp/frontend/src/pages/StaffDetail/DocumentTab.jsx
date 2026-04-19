@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Upload, CheckSquare, Eye, Trash2, Loader2, X, ChevronLeft, ChevronRight, FileText, Image, File } from 'lucide-react';
+import { Upload, CheckSquare, Eye, Trash2, Loader2, X, ChevronLeft, ChevronRight, FileText, Image, File, Printer, Award } from 'lucide-react';
+import api from '../../api';
 
 const DOC_TYPES = [
     { key: 'contract', label: '근로계약서' },
@@ -143,14 +144,43 @@ function PreviewModal({ docs, initialIndex, onClose }) {
     );
 }
 
+// ── Certificate Types ────────────────────────────
+const CERT_TYPES = [
+    { key: 'employment', label: '재직증명서', icon: FileText, desc: '현 재직 상태 증명', color: 'from-emerald-600 to-teal-600' },
+    { key: 'career', label: '경력증명서', icon: Award, desc: '경력/근무 기간 증명', color: 'from-blue-600 to-indigo-600' },
+    { key: 'salary', label: '급여확인서', icon: FileText, desc: '최근 3개월 급여 확인', color: 'from-violet-600 to-purple-600' },
+    { key: 'retirement', label: '퇴직증명서', icon: FileText, desc: '퇴직 사실 증명', color: 'from-slate-600 to-slate-700' },
+];
+
 // ── Main Component ────────────────────────────────
 export default function DocumentTab({
     documents,
     handleFileUpload,
     handleDeleteDocument,
+    staffId,
 }) {
     const [uploadingType, setUploadingType] = useState(null);
     const [preview, setPreview] = useState(null); // { docs, index }
+    const [certLoading, setCertLoading] = useState(null);
+
+    const handleGenerateCert = async (type) => {
+        if (!staffId) return;
+        setCertLoading(type);
+        try {
+            const res = await api.get(`/hr/certificate/${type}/${staffId}`);
+            if (res.data.status === 'success' && res.data.html) {
+                const printWin = window.open('', '_blank', 'width=800,height=1100');
+                printWin.document.write(res.data.html);
+                printWin.document.close();
+                setTimeout(() => printWin.print(), 500);
+            }
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.detail || '증명서 생성 실패');
+        } finally {
+            setCertLoading(null);
+        }
+    };
 
     const onFileChange = async (e, docKey) => {
         const file = e.target.files?.[0];
@@ -175,6 +205,7 @@ export default function DocumentTab({
     };
 
     return (
+        <>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mb-6">
             <div className="flex items-center gap-3 mb-6 border-b pb-4">
                 <div className="p-2 bg-orange-100 text-orange-600 rounded-lg"><Upload size={24} /></div>
@@ -309,5 +340,37 @@ export default function DocumentTab({
                 />
             )}
         </div>
+
+            {/* ═══ Certificate Generation ═══ */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center gap-3 mb-5 border-b pb-4">
+                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Printer size={24} /></div>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-800">증명서 발급</h2>
+                        <p className="text-xs text-slate-400">클릭하면 인쇄용 증명서가 새 창에서 열립니다.</p>
+                    </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {CERT_TYPES.map(cert => {
+                        const Icon = cert.icon;
+                        const isLoading = certLoading === cert.key;
+                        return (
+                            <button
+                                key={cert.key}
+                                onClick={() => handleGenerateCert(cert.key)}
+                                disabled={isLoading}
+                                className="text-left p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all disabled:opacity-50"
+                            >
+                                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${cert.color} flex items-center justify-center mb-2.5`}>
+                                    {isLoading ? <Loader2 size={14} className="text-white animate-spin" /> : <Icon size={14} className="text-white" />}
+                                </div>
+                                <p className="text-sm font-bold text-slate-800">{cert.label}</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">{cert.desc}</p>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </>
     );
 }
