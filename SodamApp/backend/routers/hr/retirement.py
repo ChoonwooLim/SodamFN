@@ -170,7 +170,10 @@ def get_retirement_calculation_detail(staff_id: int, _admin: AuthUser = Depends(
         raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
         
     payment = session.exec(apply_bid_filter(select(RetirementPayment), RetirementPayment, bid).where(RetirementPayment.staff_id == staff_id)).first()
-    calc_end_date = payment.end_date if payment else (getattr(staff, 'contract_end_date', None) or date.today())
+    # 퇴직금 지급 기록이 있으면 그 종료일 사용, 없으면 계약종료일 or 오늘
+    # 단, 재직 중인 직원은 미래 계약종료일이 아닌 오늘 기준으로 산정
+    raw_end = payment.end_date if payment else (getattr(staff, 'contract_end_date', None) or date.today())
+    calc_end_date = min(raw_end, date.today()) if raw_end else date.today()
     
     legal, w_days, p_accrued, breakdown = _calc_accrued_retirement(staff, calc_end_date, session)
     
