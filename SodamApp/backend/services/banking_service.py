@@ -76,8 +76,14 @@ class BankingService:
                     "message": "급여 출금 계좌가 설정되지 않았습니다. 환경설정 > 급여 출금계좌에서 등록해주세요."
                 }
 
-            # 이체금액 = 기본급 + 특별수당 + 주휴수당 - 공제 (세금대납 제외: 사업주가 별도 납부)
-            transfer_amount = (payroll.base_pay or 0) + (payroll.bonus_special or 0) + (payroll.bonus_holiday or 0) - (payroll.deductions or 0)
+            # 이체금액: 실수령액에서 세금대납 공제 후 이체
+            # 세금대납 있는 경우: 실수령액(기본급+세금대납) - 세금대납 = 기본급 + 특별수당 + 주휴수당
+            # 세금대납 없는 경우: 기본급 + 특별수당 + 주휴수당 - 공제
+            tax_support = payroll.bonus_tax_support or 0
+            if tax_support > 0:
+                transfer_amount = (payroll.base_pay or 0) + (payroll.bonus_special or 0) + (payroll.bonus_holiday or 0)
+            else:
+                transfer_amount = (payroll.base_pay or 0) + (payroll.bonus_special or 0) + (payroll.bonus_holiday or 0) - (payroll.deductions or 0)
 
             # 4. 은행 API 이체 실행
             # TODO: 오픈뱅킹 API 또는 펌뱅킹 API 연동 시 이 부분을 실제 API 호출로 교체

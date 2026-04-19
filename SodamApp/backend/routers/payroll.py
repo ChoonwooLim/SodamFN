@@ -527,8 +527,13 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         existing.deduction_it = d_it
         existing.deduction_lit = d_lit
         existing.bonus_tax_support = tax_support
-        # 실수령액: 기본급 + 특별수당 + 주휴수당 - 공제 + 세금대납
-        existing.total_pay = total_base_pay + special_bonus + total_holiday_pay - total_deductions + tax_support
+        # 실수령액: 세금대납 시 공제를 사업주가 대납하므로 차감하지 않음
+        if tax_support > 0:
+            # 세금대납: 실수령 = 기본급 + 특별수당 + 주휴수당 + 세금대납 (공제 미차감, 사업주 별도납부)
+            existing.total_pay = total_base_pay + special_bonus + total_holiday_pay + tax_support
+        else:
+            # 일반: 실수령 = 기본급 + 특별수당 + 주휴수당 - 공제
+            existing.total_pay = total_base_pay + special_bonus + total_holiday_pay - total_deductions
         existing.details_json = details_json
         
         service.session.add(existing)

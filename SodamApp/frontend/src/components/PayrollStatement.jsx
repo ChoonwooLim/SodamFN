@@ -201,10 +201,14 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
 
             {/* Summary Footer Section */}
             {(() => {
-                const taxSupportAmount = payroll.bonus_tax_support || 0;
-                const grossPay = (payroll.base_pay || 0) + (payroll.bonus || 0);
+                const taxSupport = payroll.bonus_tax_support || 0;
+                const basePay = payroll.base_pay || 0;
+                const specialBonus = payroll.bonus_special || 0;
+                const holidayPay = payroll.bonus_holiday || 0;
                 const deductions = payroll.deductions || 0;
-                const netAfterDeductions = grossPay - deductions;
+                const grossPay = basePay + specialBonus + holidayPay;
+                // 계좌이체액: 세금대납 시 공제 미차감, 일반은 공제 차감
+                const transferAmount = taxSupport > 0 ? grossPay : grossPay - deductions;
 
                 return (
                     <table className="w-full border-4 border-slate-800 border-collapse mb-4">
@@ -216,32 +220,25 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                                 <td className="w-1/4 border-2 border-slate-800 text-center font-black text-base text-red-600">{safeLocaleString(deductions)}</td>
                             </tr>
 
-                            {taxSupportAmount > 0 ? (
+                            {taxSupport > 0 ? (
                                 <>
                                     <tr className="h-9 text-[12px] bg-indigo-50/50">
-                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-slate-800">급여 산출 (C)</td>
-                                        <td className="w-1/4 border-2 border-slate-800 text-center font-bold text-[13px] text-slate-700">
-                                            {safeLocaleString(netAfterDeductions)}
-                                            <span className="text-[9px] font-normal block text-slate-500 leading-tight">(A - B)</span>
-                                        </td>
-                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-indigo-700">세금대납액 (D)</td>
+                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-indigo-700">세금대납 (C)</td>
                                         <td className="w-1/4 border-2 border-slate-800 text-center font-black text-[13px] text-indigo-600">
-                                            +{safeLocaleString(taxSupportAmount)}
+                                            +{safeLocaleString(taxSupport)}
                                             <span className="text-[9px] font-normal block text-indigo-400 leading-tight">(사업주 대납)</span>
                                         </td>
-                                    </tr>
-                                    <tr className="h-10 bg-slate-800 text-white">
-                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[12px] uppercase leading-tight">급여 총액 (E)</td>
-                                        <td colSpan="3" className="border-2 border-slate-800 text-center">
-                                            <div className="text-lg font-black tracking-widest leading-none my-1">₩ {safeLocaleString(payroll.total_pay)}</div>
-                                            <div className="text-[9px] font-medium opacity-60 uppercase tracking-widest leading-tight">(C + D = 보장 급여액)</div>
+                                        <td className="w-1/4 bg-indigo-100 font-black border-2 border-slate-800 text-center text-slate-700">계좌이체액</td>
+                                        <td className="w-1/4 border-2 border-slate-800 text-center font-black text-[13px] text-slate-700">
+                                            {safeLocaleString(transferAmount)}
+                                            <span className="text-[9px] font-normal block text-slate-400 leading-tight">(총보상 - 세금대납)</span>
                                         </td>
                                     </tr>
                                     <tr className="h-14 bg-slate-900 text-white">
-                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[13px] uppercase leading-tight">실수령액</td>
+                                        <td className="w-1/4 font-black border-2 border-slate-800 text-center text-[13px] uppercase leading-tight">총 보상액</td>
                                         <td colSpan="3" className="border-2 border-slate-800 text-center">
-                                            <div className="text-2xl font-black tracking-widest leading-none mb-0.5 text-yellow-300">₩ {safeLocaleString(payroll.total_pay + deductions)}</div>
-                                            <div className="text-[10px] font-medium opacity-80 uppercase tracking-widest text-yellow-100/70">(급여총액 + 공제총액 = 실수령액)</div>
+                                            <div className="text-2xl font-black tracking-widest leading-none mb-0.5 text-yellow-300">₩ {safeLocaleString(payroll.total_pay)}</div>
+                                            <div className="text-[10px] font-medium opacity-80 uppercase tracking-widest text-yellow-100/70">(A + C = 지급총액 + 세금대납)</div>
                                         </td>
                                     </tr>
                                 </>

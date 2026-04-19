@@ -141,24 +141,24 @@ export default function PayrollTab({
                     <div className="p-5">
                         {/* Top Row: main amounts */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                            <div className="bg-slate-50 rounded-xl p-3">
-                                <div className="text-[10px] font-bold text-slate-400 mb-0.5">기본급</div>
-                                <div className="text-base font-black text-slate-800 font-mono">{fmt(prevMonthPayroll.base_pay)}</div>
+                            <div className="bg-slate-50 rounded-xl p-4">
+                                <div className="text-xs font-bold text-slate-400 mb-1">기본급</div>
+                                <div className="text-xl font-black text-slate-800 font-mono">{fmt(prevMonthPayroll.base_pay)}</div>
                             </div>
                             {(prevMonthPayroll.bonus_special || 0) > 0 && (
-                                <div className="bg-violet-50 rounded-xl p-3">
-                                    <div className="text-[10px] font-bold text-violet-400 mb-0.5">특별수당</div>
-                                    <div className="text-base font-black text-violet-600 font-mono">+{fmt(prevMonthPayroll.bonus_special)}</div>
+                                <div className="bg-violet-50 rounded-xl p-4">
+                                    <div className="text-xs font-bold text-violet-400 mb-1">특별수당</div>
+                                    <div className="text-xl font-black text-violet-600 font-mono">+{fmt(prevMonthPayroll.bonus_special)}</div>
                                 </div>
                             )}
-                            <div className="bg-red-50/60 rounded-xl p-3">
-                                <div className="text-[10px] font-bold text-red-300 mb-0.5">공제액</div>
-                                <div className="text-base font-black text-red-500 font-mono">-{fmt(prevMonthPayroll.deductions)}</div>
+                            <div className="bg-red-50/60 rounded-xl p-4">
+                                <div className="text-xs font-bold text-red-300 mb-1">공제액</div>
+                                <div className="text-xl font-black text-red-500 font-mono">-{fmt(prevMonthPayroll.deductions)}</div>
                             </div>
                             {showTaxSupport && (prevMonthPayroll.bonus_tax_support || 0) > 0 && (
-                                <div className="bg-emerald-50 rounded-xl p-3">
-                                    <div className="text-[10px] font-bold text-emerald-400 mb-0.5">세금대납</div>
-                                    <div className="text-base font-black text-emerald-600 font-mono">+{fmt(prevMonthPayroll.bonus_tax_support)}</div>
+                                <div className="bg-emerald-50 rounded-xl p-4">
+                                    <div className="text-xs font-bold text-emerald-400 mb-1">세금대납</div>
+                                    <div className="text-xl font-black text-emerald-600 font-mono">+{fmt(prevMonthPayroll.bonus_tax_support)}</div>
                                 </div>
                             )}
                         </div>
@@ -173,7 +173,7 @@ export default function PayrollTab({
                                 { label: '소득세', val: prevMonthPayroll.deduction_it },
                                 { label: '지방소득세', val: prevMonthPayroll.deduction_lit },
                             ].filter(d => (d.val || 0) > 0).map((d, i) => (
-                                <span key={i} className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-600 rounded-lg px-2.5 py-1 text-[11px] font-semibold">
+                                <span key={i} className="inline-flex items-center gap-1.5 bg-slate-100 text-slate-600 rounded-lg px-3 py-1.5 text-xs font-semibold">
                                     <span className="text-slate-400">{d.label}</span>
                                     <span className="font-mono font-bold text-red-400">-{fmt(d.val)}</span>
                                 </span>
@@ -181,10 +181,10 @@ export default function PayrollTab({
                         </div>
 
                         {/* Bottom: Net Pay + Actions */}
-                        <div className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl px-5 py-3">
+                        <div className="flex items-center justify-between bg-gradient-to-r from-slate-800 to-slate-900 rounded-xl px-5 py-4">
                             <div>
-                                <div className="text-[10px] font-bold text-slate-400">실수령액</div>
-                                <div className="text-xl font-black text-yellow-300 font-mono tracking-tight">{fmt(prevMonthPayroll.total_pay)}원</div>
+                                <div className="text-xs font-bold text-slate-400">{showTaxSupport ? '총 보상액' : '실수령액'}</div>
+                                <div className="text-2xl font-black text-yellow-300 font-mono tracking-tight">{fmt(prevMonthPayroll.total_pay)}원</div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={() => setSelectedPayroll(prevMonthPayroll)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors" title="명세서 출력"><Printer size={15} /></button>
@@ -239,7 +239,7 @@ export default function PayrollTab({
                         </div>
                     )}
                     <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)' }}>
-                        <div className="text-[10px] font-bold text-white/70 mb-1">총 실수령</div>
+                        <div className="text-[10px] font-bold text-white/70 mb-1">{showTaxSupport ? '총 보상' : '총 실수령'}</div>
                         <div className="text-lg font-black">{fmt(payrollSummary.totalNet)}</div>
                         <div className="text-[10px] mt-1 text-white/50">{payrollSummary.count}건 / 지급완료 {payrollSummary.transferred}건</div>
                     </div>
@@ -289,7 +289,7 @@ export default function PayrollTab({
                                         {showTaxSupport && (
                                             <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-emerald-600">세금대납</th>
                                         )}
-                                        <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-blue-600">실수령액</th>
+                                        <th className="px-4 py-3 font-bold border-b border-slate-100 text-right text-blue-600">{showTaxSupport ? '총 보상액' : '실수령액'}</th>
                                         <th className="px-4 py-3 font-bold border-b border-slate-100 text-center">상태</th>
                                         <th className="px-4 py-3 font-bold border-b border-slate-100 text-center">관리</th>
                                     </tr>
@@ -445,7 +445,7 @@ export default function PayrollTab({
                                                         </div>
                                                     )}
                                                     <div className="border-t border-slate-700 mt-2 pt-2 flex justify-between">
-                                                        <span className="text-xs font-bold">실수령액</span>
+                                                        <span className="text-xs font-bold">{showTaxSupport ? '총 보상액' : '실수령액'}</span>
                                                         <span className="text-base font-black text-yellow-300 font-mono">{fmt(pay.total_pay)}</span>
                                                     </div>
                                                 </div>
@@ -506,7 +506,7 @@ export default function PayrollTab({
                                         )}
                                         {showTaxSupport && (
                                             <div className="col-span-2 flex justify-between bg-blue-50 rounded-lg px-3 py-2">
-                                                <span className="text-blue-500 font-bold">실수령액</span>
+                                                <span className="text-blue-500 font-bold">총 보상액</span>
                                                 <span className="font-bold font-mono text-blue-600">{fmt(pay.total_pay)}</span>
                                             </div>
                                         )}

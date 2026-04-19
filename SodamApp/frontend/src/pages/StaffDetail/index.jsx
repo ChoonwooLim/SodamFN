@@ -369,8 +369,13 @@ export default function StaffDetail() {
 
     const handleExecuteTransfer = async (payrollId) => {
         const pay = payrolls.find(p => p.id === payrollId);
-        // 이체금액 = 기본급 + 특별수당 + 주휴수당 - 공제 (세금대납 제외)
-        const transferAmount = pay ? (pay.base_pay || 0) + (pay.bonus_special || 0) + (pay.bonus_holiday || 0) - (pay.deductions || 0) : 0;
+        // 이체금액: 실수령액에서 세금대납 공제 후 이체
+        // 세금대납 있으면: 기본급 + 특별수당 + 주휴수당 (세금대납은 사업주가 별도 납부)
+        // 세금대납 없으면: 기본급 + 특별수당 + 주휴수당 - 공제
+        const hasTaxSupport = (pay?.bonus_tax_support || 0) > 0;
+        const transferAmount = pay
+            ? (pay.base_pay || 0) + (pay.bonus_special || 0) + (pay.bonus_holiday || 0) - (hasTaxSupport ? 0 : (pay.deductions || 0))
+            : 0;
         const amount = formatNumber(transferAmount);
         const target = formData.bank_name && formData.account_number
             ? `\n입금: ${formData.bank_name} ${formData.account_number} (${formData.account_holder || formData.name})`
