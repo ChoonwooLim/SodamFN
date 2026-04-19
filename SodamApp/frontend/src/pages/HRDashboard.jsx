@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Users, Clock, AlertTriangle, CalendarDays, TrendingUp, Palmtree, Bell, ChevronRight, BarChart3, Shield, FileText, UserCheck, UserMinus, Briefcase } from 'lucide-react';
+import { useBusinessConfig } from '../hooks/useBusinessConfig';
 import api from '../api';
 
 export default function HRDashboard() {
+    const { isSimpleMode, employeeScale } = useBusinessConfig();
     const [staffSummary, setStaffSummary] = useState({ total: 0, active: 0, leave: 0, resigned: 0 });
     const [leaveData, setLeaveData] = useState([]);
     const [alerts, setAlerts] = useState([]);
@@ -100,8 +102,17 @@ export default function HRDashboard() {
                         <BarChart3 size={20} className="text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-black text-slate-900">HR 대시보드</h1>
-                        <p className="text-xs text-slate-400">인력 현황 · 연차 현황 · 알림</p>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-xl font-black text-slate-900">HR 대시보드</h1>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                isSimpleMode
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : 'bg-blue-100 text-blue-700'
+                            }`}>
+                                {isSimpleMode ? '5인 미만' : '5인 이상'}
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-400">인력 현황 · {isSimpleMode ? '간편관리' : '연차 현황 · 알림'}</p>
                     </div>
                 </div>
 
@@ -179,8 +190,8 @@ export default function HRDashboard() {
                         </div>
                     </div>
 
-                    {/* Leave Summary */}
-                    <div className="lg:col-span-2">
+                    {/* Leave Summary — 5인 이상만 */}
+                    {!isSimpleMode && <div className="lg:col-span-2">
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                                 <Palmtree size={16} className="text-emerald-600" />
@@ -238,7 +249,7 @@ export default function HRDashboard() {
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </div>}
                 </div>
             </div>
         </div>

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon } from 'lucide-react';
+import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon, Users } from 'lucide-react';
 import VendorSettings from './VendorSettings';
 import ContractSettings from './ContractSettings';
 import GoogleMapPicker from '../components/GoogleMapPicker';
+import { useBusinessConfig } from '../hooks/useBusinessConfig';
 import api from '../api';
 
 const TABS = [
@@ -11,10 +12,13 @@ const TABS = [
     { key: 'payment', label: '급여 출금계좌' },
     { key: 'location', label: '매장 위치 관리' },
     { key: 'logo', label: '회사 로고 관리' },
+    { key: 'business', label: '사업장 규모 설정' },
 ];
 
 export default function Settings() {
+    const { employeeScale, updateScale } = useBusinessConfig();
     const [activeTab, setActiveTab] = useState('vendor');
+    const [scaleUpdating, setScaleUpdating] = useState(false);
     const [bizAccount, setBizAccount] = useState({ bank: '', number: '', holder: '' });
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
@@ -369,6 +373,88 @@ export default function Settings() {
                                 <Save size={16} />
                                 {logoSaving ? '저장 중...' : '로고 저장 및 변경'}
                             </button>
+                        </div>
+                    </div>
+                ) : activeTab === 'business' ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-3xl card-animate">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                                <Users size={20} className="text-white" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">사업장 규모 설정</h3>
+                                <p className="text-xs text-slate-400">상시근로자 수에 따라 적용 법령과 메뉴가 달라집니다</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                            {/* 5인 미만 카드 */}
+                            <button
+                                onClick={async () => {
+                                    setScaleUpdating(true);
+                                    await updateScale('under5');
+                                    setScaleUpdating(false);
+                                }}
+                                disabled={scaleUpdating}
+                                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
+                                    employeeScale === 'under5'
+                                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                                }`}
+                            >
+                                {employeeScale === 'under5' && (
+                                    <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                )}
+                                <div className="text-2xl mb-2">🏪</div>
+                                <h4 className="text-base font-bold text-slate-800 mb-1">5인 미만 사업장</h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">간편 모드</p>
+                                <ul className="mt-3 space-y-1.5 text-xs text-slate-500">
+                                    <li className="flex items-start gap-1.5"><span className="text-emerald-500 mt-0.5">-</span>연차/휴가 관리 미적용</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-emerald-500 mt-0.5">-</span>연장근로 규제 미적용</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-emerald-500 mt-0.5">-</span>법정교육 의무 제외</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-emerald-500 mt-0.5">-</span>간편 급여/근태 관리</li>
+                                </ul>
+                            </button>
+
+                            {/* 5인 이상 카드 */}
+                            <button
+                                onClick={async () => {
+                                    setScaleUpdating(true);
+                                    await updateScale('over5');
+                                    setScaleUpdating(false);
+                                }}
+                                disabled={scaleUpdating}
+                                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
+                                    employeeScale === 'over5'
+                                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                                }`}
+                            >
+                                {employeeScale === 'over5' && (
+                                    <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                )}
+                                <div className="text-2xl mb-2">🏢</div>
+                                <h4 className="text-base font-bold text-slate-800 mb-1">5인 이상 사업장</h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">전체 기능 모드</p>
+                                <ul className="mt-3 space-y-1.5 text-xs text-slate-500">
+                                    <li className="flex items-start gap-1.5"><span className="text-blue-500 mt-0.5">+</span>연차/휴가 자동 관리</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-blue-500 mt-0.5">+</span>근로시간 모니터링/알림</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-blue-500 mt-0.5">+</span>법정 의무교육 관리</li>
+                                    <li className="flex items-start gap-1.5"><span className="text-blue-500 mt-0.5">+</span>전체 HR 기능 활성화</li>
+                                </ul>
+                            </button>
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                            <p className="text-xs text-amber-700 font-medium">
+                                <strong>참고:</strong> 상시근로자 수 기준은 근로기준법 제11조에 따릅니다.
+                                상시 5인 미만 사업장은 근로기준법 일부 조항(연차유급휴가, 연장/야간/휴일 가산수당, 부당해고 보호 등)이 적용되지 않습니다.
+                                설정 변경 시 즉시 메뉴와 기능이 반영됩니다.
+                            </p>
                         </div>
                     </div>
                 ) : null}

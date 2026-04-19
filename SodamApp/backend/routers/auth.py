@@ -408,7 +408,38 @@ def get_business_info(bid: int):
         business = service.session.get(Business, bid)
         if not business:
             raise HTTPException(status_code=404, detail="Business not found")
-        return {"business_name": business.name, "logo_url": business.logo_url}
+        return {
+            "business_name": business.name,
+            "logo_url": business.logo_url,
+            "employee_scale": getattr(business, 'employee_scale', 'over5'),
+            "business_type": business.business_type,
+        }
+    finally:
+        service.close()
+
+@router.put("/business-settings")
+def update_business_settings(
+    data: dict,
+    admin: User = Depends(get_admin_user),
+):
+    """사업장 설정 업데이트 (employee_scale 등)"""
+    from models import Business
+    bid = admin.business_id
+    if not bid:
+        raise HTTPException(status_code=400, detail="사업장 정보가 없습니다.")
+
+    service = DatabaseService()
+    try:
+        business = service.session.get(Business, bid)
+        if not business:
+            raise HTTPException(status_code=404, detail="사업장을 찾을 수 없습니다.")
+        if "employee_scale" in data:
+            if data["employee_scale"] in ("under5", "over5"):
+                business.employee_scale = data["employee_scale"]
+        service.session.add(business)
+        service.session.commit()
+        service.session.refresh(business)
+        return {"status": "success", "employee_scale": business.employee_scale}
     finally:
         service.close()
 

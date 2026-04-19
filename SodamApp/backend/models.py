@@ -35,6 +35,9 @@ class Business(SQLModel, table=True):
     subscription_start: Optional[datetime.date] = None
     subscription_end: Optional[datetime.date] = None
     
+    # 사업장 규모 모드
+    employee_scale: str = Field(default="over5")  # "under5" = 5인 미만 (간편모드), "over5" = 5인 이상 (전체기능)
+
     # 메타
     is_active: bool = True
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

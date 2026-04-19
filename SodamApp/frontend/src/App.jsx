@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
+import { BusinessConfigProvider } from './hooks/useBusinessConfig';
 import './styles/mobile-ux.css';
 
 // Lazy Load Pages
@@ -133,6 +134,7 @@ export default function App() {
     <BrowserRouter>
       <ErrorBoundary>
         <ToastProvider>
+        <BusinessConfigProvider>
         <Layout>
           <Suspense fallback={<PageLoader />}>
             <Routes>
@@ -201,6 +203,7 @@ export default function App() {
             </Routes>
           </Suspense>
         </Layout>
+        </BusinessConfigProvider>
         </ToastProvider>
       </ErrorBoundary>
     </BrowserRouter>

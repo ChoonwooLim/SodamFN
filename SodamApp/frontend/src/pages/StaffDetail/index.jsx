@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
+import { useBusinessConfig, SCALE_FEATURES } from '../../hooks/useBusinessConfig';
 import BasicInfoTab from './BasicInfoTab';
 import AttendanceTab from './AttendanceTab';
 import PayrollTab from './PayrollTab';
@@ -13,7 +14,7 @@ import LeaveTab from './LeaveTab';
 import ChangeLogTab from './ChangeLogTab';
 import TrainingTab from './TrainingTab';
 
-const TABS = [
+const ALL_TABS = [
     { key: 'basic', label: '기본정보', icon: User },
     { key: 'attendance', label: '근태관리', icon: Calendar },
     { key: 'leave', label: '연차/휴가', icon: Palmtree },
@@ -29,6 +30,15 @@ export default function StaffDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('basic');
+    const { employeeScale, isSimpleMode } = useBusinessConfig();
+
+    // 5인 미만/이상에 따라 보이는 탭 필터링
+    const TABS = useMemo(() => {
+        return ALL_TABS.filter(tab => {
+            const feature = SCALE_FEATURES.tabs[tab.key];
+            return feature ? feature[employeeScale] : true;
+        });
+    }, [employeeScale]);
 
     // Form State
     const [formData, setFormData] = useState({
