@@ -15,7 +15,7 @@ const TABS = [
     { key: 'attendance', label: '근태관리', icon: Calendar },
     { key: 'payroll', label: '급여대장', icon: CreditCard },
     { key: 'retirement', label: '퇴직금', icon: Calculator },
-    { key: 'contract', label: '전자계약', icon: FileText },
+    { key: 'contract', label: '계약관리', icon: FileText },
     { key: 'document', label: '서류관리', icon: Upload },
 ];
 

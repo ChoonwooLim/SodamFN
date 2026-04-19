@@ -24,6 +24,9 @@ export default function RetirementTab({ id, formData: staffData }) {
         legal_retirement: 0,
     });
 
+    // 상세 근로계약 정보의 입사일 우선 사용 (contract_start_date > start_date)
+    const contractStartDate = staffData?.contract_start_date || staffData?.start_date || '';
+
     // Fetch calculation data
     useEffect(() => {
         if (!id) return;
@@ -33,14 +36,25 @@ export default function RetirementTab({ id, formData: staffData }) {
                 const res = await api.get(`/hr/retirement/calc/${id}`);
                 const data = res.data.data;
 
+                // 입사일: 상세 근로계약 정보 > API 응답 > 기본 입사일
+                const startDate = contractStartDate || data.staff.start_date;
+
+                // 근속일수 재계산 (입사일이 계약정보에서 온 경우)
+                let workDays = data.staff.work_days;
+                if (startDate && startDate !== data.staff.start_date && data.staff.end_date) {
+                    const st = new Date(startDate);
+                    const ed = new Date(data.staff.end_date);
+                    workDays = Math.max(0, Math.floor((ed - st) / (1000 * 60 * 60 * 24)));
+                }
+
                 setFormData({
                     emp_no: data.staff.emp_no,
                     name: data.staff.name,
                     dept: data.staff.dept,
                     level: data.staff.level,
-                    start_date: data.staff.start_date,
+                    start_date: startDate,
                     end_date: data.staff.end_date,
-                    work_days: data.staff.work_days,
+                    work_days: workDays,
                     history: data.history.map((h) => ({
                         period: h.period,
                         days: h.days,
@@ -64,7 +78,7 @@ export default function RetirementTab({ id, formData: staffData }) {
             }
         };
         fetchCalcDetail();
-    }, [id]);
+    }, [id, contractStartDate]);
 
     // Client-side recalculation
     const recalculate = () => {
