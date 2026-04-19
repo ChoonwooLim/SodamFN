@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
+from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel
 
-from routers.auth import get_admin_user, get_current_user
+from routers.auth import get_admin_user
 from models import Staff, LeaveBalance, LeaveRequest, User as AuthUser
 from database import get_session
 from tenant_filter import get_bid_from_token, apply_bid_filter
@@ -22,15 +23,24 @@ class LeaveRequestCreate(BaseModel):
     reason: Optional[str] = None
 
 class LeaveRequestUpdate(BaseModel):
-    status: str  # 승인, 반려
+    status: str  # 승인, 반려, 취소
     reject_reason: Optional[str] = None
+    force: bool = False  # 잔여 부족해도 강제 승인 허용
 
 class LeaveBalanceAdjust(BaseModel):
     total_annual: Optional[float] = None
     total_sick: Optional[float] = None
     total_special: Optional[float] = None
 
-# --- Helper: Calculate legal annual leave by Korean Labor Standards Act ---
+
+# --- Constants ---
+
+ANNUAL_TYPES = {"연차", "반차(오전)", "반차(오후)"}
+SICK_TYPES = {"병가"}
+SPECIAL_TYPES = {"경조사", "출산휴가", "특별휴가", "공가"}
+
+
+# --- Helpers ---
 
 def calc_legal_annual_leave(start_date: date, ref_year: int) -> float:
     """근로기준법 기반 연차 자동 계산
@@ -40,20 +50,14 @@ def calc_legal_annual_leave(start_date: date, ref_year: int) -> float:
     """
     from dateutil.relativedelta import relativedelta
 
-    # Reference date: Jan 1 of ref_year
     ref_date = date(ref_year, 1, 1)
-
     if start_date >= ref_date:
-        return 0  # Not yet started
+        return 0
 
-    # Calculate months of service as of ref_year start
     work_start = start_date
-
-    # Years of service at start of reference year
     years_worked = (ref_date - work_start).days / 365.25
 
     if years_worked < 1:
-        # 1년 미만: count full months worked in this year
         months_worked = 0
         check = work_start
         while check < date(ref_year, 12, 31):
@@ -62,7 +66,6 @@ def calc_legal_annual_leave(start_date: date, ref_year: int) -> float:
                 months_worked += 1
         return min(months_worked, 11)
 
-    # 1년 이상
     base = 15
     if years_worked >= 3:
         extra = int((years_worked - 1) / 2)
@@ -70,42 +73,116 @@ def calc_legal_annual_leave(start_date: date, ref_year: int) -> float:
 
     return float(base)
 
+
+def _verify_tenant(record, bid: Optional[int], label: str = "리소스"):
+    """멀티테넌트 격리 검증 — bid가 설정되어 있으면 record.business_id와 일치해야 함."""
+    if bid is not None and record.business_id is not None and record.business_id != bid:
+        raise HTTPException(status_code=404, detail=f"{label}을(를) 찾을 수 없습니다.")
+
+
+def _balance_field_for(leave_type: str) -> Optional[str]:
+    """휴가 유형 → LeaveBalance used_* 필드명 매핑."""
+    if leave_type in ANNUAL_TYPES:
+        return "used_annual"
+    if leave_type in SICK_TYPES:
+        return "used_sick"
+    if leave_type in SPECIAL_TYPES:
+        return "used_special"
+    return None  # 무급휴가/육아휴직 등은 잔액에 반영 안 함
+
+
+def _apply_balance_delta(balance: LeaveBalance, leave_type: str, days: float, sign: int):
+    """잔액 used_* 에 sign(+1/-1) * days 를 반영. 음수 방지."""
+    field = _balance_field_for(leave_type)
+    if not field:
+        return
+    current = getattr(balance, field)
+    new_val = current + sign * days
+    setattr(balance, field, max(0.0, new_val))
+
+
+def _get_or_create_balance(
+    session: Session, staff: Staff, year: int, bid: Optional[int], lock: bool = False
+) -> LeaveBalance:
+    """연도별 LeaveBalance 조회 또는 생성. lock=True면 행 잠금(동시성 안전).
+    UniqueConstraint(staff_id, year) 경합 시 재조회.
+    """
+    stmt = select(LeaveBalance).where(
+        LeaveBalance.staff_id == staff.id,
+        LeaveBalance.year == year,
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    balance = session.exec(stmt).first()
+    if balance:
+        _verify_tenant(balance, bid, "잔여 현황")
+        return balance
+
+    total_annual = calc_legal_annual_leave(staff.start_date, year) if staff.start_date else 0
+    balance = LeaveBalance(
+        business_id=bid or staff.business_id,
+        staff_id=staff.id,
+        year=year,
+        total_annual=total_annual,
+    )
+    session.add(balance)
+    try:
+        session.flush()  # UniqueConstraint 즉시 검증
+    except IntegrityError:
+        session.rollback()
+        # 동시 생성된 레코드 재조회
+        balance = session.exec(stmt).first()
+        if not balance:
+            raise
+    return balance
+
+
+def _check_sufficient(balance: LeaveBalance, leave_type: str, days: float):
+    """잔여 부족 검증 — 연차만 총량 제한. 병가/특별휴가는 관리자가 별도 관리."""
+    if leave_type not in ANNUAL_TYPES:
+        return
+    remaining = balance.total_annual - balance.used_annual
+    if days > remaining + 1e-6:
+        raise HTTPException(
+            status_code=400,
+            detail=f"잔여 연차 부족 — 신청 {days}일, 잔여 {remaining:.1f}일",
+        )
+
+
 # --- Endpoints ---
 
 @router.get("/leave/balance/{staff_id}")
-def get_leave_balance(staff_id: int, year: Optional[int] = None, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Get or auto-create leave balance for a staff member"""
+def get_leave_balance(
+    staff_id: int,
+    year: Optional[int] = None,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """연차 잔여 현황 조회 (없으면 자동 생성)"""
     if not year:
         year = date.today().year
 
     staff = session.get(Staff, staff_id)
     if not staff:
         raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+    _verify_tenant(staff, bid, "직원")
 
-    # Try to find existing balance
-    stmt = select(LeaveBalance).where(LeaveBalance.staff_id == staff_id, LeaveBalance.year == year)
-    balance = session.exec(stmt).first()
+    balance = _get_or_create_balance(session, staff, year, bid)
 
-    if not balance:
-        # Auto-create with legal calculation
-        total_annual = calc_legal_annual_leave(staff.start_date, year) if staff.start_date else 0
-        balance = LeaveBalance(
-            business_id=bid or staff.business_id,
-            staff_id=staff_id,
-            year=year,
-            total_annual=total_annual,
+    stmt_req = (
+        select(LeaveRequest)
+        .where(
+            LeaveRequest.staff_id == staff_id,
+            LeaveRequest.start_date >= date(year, 1, 1),
+            LeaveRequest.start_date <= date(year, 12, 31),
         )
-        session.add(balance)
-        session.commit()
-        session.refresh(balance)
-
-    # Get all requests for this year
-    stmt_req = select(LeaveRequest).where(
-        LeaveRequest.staff_id == staff_id,
-        LeaveRequest.start_date >= date(year, 1, 1),
-        LeaveRequest.start_date <= date(year, 12, 31),
-    ).order_by(LeaveRequest.start_date.desc())
+        .order_by(LeaveRequest.start_date.desc())
+    )
     requests = session.exec(stmt_req).all()
+
+    session.commit()
+    session.refresh(balance)
 
     return {
         "status": "success",
@@ -115,13 +192,24 @@ def get_leave_balance(staff_id: int, year: Optional[int] = None, _admin: AuthUse
         "start_date": str(staff.start_date) if staff.start_date else None,
     }
 
+
 @router.put("/leave/balance/{staff_id}")
-def update_leave_balance(staff_id: int, year: int, data: LeaveBalanceAdjust, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Manually adjust leave balance (admin override)"""
-    stmt = select(LeaveBalance).where(LeaveBalance.staff_id == staff_id, LeaveBalance.year == year)
+def update_leave_balance(
+    staff_id: int,
+    year: int,
+    data: LeaveBalanceAdjust,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """잔액 수동 조정 (admin)"""
+    stmt = select(LeaveBalance).where(
+        LeaveBalance.staff_id == staff_id, LeaveBalance.year == year
+    ).with_for_update()
     balance = session.exec(stmt).first()
     if not balance:
         raise HTTPException(status_code=404, detail="잔여 현황을 찾을 수 없습니다.")
+    _verify_tenant(balance, bid, "잔여 현황")
 
     if data.total_annual is not None:
         balance.total_annual = data.total_annual
@@ -135,12 +223,23 @@ def update_leave_balance(staff_id: int, year: int, data: LeaveBalanceAdjust, _ad
     session.refresh(balance)
     return {"status": "success", "balance": balance}
 
+
 @router.post("/leave/request")
-def create_leave_request(data: LeaveRequestCreate, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Create a new leave request"""
+def create_leave_request(
+    data: LeaveRequestCreate,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """관리자가 직접 생성 — 즉시 승인 처리. 단일 트랜잭션으로 원자적 반영."""
     staff = session.get(Staff, data.staff_id)
     if not staff:
         raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+    _verify_tenant(staff, bid, "직원")
+
+    year = data.start_date.year
+    balance = _get_or_create_balance(session, staff, year, bid, lock=True)
+    _check_sufficient(balance, data.leave_type, data.days)
 
     req = LeaveRequest(
         business_id=bid or staff.business_id,
@@ -151,129 +250,101 @@ def create_leave_request(data: LeaveRequestCreate, _admin: AuthUser = Depends(ge
         end_date=data.end_date,
         days=data.days,
         reason=data.reason,
-        status="대기",
+        status="승인",
+        approved_at=datetime.now(),
+        approved_by="관리자",
     )
     session.add(req)
 
-    # Auto-approve if admin is creating it directly
-    req.status = "승인"
-    req.approved_at = datetime.now()
-    req.approved_by = "관리자"
-
-    # Update balance
-    year = data.start_date.year
-    stmt = select(LeaveBalance).where(LeaveBalance.staff_id == data.staff_id, LeaveBalance.year == year)
-    balance = session.exec(stmt).first()
-    if not balance:
-        total_annual = calc_legal_annual_leave(staff.start_date, year) if staff.start_date else 0
-        balance = LeaveBalance(
-            business_id=bid or staff.business_id,
-            staff_id=data.staff_id,
-            year=year,
-            total_annual=total_annual,
-        )
-        session.add(balance)
-        session.commit()
-        session.refresh(balance)
-
-    # Update used counts based on leave type
-    if data.leave_type in ["연차", "반차(오전)", "반차(오후)"]:
-        balance.used_annual += data.days
-    elif data.leave_type == "병가":
-        balance.used_sick += data.days
-    elif data.leave_type in ["경조사", "출산휴가", "특별휴가", "공가"]:
-        balance.used_special += data.days
-
+    _apply_balance_delta(balance, data.leave_type, data.days, sign=+1)
     session.add(balance)
-    session.commit()
+
+    session.commit()  # 단일 커밋: request + balance 원자적 반영
     session.refresh(req)
 
     return {"status": "success", "data": req}
+
 
 @router.put("/leave/request/{request_id}")
-def update_leave_request(request_id: int, data: LeaveRequestUpdate, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Approve or reject a leave request"""
+def update_leave_request(
+    request_id: int,
+    data: LeaveRequestUpdate,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """승인/반려/취소 — 상태 전이 시 잔액 delta를 원자적으로 반영."""
     req = session.get(LeaveRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="휴가 신청을 찾을 수 없습니다.")
+    _verify_tenant(req, bid, "휴가 신청")
 
     old_status = req.status
-    req.status = data.status
+    new_status = data.status
 
-    if data.status == "승인":
+    if new_status not in ("승인", "반려", "취소"):
+        raise HTTPException(status_code=400, detail=f"허용되지 않은 상태: {new_status}")
+
+    # 상태 변화 없으면 노-op
+    if new_status == old_status:
+        return {"status": "success", "data": req}
+
+    # 잔액 delta: 승인 해제 시 -, 승인 진입 시 +
+    year = req.start_date.year
+    balance = None
+    need_decrement = old_status == "승인"
+    need_increment = new_status == "승인"
+
+    if need_decrement or need_increment:
+        staff = session.get(Staff, req.staff_id)
+        if not staff:
+            raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+        balance = _get_or_create_balance(session, staff, year, bid, lock=True)
+
+    # 반영 순서: 먼저 감산, 그 다음 가산 (잔액 검증 정확)
+    if need_decrement:
+        _apply_balance_delta(balance, req.leave_type, req.days, sign=-1)
+    if need_increment:
+        if not data.force:
+            _check_sufficient(balance, req.leave_type, req.days)
+        _apply_balance_delta(balance, req.leave_type, req.days, sign=+1)
+
+    req.status = new_status
+    if new_status == "승인":
         req.approved_at = datetime.now()
         req.approved_by = "관리자"
-
-        # If was previously not approved, update balance
-        if old_status != "승인":
-            year = req.start_date.year
-            stmt = select(LeaveBalance).where(LeaveBalance.staff_id == req.staff_id, LeaveBalance.year == year)
-            balance = session.exec(stmt).first()
-            if balance:
-                if req.leave_type in ["연차", "반차(오전)", "반차(오후)"]:
-                    balance.used_annual += req.days
-                elif req.leave_type == "병가":
-                    balance.used_sick += req.days
-                elif req.leave_type in ["경조사", "출산휴가", "특별휴가", "공가"]:
-                    balance.used_special += req.days
-                session.add(balance)
-
-    elif data.status == "반려":
+    elif new_status == "반려":
         req.reject_reason = data.reject_reason
-        # If was approved, reverse the balance
-        if old_status == "승인":
-            year = req.start_date.year
-            stmt = select(LeaveBalance).where(LeaveBalance.staff_id == req.staff_id, LeaveBalance.year == year)
-            balance = session.exec(stmt).first()
-            if balance:
-                if req.leave_type in ["연차", "반차(오전)", "반차(오후)"]:
-                    balance.used_annual = max(0, balance.used_annual - req.days)
-                elif req.leave_type == "병가":
-                    balance.used_sick = max(0, balance.used_sick - req.days)
-                elif req.leave_type in ["경조사", "출산휴가", "특별휴가", "공가"]:
-                    balance.used_special = max(0, balance.used_special - req.days)
-                session.add(balance)
-
-    elif data.status == "취소":
-        # Reverse balance if was approved
-        if old_status == "승인":
-            year = req.start_date.year
-            stmt = select(LeaveBalance).where(LeaveBalance.staff_id == req.staff_id, LeaveBalance.year == year)
-            balance = session.exec(stmt).first()
-            if balance:
-                if req.leave_type in ["연차", "반차(오전)", "반차(오후)"]:
-                    balance.used_annual = max(0, balance.used_annual - req.days)
-                elif req.leave_type == "병가":
-                    balance.used_sick = max(0, balance.used_sick - req.days)
-                elif req.leave_type in ["경조사", "출산휴가", "특별휴가", "공가"]:
-                    balance.used_special = max(0, balance.used_special - req.days)
-                session.add(balance)
 
     session.add(req)
+    if balance:
+        session.add(balance)
+
     session.commit()
     session.refresh(req)
 
     return {"status": "success", "data": req}
 
+
 @router.delete("/leave/request/{request_id}")
-def delete_leave_request(request_id: int, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Delete a leave request"""
+def delete_leave_request(
+    request_id: int,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """신청 삭제 — 승인 상태였다면 잔액 복원."""
     req = session.get(LeaveRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="휴가 신청을 찾을 수 없습니다.")
+    _verify_tenant(req, bid, "휴가 신청")
 
-    # If was approved, reverse the balance
     if req.status == "승인":
         year = req.start_date.year
-        stmt = select(LeaveBalance).where(LeaveBalance.staff_id == req.staff_id, LeaveBalance.year == year)
-        balance = session.exec(stmt).first()
-        if balance:
-            if req.leave_type in ["연차", "반차(오전)", "반차(오후)"]:
-                balance.used_annual = max(0, balance.used_annual - req.days)
-            elif req.leave_type == "병가":
-                balance.used_sick = max(0, balance.used_sick - req.days)
-            elif req.leave_type in ["경조사", "출산휴가", "특별휴가", "공가"]:
-                balance.used_special = max(0, balance.used_special - req.days)
+        staff = session.get(Staff, req.staff_id)
+        if staff:
+            balance = _get_or_create_balance(session, staff, year, bid, lock=True)
+            _apply_balance_delta(balance, req.leave_type, req.days, sign=-1)
             session.add(balance)
 
     session.delete(req)
@@ -281,31 +352,24 @@ def delete_leave_request(request_id: int, _admin: AuthUser = Depends(get_admin_u
 
     return {"status": "success"}
 
+
 @router.get("/leave/summary")
-def get_leave_summary(year: Optional[int] = None, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
-    """Get leave summary for all active staff"""
+def get_leave_summary(
+    year: Optional[int] = None,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """전 재직 직원의 연차 요약"""
     if not year:
         year = date.today().year
 
-    # Get all active staff
     stmt = apply_bid_filter(select(Staff), Staff, bid).where(Staff.status == "재직")
     staffs = session.exec(stmt).all()
 
     result = []
     for s in staffs:
-        stmt_bal = select(LeaveBalance).where(LeaveBalance.staff_id == s.id, LeaveBalance.year == year)
-        balance = session.exec(stmt_bal).first()
-
-        if not balance:
-            total_annual = calc_legal_annual_leave(s.start_date, year) if s.start_date else 0
-            balance = LeaveBalance(
-                business_id=bid or s.business_id,
-                staff_id=s.id,
-                year=year,
-                total_annual=total_annual,
-            )
-            session.add(balance)
-
+        balance = _get_or_create_balance(session, s, year, bid)
         result.append({
             "staff_id": s.id,
             "staff_name": s.name,
@@ -320,6 +384,6 @@ def get_leave_summary(year: Optional[int] = None, _admin: AuthUser = Depends(get
             "used_special": balance.used_special,
         })
 
-    session.commit()
+    session.commit()  # 자동 생성된 balance 일괄 커밋 (loop 안 커밋 제거)
 
     return {"status": "success", "data": result, "year": year}
