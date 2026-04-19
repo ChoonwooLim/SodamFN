@@ -75,7 +75,6 @@ export default function StaffDetail() {
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
     const [selectedPayroll, setSelectedPayroll] = useState(null); // Selected payroll for statement modal
-    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
     const [isVisaGuideOpen, setIsVisaGuideOpen] = useState(false);
@@ -542,8 +541,6 @@ export default function StaffDetail() {
                         formData={formData}
                         currentBudgetMonth={currentBudgetMonth}
                         setCurrentBudgetMonth={setCurrentBudgetMonth}
-                        isAttendanceModalOpen={isAttendanceModalOpen}
-                        setIsAttendanceModalOpen={setIsAttendanceModalOpen}
                         handleSendAttendanceRequest={handleSendAttendanceRequest}
                         fetchStaffDetail={fetchStaffDetail}
                     />
