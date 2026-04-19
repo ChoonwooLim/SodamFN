@@ -25,7 +25,7 @@ export function BusinessConfigProvider({ children }) {
       return;
     }
     try {
-      const res = await api.get(`/api/auth/business-info?bid=${bid}`);
+      const res = await api.get(`/auth/business-info?bid=${bid}`);
       setConfig({
         employeeScale: res.data.employee_scale || 'over5',
         businessType: res.data.business_type || '',
@@ -40,7 +40,7 @@ export function BusinessConfigProvider({ children }) {
 
   const updateScale = useCallback(async (scale) => {
     try {
-      await api.put('/api/auth/business-settings', { employee_scale: scale });
+      await api.put('/auth/business-settings', { employee_scale: scale });
       setConfig(prev => ({ ...prev, employeeScale: scale }));
       return true;
     } catch (err) {

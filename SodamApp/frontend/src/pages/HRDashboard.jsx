@@ -123,16 +123,22 @@ export default function HRDashboard() {
                             window.location.reload();
                         }}
                         disabled={scaleToggling}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+                        className={`flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border-2 text-xs font-bold transition-all ${
                             isSimpleMode
-                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                                ? 'bg-emerald-50 border-emerald-400 text-emerald-800 hover:bg-emerald-100 ring-2 ring-emerald-100'
+                                : 'bg-blue-50 border-blue-400 text-blue-800 hover:bg-blue-100 ring-2 ring-blue-100'
                         } disabled:opacity-50`}
-                        title="클릭하여 사업장 규모 모드를 전환합니다"
+                        title={`현재 ${isSimpleMode ? '5인 미만' : '5인 이상'} 모드 — 클릭하여 ${isSimpleMode ? '5인 이상' : '5인 미만'}으로 전환`}
                     >
-                        <ArrowRightLeft size={14} />
-                        <span>{isSimpleMode ? '🏪 5인 미만' : '🏢 5인 이상'}</span>
-                        <span className="text-[10px] font-normal text-slate-400">전환</span>
+                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isSimpleMode ? 'bg-emerald-500 text-white' : 'bg-blue-500 text-white'}`}>
+                            현재
+                        </span>
+                        <span className="text-sm">{isSimpleMode ? '🏪 5인 미만' : '🏢 5인 이상'}</span>
+                        <span className="h-3 w-px bg-slate-300" />
+                        <ArrowRightLeft size={12} className="text-slate-400" />
+                        <span className="text-[10px] font-medium text-slate-500">
+                            {isSimpleMode ? '5인 이상' : '5인 미만'}으로 전환
+                        </span>
                     </button>
                 </div>
 
