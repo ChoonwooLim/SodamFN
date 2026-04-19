@@ -75,4 +75,24 @@
 - `fe26c1b` [Phase 7] certificate.py — 재직/경력/급여확인/퇴직 증명서 HTML 생성 API, DocumentTab에 발급 UI
 - `5df377d` [Phase 8] Business.employee_scale 필드, BusinessConfigProvider, StaffDetail 탭 조건부 렌더링, Settings 사업장 규모 UI
 
+### 작업 요약 (세션 3 — 로드맵 업그레이드 + 버그 수정)
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 셈하나 개발 로드맵 전면 업그레이드 (5→6단계 확장, HR Phase 2 추가) | 완료 |
+| fix | HR 대시보드 직원 데이터 0명 표시 수정 (Axios 응답 중첩 추출 버그) | 완료 |
+| feat | HR 대시보드에 사업장 규모 모드 즉시 전환 버튼 추가 | 완료 |
+| fix | 퇴직금 탭 재직 직원 급여 내역 미표시 수정 (미래 계약종료일 문제) | 완료 |
+| infra | DB employee_scale 컬럼 누락 → ALTER TABLE 수동 추가 | 완료 |
+| infra | 소담김밥 사업장 규모를 under5로 SQL 직접 설정 | 완료 |
+
+### 세부 내용 (세션 3)
+
+- `6512f85` 개발 로드맵 5→6단계 확장 (Phase 2: HR 인사관리 시스템 추가, Phase 6: AI 경영비서)
+- `84199c5` HR 대시보드 staffRes.value.data가 응답 객체를 직접 참조하여 0명 표시 — Array.isArray 체크 + .data 추출 수정
+- `bab2dfa` HR 대시보드 헤더에 5인미만/이상 모드 즉시 전환 버튼 추가 (ArrowRightLeft 아이콘)
+- `f6487ed` 퇴직금 탭 calc_end_date가 미래 contract_end_date(2026-12-31) 사용 → 3개월 급여 윈도우가 미래로 밀려 빈 배열 반환 — min(contract_end_date, today)로 제한
+- (미커밋) DB ALTER TABLE business ADD COLUMN employee_scale VARCHAR DEFAULT 'over5'
+- (미커밋) UPDATE business SET employee_scale='under5' WHERE id=1 (소담김밥)
+
 ---

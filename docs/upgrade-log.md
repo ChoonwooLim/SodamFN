@@ -18,3 +18,5 @@
 | 2026-04-19 | HR 대시보드 (Phase 6) | feat | HRDashboard.jsx |
 | 2026-04-19 | 증명서 자동발급 시스템 — 4종 (Phase 7) | feat | certificate.py, DocumentTab.jsx |
 | 2026-04-19 | 5인 미만/이상 사업장 규모 모드 구분 (Phase 8) | feat | useBusinessConfig.jsx, Settings.jsx, models.py |
+| 2026-04-19 | 셈하나 개발 로드맵 전면 업그레이드 (5→6단계 확장) | feat | DevelopmentRoadmap.jsx |
+| 2026-04-19 | HR 대시보드에 사업장 규모 모드 즉시 전환 버튼 추가 | feat | HRDashboard.jsx |
