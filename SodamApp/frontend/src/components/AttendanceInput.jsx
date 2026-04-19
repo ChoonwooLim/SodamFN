@@ -10,6 +10,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     const [saving, setSaving] = useState(false);
     const [calculating, setCalculating] = useState(false);
     const [overrides, setOverrides] = useState({ np: '', hi: '', lti: '', ei: '', it: '', lit: '' });
+    const [specialBonus, setSpecialBonus] = useState('');
 
     const year = parseInt(month.split('-')[0]);
     const monthNum = parseInt(month.split('-')[1]);
@@ -106,17 +107,23 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                 setCompanyHolidays(holResult.data.map(h => h.date));
             }
 
-            if (payrollResult && payrollResult.status === 'success' && payrollResult.data.overrides) {
-                // Merge loaded overrides with existing empty state defaults
-                const loaded = payrollResult.data.overrides;
-                setOverrides(prev => ({
-                    np: loaded.np !== undefined ? loaded.np : prev.np,
-                    hi: loaded.hi !== undefined ? loaded.hi : prev.hi,
-                    lti: loaded.lti !== undefined ? loaded.lti : prev.lti,
-                    ei: loaded.ei !== undefined ? loaded.ei : prev.ei,
-                    it: loaded.it !== undefined ? loaded.it : prev.it,
-                    lit: loaded.lit !== undefined ? loaded.lit : prev.lit,
-                }));
+            if (payrollResult && payrollResult.status === 'success') {
+                // Load existing special bonus
+                if (payrollResult.data.bonus_special) {
+                    setSpecialBonus(payrollResult.data.bonus_special);
+                }
+                if (payrollResult.data.overrides) {
+                    // Merge loaded overrides with existing empty state defaults
+                    const loaded = payrollResult.data.overrides;
+                    setOverrides(prev => ({
+                        np: loaded.np !== undefined ? loaded.np : prev.np,
+                        hi: loaded.hi !== undefined ? loaded.hi : prev.hi,
+                        lti: loaded.lti !== undefined ? loaded.lti : prev.lti,
+                        ei: loaded.ei !== undefined ? loaded.ei : prev.ei,
+                        it: loaded.it !== undefined ? loaded.it : prev.it,
+                        lit: loaded.lit !== undefined ? loaded.lit : prev.lit,
+                    }));
+                }
             }
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -242,9 +249,10 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             const response = await fetch(`${API_URL}/api/payroll/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    staff_id: staffId, 
+                body: JSON.stringify({
+                    staff_id: staffId,
                     month,
+                    special_bonus: specialBonus !== '' && !isNaN(specialBonus) ? parseInt(specialBonus) : 0,
                     overrides: Object.keys(reqOverrides).length > 0 ? reqOverrides : null
                 })
             });
@@ -423,6 +431,24 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                         <span className="bg-indigo-600 text-white px-1.5 rounded-sm text-[9px]">INFO</span>
                         전월 마지막 주의 이월 근무일은 보라색으로 표시되며, 1주차 주휴수당 계산에 자동 합산됩니다. 월말 미완성 주는 익월정산 처리됩니다.
                     </p>
+                </div>
+
+                {/* Special Bonus Section */}
+                <div className="px-6 py-3 bg-violet-50/50 border-t border-violet-100">
+                    <div className="flex items-center gap-3">
+                        <label className="text-xs font-bold text-violet-700 whitespace-nowrap">특별수당</label>
+                        <div className="relative flex-1 max-w-[200px]">
+                            <input
+                                type="number"
+                                className="w-full border border-violet-200 rounded-lg px-3 py-1.5 text-sm text-right text-violet-800 font-bold bg-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                                placeholder="0"
+                                value={specialBonus}
+                                onChange={(e) => setSpecialBonus(e.target.value)}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-violet-400 font-bold pointer-events-none">원</span>
+                        </div>
+                        <span className="text-[10px] text-violet-400 font-medium">* 이번 달 특별수당이 있을 경우 입력</span>
+                    </div>
                 </div>
 
                 {/* Overrides Section */}

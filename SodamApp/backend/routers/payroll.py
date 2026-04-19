@@ -30,6 +30,7 @@ class AttendanceSaveRequest(BaseModel):
 class PayrollCalculateRequest(BaseModel):
     staff_id: int
     month: str
+    special_bonus: int = 0  # 특별수당
     overrides: Optional[dict] = None  # Add overrides for tax/insurances # YYYY-MM
 
 class InsuranceBaseImport(BaseModel):
@@ -511,9 +512,12 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         if not existing:
             existing = Payroll(staff_id=req.staff_id, month=req.month, business_id=bid)
             
+        special_bonus = req.special_bonus or 0
+
         existing.base_pay = total_base_pay
         existing.bonus = total_holiday_pay
         existing.bonus_holiday = total_holiday_pay
+        existing.bonus_special = special_bonus
         existing.holiday_w1, existing.holiday_w2, existing.holiday_w3, existing.holiday_w4, existing.holiday_w5, existing.holiday_w6 = holiday_per_week
         existing.deductions = total_deductions
         existing.deduction_np = d_np
@@ -523,7 +527,8 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         existing.deduction_it = d_it
         existing.deduction_lit = d_lit
         existing.bonus_tax_support = tax_support
-        existing.total_pay = net_pay + tax_support  # For 정규직: net_pay + tax_support = gross_pay + tax_support
+        # 실수령액: 기본급 + 특별수당 + 주휴수당 - 공제 + 세금대납
+        existing.total_pay = total_base_pay + special_bonus + total_holiday_pay - total_deductions + tax_support
         existing.details_json = details_json
         
         service.session.add(existing)

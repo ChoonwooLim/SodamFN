@@ -363,6 +363,7 @@ class Payroll(SQLModel, table=True):
     total_pay: int = 0
     
     # Detailed Bonus (Earnings)
+    bonus_special: int = 0 # 특별수당
     bonus_meal: int = 0 # 식비지원
     bonus_tax_support: int = 0 # 제세공과금 지원금 (정규직용 - 회사 부담 세금/보험)
     bonus_holiday: int = 0 # 주휴수당

@@ -369,7 +369,9 @@ export default function StaffDetail() {
 
     const handleExecuteTransfer = async (payrollId) => {
         const pay = payrolls.find(p => p.id === payrollId);
-        const amount = pay ? formatNumber((pay.base_pay || 0) + (pay.bonus || 0)) : '';
+        // 이체금액 = 기본급 + 특별수당 + 주휴수당 - 공제 (세금대납 제외)
+        const transferAmount = pay ? (pay.base_pay || 0) + (pay.bonus_special || 0) + (pay.bonus_holiday || 0) - (pay.deductions || 0) : 0;
+        const amount = formatNumber(transferAmount);
         const target = formData.bank_name && formData.account_number
             ? `\n입금: ${formData.bank_name} ${formData.account_number} (${formData.account_holder || formData.name})`
             : '';
