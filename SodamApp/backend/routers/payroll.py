@@ -717,6 +717,23 @@ def execute_transfer(payroll_id: int, admin: User = Depends(get_admin_user), bid
         raise HTTPException(status_code=400, detail=result["message"])
     return result
 
+@router.put("/{payroll_id}/status")
+def update_payroll_status(payroll_id: int, body: dict = Body(...), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """지급 상태 수동 변경 (지급완료/지급대기)"""
+    new_status = body.get("transfer_status")
+    if new_status not in ("완료", "대기"):
+        raise HTTPException(status_code=400, detail="상태는 '완료' 또는 '대기'만 가능합니다.")
+    service = DatabaseService()
+    try:
+        payroll = service.session.get(Payroll, payroll_id)
+        if not payroll:
+            raise HTTPException(status_code=404, detail="급여 기록을 찾을 수 없습니다.")
+        payroll.transfer_status = new_status
+        service.session.commit()
+        return {"status": "success", "message": f"지급 상태가 '{('지급완료' if new_status == '완료' else '지급대기')}'(으)로 변경되었습니다."}
+    finally:
+        service.session.close()
+
 @router.post("/transfer/bulk-data")
 def get_bulk_transfer_data(payroll_ids: List[int] = Body(..., embed=True), admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     data = BankingService.get_bulk_transfer_data(payroll_ids)

@@ -467,10 +467,7 @@ export default function StaffDetail() {
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                             <User size={20} className="text-white" />
                         </div>
-                        <div>
-                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">직원 상세</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">{formData.name} 인사기록카드</p>
-                        </div>
+                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">{formData.name} 인사기록카드</h1>
                     </div>
                     <button
                         onClick={handleSave}

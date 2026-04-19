@@ -63,6 +63,16 @@ export default function PayrollTab({
         }
     };
 
+    const handleTogglePaymentStatus = async (payrollId, currentStatus) => {
+        const newStatus = currentStatus === '완료' ? '대기' : '완료';
+        try {
+            await api.put(`/payroll/${payrollId}/status`, { transfer_status: newStatus });
+            fetchStaffDetail();
+        } catch (err) {
+            alert(err.response?.data?.detail || '상태 변경 실패');
+        }
+    };
+
     return (
         <>
             {/* ═══ Action Bar ═══ */}
@@ -119,7 +129,7 @@ export default function PayrollTab({
                     <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)' }}>
                         <div className="text-[10px] font-bold text-white/70 mb-1">총 실수령</div>
                         <div className="text-lg font-black">{fmt(payrollSummary.totalNet)}</div>
-                        <div className="text-[10px] mt-1 text-white/50">{payrollSummary.count}건 / 이체완료 {payrollSummary.transferred}건</div>
+                        <div className="text-[10px] mt-1 text-white/50">{payrollSummary.count}건 / 지급완료 {payrollSummary.transferred}건</div>
                     </div>
                 </div>
             </div>
@@ -176,19 +186,22 @@ export default function PayrollTab({
                                                 <td className="px-4 py-3 text-sm text-right text-emerald-600 font-mono border-b border-slate-50">{fmt(pay.bonus)}</td>
                                                 <td className="px-4 py-3 text-sm text-right text-blue-600 font-bold font-mono border-b border-slate-50">{fmt((pay.base_pay || 0) + (pay.bonus || 0))}</td>
                                                 <td className="px-4 py-3 text-center border-b border-slate-50">
-                                                    {pay.transfer_status === '완료' ? (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold"><CheckCircle size={10} /> 이체완료</span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold"><Clock size={10} /> 이체대기</span>
-                                                    )}
+                                                    <button
+                                                        onClick={() => handleTogglePaymentStatus(pay.id, pay.transfer_status)}
+                                                        className="cursor-pointer transition-all hover:scale-105 active:scale-95"
+                                                        title="클릭하여 상태 변경"
+                                                    >
+                                                        {pay.transfer_status === '완료' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-200"><CheckCircle size={10} /> 지급완료</span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold border border-amber-200"><Clock size={10} /> 지급대기</span>
+                                                        )}
+                                                    </button>
                                                 </td>
                                                 <td className="px-4 py-3 border-b border-slate-50">
                                                     <div className="flex items-center justify-center gap-1.5">
                                                         <button onClick={() => setSelectedPayroll(pay)} className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors" title="명세서 출력"><Printer size={14} /></button>
                                                         <button onClick={() => handleSendPayrollStatement(pay)} className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors" title="명세서 카톡전송"><MessageSquare size={14} /></button>
-                                                        {pay.transfer_status !== '완료' && (
-                                                            <button onClick={() => handleExecuteTransfer(pay.id)} className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 shadow-sm transition-all">이체</button>
-                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -311,11 +324,16 @@ export default function PayrollTab({
                                 <div key={pay.id} className="p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <span className="font-bold text-slate-800 text-sm">{pay.month}</span>
-                                        {pay.transfer_status === '완료' ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold"><CheckCircle size={10} /> 완료</span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold"><Clock size={10} /> 대기</span>
-                                        )}
+                                        <button
+                                            onClick={() => handleTogglePaymentStatus(pay.id, pay.transfer_status)}
+                                            className="transition-all active:scale-95"
+                                        >
+                                            {pay.transfer_status === '완료' ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-200"><CheckCircle size={10} /> 지급완료</span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold border border-amber-200"><Clock size={10} /> 지급대기</span>
+                                            )}
+                                        </button>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                                         <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">
@@ -342,9 +360,6 @@ export default function PayrollTab({
                                         <button onClick={() => handleSendPayrollStatement(pay)} className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-emerald-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-emerald-50">
                                             <MessageSquare size={13} /> 카톡
                                         </button>
-                                        {pay.transfer_status !== '완료' && (
-                                            <button onClick={() => handleExecuteTransfer(pay.id)} className="flex-1 p-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm">이체</button>
-                                        )}
                                     </div>
                                 </div>
                             ))}
