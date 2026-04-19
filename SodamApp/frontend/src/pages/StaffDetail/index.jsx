@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator } from 'lucide-react';
+import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2 } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import BasicInfoTab from './BasicInfoTab';
@@ -180,6 +180,11 @@ export default function StaffDetail() {
         }
     };
 
+    // ── Auto-save system ──
+    const [saveStatus, setSaveStatus] = useState(''); // '' | 'pending' | 'saving' | 'saved' | 'error'
+    const [isDirty, setIsDirty] = useState(false);
+    const saveTimerRef = useRef(null);
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         let newValue = type === 'checkbox' ? checked : value;
@@ -200,19 +205,68 @@ export default function StaffDetail() {
             }
         }
 
-        setFormData(prev => ({
-            ...prev,
-            [name]: newValue
-        }));
+        setFormData(prev => {
+            const updated = { ...prev, [name]: newValue };
+
+            // ── 필드 간 자동 연동 ──
+            // 입사일 → 근로계약 시작일 (비어있으면 자동 채움)
+            if (name === 'start_date' && !prev.contract_start_date) {
+                updated.contract_start_date = newValue;
+            }
+            // 근로계약 시작일 → 입사일 (비어있으면 자동 채움)
+            if (name === 'contract_start_date' && !prev.start_date) {
+                updated.start_date = newValue;
+            }
+
+            return updated;
+        });
+        setIsDirty(true);
     };
 
+    // setFormData를 직접 호출하는 자식 컴포넌트도 dirty 마킹
+    const setFormDataWithSync = useCallback((updater) => {
+        setFormData(updater);
+        setIsDirty(true);
+    }, []);
+
+    // Auto-save: formData 변경 후 1.5초 대기 → 자동 저장
+    useEffect(() => {
+        if (!isDirty || !id) return;
+
+        setSaveStatus('pending');
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+        saveTimerRef.current = setTimeout(async () => {
+            setSaveStatus('saving');
+            try {
+                await api.put(`/hr/staff/${id}`, formData);
+                setSaveStatus('saved');
+                setIsDirty(false);
+                setTimeout(() => setSaveStatus(''), 2500);
+            } catch (error) {
+                console.error('Auto-save failed:', error);
+                setSaveStatus('error');
+                setTimeout(() => setSaveStatus(''), 4000);
+            }
+        }, 1500);
+
+        return () => {
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [formData, isDirty, id]);
+
     const handleSave = async () => {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        setSaveStatus('saving');
         try {
             await api.put(`/hr/staff/${id}`, formData);
-            setMsg("저장되었습니다.");
-            setTimeout(() => setMsg(""), 3000);
+            setSaveStatus('saved');
+            setIsDirty(false);
+            setTimeout(() => setSaveStatus(''), 2500);
         } catch (error) {
             console.error(error);
+            setSaveStatus('error');
             alert("저장 실패");
         }
     };
@@ -480,21 +534,49 @@ export default function StaffDetail() {
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                             <User size={20} className="text-white" />
                         </div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">{formData.name} 인사기록카드</h1>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{formData.name} 인사기록카드</h1>
+                            {/* Auto-save status */}
+                            <div className="h-4 mt-0.5">
+                                {saveStatus === 'pending' && (
+                                    <span className="text-[10px] text-amber-500 font-medium animate-pulse">변경사항 감지됨...</span>
+                                )}
+                                {saveStatus === 'saving' && (
+                                    <span className="text-[10px] text-blue-500 font-medium flex items-center gap-1">
+                                        <Loader2 size={10} className="animate-spin" /> 자동 저장 중...
+                                    </span>
+                                )}
+                                {saveStatus === 'saved' && (
+                                    <span className="text-[10px] text-emerald-500 font-medium flex items-center gap-1">
+                                        <Check size={10} /> 자동 저장 완료
+                                    </span>
+                                )}
+                                {saveStatus === 'error' && (
+                                    <span className="text-[10px] text-red-500 font-medium">저장 실패 — 다시 시도해주세요</span>
+                                )}
+                            </div>
+                        </div>
                     </div>
                     <button
                         onClick={handleSave}
-                        className="flex items-center gap-2 bg-slate-900 text-white px-6 py-2 rounded-xl font-bold hover:bg-slate-800 shadow-md transition-all active:scale-95"
+                        disabled={saveStatus === 'saving'}
+                        className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold shadow-md transition-all active:scale-95 text-sm ${
+                            saveStatus === 'saved'
+                                ? 'bg-emerald-600 text-white'
+                                : saveStatus === 'saving'
+                                    ? 'bg-slate-400 text-white cursor-wait'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800'
+                        }`}
                     >
-                        <Save size={20} /> 저장하기
+                        {saveStatus === 'saving' ? (
+                            <><Loader2 size={16} className="animate-spin" /> 저장 중...</>
+                        ) : saveStatus === 'saved' ? (
+                            <><Check size={16} /> 저장됨</>
+                        ) : (
+                            <><Save size={16} /> 저장하기</>
+                        )}
                     </button>
                 </header>
-
-                {msg && (
-                    <div className="bg-green-100 text-green-700 p-4 rounded-xl mb-6 text-center font-bold animate-pulse">
-                        {msg}
-                    </div>
-                )}
 
                 {/* Tab Navigation */}
                 <div className="flex gap-1 mb-6 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto">
@@ -523,7 +605,7 @@ export default function StaffDetail() {
                     <BasicInfoTab
                         formData={formData}
                         handleChange={handleChange}
-                        setFormData={setFormData}
+                        setFormData={setFormDataWithSync}
                         user={user}
                         id={id}
                         isAccountModalOpen={isAccountModalOpen}
@@ -571,7 +653,7 @@ export default function StaffDetail() {
                 {activeTab === 'contract' && (
                     <ContractTab
                         formData={formData}
-                        setFormData={setFormData}
+                        setFormData={setFormDataWithSync}
                         handleChange={handleChange}
                         id={id}
                         contracts={contracts}

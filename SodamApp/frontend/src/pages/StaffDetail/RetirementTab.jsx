@@ -24,10 +24,11 @@ export default function RetirementTab({ id, formData: staffData }) {
         legal_retirement: 0,
     });
 
-    // 상세 근로계약 정보의 입사일 우선 사용 (contract_start_date > start_date)
-    const contractStartDate = staffData?.contract_start_date || staffData?.start_date || '';
+    // 부모 formData에서 실시간 반영되는 입사일 (계약정보 > 기본정보)
+    const parentStartDate = staffData?.contract_start_date || staffData?.start_date || '';
+    const parentName = staffData?.name || '';
 
-    // Fetch calculation data
+    // Fetch calculation data from API (급여 내역)
     useEffect(() => {
         if (!id) return;
         const fetchCalcDetail = async () => {
@@ -36,24 +37,25 @@ export default function RetirementTab({ id, formData: staffData }) {
                 const res = await api.get(`/hr/retirement/calc/${id}`);
                 const data = res.data.data;
 
-                // 입사일: 상세 근로계약 정보 > API 응답 > 기본 입사일
-                const startDate = contractStartDate || data.staff.start_date;
+                // 입사일: 부모 formData(실시간) > API 응답
+                const startDate = parentStartDate || data.staff.start_date;
 
-                // 근속일수 재계산 (입사일이 계약정보에서 온 경우)
+                // 근속일수 계산
+                const endDate = data.staff.end_date || new Date().toISOString().slice(0, 10);
                 let workDays = data.staff.work_days;
-                if (startDate && startDate !== data.staff.start_date && data.staff.end_date) {
+                if (startDate) {
                     const st = new Date(startDate);
-                    const ed = new Date(data.staff.end_date);
+                    const ed = new Date(endDate);
                     workDays = Math.max(0, Math.floor((ed - st) / (1000 * 60 * 60 * 24)));
                 }
 
                 setFormData({
                     emp_no: data.staff.emp_no,
-                    name: data.staff.name,
+                    name: parentName || data.staff.name,
                     dept: data.staff.dept,
                     level: data.staff.level,
                     start_date: startDate,
-                    end_date: data.staff.end_date,
+                    end_date: endDate,
                     work_days: workDays,
                     history: data.history.map((h) => ({
                         period: h.period,
@@ -78,7 +80,29 @@ export default function RetirementTab({ id, formData: staffData }) {
             }
         };
         fetchCalcDetail();
-    }, [id, contractStartDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
+
+    // 부모 formData 변경 시 실시간 반영 (입사일, 이름 등)
+    useEffect(() => {
+        if (!parentStartDate && !parentName) return;
+        setFormData(prev => {
+            const updated = { ...prev };
+            if (parentStartDate && parentStartDate !== prev.start_date) {
+                updated.start_date = parentStartDate;
+                // 근속일수 재계산
+                if (prev.end_date) {
+                    const st = new Date(parentStartDate);
+                    const ed = new Date(prev.end_date);
+                    updated.work_days = Math.max(0, Math.floor((ed - st) / (1000 * 60 * 60 * 24)));
+                }
+            }
+            if (parentName && parentName !== prev.name) {
+                updated.name = parentName;
+            }
+            return updated;
+        });
+    }, [parentStartDate, parentName]);
 
     // Client-side recalculation
     const recalculate = () => {
