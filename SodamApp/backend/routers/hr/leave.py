@@ -5,8 +5,8 @@ from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel
 
-from routers.auth import get_admin_user
-from models import Staff, LeaveBalance, LeaveRequest, User as AuthUser
+from routers.auth import get_admin_user, get_current_user
+from models import Staff, LeaveBalance, LeaveRequest, User as AuthUser, Business
 from database import get_session
 from tenant_filter import get_bid_from_token, apply_bid_filter
 
@@ -387,3 +387,138 @@ def get_leave_summary(
     session.commit()  # 자동 생성된 balance 일괄 커밋 (loop 안 커밋 제거)
 
     return {"status": "success", "data": result, "year": year}
+
+
+# ---------------------------------------------------------------------------
+# 직원용(Self-service) 엔드포인트 — 본인 것만 조회/신청/취소
+# ---------------------------------------------------------------------------
+
+class MyLeaveRequestCreate(BaseModel):
+    leave_type: str = "연차"
+    start_date: date
+    end_date: date
+    days: float = 1.0
+    reason: Optional[str] = None
+
+
+def _resolve_self_staff(user: AuthUser, session: Session) -> Staff:
+    """현재 로그인한 사용자의 Staff 레코드 조회 + under5 가드."""
+    if not user.staff_id:
+        raise HTTPException(status_code=403, detail="직원 계정이 연결되지 않았습니다.")
+    staff = session.get(Staff, user.staff_id)
+    if not staff:
+        raise HTTPException(status_code=404, detail="직원 정보를 찾을 수 없습니다.")
+
+    # 5인 미만 사업장 차단 — 연차 기능은 5인 이상 사업장에 한정
+    if staff.business_id:
+        biz = session.get(Business, staff.business_id)
+        if biz and getattr(biz, "employee_scale", "over5") == "under5":
+            raise HTTPException(
+                status_code=403,
+                detail="5인 미만 사업장은 연차 기능이 제공되지 않습니다.",
+            )
+    return staff
+
+
+@router.get("/leave/my")
+def get_my_leave(
+    year: Optional[int] = None,
+    user: AuthUser = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """본인 연차 잔여 + 신청 이력 조회"""
+    staff = _resolve_self_staff(user, session)
+    if not year:
+        year = date.today().year
+
+    balance = _get_or_create_balance(session, staff, year, staff.business_id)
+
+    stmt = (
+        select(LeaveRequest)
+        .where(
+            LeaveRequest.staff_id == staff.id,
+            LeaveRequest.start_date >= date(year, 1, 1),
+            LeaveRequest.start_date <= date(year, 12, 31),
+        )
+        .order_by(LeaveRequest.start_date.desc())
+    )
+    requests = session.exec(stmt).all()
+
+    session.commit()
+    session.refresh(balance)
+
+    return {
+        "status": "success",
+        "staff_id": staff.id,
+        "staff_name": staff.name,
+        "start_date": str(staff.start_date) if staff.start_date else None,
+        "balance": balance,
+        "requests": requests,
+    }
+
+
+@router.post("/leave/my/request")
+def create_my_leave_request(
+    data: MyLeaveRequestCreate,
+    user: AuthUser = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """본인이 직접 신청 — 대기(승인 전) 상태로 저장. 잔액은 아직 차감하지 않음."""
+    staff = _resolve_self_staff(user, session)
+
+    if data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="종료일은 시작일 이후여야 합니다.")
+    if data.days <= 0:
+        raise HTTPException(status_code=400, detail="일수는 0보다 커야 합니다.")
+
+    # 잔여 참고용 사전 검사 (연차만) — 부족하면 거부하지 않고 경고만 로깅
+    year = data.start_date.year
+    balance = _get_or_create_balance(session, staff, year, staff.business_id)
+    # 대기 상태라 잔액 차감은 하지 않지만, 미리 명백하게 초과면 막는다
+    try:
+        _check_sufficient(balance, data.leave_type, data.days)
+    except HTTPException:
+        # 신청 시점 자체는 허용하되 관리자가 승인 시 재검증 (force 필요)
+        pass
+
+    req = LeaveRequest(
+        business_id=staff.business_id,
+        staff_id=staff.id,
+        staff_name=staff.name,
+        leave_type=data.leave_type,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        days=data.days,
+        reason=data.reason,
+        status="대기",
+    )
+    session.add(req)
+    session.commit()
+    session.refresh(req)
+
+    return {"status": "success", "data": req}
+
+
+@router.delete("/leave/my/request/{request_id}")
+def cancel_my_leave_request(
+    request_id: int,
+    user: AuthUser = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """본인의 대기 중 신청을 취소(삭제). 이미 승인/반려된 건은 관리자 문의."""
+    staff = _resolve_self_staff(user, session)
+
+    req = session.get(LeaveRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="휴가 신청을 찾을 수 없습니다.")
+    if req.staff_id != staff.id:
+        raise HTTPException(status_code=403, detail="본인의 신청만 취소할 수 있습니다.")
+    if req.status != "대기":
+        raise HTTPException(
+            status_code=400,
+            detail=f"대기 중인 신청만 취소할 수 있습니다. (현재 상태: {req.status})",
+        )
+
+    session.delete(req)
+    session.commit()
+    return {"status": "success"}

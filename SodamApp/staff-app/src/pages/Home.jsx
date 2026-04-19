@@ -4,11 +4,13 @@ import api from '../api';
 import {
     Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone, Megaphone,
     Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer,
-    MessageSquarePlus, MessageCircle, ClipboardList
+    MessageSquarePlus, MessageCircle, ClipboardList, Palmtree
 } from 'lucide-react';
+import { useBusinessScale } from '../hooks/useBusinessScale';
 
 export default function Home() {
     const navigate = useNavigate();
+    const scale = useBusinessScale();
     const [user, setUser] = useState(null);
     const [staffId, setStaffId] = useState(null);
     const [status, setStatus] = useState({ checked_in: false, checked_out: false });
@@ -338,6 +340,14 @@ export default function Home() {
                         </span>
                     )}
                 </div>
+                {scale !== 'under5' && (
+                    <div className="action-card" onClick={() => navigate('/leave')}>
+                        <div className="action-card-icon" style={{ background: '#ccfbf1', color: '#0d9488' }}>
+                            <Palmtree size={24} />
+                        </div>
+                        <span className="action-card-label">연차 신청</span>
+                    </div>
+                )}
             </div>
         </div>
     );

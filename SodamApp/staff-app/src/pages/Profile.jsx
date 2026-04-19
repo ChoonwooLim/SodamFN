@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    User, LogOut, FileText, Wallet, Clock, ChevronRight, Shield, Lock
+    User, LogOut, FileText, Wallet, Clock, ChevronRight, Shield, Lock, Palmtree
 } from 'lucide-react';
 import api from '../api';
+import { useBusinessScale } from '../hooks/useBusinessScale';
 
 const GRADE_LABEL = {
     'normal': '정직원',
@@ -15,6 +16,7 @@ const GRADE_LABEL = {
 
 export default function Profile() {
     const navigate = useNavigate();
+    const scale = useBusinessScale();
     const [user, setUser] = useState(() => {
         const token = localStorage.getItem('token');
         if (!token) return null;
@@ -45,6 +47,9 @@ export default function Profile() {
         { icon: FileText, label: '전자계약', color: '#6366f1', bg: '#eef2ff', path: '/contracts' },
         { icon: Wallet, label: '급여명세서', color: '#059669', bg: '#d1fae5', path: '/payslip' },
         { icon: FileText, label: '서류 제출', color: '#d97706', bg: '#fef3c7', path: '/documents' },
+        ...(scale !== 'under5' ? [
+            { icon: Palmtree, label: '연차/휴가', color: '#0d9488', bg: '#ccfbf1', path: '/leave' },
+        ] : []),
     ];
 
     return (
