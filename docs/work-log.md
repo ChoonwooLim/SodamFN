@@ -95,4 +95,33 @@
 - (미커밋) DB ALTER TABLE business ADD COLUMN employee_scale VARCHAR DEFAULT 'over5'
 - (미커밋) UPDATE business SET employee_scale='under5' WHERE id=1 (소담김밥)
 
+### 작업 요약 (세션 4 — 휴가 자가신청 · 사업장 규모 안정화 · HR 대시보드 강화)
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | 직원앱 프로필 등급 표시 — stale JWT → /auth/me 최신값 조회 | 완료 |
+| fix | 연차 승인 트랜잭션 원자성 + 테넌트 검증 + 잔액 부족 체크 | 완료 |
+| feat | 사업장 규모(under5) 라우팅 가드 + StaffDetail 탭 이중 방어 | 완료 |
+| feat | 직원앱 연차/휴가 자가 신청 기능 (Profile/Home 진입점 포함) | 완료 |
+| fix | 사업장 규모 설정 API 경로 중복(/api/api/...) + HR 대시보드 토글 [현재] 배지 | 완료 |
+| fix | 사업장 규모 설정 성공/실패 메시지 + refreshBusinessConfig 강제 재조회 | 완료 |
+| fix | SuperAdmin이 사업장 규모 변경 시 400 — X-View-As-Business 헤더 서버 지원 | 완료 |
+| feat | 5인 미만 사업장도 무급/병가/경조사 신청 허용 + HR 대시보드 대기 알림 | 완료 |
+| feat | HR 대시보드 알림/연차 카드 h-[440px] 통일 + 5인 미만용 휴가 신청 현황 카드 | 완료 |
+| feat | 사업장 규모별 노동법 핵심 안내 패널 (under5 6+6건, over5 12건 아코디언) | 완료 |
+| feat | 직원관리 > 구인등록 서브메뉴 — 국내 구인 플랫폼 15곳 비교 가이드 | 완료 |
+
+### 세부 내용 (세션 4)
+
+- `819acad` 직원앱 Profile에서 토큰 payload만 읽어 등급이 DB 변경 후 갱신 안 되던 문제 — /auth/me 재조회로 최신 grade 반영
+- `0f14c82` 연차 승인 로직: 승인·잔액 차감을 단일 트랜잭션으로 묶고 X-View-As-Business 기준 테넌트 검증, 잔액 부족 시 즉시 반려
+- `bd121e1` SCALE_FEATURES + ScaleProtectedRoute + StaffDetail 탭 레벨 방어 (router ↔ UI 이중 가드)
+- `df4523d` staff-app /leave 페이지, Home 빠른 그리드/Profile 메뉴 진입점 추가 (under5는 초기 ANNUAL 차단 설계)
+- `8a78b7c` useBusinessConfig.jsx에서 axios baseURL `/api` + `/api/auth/...` 중복으로 404 → `/auth/...`로 수정, HR 토글에 [현재] 배지 + "○○으로 전환" 힌트
+- `06e8c56` Settings 사업장 규모 카드 클릭 시 성공/실패 배너 + refreshBusinessConfig 호출로 Context 즉시 갱신
+- `2442bae` PUT /auth/business-settings에 X-View-As-Business Header 지원 — SuperAdmin이 admin.business_id=None인 상황에서 400 나던 문제 해결
+- `620a87e` 5인 미만 휴가 재설계: leave.py `_resolve_self_staff`를 (staff, is_under5) 튜플로 변경, 연차(ANNUAL_TYPES)만 차단하고 무급/병가/경조사 허용. 신규 GET `/hr/leave/requests` 대기 리스트 엔드포인트. 직원앱 Leave.jsx는 규모별 옵션 분기 + balance 카드 숨김, HR 대시보드 알림 최상단에 대기 신청 표시
+- `430001e` HRDashboard 알림/연차 카드 공통 `h-[440px]` + 내부 스크롤, 5인 미만은 연차 현황 대신 '휴가 신청 현황' 테이블(상태 배지), 하단 LaborLawPanel 서브컴포넌트로 규모별 조항 아코디언 (lucide Scale/BookOpen/Banknote/GraduationCap 추가)
+- `99f332a` JobPosting.jsx 신규 — 워크넷·EPS·HI KOREA·알바몬·알바천국·당근알바·벼룩시장·사람인·잡코리아·인크루트·커리어·원티드·잡플래닛·리멤버·링크드인 15곳 비교. 카테고리 필터+검색+정렬(추천순/이름순/무료우선)+시나리오 추천 5종+비교표+상세카드
+
 ---

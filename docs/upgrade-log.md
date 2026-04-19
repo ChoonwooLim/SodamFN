@@ -20,3 +20,8 @@
 | 2026-04-19 | 5인 미만/이상 사업장 규모 모드 구분 (Phase 8) | feat | useBusinessConfig.jsx, Settings.jsx, models.py |
 | 2026-04-19 | 셈하나 개발 로드맵 전면 업그레이드 (5→6단계 확장) | feat | DevelopmentRoadmap.jsx |
 | 2026-04-19 | HR 대시보드에 사업장 규모 모드 즉시 전환 버튼 추가 | feat | HRDashboard.jsx |
+| 2026-04-19 | 사업장 규모(under5) 라우팅 가드 + StaffDetail 탭 이중 방어 | feat | useBusinessConfig.jsx, StaffDetail/index.jsx, App.jsx |
+| 2026-04-19 | 직원앱 연차/휴가 자가 신청 기능 (staff-app Leave 페이지 + Home/Profile 진입점) | feat | staff-app/Leave.jsx, Home.jsx, Profile.jsx, App.jsx |
+| 2026-04-19 | 5인 미만 사업장도 무급/병가/경조사 휴가 신청 허용 + HR 대시보드 대기 알림 | feat | leave.py, staff-app/Leave.jsx, HRDashboard.jsx |
+| 2026-04-19 | HR 대시보드 알림/연차 카드 h-[440px] 통일 + 5인 미만용 휴가 신청 현황 카드 + 노동법 핵심 안내 패널 | feat | HRDashboard.jsx |
+| 2026-04-19 | 직원관리 > 구인등록 서브메뉴 — 국내 구인 플랫폼 15곳 비교 가이드 | feat | JobPosting.jsx, Sidebar.jsx, App.jsx |
