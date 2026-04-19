@@ -3,7 +3,7 @@
 - Flux.1-schnell (최고 품질 오픈소스 모델)
 - Text-to-Image + Image-to-Image 지원
 - Real-ESRGAN 4x 업스케일러 (512→2048)
-- GTX 1080 — sequential CPU offload
+- RTX 3090 24GB — sequential CPU offload (bfloat16) — Flux 전체(~33GB)가 VRAM 초과이므로 레이어 단위 스왑이 최적
 - FastAPI REST API
 - 무료
 """
@@ -48,16 +48,20 @@ def load_pipeline():
         mem = torch.cuda.get_device_properties(i).total_memory / 1e9
         logger.info(f"  GPU {i}: {name} ({mem:.1f}GB)")
 
-    logger.info("Loading Flux.1-schnell with sequential CPU offload (low VRAM)...")
+    logger.info("Loading Flux.1-schnell (sequential CPU offload, bfloat16)...")
     start = time.time()
 
     pipe = FluxPipeline.from_pretrained(
         MODEL_ID,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
     )
+    # RTX 3090 24GB에서 Flux.1-schnell(~33GB) 최적 구동 방식:
+    # A/B 벤치마크(2026-04-12): sequential ~11.5s vs model_cpu_offload ~22s vs native OOM.
+    # transformer(~24GB)가 단독으로 VRAM을 꽉 채워 model_cpu_offload는 메모리 경쟁으로 느려짐.
+    # sequential은 레이어 단위 작은 스왑으로 VRAM 0.7GB만 쓰면서 PCIe 대역폭을 효율적으로 사용.
     pipe.enable_sequential_cpu_offload(gpu_id=0)
 
-    # i2i 파이프라인: 동일 모델 가중치 공유 (추가 VRAM 없음)
+    # i2i 파이프라인: 동일 가중치 공유 (추가 VRAM 없음)
     img2img_pipe = FluxImg2ImgPipeline(**pipe.components)
     img2img_pipe.enable_sequential_cpu_offload(gpu_id=0)
 
@@ -530,7 +534,7 @@ def health():
         "model": "Flux.1-schnell",
         "img2img": "ready" if img2img_pipe is not None else "not loaded",
         "upscaler": "Real-ESRGAN x4" if upscaler is not None else "not loaded",
-        "mode": "sequential-cpu-offload",
+        "mode": "sequential-cpu-offload-bf16",
         "gpu_count": torch.cuda.device_count(),
         "gpus": gpus,
         "busy": gen_lock.locked(),
