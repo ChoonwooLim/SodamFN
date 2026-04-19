@@ -226,6 +226,7 @@ class Staff(SQLModel, table=True):
     payrolls: List["Payroll"] = Relationship(back_populates="staff")
     documents: List["StaffDocument"] = Relationship(back_populates="staff")
     contracts: List["ElectronicContract"] = Relationship(back_populates="staff")
+    leave_requests: List["LeaveRequest"] = Relationship(back_populates="staff")
     user: Optional["User"] = Relationship(back_populates="staff")
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     business: Optional[Business] = Relationship(back_populates="staff_members")
@@ -509,6 +510,59 @@ class RetirementPayment(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     
     staff: Optional[Staff] = Relationship()
+
+
+# --- Leave / Vacation Management (연차/휴가관리) ---
+
+class LeaveBalance(SQLModel, table=True):
+    """연차/휴가 잔여 현황 (연도별)"""
+    __table_args__ = (
+        UniqueConstraint("staff_id", "year", name="uq_leavebalance_staff_year"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    year: int  # 기준 연도
+
+    # 법정 연차
+    total_annual: float = 0  # 총 발생 연차 (법정 자동계산)
+    used_annual: float = 0   # 사용 연차
+
+    # 기타 휴가
+    total_sick: float = 0    # 병가 부여일
+    used_sick: float = 0     # 병가 사용
+    total_special: float = 0 # 특별휴가 (경조사 등) 부여일
+    used_special: float = 0  # 특별휴가 사용
+
+    # 보상
+    annual_allowance_paid: bool = False  # 미사용 연차수당 지급 여부
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+    staff: Optional[Staff] = Relationship()
+
+
+class LeaveRequest(SQLModel, table=True):
+    """휴가 신청/승인"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""
+
+    leave_type: str = "연차"  # 연차, 반차(오전), 반차(오후), 병가, 경조사, 출산휴가, 육아휴직, 공가, 특별휴가, 무급휴가
+    start_date: datetime.date
+    end_date: datetime.date
+    days: float = 1.0  # 사용 일수 (반차=0.5)
+    reason: Optional[str] = None
+
+    status: str = Field(default="대기")  # 대기, 승인, 반려, 취소
+    approved_by: Optional[str] = None  # 승인자 이름
+    approved_at: Optional[datetime.datetime] = None
+    reject_reason: Optional[str] = None
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+    staff: Optional[Staff] = Relationship(back_populates="leave_requests")
 
 
 # --- AI Auto-Learning Rules ---
