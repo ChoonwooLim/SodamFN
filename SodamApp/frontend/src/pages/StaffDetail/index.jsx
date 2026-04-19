@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Save, FileText, CreditCard, Calendar, Upload } from 'lucide-react';
+import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import BasicInfoTab from './BasicInfoTab';
@@ -8,11 +8,13 @@ import AttendanceTab from './AttendanceTab';
 import PayrollTab from './PayrollTab';
 import ContractTab from './ContractTab';
 import DocumentTab from './DocumentTab';
+import RetirementTab from './RetirementTab';
 
 const TABS = [
     { key: 'basic', label: '기본정보', icon: User },
     { key: 'attendance', label: '근태관리', icon: Calendar },
     { key: 'payroll', label: '급여대장', icon: CreditCard },
+    { key: 'retirement', label: '퇴직금', icon: Calculator },
     { key: 'contract', label: '전자계약', icon: FileText },
     { key: 'document', label: '서류관리', icon: Upload },
 ];
@@ -556,6 +558,13 @@ export default function StaffDetail() {
                         handleSendPayrollStatement={handleSendPayrollStatement}
                         handleExecuteTransfer={handleExecuteTransfer}
                         fetchStaffDetail={fetchStaffDetail}
+                    />
+                )}
+
+                {activeTab === 'retirement' && (
+                    <RetirementTab
+                        id={id}
+                        formData={formData}
                     />
                 )}
 
