@@ -582,6 +582,44 @@ class StaffChangeLog(SQLModel, table=True):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 
+# --- Training & Certification (교육/자격증 관리) ---
+
+class StaffTraining(SQLModel, table=True):
+    """직원 교육 이수 관리"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+
+    training_type: str = ""  # 산업안전보건교육, 성희롱예방교육, 장애인인식개선, 직장내괴롭힘예방, 개인정보보호, 식품위생교육, 소방안전교육, 기타
+    training_name: Optional[str] = None  # 교육명 상세
+    completed_date: Optional[datetime.date] = None  # 이수일
+    expiry_date: Optional[datetime.date] = None  # 만료일 (갱신 필요 시)
+    certificate_number: Optional[str] = None  # 수료증 번호
+    institution: Optional[str] = None  # 교육기관
+    hours: float = 0  # 교육시간
+    status: str = "미이수"  # 미이수, 이수, 만료
+    note: Optional[str] = None
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class StaffCertification(SQLModel, table=True):
+    """직원 자격증 관리"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+
+    cert_name: str = ""  # 자격증명 (조리기능사, 위생사, 식품기사 등)
+    cert_number: Optional[str] = None  # 자격증 번호
+    issued_date: Optional[datetime.date] = None  # 취득일
+    expiry_date: Optional[datetime.date] = None  # 만료일
+    issuing_body: Optional[str] = None  # 발급기관
+    status: str = "유효"  # 유효, 만료, 갱신필요
+    note: Optional[str] = None
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
 # --- AI Auto-Learning Rules ---
 
 class VendorRule(SQLModel, table=True):

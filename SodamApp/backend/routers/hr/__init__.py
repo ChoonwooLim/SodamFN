@@ -7,6 +7,8 @@ from .retirement import router as retirement_router
 from .leave import router as leave_router
 from .changelog import router as changelog_router
 from .worktime import router as worktime_router
+from .training import router as training_router
+from .alerts import router as alerts_router
 
 router = APIRouter()
 
@@ -17,3 +19,5 @@ router.include_router(retirement_router)
 router.include_router(leave_router)
 router.include_router(changelog_router)
 router.include_router(worktime_router)
+router.include_router(training_router)
+router.include_router(alerts_router)
