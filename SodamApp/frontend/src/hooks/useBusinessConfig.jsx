@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import api from '../api';
 
 const BusinessConfigContext = createContext({
@@ -116,4 +117,30 @@ export function isFeatureEnabled(featureKey, scale) {
     ref = ref?.[p];
   }
   return ref?.[scale] ?? true;
+}
+
+/**
+ * 사업장 규모(employee_scale) 기반 라우팅 가드.
+ *
+ * 사용 예:
+ *   <Route path="/hr/leave" element={
+ *     <ProtectedRoute adminOnly>
+ *       <ScaleProtectedRoute feature="tabs.leave" redirectTo="/hr/dashboard">
+ *         <LeavePage />
+ *       </ScaleProtectedRoute>
+ *     </ProtectedRoute>
+ *   } />
+ *
+ * - feature: SCALE_FEATURES의 경로 (예: 'tabs.leave', 'features.overtimeAlert')
+ * - requireOver5: feature 없이 단순히 5인 이상만 허용할 때
+ * - redirectTo: 차단 시 이동할 경로 (기본: /hr/dashboard)
+ *
+ * loading 중에는 children을 보류하여 깜빡임 방지.
+ */
+export function ScaleProtectedRoute({ children, feature, requireOver5 = false, redirectTo = '/hr/dashboard' }) {
+  const { employeeScale, loading } = useBusinessConfig();
+  if (loading) return null;
+  const allowed = feature ? isFeatureEnabled(feature, employeeScale) : (!requireOver5 || employeeScale === 'over5');
+  if (!allowed) return <Navigate to={redirectTo} replace />;
+  return children;
 }

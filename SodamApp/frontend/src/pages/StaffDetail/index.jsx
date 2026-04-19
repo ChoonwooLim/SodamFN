@@ -40,6 +40,19 @@ export default function StaffDetail() {
         });
     }, [employeeScale]);
 
+    // 방어: activeTab이 현재 규모에서 허용되지 않으면 'basic'으로 폴백
+    // (scale 변경 / 직접 setActiveTab / 향후 URL 기반 탭 진입 모두 차단)
+    const effectiveTab = useMemo(() => {
+        const feature = SCALE_FEATURES.tabs[activeTab];
+        if (feature && !feature[employeeScale]) return 'basic';
+        return activeTab;
+    }, [activeTab, employeeScale]);
+
+    // 차단된 탭에 있었다면 상태도 정리
+    useEffect(() => {
+        if (effectiveTab !== activeTab) setActiveTab(effectiveTab);
+    }, [effectiveTab, activeTab]);
+
     // Form State
     const [formData, setFormData] = useState({
         name: '',
@@ -616,8 +629,8 @@ export default function StaffDetail() {
                     })}
                 </div>
 
-                {/* Tab Content */}
-                {activeTab === 'basic' && (
+                {/* Tab Content — effectiveTab으로 분기하여 차단된 탭 렌더링 방지 */}
+                {effectiveTab === 'basic' && (
                     <BasicInfoTab
                         formData={formData}
                         handleChange={handleChange}
@@ -635,7 +648,7 @@ export default function StaffDetail() {
                     />
                 )}
 
-                {activeTab === 'attendance' && (
+                {effectiveTab === 'attendance' && (
                     <AttendanceTab
                         id={id}
                         formData={formData}
@@ -646,7 +659,7 @@ export default function StaffDetail() {
                     />
                 )}
 
-                {activeTab === 'payroll' && (
+                {effectiveTab === 'payroll' && (
                     <PayrollTab
                         id={id}
                         formData={formData}
@@ -659,21 +672,21 @@ export default function StaffDetail() {
                     />
                 )}
 
-                {activeTab === 'leave' && (
+                {effectiveTab === 'leave' && (
                     <LeaveTab
                         id={id}
                         formData={formData}
                     />
                 )}
 
-                {activeTab === 'retirement' && (
+                {effectiveTab === 'retirement' && (
                     <RetirementTab
                         id={id}
                         formData={formData}
                     />
                 )}
 
-                {activeTab === 'contract' && (
+                {effectiveTab === 'contract' && (
                     <ContractTab
                         formData={formData}
                         setFormData={setFormDataWithSync}
@@ -693,11 +706,11 @@ export default function StaffDetail() {
                     />
                 )}
 
-                {activeTab === 'training' && (
+                {effectiveTab === 'training' && (
                     <TrainingTab id={id} />
                 )}
 
-                {activeTab === 'document' && (
+                {effectiveTab === 'document' && (
                     <DocumentTab
                         documents={documents}
                         handleFileUpload={handleFileUpload}
@@ -706,7 +719,7 @@ export default function StaffDetail() {
                     />
                 )}
 
-                {activeTab === 'changelog' && (
+                {effectiveTab === 'changelog' && (
                     <ChangeLogTab
                         id={id}
                         formData={formData}
