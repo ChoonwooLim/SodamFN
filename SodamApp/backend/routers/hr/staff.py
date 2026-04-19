@@ -252,8 +252,11 @@ def upload_staff_document(
     filename = f"{doc_type}_{timestamp}_{file.filename}"
     storage_key = f"staff_docs/{staff_id}/{filename}"
     
-    file_url = storage.upload_file(file.file, storage_key, file.content_type)
-        
+    try:
+        file_url = storage.upload_file(file.file, storage_key, file.content_type)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     new_doc = StaffDocument(
         staff_id=staff_id,
         doc_type=doc_type,

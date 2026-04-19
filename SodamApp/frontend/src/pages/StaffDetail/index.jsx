@@ -226,7 +226,6 @@ export default function StaffDetail() {
 
         try {
             await api.post(`/hr/staff/${id}/document`, uploadData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000, // 60s timeout for large files
             });
             // Refresh data to show new file
