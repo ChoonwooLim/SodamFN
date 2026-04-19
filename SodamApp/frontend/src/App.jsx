@@ -175,8 +175,8 @@ export default function App() {
               <Route path="/settings" element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
               <Route path="/vendor-settings" element={<ProtectedRoute adminOnly><VendorSettings /></ProtectedRoute>} />
               <Route path="/manual" element={<ProtectedRoute adminOnly><UserManual /></ProtectedRoute>} />
-              <Route path="/staff" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
-              <Route path="/staff/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
+              <Route path="/employees" element={<ProtectedRoute adminOnly><StaffPage /></ProtectedRoute>} />
+              <Route path="/employees/:id" element={<ProtectedRoute adminOnly><StaffDetail /></ProtectedRoute>} />
               <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
               <Route path="/retirement-calc" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />

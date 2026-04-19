@@ -317,7 +317,7 @@ export default function PayrollLedger() {
                       <span className="font-bold text-sm">계약 및 급여 — {staffData.name}</span>
                     </div>
                     <button
-                      onClick={() => navigate(`/staff/${selectedStaffId}`)}
+                      onClick={() => navigate(`/employees/${selectedStaffId}`)}
                       className="text-[10px] px-3 py-1 bg-white/20 hover:bg-white/30 rounded-lg text-white font-bold transition-all"
                     >
                       인사기록 →

@@ -178,7 +178,7 @@ export default function StaffPage() {
                         {sortedStaffs.map((staff) => (
                             <div
                                 key={staff.id}
-                                onClick={() => navigate(`/staff/${staff.id}`)}
+                                onClick={() => navigate(`/employees/${staff.id}`)}
                                 className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow group card-animate"
                             >
                                 <div>

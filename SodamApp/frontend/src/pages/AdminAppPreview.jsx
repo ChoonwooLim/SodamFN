@@ -40,7 +40,7 @@ export default function AdminAppPreview() {
         ]
         : [
             { path: '/dashboard', label: '대시보드' },
-            { path: '/staff', label: '직원관리' },
+            { path: '/employees', label: '직원관리' },
             { path: '/finance/profitloss', label: '손익현황' },
             { path: '/revenue', label: '매출관리' },
             { path: '/purchase', label: '매입관리' },
