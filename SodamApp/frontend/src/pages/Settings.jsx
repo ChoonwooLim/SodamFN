@@ -16,9 +16,10 @@ const TABS = [
 ];
 
 export default function Settings() {
-    const { employeeScale, updateScale } = useBusinessConfig();
+    const { employeeScale, updateScale, refresh: refreshBusinessConfig } = useBusinessConfig();
     const [activeTab, setActiveTab] = useState('vendor');
     const [scaleUpdating, setScaleUpdating] = useState(false);
+    const [scaleMessage, setScaleMessage] = useState(null); // { type: 'success'|'error', text }
     const [bizAccount, setBizAccount] = useState({ bank: '', number: '', holder: '' });
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
@@ -392,8 +393,13 @@ export default function Settings() {
                             <button
                                 onClick={async () => {
                                     setScaleUpdating(true);
-                                    await updateScale('under5');
+                                    setScaleMessage(null);
+                                    const ok = await updateScale('under5');
+                                    await refreshBusinessConfig();
                                     setScaleUpdating(false);
+                                    setScaleMessage(ok
+                                        ? { type: 'success', text: '5인 미만 사업장으로 변경되었습니다.' }
+                                        : { type: 'error', text: '변경에 실패했습니다. 잠시 후 다시 시도해주세요.' });
                                 }}
                                 disabled={scaleUpdating}
                                 className={`relative p-5 rounded-xl border-2 text-left transition-all ${
@@ -422,8 +428,13 @@ export default function Settings() {
                             <button
                                 onClick={async () => {
                                     setScaleUpdating(true);
-                                    await updateScale('over5');
+                                    setScaleMessage(null);
+                                    const ok = await updateScale('over5');
+                                    await refreshBusinessConfig();
                                     setScaleUpdating(false);
+                                    setScaleMessage(ok
+                                        ? { type: 'success', text: '5인 이상 사업장으로 변경되었습니다.' }
+                                        : { type: 'error', text: '변경에 실패했습니다. 잠시 후 다시 시도해주세요.' });
                                 }}
                                 disabled={scaleUpdating}
                                 className={`relative p-5 rounded-xl border-2 text-left transition-all ${
@@ -448,6 +459,16 @@ export default function Settings() {
                                 </ul>
                             </button>
                         </div>
+
+                        {scaleMessage && (
+                            <div className={`mb-4 rounded-xl p-3 text-sm font-medium border ${
+                                scaleMessage.type === 'success'
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-rose-50 border-rose-200 text-rose-700'
+                            }`}>
+                                {scaleMessage.text}
+                            </div>
+                        )}
 
                         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                             <p className="text-xs text-amber-700 font-medium">
