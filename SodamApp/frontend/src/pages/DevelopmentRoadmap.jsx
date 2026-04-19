@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Rocket, CheckCircle, Clock, Lock, ArrowRight, Zap, Shield, TrendingUp, Users, Calculator, Globe, Sparkles, Target, Layers } from 'lucide-react';
+import { Rocket, CheckCircle, Clock, Lock, ArrowRight, Zap, Shield, TrendingUp, Users, Calculator, Globe, Sparkles, Target, Layers, FileText, Brain } from 'lucide-react';
 
 const phases = [
     {
         id: 1,
         title: 'Phase 1 — 내부 경영관리 고도화',
-        subtitle: '현재 → 6개월',
-        status: 'active',
+        subtitle: '완료',
+        status: 'done',
         color: 'from-blue-500 to-cyan-500',
         bgColor: 'bg-blue-50',
         borderColor: 'border-blue-200',
         icon: Zap,
-        description: '현재 시스템의 급여·매출·매입 관리 기능을 더욱 정확하고 자동화된 수준으로 업그레이드합니다.',
+        description: '급여·매출·매입 관리 기능을 정밀하고 자동화된 수준으로 구축 완료했습니다.',
         modules: [
             {
                 name: '급여 계산 엔진 정밀화',
@@ -24,6 +24,7 @@ const phases = [
                     { text: '두루누리 사회보험 80% 감면 지원', done: true },
                     { text: '세금 대납 (사업주 부담) 기능', done: true },
                     { text: '부양가족/자녀 수 기반 소득세 산정', done: true },
+                    { text: '총 보상액 / 실수령액 / 이체액 3단계 분리 표시', done: true },
                 ],
             },
             {
@@ -34,6 +35,15 @@ const phases = [
                     { text: '카드 매출 자동 매칭 (VAN 데이터 연동)', done: true },
                     { text: '매입 PDF 자동 파싱 (은행 거래내역)', done: true },
                     { text: '월별 손익 자동 집계', done: true },
+                ],
+            },
+            {
+                name: '배달앱 매출 관리',
+                status: 'done',
+                items: [
+                    { text: '배민/쿠팡이츠/요기요 매출 수동 입력', done: true },
+                    { text: '수수료·배달비 자동 분리 계산', done: true },
+                    { text: '플랫폼별 수익률 비교 대시보드', done: true },
                 ],
             },
             {
@@ -50,9 +60,108 @@ const phases = [
     },
     {
         id: 2,
-        title: 'Phase 2 — SaaS 플랫폼 상용화',
-        subtitle: '6개월 → 12개월',
-        status: 'planned',
+        title: 'Phase 2 — HR 인사관리 시스템',
+        subtitle: '완료',
+        status: 'done',
+        color: 'from-emerald-500 to-teal-500',
+        bgColor: 'bg-emerald-50',
+        borderColor: 'border-emerald-200',
+        icon: Users,
+        description: '유료 SaaS 수준의 종합 HR 인사관리 시스템을 구축 완료했습니다. 근로기준법 준수 자동 체크, 증명서 발급, 교육관리까지.',
+        modules: [
+            {
+                name: '인사기록관리 (9탭 시스템)',
+                status: 'done',
+                items: [
+                    { text: '기본정보 — 인적사항·재직현황·체류자격·계좌 통합 관리', done: true },
+                    { text: '근태관리 — GPS 기반 출퇴근 + 캘린더 기반 인라인 입력', done: true },
+                    { text: '급여대장 — 매월 급여 산출·명세서·이체 실행', done: true },
+                    { text: '계약관리 — 전자계약서 생성·카카오톡 발송·전자서명', done: true },
+                    { text: '서류관리 — 다중 파일 업로드·미리보기·증명서 발급', done: true },
+                    { text: '변경이력 — 인사정보 변경 시 자동 추적 (old→new 기록)', done: true },
+                ],
+            },
+            {
+                name: '연차/휴가 관리',
+                status: 'done',
+                items: [
+                    { text: '연차 유급휴가 자동 산정 (입사일 기준, 한국 노동법)', done: true },
+                    { text: '1년 미만: 월 1일 (최대 11일) / 1년 이상: 15일', done: true },
+                    { text: '3년 이상: 매 2년마다 +1일 (최대 25일)', done: true },
+                    { text: '10종 휴가 타입 (연차/병가/경조/출산/육아/공가 등)', done: true },
+                    { text: '휴가 신청 → 승인/반려 워크플로우', done: true },
+                    { text: '월별 사용량 차트 + 관리자 잔액 직접 조정', done: true },
+                ],
+            },
+            {
+                name: '교육/자격증 관리',
+                status: 'done',
+                items: [
+                    { text: '법정 의무교육 5종 이수 체크 (산업안전, 성희롱, 개인정보 등)', done: true },
+                    { text: '교육 이력 CRUD + 이수증 파일 첨부', done: true },
+                    { text: '자격증 관리 + 만료일 자동 경고', done: true },
+                    { text: '전 직원 교육 이수율 통합 대시보드', done: true },
+                ],
+            },
+            {
+                name: '퇴직 관리',
+                status: 'done',
+                items: [
+                    { text: '퇴직금 자동 산정 (3개월 평균임금 기준)', done: true },
+                    { text: '퇴직소득세 자동 계산 (근속연수 공제 반영)', done: true },
+                    { text: '퇴직금 지급 관리 및 지급 확인서', done: true },
+                    { text: '퇴직연금 DC/DB 관리', done: false },
+                ],
+            },
+            {
+                name: '증명서 자동 발급',
+                status: 'done',
+                items: [
+                    { text: '재직증명서 (A4 인쇄용, 직인 플레이스홀더)', done: true },
+                    { text: '경력증명서 (근속기간 자동 계산)', done: true },
+                    { text: '급여확인서 (최근 3개월 급여 요약)', done: true },
+                    { text: '퇴직증명서 (퇴사자 전용, 퇴직금 정보 포함)', done: true },
+                ],
+            },
+            {
+                name: 'HR 대시보드 & 알림',
+                status: 'done',
+                items: [
+                    { text: 'HR 대시보드 — 인력현황·연차현황·알림 통합 뷰', done: true },
+                    { text: '계약 만료 자동 알림 (7일/30일 전)', done: true },
+                    { text: '서류 미제출 직원 자동 감지', done: true },
+                    { text: '수습 기간 종료 알림', done: true },
+                    { text: '교육/자격증 만료 예정 경고', done: true },
+                    { text: '근로시간 모니터링 (주 48시간 초과 경고)', done: true },
+                ],
+            },
+            {
+                name: '5인 미만/이상 사업장 모드',
+                status: 'done',
+                items: [
+                    { text: '사업장 규모 설정 (Settings에서 전환)', done: true },
+                    { text: '5인 미만 간편모드 — 연차/교육 탭 자동 숨김', done: true },
+                    { text: '5인 이상 전체모드 — 모든 HR 기능 활성화', done: true },
+                    { text: 'HR 대시보드 규모별 조건부 렌더링', done: true },
+                ],
+            },
+            {
+                name: '외국인 근로자 관리',
+                status: 'done',
+                items: [
+                    { text: '외국인 고용안내 페이지 (비자별 상세 가이드)', done: true },
+                    { text: '체류자격별 허용 업종·필요서류·갱신주기 안내', done: true },
+                    { text: '관공서·보험·법률 상담 연락처 통합 제공', done: true },
+                    { text: '기본정보 탭 체류자격/외국인등록번호 필드', done: true },
+                ],
+            },
+        ],
+    },
+    {
+        id: 3,
+        title: 'Phase 3 — SaaS 플랫폼 상용화',
+        subtitle: '진행중',
+        status: 'active',
         color: 'from-rose-500 to-pink-500',
         bgColor: 'bg-rose-50',
         borderColor: 'border-rose-200',
@@ -63,9 +172,9 @@ const phases = [
                 name: '멀티테넌트 아키텍처',
                 status: 'done',
                 items: [
-                    { text: '사업자별 독립 데이터 스토어', done: true },
+                    { text: '사업자별 독립 데이터 스토어 (business_id 기반)', done: true },
                     { text: '업종별 맞춤 설정 (음식점, 소매, 서비스업)', done: true },
-                    { text: '요금제 및 결제 시스템', done: true },
+                    { text: '요금제 및 결제 시스템 (무료/기본/프리미엄)', done: true },
                     { text: '온보딩 자동화 (가입 → 설정 → 사용)', done: true },
                 ],
             },
@@ -83,8 +192,9 @@ const phases = [
             },
             {
                 name: '외부 서비스 연동',
-                status: 'planned',
+                status: 'in-progress',
                 items: [
+                    { text: '카카오톡 알림톡 연동 (계약서/급여명세서)', done: true },
                     { text: '배달앱 (배민, 쿠팡이츠, 요기요) 매출 연동', done: false },
                     { text: 'POS 시스템 실시간 연동', done: false },
                     { text: '온라인 뱅킹 Open API (계좌 조회/이체)', done: false },
@@ -93,11 +203,12 @@ const phases = [
             },
             {
                 name: '모바일 앱 고도화',
-                status: 'planned',
+                status: 'in-progress',
                 items: [
+                    { text: 'PWA 기반 직원용 앱 (출퇴근, 급여명세서)', done: true },
+                    { text: 'PWA 기반 관리자 앱 (인사·매출·급여 관리)', done: true },
                     { text: 'React Native 네이티브 앱 (iOS/Android)', done: false },
                     { text: '사장님 전용 앱 (실시간 매출/출퇴근 알림)', done: false },
-                    { text: '직원 앱 (급여명세서, 연차신청, 근무일정)', done: false },
                     { text: '오프라인 모드 지원', done: false },
                 ],
             },
@@ -128,9 +239,9 @@ const phases = [
         ],
     },
     {
-        id: 3,
-        title: 'Phase 3 — 세무 신고 자동화',
-        subtitle: '12개월 → 18개월',
+        id: 4,
+        title: 'Phase 4 — 세무 신고 자동화',
+        subtitle: '예정',
         status: 'planned',
         color: 'from-violet-500 to-purple-500',
         bgColor: 'bg-violet-50',
@@ -168,57 +279,14 @@ const phases = [
                     { text: '예정/확정 신고 일정 알림', done: false },
                 ],
             },
-        ],
-    },
-    {
-        id: 4,
-        title: 'Phase 4 — 노무 관리 자동화',
-        subtitle: '18개월 → 24개월',
-        status: 'planned',
-        color: 'from-emerald-500 to-teal-500',
-        bgColor: 'bg-emerald-50',
-        borderColor: 'border-emerald-200',
-        icon: Users,
-        description: '근로기준법 준수를 자동으로 체크하고, 노무 분쟁을 예방하는 종합 노무관리 시스템을 구축합니다.',
-        modules: [
             {
-                name: '근로계약 자동 관리',
+                name: '연말정산 자동화',
                 status: 'planned',
                 items: [
-                    { text: '법정 근로계약서 템플릿 (최신 노동법 반영)', done: false },
-                    { text: '계약 만료 자동 알림 및 갱신', done: false },
-                    { text: '수습 기간 관리 및 전환 프로세스', done: false },
-                    { text: '취업규칙 자동 생성 및 신고', done: false },
-                ],
-            },
-            {
-                name: '근태 및 휴가 관리',
-                status: 'planned',
-                items: [
-                    { text: '연차 유급휴가 자동 산정 (입사일 기준)', done: false },
-                    { text: '연차 사용 촉진 (법정 절차 자동화)', done: false },
-                    { text: '초과근무(OT) 자동 계산 및 수당 산정', done: false },
-                    { text: '야간/휴일 근무 가산수당 자동 적용', done: false },
-                ],
-            },
-            {
-                name: '퇴직 관리',
-                status: 'planned',
-                items: [
-                    { text: '퇴직금 자동 산정 (3개월 평균임금 기준)', done: false },
-                    { text: '퇴직소득세 자동 계산', done: false },
-                    { text: '퇴직연금 DC/DB 관리', done: false },
-                    { text: '고용보험 피보험자격 상실 자동 신고', done: false },
-                ],
-            },
-            {
-                name: '법정 의무 준수 체크',
-                status: 'planned',
-                items: [
-                    { text: '최저임금 위반 자동 경고', done: false },
-                    { text: '주 52시간 초과 알림', done: false },
-                    { text: '산업안전보건 교육 이수 관리', done: false },
-                    { text: '직장 내 괴롭힘 예방교육 일정 관리', done: false },
+                    { text: '직원별 연간 소득·세금 현황 조회', done: false },
+                    { text: '근로소득원천징수영수증 자동 생성', done: false },
+                    { text: '연말정산 간소화 데이터 연동 (PDF 업로드)', done: false },
+                    { text: '연말정산 환급/추가납부 자동 계산', done: false },
                 ],
             },
         ],
@@ -226,7 +294,7 @@ const phases = [
     {
         id: 5,
         title: 'Phase 5 — 재무관리 및 경영분석',
-        subtitle: '24개월 → 36개월',
+        subtitle: '예정',
         status: 'planned',
         color: 'from-amber-500 to-orange-500',
         bgColor: 'bg-amber-50',
@@ -266,13 +334,56 @@ const phases = [
             },
         ],
     },
+    {
+        id: 6,
+        title: 'Phase 6 — AI 경영 비서',
+        subtitle: '비전',
+        status: 'planned',
+        color: 'from-indigo-500 to-blue-600',
+        bgColor: 'bg-indigo-50',
+        borderColor: 'border-indigo-200',
+        icon: Brain,
+        description: 'AI가 경영 데이터를 분석하고, 사장님에게 실시간으로 경영 인사이트와 의사결정 지원을 제공합니다.',
+        modules: [
+            {
+                name: 'AI 자동 분석',
+                status: 'planned',
+                items: [
+                    { text: 'AI 매출 이상 감지 및 원인 분석', done: false },
+                    { text: '인건비 최적화 AI 추천 (시간대별 배치)', done: false },
+                    { text: '메뉴별 수익성 AI 분석 및 가격 제안', done: false },
+                    { text: '시즌별 매출 예측 및 재고 추천', done: false },
+                ],
+            },
+            {
+                name: '자연어 경영 질의',
+                status: 'planned',
+                items: [
+                    { text: '"이번 달 인건비가 지난달보다 얼마나 늘었어?" 자연어 질문', done: false },
+                    { text: '챗봇 기반 경영 데이터 조회', done: false },
+                    { text: '음성 인식 기반 경영 리포트', done: false },
+                    { text: '일일/주간/월간 자동 경영 브리핑', done: false },
+                ],
+            },
+            {
+                name: '노무 리스크 AI 진단',
+                status: 'planned',
+                items: [
+                    { text: '근로기준법 위반 리스크 자동 스캔', done: false },
+                    { text: '퇴직금 분쟁 예방 AI 점검', done: false },
+                    { text: '취업규칙 자동 생성 및 개정 추천', done: false },
+                    { text: '노무 관련 법령 변경 실시간 알림', done: false },
+                ],
+            },
+        ],
+    },
 ];
 
 const techStack = [
-    { category: '백엔드', items: ['FastAPI (Python)', 'SQLite → PostgreSQL', 'Redis (캐싱)', 'Celery (비동기 작업)'] },
-    { category: '프론트엔드', items: ['React 19 + Vite', 'Tailwind CSS', 'Chart.js / Recharts', 'PWA + React Native'] },
-    { category: '인프라', items: ['Docker + Kubernetes', 'AWS / GCP', 'CI/CD (GitHub Actions)', 'SSL + 보안 감사'] },
-    { category: '연동 API', items: ['홈택스 (원천세/부가세)', '4대보험 EDI', '금융결제원 (오픈뱅킹)', '카카오 알림톡'] },
+    { category: '백엔드', items: ['FastAPI (Python)', 'PostgreSQL + SQLModel', 'Redis (캐싱)', 'Celery (비동기 작업)'] },
+    { category: '프론트엔드', items: ['React 19 + Vite', 'Tailwind CSS v4', 'Chart.js / Recharts', 'PWA (직원앱/관리자앱)'] },
+    { category: '인프라', items: ['Docker (Orbitron 서버)', 'GitHub Actions CI/CD', 'Nginx Reverse Proxy', 'SSL + CORS 보안'] },
+    { category: '연동 API', items: ['카카오 알림톡 (완료)', '홈택스 (원천세/부가세)', '4대보험 EDI', '금융결제원 (오픈뱅킹)'] },
 ];
 
 export default function DevelopmentRoadmap() {
@@ -320,7 +431,7 @@ export default function DevelopmentRoadmap() {
                                 </span>
                             </h1>
                             <p className="text-slate-300 text-base md:text-lg max-w-3xl leading-relaxed">
-                                하나로 셈을 끝내다 — 세무·노무·재무 통합 플랫폼으로 가는 5단계 여정
+                                하나로 셈을 끝내다 — 급여·HR·세무·노무·재무·AI 통합 플랫폼으로 가는 6단계 여정
                             </p>
 
                             {/* 메타 카드 */}
@@ -372,7 +483,7 @@ export default function DevelopmentRoadmap() {
                                 <strong className="text-white"> 셈하나</strong>가 소규모 사업자의 <strong className="text-white">경영 파트너</strong>가 되겠습니다.
                             </p>
                             <div className="flex flex-wrap gap-2 mt-4">
-                                {['세무 자동화', '노무 관리', '재무 분석', 'SaaS 플랫폼'].map(tag => (
+                                {['급여 자동화', 'HR 인사관리', '세무 자동화', '노무 관리', '재무 분석', 'SaaS 플랫폼', 'AI 경영 비서'].map(tag => (
                                     <span key={tag} className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-xs font-medium text-slate-200">{tag}</span>
                                 ))}
                             </div>
@@ -403,6 +514,9 @@ export default function DevelopmentRoadmap() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <h3 className="text-lg font-bold text-white">{phase.title}</h3>
+                                                {phase.status === 'done' && (
+                                                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-bold">완료</span>
+                                                )}
                                                 {phase.status === 'active' && (
                                                     <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-[10px] font-bold animate-pulse">진행중</span>
                                                 )}
@@ -483,9 +597,9 @@ export default function DevelopmentRoadmap() {
                 {/* Timeline Summary */}
                 <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl p-6 shadow-xl">
                     <h3 className="text-lg font-bold mb-4">📅 전체 타임라인</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                         {phases.map((p, i) => (
-                            <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-center">
+                            <div key={i} className={`backdrop-blur-sm rounded-xl p-3 text-center ${p.status === 'done' ? 'bg-emerald-500/20 border border-emerald-500/30' : p.status === 'active' ? 'bg-amber-500/15 border border-amber-500/30' : 'bg-white/10'}`}>
                                 <div className="text-[10px] font-medium text-white/60 mb-1">{p.subtitle}</div>
                                 <div className="text-xs font-bold">{p.title.split('—')[1]?.trim() || p.title}</div>
                             </div>
