@@ -40,7 +40,7 @@ export default function Sidebar() {
             user = {
                 role: payload.role,
                 real_name: payload.real_name || payload.sub,
-                grade: payload.grade || 'normal',
+                grade: payload.grade || '정직원',
                 profile_image: payload.profile_image,
                 business_id: payload.business_id
             };

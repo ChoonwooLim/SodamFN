@@ -61,7 +61,7 @@ export default function Profile() {
                     <div className="text-center">
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>등급</div>
                         <div style={{ fontWeight: 600, marginTop: '4px' }}>
-                            <span className="badge badge-info">{user.grade || 'normal'}</span>
+                            <span className="badge badge-info">{user.grade === 'normal' ? '정직원' : user.grade === 'vip' ? '아르바이트' : user.grade || '정직원'}</span>
                         </div>
                     </div>
                 </div>

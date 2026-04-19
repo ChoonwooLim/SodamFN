@@ -155,7 +155,7 @@ def create_staff_account(
     staff_id: int, 
     username: str = Body(..., embed=True), 
     password: str = Body(..., embed=True),
-    grade: str = Body("normal", embed=True),
+    grade: str = Body("정직원", embed=True),
     _admin: AuthUser = Depends(get_admin_user),
     session: Session = Depends(get_session)
 ):

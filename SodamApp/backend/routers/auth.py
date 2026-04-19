@@ -167,7 +167,7 @@ async def get_or_create_social_user(provider: str, provider_id: str, email: str,
                 provider=provider,
                 provider_id=provider_id,
                 role="guest",
-                grade="normal"
+                grade="정직원"
             )
             service.session.add(user)
             service.session.commit()
@@ -196,7 +196,7 @@ async def signup(user_data: UserCreate):
             email=user_data.email,
             real_name=user_data.real_name,
             role="guest",
-            grade="normal"
+            grade="정직원"
         )
         service.session.add(new_user)
         service.session.commit()

@@ -268,7 +268,7 @@ class User(SQLModel, table=True):
     username: str = Field(index=True, unique=True)
     hashed_password: Optional[str] = None # Optional for social logins
     role: str = Field(default="guest") # superadmin, admin, staff, guest
-    grade: str = Field(default="normal") # normal, vip, vvip, admin
+    grade: str = Field(default="정직원") # 정직원, 아르바이트, admin
     
     # Subscription (Admin only)
     subscription_type: Optional[str] = None  # free, basic, premium

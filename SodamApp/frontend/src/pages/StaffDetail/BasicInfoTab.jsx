@@ -199,13 +199,13 @@ export default function BasicInfoTab({
                                 <div className="flex justify-between items-center text-sm border-t border-slate-200 pt-2">
                                     <span className="text-slate-500">등급</span>
                                     <select
-                                        value={user.grade || 'normal'}
+                                        value={user.grade === 'normal' ? '정직원' : user.grade === 'vip' ? '아르바이트' : user.grade || '정직원'}
                                         onChange={(e) => handleGradeUpdate(e.target.value)}
                                         className="bg-white border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-700 outline-none"
                                     >
-                                        <option value="normal">일반 (Normal)</option>
-                                        <option value="vip">VIP</option>
-                                        <option value="admin">관리자 (Admin)</option>
+                                        <option value="정직원">정직원</option>
+                                        <option value="아르바이트">아르바이트</option>
+                                        <option value="admin">관리자</option>
                                     </select>
                                 </div>
                             </div>
@@ -468,6 +468,17 @@ export default function BasicInfoTab({
                                         className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="비밀번호"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1.5">등급</label>
+                                    <select
+                                        value={accountForm.grade}
+                                        onChange={(e) => setAccountForm({ ...accountForm, grade: e.target.value })}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    >
+                                        <option value="정직원">정직원</option>
+                                        <option value="아르바이트">아르바이트</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>

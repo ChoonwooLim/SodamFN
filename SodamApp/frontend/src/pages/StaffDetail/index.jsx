@@ -82,7 +82,7 @@ export default function StaffDetail() {
     const [currentBudgetMonth, setCurrentBudgetMonth] = useState(new Date().toISOString().slice(0, 7));
 
     // New Account Form
-    const [accountForm, setAccountForm] = useState({ username: '', password: '', grade: 'normal' });
+    const [accountForm, setAccountForm] = useState({ username: '', password: '', grade: '정직원' });
     // New Contract Form
     const [contractForm, setContractForm] = useState({
         title: '표준근로계약서',
