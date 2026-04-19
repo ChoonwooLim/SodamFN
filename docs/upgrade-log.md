@@ -25,3 +25,4 @@
 | 2026-04-19 | 5인 미만 사업장도 무급/병가/경조사 휴가 신청 허용 + HR 대시보드 대기 알림 | feat | leave.py, staff-app/Leave.jsx, HRDashboard.jsx |
 | 2026-04-19 | HR 대시보드 알림/연차 카드 h-[440px] 통일 + 5인 미만용 휴가 신청 현황 카드 + 노동법 핵심 안내 패널 | feat | HRDashboard.jsx |
 | 2026-04-19 | 직원관리 > 구인등록 서브메뉴 — 국내 구인 플랫폼 15곳 비교 가이드 | feat | JobPosting.jsx, Sidebar.jsx, App.jsx |
+| 2026-04-19 | 회사직인 관리 메뉴 + 10종 SVG 직인 샘플 선택 시스템 (settings_json 저장) | feat | CompanySeal.jsx, Settings.jsx, auth.py |
