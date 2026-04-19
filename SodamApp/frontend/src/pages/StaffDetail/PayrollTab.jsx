@@ -233,32 +233,32 @@ export default function PayrollTab({
                     </select>
                 </div>
                 <div className={`p-4 grid grid-cols-2 ${showTaxSupport ? 'sm:grid-cols-6' : 'sm:grid-cols-4'} gap-3`}>
-                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #0f766e, #0d5c56)' }}>
                         <div className="text-[10px] font-bold text-white/70 mb-1">총 기본급</div>
                         <div className="text-lg font-black">{fmt(payrollSummary.totalBase)}</div>
                     </div>
-                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #0e7490, #0c5f75)' }}>
                         <div className="text-[10px] font-bold text-white/70 mb-1">총 특별수당</div>
                         <div className="text-lg font-black">{fmt(payrollSummary.totalSpecial)}</div>
                     </div>
-                    <div className="rounded-xl p-4 border border-slate-200">
-                        <div className="text-[10px] font-bold text-slate-400 mb-1">총 공제</div>
-                        <div className="text-lg font-black text-red-500">-{fmt(payrollSummary.totalDeductions)}</div>
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #1e3a5f, #162d4a)' }}>
+                        <div className="text-[10px] font-bold text-rose-300 mb-1">총 공제</div>
+                        <div className="text-lg font-black text-rose-300">-{fmt(payrollSummary.totalDeductions)}</div>
                     </div>
                     {showTaxSupport && (
-                        <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #059669, #047857)' }}>
+                        <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #115e59, #0d4f4a)' }}>
                             <div className="text-[10px] font-bold text-white/70 mb-1">총 세금대납</div>
                             <div className="text-lg font-black">{fmt(payrollSummary.totalTaxSupport)}</div>
                         </div>
                     )}
                     {showTaxSupport && (
-                        <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #4338ca, #3730a3)' }}>
+                        <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #164e63, #0e3d4f)' }}>
                             <div className="text-[10px] font-bold text-white/70 mb-1">총 보상</div>
                             <div className="text-lg font-black">{fmt(payrollSummary.totalNet)}</div>
                         </div>
                     )}
-                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #1e3a3a)' }}>
-                        <div className="text-[10px] font-bold text-white/70 mb-1">총 실수령</div>
+                    <div className="rounded-xl p-4 text-white" style={{ background: 'linear-gradient(135deg, #134e4a, #0a2e2b)' }}>
+                        <div className="text-[10px] font-bold text-emerald-300 mb-1">총 실수령</div>
                         <div className="text-lg font-black">{fmt(showTaxSupport ? payrollSummary.totalNet - payrollSummary.totalTaxSupport : payrollSummary.totalNet)}</div>
                         <div className="text-[10px] mt-1 text-white/50">{payrollSummary.count}건 / 지급완료 {payrollSummary.transferred}건</div>
                     </div>
