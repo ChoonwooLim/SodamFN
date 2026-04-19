@@ -26,7 +26,8 @@ export default function HRDashboard() {
 
             // Staff Summary
             if (staffRes.status === 'fulfilled' && staffRes.value.data) {
-                const list = staffRes.value.data || [];
+                const rawData = staffRes.value.data;
+                const list = Array.isArray(rawData) ? rawData : (rawData?.data || []);
                 const active = list.filter(s => s.status === '재직').length;
                 const onLeave = list.filter(s => s.status === '휴직').length;
                 const resigned = list.filter(s => s.status === '퇴사').length;
