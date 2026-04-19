@@ -202,6 +202,9 @@ export default function PayrollTab({
                                                     <div className="flex items-center justify-center gap-1.5">
                                                         <button onClick={() => setSelectedPayroll(pay)} className="p-1.5 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-colors" title="명세서 출력"><Printer size={14} /></button>
                                                         <button onClick={() => handleSendPayrollStatement(pay)} className="p-1.5 hover:bg-emerald-50 text-slate-400 hover:text-emerald-600 rounded-lg transition-colors" title="명세서 카톡전송"><MessageSquare size={14} /></button>
+                                                        {pay.transfer_status !== '완료' && (
+                                                            <button onClick={() => handleExecuteTransfer(pay.id)} className="px-2.5 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 shadow-sm transition-all" title="급여 계좌이체">이체</button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -360,6 +363,9 @@ export default function PayrollTab({
                                         <button onClick={() => handleSendPayrollStatement(pay)} className="flex-1 flex items-center justify-center gap-1 p-2 bg-white text-emerald-600 rounded-lg text-xs font-bold border border-slate-200 hover:bg-emerald-50">
                                             <MessageSquare size={13} /> 카톡
                                         </button>
+                                        {pay.transfer_status !== '완료' && (
+                                            <button onClick={() => handleExecuteTransfer(pay.id)} className="flex-1 p-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 shadow-sm">이체</button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

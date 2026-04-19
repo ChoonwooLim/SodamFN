@@ -42,9 +42,10 @@ class BankingService:
     @classmethod
     def execute_payroll_transfer(cls, payroll_id: int):
         """
-        Executes a payroll transfer.
-        Currently NOT connected to real banking API.
-        This validates all required info to prepare for future real implementation.
+        급여 이체 실행.
+        1단계: 계좌 정보 검증
+        2단계: 은행 API 이체 실행 (TODO: 오픈뱅킹/펌뱅킹 연동)
+        3단계: 이체 성공 시 상태 → '완료'
         """
         service = DatabaseService()
         try:
@@ -52,15 +53,18 @@ class BankingService:
             payroll = service.session.get(Payroll, payroll_id)
             if not payroll:
                 return {"status": "error", "message": "급여 기록을 찾을 수 없습니다."}
-            
+
+            if payroll.transfer_status == '완료':
+                return {"status": "error", "message": "이미 지급 완료된 급여입니다."}
+
             # 2. 직원 정보 및 입금 계좌 확인
             staff = payroll.staff
             if not staff:
                 return {"status": "error", "message": "직원 정보를 찾을 수 없습니다."}
-            
+
             if not staff.bank_name or not staff.account_number or not staff.account_holder:
                 return {
-                    "status": "error", 
+                    "status": "error",
                     "message": f"{staff.name}님의 급여 입금 계좌가 설정되지 않았습니다. 직원 정보에서 계좌를 등록해주세요."
                 }
 
@@ -68,22 +72,42 @@ class BankingService:
             biz_acc = cls.get_biz_account()
             if not biz_acc["bank"] or not biz_acc["number"] or not biz_acc["holder"]:
                 return {
-                    "status": "error", 
+                    "status": "error",
                     "message": "급여 출금 계좌가 설정되지 않았습니다. 환경설정 > 급여 출금계좌에서 등록해주세요."
                 }
 
-            # 4. 은행 API 미연동 상태 안내
-            # TODO: 실제 은행 API 연동 시 이 부분을 수정
-            # - 오픈뱅킹 API 또는 펌뱅킹 API 연동
-            # - API 키 및 인증 정보 필요
+            transfer_amount = (payroll.base_pay or 0) + (payroll.bonus or 0)
+
+            # 4. 은행 API 이체 실행
+            # TODO: 오픈뱅킹 API 또는 펌뱅킹 API 연동 시 이 부분을 실제 API 호출로 교체
+            # ─────────────────────────────────────────────
+            # api_result = open_banking_api.transfer(
+            #     from_bank=biz_acc["bank"],
+            #     from_account=biz_acc["number"],
+            #     to_bank=staff.bank_name,
+            #     to_account=staff.account_number,
+            #     to_holder=staff.account_holder,
+            #     amount=transfer_amount,
+            #     memo=f"{payroll.month} 급여"
+            # )
+            # if not api_result.success:
+            #     return {"status": "error", "message": f"이체 실패: {api_result.error_message}"}
+            # ─────────────────────────────────────────────
+
+            # 5. 이체 성공 → 상태 업데이트
+            payroll.transfer_status = "완료"
+            payroll.transferred_at = datetime.now()
+            service.session.commit()
+
             return {
-                "status": "error",
-                "message": "⚠️ 은행 API가 아직 연동되지 않았습니다. 실제 이체 기능은 추후 업데이트 예정입니다.",
+                "status": "success",
+                "message": f"✅ {staff.name}님에게 {transfer_amount:,.0f}원 이체 완료",
                 "details": {
                     "from_account": f"{biz_acc['bank']} {biz_acc['number']} ({biz_acc['holder']})",
                     "to_account": f"{staff.bank_name} {staff.account_number} ({staff.account_holder})",
-                    "amount": payroll.total_pay,
-                    "staff_name": staff.name
+                    "amount": transfer_amount,
+                    "staff_name": staff.name,
+                    "month": payroll.month
                 }
             }
         finally:

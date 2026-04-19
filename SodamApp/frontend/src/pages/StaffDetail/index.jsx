@@ -368,7 +368,12 @@ export default function StaffDetail() {
     };
 
     const handleExecuteTransfer = async (payrollId) => {
-        if (!window.confirm("급여 이체를 실행하시겠습니까?")) return;
+        const pay = payrolls.find(p => p.id === payrollId);
+        const amount = pay ? formatNumber((pay.base_pay || 0) + (pay.bonus || 0)) : '';
+        const target = formData.bank_name && formData.account_number
+            ? `\n입금: ${formData.bank_name} ${formData.account_number} (${formData.account_holder || formData.name})`
+            : '';
+        if (!window.confirm(`${formData.name}님에게 ${amount}원 급여 이체를 실행하시겠습니까?${target}`)) return;
         try {
             const resp = await api.post(`/payroll/transfer/${payrollId}`);
             if (resp.data.status === 'success') {
