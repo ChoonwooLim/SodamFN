@@ -7,7 +7,7 @@ import os
 from sqlmodel import Session, select, col
 
 from routers.auth import get_admin_user, get_current_user, get_password_hash
-from models import User as AuthUser, Staff, StaffDocument
+from models import User as AuthUser, Staff, StaffDocument, StaffChangeLog
 from database import get_session
 from tenant_filter import get_bid_from_token, apply_bid_filter
 from pydantic import BaseModel
@@ -135,19 +135,84 @@ def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), 
         "user": user_info
     }
 
+FIELD_LABELS = {
+    'hourly_wage': '시급',
+    'monthly_salary': '월급',
+    'role': '직책',
+    'status': '상태',
+    'contract_type': '계약형태',
+    'insurance_4major': '4대보험',
+    'insurance_base_salary': '보수월액',
+    'start_date': '입사일',
+    'np_exempt': '국민연금면제',
+    'durunnuri_support': '두루누리지원',
+    'tax_support_enabled': '세금대납',
+    'visa_type': '체류자격',
+    'work_start_time': '근무시작',
+    'work_end_time': '근무종료',
+    'contract_start_date': '계약시작일',
+    'contract_end_date': '계약종료일',
+}
+
+CHANGE_TYPE_MAP = {
+    'hourly_wage': '시급변경',
+    'monthly_salary': '월급변경',
+    'role': '직책변경',
+    'status': '상태변경',
+    'contract_type': '계약변경',
+    'insurance_4major': '4대보험변경',
+    'insurance_base_salary': '4대보험변경',
+    'start_date': '입사',
+    'np_exempt': '4대보험변경',
+    'durunnuri_support': '4대보험변경',
+    'tax_support_enabled': '세금대납',
+    'visa_type': '계약변경',
+    'work_start_time': '계약변경',
+    'work_end_time': '계약변경',
+    'contract_start_date': '계약변경',
+    'contract_end_date': '계약변경',
+}
+
+
 @router.put("/staff/{staff_id}")
-def update_staff(staff_id: int, update_data: StaffUpdate, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
+def update_staff(staff_id: int, update_data: StaffUpdate, _admin: AuthUser = Depends(get_admin_user), bid=Depends(get_bid_from_token), session: Session = Depends(get_session)):
     staff = session.get(Staff, staff_id)
     if not staff:
         raise HTTPException(status_code=404, detail="Staff not found")
-        
+
     update_dict = update_data.dict(exclude_unset=True)
+
+    # Capture old values for tracked fields before applying updates
+    old_values = {}
+    for key in update_dict:
+        if key in FIELD_LABELS:
+            old_values[key] = getattr(staff, key, None)
+
     for key, value in update_dict.items():
         setattr(staff, key, value)
-        
+
     session.add(staff)
     session.commit()
     session.refresh(staff)
+
+    # Auto-log changes for HR-significant fields
+    for key, old_val in old_values.items():
+        new_val = getattr(staff, key, None)
+        if str(old_val) != str(new_val):
+            log = StaffChangeLog(
+                business_id=bid or staff.business_id,
+                staff_id=staff_id,
+                staff_name=staff.name,
+                change_type=CHANGE_TYPE_MAP.get(key, '기타변경'),
+                field_name=FIELD_LABELS[key],
+                old_value=str(old_val) if old_val is not None else None,
+                new_value=str(new_val) if new_val is not None else None,
+                changed_by="관리자",
+            )
+            session.add(log)
+
+    session.commit()
+
     return {"status": "success", "data": staff}
 
 @router.post("/staff/{staff_id}/account")

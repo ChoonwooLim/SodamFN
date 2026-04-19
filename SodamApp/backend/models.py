@@ -565,6 +565,23 @@ class LeaveRequest(SQLModel, table=True):
     staff: Optional[Staff] = Relationship(back_populates="leave_requests")
 
 
+class StaffChangeLog(SQLModel, table=True):
+    """인사변경 이력"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    staff_name: str = ""
+
+    change_type: str = ""  # 입사, 시급변경, 월급변경, 직급변경, 직책변경, 부서변경, 계약변경, 상태변경, 4대보험변경, 퇴사
+    field_name: str = ""   # Changed field name
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    note: Optional[str] = None
+
+    changed_by: str = "시스템"  # 관리자 or 시스템
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
 # --- AI Auto-Learning Rules ---
 
 class VendorRule(SQLModel, table=True):

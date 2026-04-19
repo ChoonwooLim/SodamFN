@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree } from 'lucide-react';
+import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import BasicInfoTab from './BasicInfoTab';
@@ -10,6 +10,7 @@ import ContractTab from './ContractTab';
 import DocumentTab from './DocumentTab';
 import RetirementTab from './RetirementTab';
 import LeaveTab from './LeaveTab';
+import ChangeLogTab from './ChangeLogTab';
 
 const TABS = [
     { key: 'basic', label: '기본정보', icon: User },
@@ -19,6 +20,7 @@ const TABS = [
     { key: 'retirement', label: '퇴직금', icon: Calculator },
     { key: 'contract', label: '계약관리', icon: FileText },
     { key: 'document', label: '서류관리', icon: Upload },
+    { key: 'changelog', label: '변경이력', icon: History },
 ];
 
 export default function StaffDetail() {
@@ -684,6 +686,13 @@ export default function StaffDetail() {
                         documents={documents}
                         handleFileUpload={handleFileUpload}
                         handleDeleteDocument={handleDeleteDocument}
+                    />
+                )}
+
+                {activeTab === 'changelog' && (
+                    <ChangeLogTab
+                        id={id}
+                        formData={formData}
                     />
                 )}
             </div>
