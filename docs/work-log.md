@@ -134,4 +134,18 @@
 
 - `9a6d9cb` 환경설정에 '회사직인 관리' 탭 추가 (10종 스타일: 클래식 원형·이중 원·사각 인장·톱니 테두리·모던 블루·프리미엄 골드·블랙 포멀·꽃문양·미니멀·대표이사 직인). 공용 `CompanySeal.jsx` 컴포넌트 분리하여 계약서·증명서 등 재사용 가능. `Business.settings_json`에 `seal_style`/`seal_text`를 JSON 병합 저장(DB 마이그레이션 불필요). `/auth/business-info`·`/auth/business-settings` 확장으로 조회/저장 지원
 
+### 작업 요약 (세션 6 — 로드맵 최신화 + HEAD DevWorkLog 고정 콘텐츠 전면 업데이트)
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 셈하나 개발 로드맵 — 오늘 완료 기능 4종 반영 (회사직인·구인등록 등) | 완료 |
+| infra | DevWorkLog [HEAD] 고정 엔트리 전면 재작성 (14섹션 / ai_summary 16개) | 완료 |
+| infra | `/end` 스킬에 "3-8단계: [HEAD] DevWorkLog 고정 콘텐츠 업그레이드" 섹션 추가 (opt-in) | 완료 |
+
+### 세부 내용 (세션 6)
+
+- `cacea36` DevelopmentRoadmap.jsx의 Phase 2 모듈에 오늘 완료 기능 반영: 증명서 자동발급 → "증명서 자동발급 & 회사직인"로 확장, 연차/휴가 관리에 직원앱 자가 신청 추가, HR 대시보드 알림에 휴가 대기·카드 높이 통일 추가, 5인 미만/이상 사업장 모드에 무급 휴가 허용·노동법 안내 패널·라우팅 가드·View-As 헤더 지원 추가, 신규 "구인/채용 지원" 모듈(15곳 플랫폼 비교) 추가
+- [HEAD] DevWorkLog id=4 content 4045→5679자, ai_summary 590→962자로 전면 재작성. 라우터 25→32개, DB 모델 30+개로 최신화. HRDashboard·JobPosting·ForeignWorkerGuide·CompanySeal·LeaveBalance·LeaveRequest·StaffChangeLog·StaffTraining·StaffCertification 등 반영. ai_summary에 세금대납 규칙/연차법/settings_json/storage_service/stale JWT/ALTER TABLE 등 핵심 gotcha 16개 정리 (임시 스크립트는 실행 후 삭제)
+- `~/.claude/skills/end/SKILL.md` 3-8단계 추가: `[HEAD]` 로 시작하는 DevWorkLog 엔트리가 있을 때만 실행되는 opt-in 단계. 신규 라우터/모델/페이지/컴포넌트/메뉴/인프라 변화 발생 시 HEAD 콘텐츠를 전면 재작성하도록 가이드. 핵심 규칙 3번에 `[HEAD]` 마커 추가
+
 ---
