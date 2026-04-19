@@ -86,7 +86,7 @@ export const SCALE_FEATURES = {
   tabs: {
     basic: { under5: true, over5: true },
     attendance: { under5: true, over5: true },
-    leave: { under5: false, over5: true },      // 연차관리: 5인 이상만
+    leave: { under5: true, over5: true },       // 휴가: under5도 무급/병가/경조사 조회·승인 필요
     payroll: { under5: true, over5: true },
     retirement: { under5: true, over5: true },
     contract: { under5: true, over5: true },

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Calendar, Loader2, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, X, Calendar, Loader2, Trash2 } from 'lucide-react';
 import api from '../api';
 
-const LEAVE_TYPES = ['연차', '반차(오전)', '반차(오후)', '병가', '경조사', '특별휴가'];
+const LEAVE_TYPES_OVER5 = ['연차', '반차(오전)', '반차(오후)', '병가', '경조사', '특별휴가'];
+const LEAVE_TYPES_UNDER5 = ['무급휴가', '병가', '경조사'];
 
 const STATUS_BADGE = {
     '대기': { label: '대기', className: 'badge badge-warning' },
@@ -24,7 +25,7 @@ function calcDays(leaveType, startDate, endDate) {
 export default function Leave() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
-    const [scaleBlocked, setScaleBlocked] = useState(false);
+    const [isUnder5, setIsUnder5] = useState(false);
     const [balance, setBalance] = useState(null);
     const [requests, setRequests] = useState([]);
     const [showForm, setShowForm] = useState(false);
@@ -37,15 +38,24 @@ export default function Leave() {
         reason: '',
     });
 
+    const leaveTypeOptions = isUnder5 ? LEAVE_TYPES_UNDER5 : LEAVE_TYPES_OVER5;
+
     const fetchData = useCallback(async () => {
         try {
             const res = await api.get('/hr/leave/my');
+            const under5 = !!res.data.is_under5;
+            setIsUnder5(under5);
             setBalance(res.data.balance);
             setRequests(res.data.requests || []);
-            setScaleBlocked(false);
+            // under5는 '연차' 기본값을 허용 타입으로 교체
+            if (under5) {
+                setForm((prev) => ({
+                    ...prev,
+                    leave_type: LEAVE_TYPES_UNDER5.includes(prev.leave_type) ? prev.leave_type : LEAVE_TYPES_UNDER5[0],
+                }));
+            }
         } catch (err) {
-            if (err?.response?.status === 403) setScaleBlocked(true);
-            else console.error(err);
+            console.error(err);
         } finally {
             setLoading(false);
         }
@@ -81,7 +91,7 @@ export default function Leave() {
         try {
             await api.post('/hr/leave/my/request', form);
             setShowForm(false);
-            setForm({ leave_type: '연차', start_date: '', end_date: '', days: 1, reason: '' });
+            setForm({ leave_type: leaveTypeOptions[0], start_date: '', end_date: '', days: 1, reason: '' });
             await fetchData();
         } catch (err) {
             alert(err?.response?.data?.detail || '신청 실패');
@@ -108,52 +118,44 @@ export default function Leave() {
         );
     }
 
-    if (scaleBlocked) {
-        return (
-            <div className="page animate-fade">
-                <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={() => navigate(-1)} className="btn-ghost btn-circle" style={{ padding: '8px' }}>
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="page-title">연차/휴가</h1>
-                </div>
-                <div className="card" style={{ textAlign: 'center', padding: '32px 16px' }}>
-                    <AlertCircle size={40} style={{ color: 'var(--warning)', margin: '0 auto 12px' }} />
-                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>5인 미만 사업장</div>
-                    <div className="text-sm text-muted">연차 기능은 5인 이상 사업장에서 제공됩니다.</div>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="page animate-fade">
             <div className="page-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <button onClick={() => navigate(-1)} className="btn-ghost btn-circle" style={{ padding: '8px' }}>
                     <ArrowLeft size={20} />
                 </button>
-                <h1 className="page-title">연차/휴가</h1>
+                <h1 className="page-title">{isUnder5 ? '휴가 신청' : '연차/휴가'}</h1>
             </div>
 
-            {/* 잔여 연차 카드 */}
-            <div className="card card-gradient-dark mb-4" style={{ padding: '24px', color: 'white' }}>
-                <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '4px' }}>올해 잔여 연차</div>
-                <div style={{ fontSize: '2.4rem', fontWeight: 700, lineHeight: 1.1 }}>
-                    {remaining.toFixed(1)}<span style={{ fontSize: '1rem', fontWeight: 500, marginLeft: '4px', opacity: 0.85 }}>일</span>
+            {isUnder5 ? (
+                /* under5: 잔액 개념 없음 — 안내 카드만 */
+                <div className="card mb-4" style={{ padding: '16px', background: 'var(--warning-bg, #fffaf0)', border: '1px solid var(--warning-border, #fde68a)' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>무급휴가 · 병가 · 경조사 신청</div>
+                    <div className="text-sm text-muted">
+                        5인 미만 사업장은 유급 연차가 없습니다. 개인사정으로 일정 조율이 필요할 때 신청하면 사업주에게 전달됩니다.
+                    </div>
                 </div>
-                <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
-                    <div style={{
-                        width: `${progressPct}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, var(--accent), var(--primary-light))',
-                        transition: 'width 300ms ease',
-                    }} />
+            ) : (
+                /* 잔여 연차 카드 */
+                <div className="card card-gradient-dark mb-4" style={{ padding: '24px', color: 'white' }}>
+                    <div style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '4px' }}>올해 잔여 연차</div>
+                    <div style={{ fontSize: '2.4rem', fontWeight: 700, lineHeight: 1.1 }}>
+                        {remaining.toFixed(1)}<span style={{ fontSize: '1rem', fontWeight: 500, marginLeft: '4px', opacity: 0.85 }}>일</span>
+                    </div>
+                    <div style={{ marginTop: '16px', background: 'rgba(255,255,255,0.15)', borderRadius: 'var(--radius-full)', height: '8px', overflow: 'hidden' }}>
+                        <div style={{
+                            width: `${progressPct}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, var(--accent), var(--primary-light))',
+                            transition: 'width 300ms ease',
+                        }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', opacity: 0.9, marginTop: '8px' }}>
+                        <span>사용 {(balance?.used_annual || 0).toFixed(1)}일</span>
+                        <span>총 {(balance?.total_annual || 0).toFixed(1)}일</span>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', opacity: 0.9, marginTop: '8px' }}>
-                    <span>사용 {(balance?.used_annual || 0).toFixed(1)}일</span>
-                    <span>총 {(balance?.total_annual || 0).toFixed(1)}일</span>
-                </div>
-            </div>
+            )}
 
             {/* 신청 버튼 */}
             <button
@@ -245,7 +247,7 @@ export default function Leave() {
                                     onChange={(e) => setForm({ ...form, leave_type: e.target.value })}
                                     style={inputStyle}
                                 >
-                                    {LEAVE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                    {leaveTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
                                 </select>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

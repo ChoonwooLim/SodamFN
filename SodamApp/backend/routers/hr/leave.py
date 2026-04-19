@@ -353,6 +353,23 @@ def delete_leave_request(
     return {"status": "success"}
 
 
+@router.get("/leave/requests")
+def list_leave_requests(
+    status: Optional[str] = None,
+    limit: int = 50,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """관리자용: 휴가 신청 목록. status로 필터(대기/승인/반려/취소). 사업장 스코프 자동 적용."""
+    stmt = apply_bid_filter(select(LeaveRequest), LeaveRequest, bid)
+    if status:
+        stmt = stmt.where(LeaveRequest.status == status)
+    stmt = stmt.order_by(LeaveRequest.start_date.desc()).limit(limit)
+    rows = session.exec(stmt).all()
+    return {"status": "success", "data": rows, "count": len(rows)}
+
+
 @router.get("/leave/summary")
 def get_leave_summary(
     year: Optional[int] = None,
@@ -401,23 +418,23 @@ class MyLeaveRequestCreate(BaseModel):
     reason: Optional[str] = None
 
 
-def _resolve_self_staff(user: AuthUser, session: Session) -> Staff:
-    """현재 로그인한 사용자의 Staff 레코드 조회 + under5 가드."""
+def _resolve_self_staff(user: AuthUser, session: Session) -> tuple[Staff, bool]:
+    """현재 로그인한 사용자의 Staff 레코드 조회. (staff, is_under5) 반환.
+
+    5인 미만 사업장도 무급휴가/병가/경조사는 허용하되, 연차(유급)는 POST 시점에 차단.
+    """
     if not user.staff_id:
         raise HTTPException(status_code=403, detail="직원 계정이 연결되지 않았습니다.")
     staff = session.get(Staff, user.staff_id)
     if not staff:
         raise HTTPException(status_code=404, detail="직원 정보를 찾을 수 없습니다.")
 
-    # 5인 미만 사업장 차단 — 연차 기능은 5인 이상 사업장에 한정
+    is_under5 = False
     if staff.business_id:
         biz = session.get(Business, staff.business_id)
         if biz and getattr(biz, "employee_scale", "over5") == "under5":
-            raise HTTPException(
-                status_code=403,
-                detail="5인 미만 사업장은 연차 기능이 제공되지 않습니다.",
-            )
-    return staff
+            is_under5 = True
+    return staff, is_under5
 
 
 @router.get("/leave/my")
@@ -426,12 +443,14 @@ def get_my_leave(
     user: AuthUser = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """본인 연차 잔여 + 신청 이력 조회"""
-    staff = _resolve_self_staff(user, session)
+    """본인 연차 잔여 + 신청 이력 조회. under5 사업장은 balance=None 으로 반환(잔액 개념 없음)."""
+    staff, is_under5 = _resolve_self_staff(user, session)
     if not year:
         year = date.today().year
 
-    balance = _get_or_create_balance(session, staff, year, staff.business_id)
+    balance = None
+    if not is_under5:
+        balance = _get_or_create_balance(session, staff, year, staff.business_id)
 
     stmt = (
         select(LeaveRequest)
@@ -445,13 +464,15 @@ def get_my_leave(
     requests = session.exec(stmt).all()
 
     session.commit()
-    session.refresh(balance)
+    if balance is not None:
+        session.refresh(balance)
 
     return {
         "status": "success",
         "staff_id": staff.id,
         "staff_name": staff.name,
         "start_date": str(staff.start_date) if staff.start_date else None,
+        "is_under5": is_under5,
         "balance": balance,
         "requests": requests,
     }
@@ -463,23 +484,33 @@ def create_my_leave_request(
     user: AuthUser = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """본인이 직접 신청 — 대기(승인 전) 상태로 저장. 잔액은 아직 차감하지 않음."""
-    staff = _resolve_self_staff(user, session)
+    """본인이 직접 신청 — 대기(승인 전) 상태로 저장. 잔액은 아직 차감하지 않음.
+
+    under5 사업장: 연차(유급) 타입은 차단, 무급휴가/병가/경조사 등은 허용.
+    """
+    staff, is_under5 = _resolve_self_staff(user, session)
 
     if data.end_date < data.start_date:
         raise HTTPException(status_code=400, detail="종료일은 시작일 이후여야 합니다.")
     if data.days <= 0:
         raise HTTPException(status_code=400, detail="일수는 0보다 커야 합니다.")
 
-    # 잔여 참고용 사전 검사 (연차만) — 부족하면 거부하지 않고 경고만 로깅
-    year = data.start_date.year
-    balance = _get_or_create_balance(session, staff, year, staff.business_id)
-    # 대기 상태라 잔액 차감은 하지 않지만, 미리 명백하게 초과면 막는다
-    try:
-        _check_sufficient(balance, data.leave_type, data.days)
-    except HTTPException:
-        # 신청 시점 자체는 허용하되 관리자가 승인 시 재검증 (force 필요)
-        pass
+    # under5 사업장은 유급 연차 의무가 없으므로 연차 타입 차단
+    if is_under5 and data.leave_type in ANNUAL_TYPES:
+        raise HTTPException(
+            status_code=403,
+            detail="5인 미만 사업장은 유급 연차 의무가 없습니다. 무급휴가/병가/경조사로 신청해주세요.",
+        )
+
+    # 잔여 참고용 사전 검사 (연차만) — over5만 대상
+    if not is_under5:
+        year = data.start_date.year
+        balance = _get_or_create_balance(session, staff, year, staff.business_id)
+        try:
+            _check_sufficient(balance, data.leave_type, data.days)
+        except HTTPException:
+            # 신청 시점 자체는 허용하되 관리자가 승인 시 재검증 (force 필요)
+            pass
 
     req = LeaveRequest(
         business_id=staff.business_id,
@@ -506,7 +537,7 @@ def cancel_my_leave_request(
     session: Session = Depends(get_session),
 ):
     """본인의 대기 중 신청을 취소(삭제). 이미 승인/반려된 건은 관리자 문의."""
-    staff = _resolve_self_staff(user, session)
+    staff, _ = _resolve_self_staff(user, session)
 
     req = session.get(LeaveRequest, request_id)
     if not req:

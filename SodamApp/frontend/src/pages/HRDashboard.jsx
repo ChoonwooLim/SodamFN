@@ -21,9 +21,10 @@ export default function HRDashboard() {
     const fetchAll = async () => {
         setLoading(true);
         try {
-            const [staffRes, leaveRes] = await Promise.allSettled([
+            const [staffRes, leaveRes, pendingRes] = await Promise.allSettled([
                 api.get('/hr/staff?status=all'),
                 api.get(`/hr/leave/summary?year=${year}`),
+                api.get('/hr/leave/requests?status=대기&limit=20'),
             ]);
 
             // Staff Summary
@@ -37,6 +38,21 @@ export default function HRDashboard() {
 
                 // Generate alerts from staff data
                 const newAlerts = [];
+
+                // Pending leave requests — 최상단
+                if (pendingRes.status === 'fulfilled' && pendingRes.value.data?.data?.length) {
+                    pendingRes.value.data.data.forEach(r => {
+                        newAlerts.push({
+                            type: 'leave',
+                            icon: Palmtree,
+                            color: 'text-emerald-600',
+                            bg: 'bg-emerald-50',
+                            message: `${r.staff_name} ${r.leave_type} 신청 대기 (${r.start_date}~${r.end_date}, ${r.days}일)`,
+                            staffId: r.staff_id,
+                        });
+                    });
+                }
+
                 list.forEach(s => {
                     if (s.status !== '재직') return;
                     // Contract expiry alert
