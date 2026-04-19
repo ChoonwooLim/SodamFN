@@ -1,4 +1,4 @@
-import { User, Calendar, CheckCircle, Shield, Globe, X } from 'lucide-react';
+import { User, Calendar, CheckCircle, Shield, Globe, X, Phone, Building2, AlertTriangle, Clock, FileCheck, Info } from 'lucide-react';
 
 export default function BasicInfoTab({
     formData,
@@ -214,37 +214,350 @@ export default function BasicInfoTab({
                 </div>
             )}
 
-            {/* ═══ Visa Guide Modal ═══ */}
+            {/* ═══ Visa Guide Modal (상세) ═══ */}
             {isVisaGuideOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl">
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-gradient-to-r from-cyan-50 to-blue-50">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center">
-                                    <Globe size={14} className="text-white" />
+                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-md shadow-cyan-200">
+                                    <Globe size={16} className="text-white" />
                                 </div>
-                                <h3 className="text-base font-bold text-slate-800">체류자격별 외국인 고용 안내</h3>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-800">체류자격별 외국인 고용 안내</h3>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">외국인 근로자 고용 시 필수 확인사항</p>
+                                </div>
                             </div>
-                            <button onClick={() => setIsVisaGuideOpen(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
+                            <button onClick={() => setIsVisaGuideOpen(false)} className="p-1.5 hover:bg-white/80 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><X size={18} /></button>
                         </div>
-                        <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
-                            {[
-                                { code: 'H-2 (방문취업)', color: 'from-teal-500 to-teal-700', bg: 'bg-teal-50', text: 'text-teal-800', desc: '특례고용가능확인서 필요. 근로개시일 14일 이내 신고 필수.' },
-                                { code: 'E-9 (비전문취업)', color: 'from-cyan-500 to-cyan-700', bg: 'bg-cyan-50', text: 'text-cyan-800', desc: '고용허가서 필요. 사업장 변경 시 고용센터 신고 필수.' },
-                                { code: 'D-2 (유학) / D-4 (연수)', color: 'from-blue-500 to-blue-700', bg: 'bg-blue-50', text: 'text-blue-800', desc: '학교 유학생 담당자 승인 및 출입국 시간제 취업 허가 필수. 주당 시간 제한 확인.' },
-                                { code: 'F-2, F-4, F-5, F-6', color: 'from-indigo-500 to-indigo-700', bg: 'bg-indigo-50', text: 'text-indigo-800', desc: '내국인과 동일하게 자유로운 취업 가능 (단, F-4는 단순노무 일부 제한).' },
-                            ].map((item, i) => (
-                                <div key={i} className={`${item.bg} p-4 rounded-xl`}>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${item.color}`}></div>
-                                        <h4 className={`font-bold text-sm ${item.text}`}>{item.code}</h4>
-                                    </div>
-                                    <p className={`text-xs ${item.text} opacity-80 leading-relaxed`}>{item.desc}</p>
+
+                        {/* Content */}
+                        <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+
+                            {/* ── H-2 방문취업 ── */}
+                            <div className="bg-teal-50 rounded-xl overflow-hidden border border-teal-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-teal-600 to-teal-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><FileCheck size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">H-2 (방문취업)</h4>
                                 </div>
-                            ))}
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-teal-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-teal-800 leading-relaxed">중국·CIS 등 외국국적동포 (만 25세 이상). 한국어능력시험(TOPIK) 또는 사회통합프로그램 이수자 우대.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-teal-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 가능 업종</p>
+                                        <p className="text-xs text-teal-800 leading-relaxed">건설업, 서비스업, 제조업, 농축산업, 어업 등 허용 업종에서 자유롭게 취업 가능. 단, <span className="font-bold">특례고용가능확인서</span> 발급 후 취업 가능.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-teal-700 mb-1 flex items-center gap-1"><FileCheck size={11} /> 필요 서류</p>
+                                        <ul className="text-xs text-teal-800 space-y-0.5 ml-3 list-disc">
+                                            <li>특례고용가능확인서 (고용센터 발급)</li>
+                                            <li>외국인등록증 사본</li>
+                                            <li>근로계약서 (2부 작성)</li>
+                                            <li>여권 사본</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-teal-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-teal-800 space-y-0.5 ml-3 list-disc">
+                                            <li><span className="font-bold">근로개시 신고</span>: 근로 시작일로부터 <span className="font-bold text-red-600">14일 이내</span> 고용센터 신고 필수</li>
+                                            <li>체류기간: 최대 3년 (재입국 후 재취업 가능)</li>
+                                            <li>사업장 변경 시 고용센터에 변경 신고</li>
+                                            <li>4대 보험 가입 의무 (국민연금·건강보험·고용보험·산재보험)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── E-9 비전문취업 ── */}
+                            <div className="bg-cyan-50 rounded-xl overflow-hidden border border-cyan-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-cyan-600 to-cyan-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><FileCheck size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">E-9 (비전문취업)</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-cyan-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-cyan-800 leading-relaxed">고용허가제(EPS)를 통해 입국한 비전문 외국인 근로자. 16개 송출국가 대상.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-cyan-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 가능 업종</p>
+                                        <p className="text-xs text-cyan-800 leading-relaxed">제조업, 건설업, 농축산업, 어업, 서비스업 (음식점업 포함). <span className="font-bold">고용허가서에 명시된 사업장에서만</span> 취업 가능.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-cyan-700 mb-1 flex items-center gap-1"><FileCheck size={11} /> 필요 서류</p>
+                                        <ul className="text-xs text-cyan-800 space-y-0.5 ml-3 list-disc">
+                                            <li>고용허가서 (고용센터 발급, 사업주 신청)</li>
+                                            <li>표준근로계약서 (한국산업인력공단 서식)</li>
+                                            <li>외국인등록증 사본</li>
+                                            <li>출국만기보험·귀국비용보험 가입 증명</li>
+                                            <li>상해보험 가입증명서</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-cyan-700 mb-1 flex items-center gap-1"><Clock size={11} /> 체류기간</p>
+                                        <p className="text-xs text-cyan-800 leading-relaxed">최초 3년 → 성실근로자 재고용 시 1년 10개월 연장 가능 (최대 4년 10개월).</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-cyan-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-cyan-800 space-y-0.5 ml-3 list-disc">
+                                            <li><span className="font-bold text-red-600">사업장 변경 제한</span>: 최대 3회 (사유 발생 시 1개월 이내 신청)</li>
+                                            <li>사업장 변경 사유: 휴·폐업, 근로조건 위반, 부당처우 등</li>
+                                            <li>출국만기보험: 월 급여의 8.3% 적립 (사업주 부담)</li>
+                                            <li>4대 보험 전부 가입 필수</li>
+                                            <li>임금체불 시 고용노동부 신고 가능 (1350)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── D-2 유학 / D-4 어학연수 ── */}
+                            <div className="bg-blue-50 rounded-xl overflow-hidden border border-blue-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><Clock size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">D-2 (유학) / D-4 (어학연수) — 시간제 취업</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-blue-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-blue-800 leading-relaxed">국내 대학(원) 재학 유학생(D-2) 또는 어학연수생(D-4). 시간제 취업허가를 받은 경우에만 아르바이트 가능.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-blue-700 mb-1 flex items-center gap-1"><Clock size={11} /> 근로시간 제한</p>
+                                        <div className="bg-white/60 rounded-lg p-3 mt-1">
+                                            <table className="w-full text-xs text-blue-800">
+                                                <thead>
+                                                    <tr className="border-b border-blue-200">
+                                                        <th className="text-left pb-1.5 font-bold">구분</th>
+                                                        <th className="text-left pb-1.5 font-bold">학기 중</th>
+                                                        <th className="text-left pb-1.5 font-bold">방학 중</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-blue-100">
+                                                    <tr><td className="py-1.5">D-2 석·박사</td><td className="py-1.5">주 30시간</td><td className="py-1.5 font-bold text-blue-600">무제한</td></tr>
+                                                    <tr><td className="py-1.5">D-2 학부</td><td className="py-1.5">주 25시간</td><td className="py-1.5 font-bold text-blue-600">무제한</td></tr>
+                                                    <tr><td className="py-1.5">D-4 어학연수</td><td className="py-1.5">주 20시간</td><td className="py-1.5 font-bold text-blue-600">무제한</td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-blue-700 mb-1 flex items-center gap-1"><FileCheck size={11} /> 필요 서류</p>
+                                        <ul className="text-xs text-blue-800 space-y-0.5 ml-3 list-disc">
+                                            <li>시간제 취업허가서 (출입국관리사무소 발급)</li>
+                                            <li>재학증명서 및 성적증명서</li>
+                                            <li>학교 유학생 담당자 확인서 (학교장 추천서)</li>
+                                            <li>근로계약서</li>
+                                            <li>여권 및 외국인등록증 사본</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-blue-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-blue-800 space-y-0.5 ml-3 list-disc">
+                                            <li><span className="font-bold text-red-600">허가 없이 취업 시 강제퇴거 사유</span></li>
+                                            <li>유흥업소, 사행시설 등 취업 금지 업종 확인</li>
+                                            <li>TOPIK 2급 이상 소지 시 허가 우대</li>
+                                            <li>산재보험 의무가입, 건강보험 지역가입</li>
+                                            <li>사업주도 허가 없이 고용 시 <span className="font-bold">과태료 부과</span></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── F-2 거주 ── */}
+                            <div className="bg-violet-50 rounded-xl overflow-hidden border border-violet-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-violet-600 to-violet-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><Shield size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">F-2 (거주)</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-violet-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-violet-800 leading-relaxed">점수제(F-2-7) 거주자격 취득자, 영주자격 예비 단계. 국민의 미성년 자녀, 영주권자 배우자 등 포함.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-violet-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 범위</p>
+                                        <p className="text-xs text-violet-800 leading-relaxed"><span className="font-bold text-violet-600">내국인과 동일하게 자유롭게 취업 가능.</span> 업종·사업장 제한 없음. 별도 취업허가 불요.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-violet-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-violet-800 space-y-0.5 ml-3 list-disc">
+                                            <li>체류기간 연장 시 소득·납세 증빙 필요</li>
+                                            <li>4대 보험 내국인과 동일하게 가입</li>
+                                            <li>범죄경력·체류기간 준수 등 자격 유지 요건 확인</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── F-4 재외동포 ── */}
+                            <div className="bg-indigo-50 rounded-xl overflow-hidden border border-indigo-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><Globe size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">F-4 (재외동포)</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-indigo-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-indigo-800 leading-relaxed">대한민국 국적을 보유했던 자 (또는 그 직계비속)로서 외국국적을 취득한 재외동포.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-indigo-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 범위</p>
+                                        <p className="text-xs text-indigo-800 leading-relaxed">대부분 업종 자유 취업 가능. <span className="font-bold text-red-600">단, 단순노무 일부 제한</span> (건설 단순노무, 가사도우미 등은 별도 허가 필요).</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-indigo-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-indigo-800 space-y-0.5 ml-3 list-disc">
+                                            <li>체류기간: 2년 (무제한 연장 가능)</li>
+                                            <li>취업활동 신고: 근로 시작 후 <span className="font-bold">14일 이내</span> 출입국관리사무소 신고</li>
+                                            <li>단순노무 취업 시 별도 <span className="font-bold">체류자격외활동허가</span> 필요</li>
+                                            <li>건강보험 당연적용 (입국 6개월 후)</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── F-5 영주 ── */}
+                            <div className="bg-emerald-50 rounded-xl overflow-hidden border border-emerald-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><Shield size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">F-5 (영주)</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-emerald-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-emerald-800 leading-relaxed">5년 이상 합법 체류 + 생계유지 능력 + 품행 단정 등 영주 요건 충족자. 대한민국에 특별한 공로가 있는 자 포함.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-emerald-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 범위</p>
+                                        <p className="text-xs text-emerald-800 leading-relaxed"><span className="font-bold text-emerald-600">내국인과 완전히 동일. 모든 업종 자유 취업. 별도 허가 불요.</span></p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-emerald-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-emerald-800 space-y-0.5 ml-3 list-disc">
+                                            <li>체류기간 제한 없음 (영주권)</li>
+                                            <li>단, 출국 후 <span className="font-bold">2년 이상 미입국 시 영주자격 취소</span> 가능</li>
+                                            <li>재입국허가 기간 내 입국 필수</li>
+                                            <li>4대 보험 내국인과 동일</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── F-6 결혼이민 ── */}
+                            <div className="bg-pink-50 rounded-xl overflow-hidden border border-pink-100">
+                                <div className="px-4 py-3 bg-gradient-to-r from-pink-600 to-rose-600 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><User size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">F-6 (결혼이민)</h4>
+                                </div>
+                                <div className="p-4 space-y-3">
+                                    <div>
+                                        <p className="text-[11px] font-bold text-pink-700 mb-1 flex items-center gap-1"><Info size={11} /> 대상자</p>
+                                        <p className="text-xs text-pink-800 leading-relaxed">대한민국 국민과 혼인관계에 있는 외국인. 혼인 파탄 시에도 귀책사유 없으면 체류 가능.</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-pink-700 mb-1 flex items-center gap-1"><Building2 size={11} /> 취업 범위</p>
+                                        <p className="text-xs text-pink-800 leading-relaxed"><span className="font-bold text-pink-600">내국인과 동일하게 자유 취업 가능. 업종·시간 제한 없음.</span></p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[11px] font-bold text-pink-700 mb-1 flex items-center gap-1"><AlertTriangle size={11} /> 주의사항</p>
+                                        <ul className="text-xs text-pink-800 space-y-0.5 ml-3 list-disc">
+                                            <li>4대 보험 내국인과 동일 적용</li>
+                                            <li>한국어·사회통합프로그램(KIIP) 이수 시 영주권 신청 유리</li>
+                                            <li>귀화 신청 시 체류기간 산입</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ═══════ 관계기관 연락처 ═══════ */}
+                            <div className="bg-slate-50 rounded-xl overflow-hidden border border-slate-200 mt-6">
+                                <div className="px-4 py-3 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-md bg-white/20 flex items-center justify-center"><Phone size={13} className="text-white" /></div>
+                                    <h4 className="font-bold text-sm text-white">관계기관 연락처</h4>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    {/* 정부·공공기관 */}
+                                    <div>
+                                        <p className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1 uppercase tracking-wider"><Building2 size={11} /> 정부·공공기관</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {[
+                                                { name: '외국인종합안내센터 (출입국)', tel: '1345', desc: '체류자격·비자·신고 등 전반 상담 (다국어)' },
+                                                { name: '고용노동부 고객상담센터', tel: '1350', desc: '임금체불·부당해고·근로기준 상담' },
+                                                { name: '외국인력지원센터', tel: '1577-0071', desc: '외국인 근로자 고충상담·생활지원' },
+                                                { name: '대한법률구조공단', tel: '132', desc: '무료 법률상담·소송지원 (외국인 포함)' },
+                                                { name: '한국산업인력공단 (HRDKorea)', tel: '1644-8000', desc: 'EPS 고용허가제·한국어시험 관련' },
+                                                { name: '사회통합정보망 (SOCINET)', tel: '1345 → 4번', desc: '사회통합프로그램(KIIP) 등록·문의' },
+                                            ].map((item, i) => (
+                                                <div key={i} className="bg-white rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
+                                                    <div className="flex items-start justify-between">
+                                                        <p className="text-xs font-bold text-slate-800 leading-tight">{item.name}</p>
+                                                        <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md whitespace-nowrap ml-2">{item.tel}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 4대 보험 기관 */}
+                                    <div>
+                                        <p className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1 uppercase tracking-wider"><Shield size={11} /> 4대 보험 기관</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {[
+                                                { name: '국민연금공단', tel: '1355', desc: '외국인 국민연금 가입·반환일시금 상담' },
+                                                { name: '국민건강보험공단', tel: '1577-1000', desc: '직장가입자 등록·보험료·자격 관련' },
+                                                { name: '근로복지공단 (산재보험)', tel: '1588-0075', desc: '산재보험 가입·산업재해 신고·보상' },
+                                                { name: '고용보험 (고용센터)', tel: '1350', desc: '고용보험 가입확인·실업급여 문의' },
+                                            ].map((item, i) => (
+                                                <div key={i} className="bg-white rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
+                                                    <div className="flex items-start justify-between">
+                                                        <p className="text-xs font-bold text-slate-800 leading-tight">{item.name}</p>
+                                                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap ml-2">{item.tel}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 외국인 전용 보험 */}
+                                    <div>
+                                        <p className="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1 uppercase tracking-wider"><FileCheck size={11} /> 외국인 근로자 전용 보험</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {[
+                                                { name: '출국만기보험 (삼성화재)', tel: '1588-5114', desc: 'E-9 출국만기보험 가입·청구 (사업주 가입)' },
+                                                { name: '귀국비용보험 (삼성화재)', tel: '1588-5114', desc: 'E-9 귀국비용보험 가입·청구 (근로자 가입)' },
+                                                { name: '상해보험 (DB손해보험)', tel: '1588-0100', desc: 'E-9·H-2 상해보험 가입 (입국 후 즉시)' },
+                                                { name: '보증보험 (서울보증보험)', tel: '1670-7000', desc: '체불 임금 보증보험 관련 문의' },
+                                            ].map((item, i) => (
+                                                <div key={i} className="bg-white rounded-lg p-3 border border-slate-100 hover:border-slate-300 transition-colors">
+                                                    <div className="flex items-start justify-between">
+                                                        <p className="text-xs font-bold text-slate-800 leading-tight">{item.name}</p>
+                                                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md whitespace-nowrap ml-2">{item.tel}</span>
+                                                    </div>
+                                                    <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* 안내 참고사항 */}
+                                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                                        <p className="text-[10px] text-amber-700 leading-relaxed flex items-start gap-1.5">
+                                            <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                                            <span>위 전화번호는 변경될 수 있습니다. 외국인 근로자 관련 민원은 <span className="font-bold">1345 (외국인종합안내센터)</span>에서 20개 국어로 상담 가능합니다. 운영시간: 평일 09:00~22:00, 주말·공휴일 09:00~18:00.</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-4 border-t border-slate-100">
-                            <button onClick={() => setIsVisaGuideOpen(false)} className="w-full p-2.5 bg-slate-100 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-200 transition-colors">확인</button>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+                            <button onClick={() => setIsVisaGuideOpen(false)} className="w-full p-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-xl text-sm font-bold hover:from-cyan-700 hover:to-blue-700 shadow-md transition-all">확인</button>
                         </div>
                     </div>
                 </div>
