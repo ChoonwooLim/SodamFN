@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Users, Clock, AlertTriangle, CalendarDays, TrendingUp, Palmtree, Bell, ChevronRight, BarChart3, Shield, FileText, UserCheck, UserMinus, Briefcase } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Users, Clock, AlertTriangle, CalendarDays, TrendingUp, Palmtree, Bell, ChevronRight, BarChart3, Shield, FileText, UserCheck, UserMinus, Briefcase, Settings, ArrowRightLeft } from 'lucide-react';
 import { useBusinessConfig } from '../hooks/useBusinessConfig';
 import api from '../api';
 
 export default function HRDashboard() {
-    const { isSimpleMode, employeeScale } = useBusinessConfig();
+    const navigate = useNavigate();
+    const { isSimpleMode, employeeScale, updateScale } = useBusinessConfig();
+    const [scaleToggling, setScaleToggling] = useState(false);
     const [staffSummary, setStaffSummary] = useState({ total: 0, active: 0, leave: 0, resigned: 0 });
     const [leaveData, setLeaveData] = useState([]);
     const [alerts, setAlerts] = useState([]);
@@ -98,23 +100,40 @@ export default function HRDashboard() {
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/20 to-blue-50/10">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 flex items-center justify-center shadow-lg shadow-indigo-200">
-                        <BarChart3 size={20} className="text-white" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-black text-slate-900">HR 대시보드</h1>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                                isSimpleMode
-                                    ? 'bg-emerald-100 text-emerald-700'
-                                    : 'bg-blue-100 text-blue-700'
-                            }`}>
-                                {isSimpleMode ? '5인 미만' : '5인 이상'}
-                            </span>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-700 flex items-center justify-center shadow-lg shadow-indigo-200">
+                            <BarChart3 size={20} className="text-white" />
                         </div>
-                        <p className="text-xs text-slate-400">인력 현황 · {isSimpleMode ? '간편관리' : '연차 현황 · 알림'}</p>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-xl font-black text-slate-900">HR 대시보드</h1>
+                            </div>
+                            <p className="text-xs text-slate-400">인력 현황 · {isSimpleMode ? '간편관리' : '연차 현황 · 알림'}</p>
+                        </div>
                     </div>
+
+                    {/* 사업장 규모 토글 */}
+                    <button
+                        onClick={async () => {
+                            setScaleToggling(true);
+                            const newScale = isSimpleMode ? 'over5' : 'under5';
+                            await updateScale(newScale);
+                            setScaleToggling(false);
+                            window.location.reload();
+                        }}
+                        disabled={scaleToggling}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
+                            isSimpleMode
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                                : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                        } disabled:opacity-50`}
+                        title="클릭하여 사업장 규모 모드를 전환합니다"
+                    >
+                        <ArrowRightLeft size={14} />
+                        <span>{isSimpleMode ? '🏪 5인 미만' : '🏢 5인 이상'}</span>
+                        <span className="text-[10px] font-normal text-slate-400">전환</span>
+                    </button>
                 </div>
 
                 {/* Staff Summary Cards */}
