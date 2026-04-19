@@ -249,7 +249,9 @@ def upload_staff_document(
         raise HTTPException(status_code=404, detail="Staff not found")
     
     timestamp = int(datetime.now().timestamp())
-    filename = f"{doc_type}_{timestamp}_{file.filename}"
+    # Use only extension from original filename (avoid Korean chars in path)
+    ext = os.path.splitext(file.filename or "")[1] or ".bin"
+    filename = f"{doc_type}_{timestamp}{ext}"
     storage_key = f"staff_docs/{staff_id}/{filename}"
     
     try:
