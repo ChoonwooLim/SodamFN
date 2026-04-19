@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon, Users } from 'lucide-react';
+import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon, Users, Stamp, Check } from 'lucide-react';
 import VendorSettings from './VendorSettings';
 import ContractSettings from './ContractSettings';
 import GoogleMapPicker from '../components/GoogleMapPicker';
 import { useBusinessConfig } from '../hooks/useBusinessConfig';
+import { SEAL_STYLES, CompanySeal } from '../components/CompanySeal';
 import api from '../api';
 
 const TABS = [
@@ -12,6 +13,7 @@ const TABS = [
     { key: 'payment', label: '급여 출금계좌' },
     { key: 'location', label: '매장 위치 관리' },
     { key: 'logo', label: '회사 로고 관리' },
+    { key: 'seal', label: '회사직인 관리' },
     { key: 'business', label: '사업장 규모 설정' },
 ];
 
@@ -39,11 +41,49 @@ export default function Settings() {
     const [logoSaving, setLogoSaving] = useState(false);
     const [logoMessage, setLogoMessage] = useState('');
 
+    // Seal State
+    const [sealStyle, setSealStyle] = useState('seal-01');
+    const [sealText, setSealText] = useState('');
+    const [sealSaving, setSealSaving] = useState(false);
+    const [sealMessage, setSealMessage] = useState(null);
+
     useEffect(() => {
         if (activeTab === 'payment') fetchBizAccount();
         if (activeTab === 'location') fetchLocation();
         if (activeTab === 'logo') fetchBusinessInfo();
+        if (activeTab === 'seal') fetchSealSettings();
     }, [activeTab]);
+
+    const fetchSealSettings = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) return;
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const bid = payload.business_id || localStorage.getItem('business_id');
+            if (!bid) return;
+            const res = await api.get(`/auth/business-info?bid=${bid}`);
+            if (res.data) {
+                setSealStyle(res.data.seal_style || 'seal-01');
+                setSealText(res.data.seal_text || res.data.business_name || '');
+            }
+        } catch (e) { console.error('Error fetching seal settings:', e); }
+    };
+
+    const handleSaveSeal = async () => {
+        setSealSaving(true);
+        setSealMessage(null);
+        try {
+            await api.put('/auth/business-settings', {
+                seal_style: sealStyle,
+                seal_text: sealText,
+            });
+            setSealMessage({ type: 'success', text: '회사 직인이 저장되었습니다.' });
+        } catch (e) {
+            setSealMessage({ type: 'error', text: '저장 중 오류가 발생했습니다.' });
+        } finally {
+            setSealSaving(false);
+        }
+    };
 
     const fetchBusinessInfo = async () => {
         try {
@@ -375,6 +415,107 @@ export default function Settings() {
                                 {logoSaving ? '저장 중...' : '로고 저장 및 변경'}
                             </button>
                         </div>
+                    </div>
+                ) : activeTab === 'seal' ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-5xl card-animate">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center shadow-lg shadow-red-500/20">
+                                <Stamp size={18} className="text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-800">회사직인 관리</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">계약서·증명서 등에 사용할 회사 직인 스타일과 문구를 선택합니다.</p>
+                            </div>
+                        </div>
+
+                        {/* 회사명 입력 + 미리보기 */}
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-6 mb-6 items-start">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                                        직인 문구 (회사명)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={sealText}
+                                        onChange={(e) => setSealText(e.target.value)}
+                                        placeholder="예: 소담김밥"
+                                        maxLength={30}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all"
+                                    />
+                                    <p className="text-xs text-slate-400 mt-1.5">
+                                        사각 인장(seal-03)은 최대 4자, 그 외는 6자 이내를 권장합니다.
+                                    </p>
+                                </div>
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 leading-relaxed">
+                                    <strong>💡 안내</strong><br />
+                                    선택한 직인은 전자계약서·급여명세서·재직증명서 등 공식 문서에 자동 삽입됩니다.
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-center">
+                                <div className="text-xs text-slate-500 mb-2 font-medium">현재 선택된 직인</div>
+                                <div className="p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border border-slate-200">
+                                    <CompanySeal style={sealStyle} text={sealText || '회사명'} size={160} />
+                                </div>
+                                <div className="text-xs font-semibold text-slate-700 mt-2">
+                                    {(SEAL_STYLES.find(s => s.key === sealStyle) || {}).name}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 10개 샘플 그리드 */}
+                        <div className="mb-4">
+                            <div className="text-sm font-bold text-slate-700 mb-3">
+                                스타일 선택 (10종)
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                                {SEAL_STYLES.map((s) => {
+                                    const selected = s.key === sealStyle;
+                                    return (
+                                        <button
+                                            key={s.key}
+                                            type="button"
+                                            onClick={() => setSealStyle(s.key)}
+                                            className={`relative p-3 rounded-xl border-2 transition-all text-left flex flex-col items-center gap-2 ${
+                                                selected
+                                                    ? 'border-red-500 bg-red-50 ring-2 ring-red-200 shadow-md'
+                                                    : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                                            }`}
+                                        >
+                                            {selected && (
+                                                <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-red-600 flex items-center justify-center z-10">
+                                                    <Check size={12} className="text-white" strokeWidth={3} />
+                                                </div>
+                                            )}
+                                            <CompanySeal style={s.key} text={sealText || '회사명'} size={96} />
+                                            <div className="text-center">
+                                                <div className="text-xs font-bold text-slate-800">{s.name}</div>
+                                                <div className="text-[10px] text-slate-400 mt-0.5 leading-tight line-clamp-2">{s.description}</div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {sealMessage && (
+                            <div className={`mb-4 text-sm font-medium p-4 rounded-xl ${
+                                sealMessage.type === 'error'
+                                    ? 'bg-red-50 border border-red-200 text-red-600'
+                                    : 'bg-emerald-50 border border-emerald-200 text-emerald-600'
+                            }`}>
+                                {sealMessage.text}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={handleSaveSeal}
+                            disabled={sealSaving || !sealText.trim()}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-xl text-sm font-semibold hover:from-red-700 hover:to-red-800 transition-all shadow-sm disabled:opacity-50"
+                        >
+                            <Save size={16} />
+                            {sealSaving ? '저장 중...' : '직인 저장'}
+                        </button>
                     </div>
                 ) : activeTab === 'business' ? (
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 max-w-3xl card-animate">

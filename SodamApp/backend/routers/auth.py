@@ -400,6 +400,16 @@ async def kakao_callback(code: str):
 
 # --- User Info & Dependency ---
 
+def _parse_settings_json(raw):
+    import json
+    if not raw:
+        return {}
+    try:
+        v = json.loads(raw)
+        return v if isinstance(v, dict) else {}
+    except Exception:
+        return {}
+
 @router.get("/business-info")
 def get_business_info(bid: int):
     from models import Business
@@ -408,11 +418,14 @@ def get_business_info(bid: int):
         business = service.session.get(Business, bid)
         if not business:
             raise HTTPException(status_code=404, detail="Business not found")
+        settings = _parse_settings_json(getattr(business, 'settings_json', None))
         return {
             "business_name": business.name,
             "logo_url": business.logo_url,
             "employee_scale": getattr(business, 'employee_scale', 'over5'),
             "business_type": business.business_type,
+            "seal_style": settings.get("seal_style", "seal-01"),
+            "seal_text": settings.get("seal_text", business.name or ""),
         }
     finally:
         service.close()
@@ -423,11 +436,12 @@ def update_business_settings(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """사업장 설정 업데이트 (employee_scale 등)
+    """사업장 설정 업데이트 (employee_scale, seal_style, seal_text 등)
 
     SuperAdmin이 'View As'로 특정 사업장을 보고 있을 때는 X-View-As-Business 헤더의 bid를 사용.
     일반 admin은 본인의 business_id 사용.
     """
+    import json
     from models import Business
     bid = admin.business_id
     # SuperAdmin은 본인 business_id가 없을 수 있음 → View-As 헤더 허용
@@ -441,13 +455,32 @@ def update_business_settings(
         business = service.session.get(Business, bid)
         if not business:
             raise HTTPException(status_code=404, detail="사업장을 찾을 수 없습니다.")
+
         if "employee_scale" in data:
             if data["employee_scale"] in ("under5", "over5"):
                 business.employee_scale = data["employee_scale"]
+
+        # settings_json 병합 저장 (seal_style, seal_text 등)
+        settings = _parse_settings_json(business.settings_json)
+        changed_settings = False
+        if "seal_style" in data and isinstance(data["seal_style"], str):
+            settings["seal_style"] = data["seal_style"][:32]
+            changed_settings = True
+        if "seal_text" in data and isinstance(data["seal_text"], str):
+            settings["seal_text"] = data["seal_text"][:64]
+            changed_settings = True
+        if changed_settings:
+            business.settings_json = json.dumps(settings, ensure_ascii=False)
+
         service.session.add(business)
         service.session.commit()
         service.session.refresh(business)
-        return {"status": "success", "employee_scale": business.employee_scale}
+        return {
+            "status": "success",
+            "employee_scale": business.employee_scale,
+            "seal_style": settings.get("seal_style", "seal-01"),
+            "seal_text": settings.get("seal_text", business.name or ""),
+        }
     finally:
         service.close()
 
