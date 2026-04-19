@@ -3,16 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import {
     User, LogOut, FileText, Wallet, Clock, ChevronRight, Shield, Lock
 } from 'lucide-react';
+import api from '../api';
+
+const GRADE_LABEL = {
+    'normal': '정직원',
+    'vip': '정직원',
+    '정직원': '정직원',
+    '아르바이트': '아르바이트',
+    'admin': '관리자',
+};
 
 export default function Profile() {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState(() => {
+        const token = localStorage.getItem('token');
+        if (!token) return null;
+        try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
+    });
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) { navigate(`/login${window.location.search}`); return; }
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser(payload);
+        if (!localStorage.getItem('token')) {
+            navigate(`/login${window.location.search}`);
+            return;
+        }
+        api.get('/auth/me')
+            .then((res) => setUser((prev) => ({ ...(prev || {}), ...res.data })))
+            .catch(() => { });
     }, [navigate]);
 
     const handleLogout = () => {
@@ -61,7 +77,7 @@ export default function Profile() {
                     <div className="text-center">
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>등급</div>
                         <div style={{ fontWeight: 600, marginTop: '4px' }}>
-                            <span className="badge badge-info">{user.grade === 'normal' ? '정직원' : user.grade === 'vip' ? '아르바이트' : user.grade || '정직원'}</span>
+                            <span className="badge badge-info">{GRADE_LABEL[user.grade] || '정직원'}</span>
                         </div>
                     </div>
                 </div>
