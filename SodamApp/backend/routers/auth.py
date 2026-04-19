@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Header
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
@@ -421,12 +421,20 @@ def get_business_info(bid: int):
 def update_business_settings(
     data: dict,
     admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """사업장 설정 업데이트 (employee_scale 등)"""
+    """사업장 설정 업데이트 (employee_scale 등)
+
+    SuperAdmin이 'View As'로 특정 사업장을 보고 있을 때는 X-View-As-Business 헤더의 bid를 사용.
+    일반 admin은 본인의 business_id 사용.
+    """
     from models import Business
     bid = admin.business_id
+    # SuperAdmin은 본인 business_id가 없을 수 있음 → View-As 헤더 허용
+    if admin.role == "superadmin" and x_view_as_business is not None:
+        bid = x_view_as_business
     if not bid:
-        raise HTTPException(status_code=400, detail="사업장 정보가 없습니다.")
+        raise HTTPException(status_code=400, detail="사업장 정보가 없습니다. (SuperAdmin은 먼저 대상 사업장을 선택하세요.)")
 
     service = DatabaseService()
     try:
