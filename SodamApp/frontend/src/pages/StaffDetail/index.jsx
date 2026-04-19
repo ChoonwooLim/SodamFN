@@ -225,14 +225,18 @@ export default function StaffDetail() {
         uploadData.append('file', file);
 
         try {
-            await api.post(`/hr/staff/${id}/document`, uploadData);
+            await api.post(`/hr/staff/${id}/document`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+                timeout: 60000, // 60s timeout for large files
+            });
             // Refresh data to show new file
-            fetchStaffDetail();
+            await fetchStaffDetail();
             setMsg("파일이 업로드되었습니다.");
             setTimeout(() => setMsg(""), 3000);
         } catch (error) {
             console.error("Upload failed", error);
-            alert("파일 업로드 실패");
+            const detail = error.response?.data?.detail || error.message || '알 수 없는 오류';
+            alert(`파일 업로드 실패: ${detail}`);
         } finally {
             e.target.value = null; // Reset file input so the same file can be uploaded again
         }

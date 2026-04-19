@@ -27,6 +27,10 @@ services:
         value: "https://sodamfn.twinverse.org"
       - key: STAFF_APP_URL
         value: "https://sodam-staff.pages.dev"
+      - key: MEDIA_SERVER_URL
+        value: "http://192.168.219.101:8200"
+      - key: MEDIA_API_KEY
+        value: "sodam-media-2026"
       - key: R2_ACCOUNT_ID
         value: ""  # Set via Orbitron secrets
       - key: R2_ACCESS_KEY_ID
@@ -39,12 +43,18 @@ services:
         value: ""  # Set after R2 bucket creation
       - key: REPLICATE_API_TOKEN
         value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
+      - key: OPENAI_API_KEY
+        value: ""  # Set via Orbitron secrets (OpenAI DALL-E 3 final fallback)
+      # Shared AI compute server: twinverse-ai @ 192.168.219.117 (RTX 3090 24GB)
+      # See C:\WORK\infra-docs\ai-shared-registry.md for full policy
       - key: AI_GPU_SERVER_URL
-        value: "http://192.168.219.100:8100"  # Windows PC RTX 3090 AI service
+        value: "http://192.168.219.117:8100"  # Flux.1-schnell + Real-ESRGAN + rembg + LaMa
+      - key: OLLAMA_URL
+        value: "http://192.168.219.117:11434"  # Ollama LLM (qwen2.5/mistral/llava)
       - key: TTS_SERVER_URL
-        value: "http://192.168.219.100:8101"  # Windows PC TTS service (Edge-TTS)
+        value: "http://192.168.219.117:8101"  # TTS (Edge-TTS / XTTS v2) - reserved
       - key: MUSIC_SERVER_URL
-        value: "http://192.168.219.100:8102"  # Windows PC Music service (ACE-Step)
+        value: "http://192.168.219.117:8102"  # Music generation (ACE-Step) - reserved
       - key: MEDIA_SERVER_URL
         value: "http://192.168.219.101:8200"  # Central media file server
       - key: MEDIA_API_KEY
