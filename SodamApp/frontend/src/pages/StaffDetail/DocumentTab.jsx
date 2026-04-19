@@ -3,7 +3,7 @@ import { Upload, CheckSquare, Eye, Trash2, Loader2, X, ChevronLeft, ChevronRight
 
 const DOC_TYPES = [
     { key: 'contract', label: '근로계약서' },
-    { key: 'health_cert', label: '보건증' },
+    { key: 'health_cert', label: '건강진단서' },
     { key: 'id_copy', label: '신분증 사본' },
     { key: 'bank_copy', label: '통장 사본' },
     { key: 'photo', label: '취업승인서' },
