@@ -10,6 +10,29 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 STATIC = "/app/static"
 STAFF_STATIC = "/app/staff-static"
 
+# ── Cache-Control Middleware ──
+# 브라우저가 새로고침 없이도 항상 최신 빌드를 받도록 설정
+# - HTML / 루트: max-age=0 → 매번 서버에 재확인 (304로 빠르게 응답)
+# - /assets/* (해시 포함 번들): 1년 캐시 (파일명이 바뀌면 자동 갱신)
+# - 기타 정적 파일: max-age=0 → 매번 재확인
+@app.middleware("http")
+async def cache_control_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+
+    # API, uploads, docs 등은 각자 고유 헤더 사용 → 건드리지 않음
+    if path.startswith(("/api/", "/uploads/", "/docs", "/openapi", "/redoc")):
+        return response
+
+    # Vite 빌드 산출물: /assets/index-Ab3Cd4Ef.js 등 해시 포함 → 1년 immutable
+    if "/assets/" in path:
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    else:
+        # index.html, manifest.json, 아이콘 등 → 항상 서버 재확인
+        response.headers["Cache-Control"] = "public, max-age=0, must-revalidate"
+
+    return response
+
 # ── Staff App (served at /staff/) ──
 if os.path.isdir(STAFF_STATIC) and os.path.isfile(os.path.join(STAFF_STATIC, "index.html")):
     # Mount staff-app known subdirectories

@@ -1,14 +1,17 @@
-# index.html은 절대 캐시하지 않음
+# HTML/루트: 매번 서버 재확인 (변경 없으면 304 → 빠르게 응답)
 /
-  Cache-Control: no-cache, no-store, must-revalidate
-  Pragma: no-cache
-  Expires: 0
+  Cache-Control: public, max-age=0, must-revalidate
 
 /index.html
-  Cache-Control: no-cache, no-store, must-revalidate
-  Pragma: no-cache
-  Expires: 0
+  Cache-Control: public, max-age=0, must-revalidate
 
-# JS/CSS 번들은 해시가 포함되므로 장기 캐시 가능
+# 아이콘/이미지 등 public 정적 파일: 매번 재확인
+/icons/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+/recipes/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# JS/CSS 번들은 해시가 포함되므로 1년 캐시 (파일명 바뀌면 자동 갱신)
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

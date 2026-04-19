@@ -90,6 +90,17 @@ services:
     routes:
       - source: "/*"
         rewrite: /index.html
+    headers:
+      # HTML/루트: 항상 서버 재확인 → 새로고침 없이 최신 반영
+      - source: "/**"
+        headers:
+          - key: Cache-Control
+            value: "public, max-age=0, must-revalidate"
+      # 해시 포함 빌드 산출물: 1년 immutable 캐시
+      - source: "/assets/**"
+        headers:
+          - key: Cache-Control
+            value: "public, max-age=31536000, immutable"
 
 # ─────────────────────────────────────────────
 # Post-deploy: Staff App → Cloudflare Pages
