@@ -45,4 +45,34 @@
 - `3fe110d` 급여 테이블에 총 보상액과 실수령액 두 컬럼을 분리하여 표시
 - (미커밋) AttendanceInput 컴포넌트를 모달에서 인라인 모드로 전환, AttendanceTab에서 직접 렌더링
 
+### 작업 요약 (세션 2 — HR SaaS 전문화 Phase 1~8)
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| infra | Cache-Control 헤더 설정 — 새로고침 없이 최신 빌드 반영 | 완료 |
+| feat | 퇴직금 산출을 인사기록카드 탭으로 이관 | 완료 |
+| style | 계약관리 탭 명칭 변경, 급여 카드 색상 통일, 기본정보 레이아웃 재구성 | 완료 |
+| feat | 인사기록카드 전체 데이터 자동 연동 시스템 | 완료 |
+| feat | 외국인 고용안내 전용 페이지 + 사이드메뉴 등록 | 완료 |
+| feat | Phase 1: 연차/휴가관리 탭 — 잔여현황, 신청, 이력, 잔액조정 | 완료 |
+| feat | Phase 2-3-6: 인사변경이력 자동추적 + 근로시간 모니터링 + HR 대시보드 | 완료 |
+| feat | Phase 4-5: 교육/자격증 관리 + HR 알림 시스템 (계약만료, 서류미비 등) | 완료 |
+| feat | Phase 7: 증명서 자동발급 (재직/경력/급여확인/퇴직 4종 A4 HTML) | 완료 |
+| feat | Phase 8: 5인 미만/이상 사업장 규모 모드 구분 (간편/전체 기능 분리) | 완료 |
+
+### 세부 내용 (세션 2)
+
+- `05d1793` Cache-Control 헤더 설정 — vercel.json headers로 캐시 무효화
+- `913faf0` 퇴직금 산출을 별도 페이지에서 인사기록카드 탭으로 이관
+- `29ec27f` 전자계약→계약관리 탭 명칭 변경, 퇴직금에 계약정보 입사일 자동 반영
+- `7780eb4` 연간 급여 요약 카드 색상 통일 — 다크녹색/청색 계열
+- `4893742` 기본정보 탭 레이아웃 재구성 — 재직현황/체류자격 우측 이동
+- `8d9ec6c` 인사기록카드 전체 데이터(계약정보, 인사기록 등) 자동 연동
+- `5cac344` 외국인 고용안내 전용 페이지 생성 (비자별 상세정보, 관공서 연락처)
+- `e175472` [Phase 1] 연차/휴가관리 — LeaveBalance/LeaveRequest 모델, 한국 노동법 연차 자동계산, 휴가신청/승인/반려
+- `b4878af` [Phase 2-3-6] StaffChangeLog 자동 기록, 근로시간 모니터링(주 48h 초과 경고), HR 대시보드
+- `4c20b56` [Phase 4-5] StaffTraining/StaffCertification CRUD, 법정교육 5종 이수체크, HR 알림 통합 API
+- `fe26c1b` [Phase 7] certificate.py — 재직/경력/급여확인/퇴직 증명서 HTML 생성 API, DocumentTab에 발급 UI
+- `5df377d` [Phase 8] Business.employee_scale 필드, BusinessConfigProvider, StaffDetail 탭 조건부 렌더링, Settings 사업장 규모 UI
+
 ---
