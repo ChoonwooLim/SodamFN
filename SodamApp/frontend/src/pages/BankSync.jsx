@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2 } from 'lucide-react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon } from 'lucide-react';
 import api from '../api';
 
 const TABS = [
@@ -51,6 +51,25 @@ export default function BankSync() {
     const [pullForm, setPullForm] = useState({ start_date: '', end_date: '' });
     const [pulling, setPulling] = useState(false);
     const [pullResult, setPullResult] = useState(null);
+
+    // Diagnostic
+    const [diagOpen, setDiagOpen] = useState(false);
+    const [diag, setDiag] = useState(null);
+    const [diagLoading, setDiagLoading] = useState(false);
+
+    async function runDiagnose() {
+        setDiagOpen(true);
+        setDiagLoading(true);
+        setDiag(null);
+        try {
+            const res = await api.get('/bank-sync/diagnose');
+            setDiag(res.data);
+        } catch (e) {
+            setDiag({ _fetch_error: e.response?.data?.detail || e.message });
+        } finally {
+            setDiagLoading(false);
+        }
+    }
 
     useEffect(() => {
         fetchStatus();
@@ -257,6 +276,7 @@ export default function BankSync() {
                         onOpenMgtUrl={handleOpenMgtUrl}
                         onPull={openPullModal}
                         onDelete={handleDeleteAccount}
+                        onDiagnose={runDiagnose}
                     />
                 ) : (
                     <TransactionsTab
@@ -285,14 +305,164 @@ export default function BankSync() {
                     onExecute={executePull}
                 />
             )}
+
+            {diagOpen && (
+                <DiagnoseModal
+                    data={diag}
+                    loading={diagLoading}
+                    onClose={() => setDiagOpen(false)}
+                    onRerun={runDiagnose}
+                />
+            )}
         </div>
     );
 }
 
-function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete }) {
+function DiagnoseModal({ data, loading, onClose, onRerun }) {
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-start justify-center px-4 pt-12 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 mb-12">
+                <div className="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <Stethoscope size={18} className="text-amber-600" />
+                            팝빌 연결 진단
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Cloudflare에 가려진 502 에러의 실제 원인을 확인합니다.
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"
+                    >
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="p-12 text-center">
+                        <Loader2 size={24} className="animate-spin mx-auto text-slate-400" />
+                        <p className="text-xs text-slate-400 mt-2">팝빌 API 호출 중...</p>
+                    </div>
+                ) : !data ? (
+                    <div className="p-8 text-center text-sm text-slate-400">진단 데이터가 없습니다.</div>
+                ) : data._fetch_error ? (
+                    <div className="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm">
+                        <div className="font-semibold">진단 엔드포인트 자체가 실패했습니다</div>
+                        <div className="mt-1 font-mono text-xs">{data._fetch_error}</div>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <section>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">환경변수</h4>
+                            <div className="bg-slate-50 rounded-lg p-3 font-mono text-xs space-y-1">
+                                {Object.entries(data.env || {}).map(([k, v]) => (
+                                    <div key={k} className="flex justify-between">
+                                        <span className="text-slate-500">{k}</span>
+                                        <span className={`font-semibold ${v === true ? 'text-emerald-600' : v === false ? 'text-rose-600' : 'text-slate-700'}`}>
+                                            {typeof v === 'boolean' ? (v ? 'SET ✓' : 'MISSING ✗') : (v || '(empty)')}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+
+                        <section>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">프로바이더</h4>
+                            <div className="bg-slate-50 rounded-lg p-3 text-sm flex justify-between">
+                                <span>활성: <b className="font-mono">{data.provider || '-'}</b></span>
+                                <span>
+                                    is_test_mode:{' '}
+                                    <b className={`font-mono ${data.is_test_mode === false ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                        {String(data.is_test_mode)}
+                                    </b>
+                                </span>
+                            </div>
+                            {data.is_test_mode === true && (
+                                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs">
+                                    ⚠️ is_test_mode=true. 팝빌 테스트 API 로 연결됨. 실계좌 조회 불가.
+                                    Orbitron env 에서 <code className="bg-white px-1 rounded">POPBILL_BANK_IS_TEST=false</code> 설정 필요.
+                                </div>
+                            )}
+                        </section>
+
+                        {data.provider_init_error && (
+                            <div className="p-3 bg-rose-50 text-rose-700 rounded-xl text-xs font-mono">
+                                <div className="font-sans font-semibold mb-1">Provider 초기화 실패</div>
+                                {data.provider_init_error}
+                            </div>
+                        )}
+
+                        <section>
+                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">팝빌 API 호출 결과</h4>
+                            <div className="space-y-2">
+                                {(data.checks || []).map((c, i) => (
+                                    <details key={i} className={`rounded-lg border ${c.ok ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+                                        <summary className="px-3 py-2 cursor-pointer text-sm flex items-center gap-2">
+                                            {c.ok ? (
+                                                <CheckCircle2 size={14} className="text-emerald-600" />
+                                            ) : (
+                                                <AlertCircle size={14} className="text-rose-600" />
+                                            )}
+                                            <span className="font-mono font-semibold">{c.name}</span>
+                                            <span className={`text-xs ml-auto ${c.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                                {c.ok ? 'OK' : (c.error_type || 'FAIL')}
+                                            </span>
+                                        </summary>
+                                        <div className="px-3 pb-3 border-t border-slate-200">
+                                            {c.ok ? (
+                                                <pre className="mt-2 p-2 bg-white rounded text-xs overflow-x-auto">
+                                                    {JSON.stringify(c.result, null, 2)}
+                                                </pre>
+                                            ) : (
+                                                <div className="mt-2 space-y-1">
+                                                    <div className="text-xs font-mono text-rose-800 bg-white p-2 rounded">
+                                                        {c.error}
+                                                    </div>
+                                                    {c.traceback && (
+                                                        <details className="text-xs">
+                                                            <summary className="text-slate-500 cursor-pointer">traceback</summary>
+                                                            <pre className="mt-1 p-2 bg-slate-900 text-slate-100 rounded overflow-x-auto text-[10px]">
+                                                                {c.traceback.join('\n')}
+                                                            </pre>
+                                                        </details>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </details>
+                                ))}
+                            </div>
+                        </section>
+                    </div>
+                )}
+
+                <div className="flex gap-2 mt-5">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-200"
+                    >
+                        닫기
+                    </button>
+                    <button
+                        onClick={onRerun}
+                        disabled={loading}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:bg-amber-600 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                        재진단
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose }) {
     return (
         <div>
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4">
                 <button
                     onClick={onSync}
                     disabled={loading}
@@ -307,6 +477,14 @@ function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull,
                 >
                     <ExternalLink size={14} />
                     팝빌 관리 페이지 열기
+                </button>
+                <button
+                    onClick={onDiagnose}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 transition-all ml-auto"
+                    title="팝빌 연결 상태를 상세히 진단합니다"
+                >
+                    <Stethoscope size={14} />
+                    연결 진단
                 </button>
             </div>
 

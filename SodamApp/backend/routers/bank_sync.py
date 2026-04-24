@@ -190,6 +190,65 @@ def get_status(admin: User = Depends(get_admin_user)):
     }
 
 
+@router.get("/diagnose")
+def diagnose(admin: User = Depends(get_admin_user)):
+    """팝빌 연결 진단 — 각 API 호출을 개별로 실행하고 결과/에러를 JSON 으로 반환.
+
+    502/500 에러가 Cloudflare 에 가려져도 이 엔드포인트는 항상 200 으로 응답해
+    각 단계의 성공/실패를 클라이언트 UI 에 노출시킴.
+    """
+    import os
+    import traceback
+
+    result = {
+        "env": {
+            "POPBILL_LINK_ID": bool(os.getenv("POPBILL_LINK_ID", "").strip()),
+            "POPBILL_SECRET_KEY_set": bool(os.getenv("POPBILL_SECRET_KEY", "").strip()),
+            "POPBILL_SECRET_KEY_len": len(os.getenv("POPBILL_SECRET_KEY", "").strip()),
+            "POPBILL_CORP_NUM": os.getenv("POPBILL_CORP_NUM", ""),
+            "POPBILL_USER_ID": os.getenv("POPBILL_USER_ID", ""),
+            "POPBILL_IS_TEST": os.getenv("POPBILL_IS_TEST", ""),
+            "POPBILL_BANK_IS_TEST": os.getenv("POPBILL_BANK_IS_TEST", ""),
+            "BANK_SYNC_PROVIDER": os.getenv("BANK_SYNC_PROVIDER", ""),
+        },
+        "provider": None,
+        "checks": [],
+    }
+
+    try:
+        provider = get_provider()
+        result["provider"] = provider.name
+        result["is_test_mode"] = getattr(provider, "is_test", None)
+    except Exception as e:
+        result["provider_init_error"] = f"{type(e).__name__}: {e}"
+        return result
+
+    def _run(name: str, fn):
+        step = {"name": name, "ok": False}
+        try:
+            step["result"] = fn()
+            step["ok"] = True
+        except Exception as e:
+            step["error_type"] = type(e).__name__
+            step["error"] = str(e)
+            step["traceback"] = traceback.format_exc().splitlines()[-5:]
+        result["checks"].append(step)
+
+    _run("getBalance", lambda: provider.get_balance())
+    _run("getBankAccountMgtURL", lambda: provider.get_mgt_url())
+    _run("listBankAccount", lambda: [
+        {
+            "bank_code": a.bank_code, "bank_name": a.bank_name,
+            "account_number": a.account_number, "alias": a.alias,
+            "state": a.state,
+            "use_start": a.use_period_start, "use_end": a.use_period_end,
+        }
+        for a in provider.list_accounts()
+    ])
+
+    return result
+
+
 @router.get("/mgt-url")
 def get_mgt_url(admin: User = Depends(get_admin_user)):
     """팝빌 계좌조회 관리 페이지 팝업 URL (로그인 스킵된 1회용 링크)."""
