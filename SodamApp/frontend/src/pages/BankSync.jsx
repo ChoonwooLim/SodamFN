@@ -398,12 +398,16 @@ function DiagnoseModal({ data, loading, onClose, onRerun }) {
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">팝빌 API 호출 결과</h4>
                             <div className="space-y-2">
                                 {(data.checks || []).map((c, i) => (
-                                    <details key={i} className={`rounded-lg border ${c.ok ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
-                                        <summary className="px-3 py-2 cursor-pointer text-sm flex items-center gap-2">
+                                    <details
+                                        key={i}
+                                        open={!c.ok}
+                                        className={`rounded-lg border ${c.ok ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}
+                                    >
+                                        <summary className="px-3 py-2 cursor-pointer text-sm flex items-center gap-2 flex-wrap">
                                             {c.ok ? (
-                                                <CheckCircle2 size={14} className="text-emerald-600" />
+                                                <CheckCircle2 size={14} className="text-emerald-600 flex-shrink-0" />
                                             ) : (
-                                                <AlertCircle size={14} className="text-rose-600" />
+                                                <AlertCircle size={14} className="text-rose-600 flex-shrink-0" />
                                             )}
                                             <span className="font-mono font-semibold">{c.name}</span>
                                             <span className={`text-xs ml-auto ${c.ok ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -416,14 +420,16 @@ function DiagnoseModal({ data, loading, onClose, onRerun }) {
                                                     {JSON.stringify(c.result, null, 2)}
                                                 </pre>
                                             ) : (
-                                                <div className="mt-2 space-y-1">
-                                                    <div className="text-xs font-mono text-rose-800 bg-white p-2 rounded">
-                                                        {c.error}
+                                                <div className="mt-2 space-y-2">
+                                                    <div className="text-xs font-mono text-rose-900 bg-white p-3 rounded border border-rose-200 whitespace-pre-wrap break-all">
+                                                        <b className="font-sans text-rose-700">에러 메시지:</b>
+                                                        <br />
+                                                        {c.error || '(no message)'}
                                                     </div>
                                                     {c.traceback && (
-                                                        <details className="text-xs">
-                                                            <summary className="text-slate-500 cursor-pointer">traceback</summary>
-                                                            <pre className="mt-1 p-2 bg-slate-900 text-slate-100 rounded overflow-x-auto text-[10px]">
+                                                        <details className="text-xs" open>
+                                                            <summary className="text-slate-500 cursor-pointer">traceback (최근 5줄)</summary>
+                                                            <pre className="mt-1 p-2 bg-slate-900 text-slate-100 rounded overflow-x-auto text-[10px] whitespace-pre-wrap">
                                                                 {c.traceback.join('\n')}
                                                             </pre>
                                                         </details>
