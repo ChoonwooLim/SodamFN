@@ -369,6 +369,49 @@ class FaxTransmission(SQLModel, table=True):
     completed_at: Optional[datetime.datetime] = None
 
 
+class NotificationHistory(SQLModel, table=True):
+    """카카오 알림톡 / 친구톡 / SMS / LMS / MMS 발송 이력.
+
+    channel: 'alimtalk' / 'friendtalk' / 'sms' / 'lms' / 'mms'
+    trigger: 수동('manual') / 자동('attendance_late', 'payroll_sent',
+             'leave_approved', 'leave_rejected', 'contract_expiring',
+             'probation_ended' 등)
+    status: 'pending' / 'sending' / 'success' / 'failed'
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+
+    channel: str = Field(default="sms", index=True)
+    trigger: str = Field(default="manual", index=True)
+
+    target_number: str = Field(index=True)
+    target_name: Optional[str] = None
+    sender_number: Optional[str] = None
+
+    # 알림톡 전용
+    template_code: Optional[str] = None
+    template_variables: Optional[str] = None   # JSON 직렬화
+
+    # 메시지 본문
+    subject: Optional[str] = None              # LMS/MMS 제목
+    content: str = Field(default="")
+
+    # 전송 결과
+    status: str = Field(default="pending", index=True)
+    provider: Optional[str] = None             # 'stub' / 'popbill'
+    provider_tx_id: Optional[str] = None
+    error_message: Optional[str] = None
+
+    # 관련 엔티티
+    staff_id: Optional[int] = Field(default=None, foreign_key="staff.id", index=True)
+    source_ref: Optional[str] = None
+
+    created_by_user_id: Optional[int] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now, index=True)
+    sent_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None
+
+
 class WorkLocation(SQLModel, table=True):
     """매장 위치 및 Geofence 설정"""
     id: Optional[int] = Field(default=None, primary_key=True)
