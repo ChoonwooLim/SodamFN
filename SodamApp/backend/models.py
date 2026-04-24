@@ -316,8 +316,28 @@ class StaffDocument(SQLModel, table=True):
     file_path: str
     original_filename: str
     upload_date: datetime.datetime = Field(default_factory=datetime.datetime.now)
-    
+
     staff: Optional[Staff] = Relationship(back_populates="documents")
+
+
+class BusinessDocument(SQLModel, table=True):
+    """사업장(회사) 공식 문서 보관.
+
+    doc_type 예: 'biz_registration'(사업자등록증), 'biz_license'(영업신고증),
+    'corp_registry'(법인등기부등본), 'lease'(임대차계약서),
+    'bank_copy'(통장사본), 'tax_cert'(납세증명서), 'seal_cert'(인감증명서),
+    'vat_return'(부가세신고서), 'insurance'(4대보험가입증), 'permit'(인허가증),
+    'other' 등. 프론트에서 타입 리스트 관리.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    doc_type: str = Field(index=True)
+    label: Optional[str] = None  # 'other' 등 사용자 지정 라벨
+    file_path: str
+    original_filename: str
+    note: Optional[str] = None
+    uploaded_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 
 class WorkLocation(SQLModel, table=True):
     """매장 위치 및 Geofence 설정"""

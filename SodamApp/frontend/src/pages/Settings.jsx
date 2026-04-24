@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon, Users, Stamp, Check } from 'lucide-react';
 import VendorSettings from './VendorSettings';
 import ContractSettings from './ContractSettings';
+import CompanyInfoSettings from './CompanyInfoSettings';
 import GoogleMapPicker from '../components/GoogleMapPicker';
 import { useBusinessConfig } from '../hooks/useBusinessConfig';
 import { SEAL_STYLES, CompanySeal } from '../components/CompanySeal';
 import api from '../api';
 
 const TABS = [
+    { key: 'company', label: '회사정보 관리' },
     { key: 'vendor', label: '거래처 및 품목 관리' },
     { key: 'contract', label: '전자계약서 양식' },
     { key: 'payment', label: '급여 출금계좌' },
@@ -19,7 +21,7 @@ const TABS = [
 
 export default function Settings() {
     const { employeeScale, updateScale, refresh: refreshBusinessConfig } = useBusinessConfig();
-    const [activeTab, setActiveTab] = useState('vendor');
+    const [activeTab, setActiveTab] = useState('company');
     const [scaleUpdating, setScaleUpdating] = useState(false);
     const [scaleMessage, setScaleMessage] = useState(null); // { type: 'success'|'error', text }
     const [bizAccount, setBizAccount] = useState({ bank: '', number: '', holder: '' });
@@ -237,7 +239,9 @@ export default function Settings() {
                 </div>
 
                 {/* Content Area */}
-                {activeTab === 'vendor' ? (
+                {activeTab === 'company' ? (
+                    <CompanyInfoSettings />
+                ) : activeTab === 'vendor' ? (
                     <div className="-mt-2">
                         <VendorSettings />
                     </div>

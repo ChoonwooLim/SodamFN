@@ -265,6 +265,44 @@ const styles = {
             );
         },
     },
+
+    // 11. English Traditional Seal — 영문 전각 스타일 원형 낙관
+    'seal-11': {
+        name: 'English Traditional',
+        description: 'Round red seal with English name in carved seal-script style. Mirrors a traditional East Asian 낙관.',
+        render: (text) => {
+            const words = (text || '').trim().toUpperCase().split(/\s+/).filter(Boolean);
+            const line1 = words[0] || '';
+            const line2 = words.slice(1).join(' ');
+            const longest = Math.max(line1.length, line2.length, 3);
+            const fs = Math.max(20, Math.min(40, Math.floor(180 / longest)));
+            return (
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="sealRough11" x="-10%" y="-10%" width="120%" height="120%">
+                            <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="5" />
+                            <feDisplacementMap in="SourceGraphic" scale="2.2" />
+                        </filter>
+                    </defs>
+                    <g filter="url(#sealRough11)">
+                        <circle cx="100" cy="100" r="90" fill="#b71c1c" />
+                        <circle cx="100" cy="100" r="90" fill="none" stroke="#7f0f10" strokeWidth="3" />
+                        <circle cx="100" cy="100" r="74" fill="none" stroke="#ffe9e0" strokeWidth="1.5" />
+                        <g fontFamily={'Georgia, "Times New Roman", serif'} fontWeight="900" fill="#fff3ec" textAnchor="middle" letterSpacing="3">
+                            {line2 ? (
+                                <>
+                                    <text x="100" y="92" fontSize={fs}>{line1}</text>
+                                    <text x="100" y="134" fontSize={fs}>{line2}</text>
+                                </>
+                            ) : (
+                                <text x="100" y="115" fontSize={fs + 4}>{line1}</text>
+                            )}
+                        </g>
+                    </g>
+                </svg>
+            );
+        },
+    },
 };
 
 export const SEAL_STYLES = Object.entries(styles).map(([key, v]) => ({

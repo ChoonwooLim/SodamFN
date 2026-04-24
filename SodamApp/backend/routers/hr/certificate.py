@@ -61,6 +61,128 @@ def _get_staff_and_business(
     return staff, business
 
 
+# ──────────────────────────────────────────────
+# Seal rendering (mirrors CompanySeal.jsx)
+# ──────────────────────────────────────────────
+
+def _parse_business_settings(business) -> dict:
+    """Safely parse Business.settings_json."""
+    import json
+    if not business:
+        return {}
+    raw = getattr(business, "settings_json", None)
+    if not raw:
+        return {}
+    try:
+        v = json.loads(raw)
+        return v if isinstance(v, dict) else {}
+    except Exception:
+        return {}
+
+
+def _svg_escape(s: str) -> str:
+    return (
+        (s or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _render_seal_svg(seal_style: str, seal_text: str) -> str:
+    """Render an inline SVG seal matching the frontend CompanySeal component.
+
+    Supports the same seal-01..seal-11 style keys. Defaults to seal-11 (English Traditional).
+    The returned SVG is sized to 100% of its container — the caller controls the box size.
+    """
+    style = (seal_style or "seal-11").lower()
+    text = seal_text or ""
+
+    FONT_TRAD = "'Nanum Myeongjo','Noto Serif KR',serif"
+    FONT_ENG = "Georgia,'Times New Roman',serif"
+
+    def _wrap(t: str, per: int) -> list:
+        t = (t or "").strip()
+        if not t:
+            return [""]
+        if len(t) <= per:
+            return [t]
+        return [t[i : i + per] for i in range(0, len(t), per)]
+
+    if style == "seal-11":
+        words = [w for w in (text or "").strip().upper().split() if w]
+        line1 = words[0] if words else ""
+        line2 = " ".join(words[1:]) if len(words) > 1 else ""
+        longest = max(len(line1), len(line2), 3)
+        fs = max(20, min(40, 180 // longest))
+        e1 = _svg_escape(line1)
+        e2 = _svg_escape(line2)
+        if line2:
+            text_block = (
+                f'<text x="100" y="92" font-size="{fs}">{e1}</text>'
+                f'<text x="100" y="134" font-size="{fs}">{e2}</text>'
+            )
+        else:
+            text_block = f'<text x="100" y="115" font-size="{fs + 4}">{e1}</text>'
+        return f"""
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <defs>
+    <filter id="sealRough11" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="5"/>
+      <feDisplacementMap in="SourceGraphic" scale="2.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#sealRough11)">
+    <circle cx="100" cy="100" r="90" fill="#b71c1c"/>
+    <circle cx="100" cy="100" r="90" fill="none" stroke="#7f0f10" stroke-width="3"/>
+    <circle cx="100" cy="100" r="74" fill="none" stroke="#ffe9e0" stroke-width="1.5"/>
+    <g font-family="{FONT_ENG}" font-weight="900" fill="#fff3ec" text-anchor="middle" letter-spacing="3">
+      {text_block}
+    </g>
+  </g>
+</svg>
+""".strip()
+
+    # Default Korean round seal (seal-01 fallback for any other key)
+    lines = _wrap(text, 2)
+    fs = 42 if len(lines) > 1 else 54
+    text_tags = ""
+    for i, l in enumerate(lines):
+        y = 118 if len(lines) == 1 else 90 + i * 50
+        text_tags += f'<text x="100" y="{y}" font-size="{fs}">{_svg_escape(l)}</text>'
+    return f"""
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+  <circle cx="100" cy="100" r="88" fill="#c1272d"/>
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#8b1a1f" stroke-width="3"/>
+  <g font-family="{FONT_TRAD}" font-weight="900" fill="#fff8f0" text-anchor="middle">
+    {text_tags}
+  </g>
+</svg>
+""".strip()
+
+
+def _seal_block(business) -> str:
+    """Return the HTML snippet that replaces the placeholder seal span.
+
+    Priority:
+    1. seal_image_url (uploaded image file) — highest fidelity
+    2. seal_style SVG rendered inline (default fallback)
+    """
+    settings = _parse_business_settings(business)
+    seal_image_url = (settings.get("seal_image_url") or "").strip()
+    if seal_image_url:
+        return (
+            f'<span class="cert-seal-img">'
+            f'<img src="{_svg_escape(seal_image_url)}" alt="직인" />'
+            f'</span>'
+        )
+    seal_style = settings.get("seal_style", "seal-11")
+    seal_text = settings.get("seal_text") or (business.name if business else "") or ""
+    svg = _render_seal_svg(seal_style, seal_text)
+    return f'<span class="cert-seal-img">{svg}</span>'
+
+
 def _base_css() -> str:
     """Shared print-friendly CSS for all certificates."""
     return """
@@ -139,19 +261,18 @@ def _base_css() -> str:
             font-size: 16px;
             line-height: 2.2;
         }
-        .cert-seal {
+        .cert-seal-img {
             display: inline-block;
-            width: 70px;
-            height: 70px;
-            border: 2px solid #c00;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 66px;
-            color: #c00;
-            font-size: 14px;
-            font-weight: bold;
-            margin-left: 10px;
+            width: 72px;
+            height: 72px;
+            margin-left: 12px;
             vertical-align: middle;
+            transform: rotate(-6deg);
+        }
+        .cert-seal-img svg {
+            width: 100%;
+            height: 100%;
+            display: block;
         }
         .cert-footer {
             position: absolute;
@@ -215,6 +336,7 @@ def generate_employment_certificate(
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
     biz_phone = business.phone or "-" if business else "-"
+    seal_html = _seal_block(business)
 
     body = f"""
     <h1 class="cert-title">재 직 증 명 서</h1>
@@ -285,7 +407,7 @@ def generate_employment_certificate(
         <p>전 화 번 호 : {biz_phone}</p>
         <p style="margin-top:15px;">
             대 표 자 : {biz_owner}
-            <span class="cert-seal">직인</span>
+            {seal_html}
         </p>
     </div>
     """
@@ -335,6 +457,7 @@ def generate_career_certificate(
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
     biz_phone = business.phone or "-" if business else "-"
+    seal_html = _seal_block(business)
 
     body = f"""
     <h1 class="cert-title">경 력 증 명 서</h1>
@@ -409,7 +532,7 @@ def generate_career_certificate(
         <p>전 화 번 호 : {biz_phone}</p>
         <p style="margin-top:15px;">
             대 표 자 : {biz_owner}
-            <span class="cert-seal">직인</span>
+            {seal_html}
         </p>
     </div>
     """
@@ -477,6 +600,7 @@ def generate_salary_certificate(
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
     biz_phone = business.phone or "-" if business else "-"
+    seal_html = _seal_block(business)
 
     body = f"""
     <h1 class="cert-title">급 여 확 인 서</h1>
@@ -551,7 +675,7 @@ def generate_salary_certificate(
         <p>전 화 번 호 : {biz_phone}</p>
         <p style="margin-top:15px;">
             대 표 자 : {biz_owner}
-            <span class="cert-seal">직인</span>
+            {seal_html}
         </p>
     </div>
     """
@@ -646,6 +770,7 @@ def generate_retirement_certificate(
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
     biz_phone = business.phone or "-" if business else "-"
+    seal_html = _seal_block(business)
 
     body = f"""
     <h1 class="cert-title">퇴 직 증 명 서</h1>
@@ -724,7 +849,7 @@ def generate_retirement_certificate(
         <p>전 화 번 호 : {biz_phone}</p>
         <p style="margin-top:15px;">
             대 표 자 : {biz_owner}
-            <span class="cert-seal">직인</span>
+            {seal_html}
         </p>
     </div>
     """

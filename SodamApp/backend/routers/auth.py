@@ -424,8 +424,22 @@ def get_business_info(bid: int):
             "logo_url": business.logo_url,
             "employee_scale": getattr(business, 'employee_scale', 'over5'),
             "business_type": business.business_type,
+            "business_number": business.business_number or "",
+            "owner_name": business.owner_name or "",
+            "phone": business.phone or "",
+            "address": business.address or "",
+            "region": business.region or "",
             "seal_style": settings.get("seal_style", "seal-01"),
             "seal_text": settings.get("seal_text", business.name or ""),
+            # Extended (stored inside settings_json for flexibility)
+            "email": settings.get("email", ""),
+            "fax": settings.get("fax", ""),
+            "website": settings.get("website", ""),
+            "opening_date": settings.get("opening_date", ""),
+            "owner_title": settings.get("owner_title", "대표"),
+            "representative_eng": settings.get("representative_eng", ""),
+            "tax_office": settings.get("tax_office", ""),
+            "industry_code": settings.get("industry_code", ""),
         }
     finally:
         service.close()
@@ -460,15 +474,43 @@ def update_business_settings(
             if data["employee_scale"] in ("under5", "over5"):
                 business.employee_scale = data["employee_scale"]
 
-        # settings_json 병합 저장 (seal_style, seal_text 등)
+        # Direct Business columns
+        DIRECT_FIELDS = {
+            "name": 120,
+            "business_number": 32,
+            "business_type": 64,
+            "owner_name": 64,
+            "phone": 32,
+            "address": 255,
+            "region": 64,
+        }
+        for field, maxlen in DIRECT_FIELDS.items():
+            if field in data:
+                v = data[field]
+                if v is None:
+                    setattr(business, field, None)
+                elif isinstance(v, str):
+                    setattr(business, field, v.strip()[:maxlen])
+
+        # settings_json 병합 저장 (seal + 추가 정보)
         settings = _parse_settings_json(business.settings_json)
         changed_settings = False
-        if "seal_style" in data and isinstance(data["seal_style"], str):
-            settings["seal_style"] = data["seal_style"][:32]
-            changed_settings = True
-        if "seal_text" in data and isinstance(data["seal_text"], str):
-            settings["seal_text"] = data["seal_text"][:64]
-            changed_settings = True
+        SETTINGS_STR_FIELDS = {
+            "seal_style": 32,
+            "seal_text": 64,
+            "email": 128,
+            "fax": 32,
+            "website": 255,
+            "opening_date": 20,      # YYYY-MM-DD
+            "owner_title": 32,       # 대표 / 대표이사 / CEO
+            "representative_eng": 64,
+            "tax_office": 64,
+            "industry_code": 32,
+        }
+        for field, maxlen in SETTINGS_STR_FIELDS.items():
+            if field in data and isinstance(data[field], str):
+                settings[field] = data[field].strip()[:maxlen]
+                changed_settings = True
         if changed_settings:
             business.settings_json = json.dumps(settings, ensure_ascii=False)
 
@@ -478,6 +520,11 @@ def update_business_settings(
         return {
             "status": "success",
             "employee_scale": business.employee_scale,
+            "name": business.name,
+            "business_number": business.business_number or "",
+            "owner_name": business.owner_name or "",
+            "phone": business.phone or "",
+            "address": business.address or "",
             "seal_style": settings.get("seal_style", "seal-01"),
             "seal_text": settings.get("seal_text", business.name or ""),
         }
