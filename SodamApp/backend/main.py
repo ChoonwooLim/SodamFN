@@ -136,6 +136,9 @@ app.include_router(bizinfo_check.router, prefix="/api")
 from routers import hometax
 app.include_router(hometax.router, prefix="/api")
 
+from routers import cashbill
+app.include_router(cashbill.router, prefix="/api")
+
 from routers import bank_sync
 app.include_router(bank_sync.router, prefix="/api")
 
