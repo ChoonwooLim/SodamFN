@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Globe, Gauge, Briefcase, Send } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Globe, Gauge, Briefcase, Send, Landmark } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -116,6 +116,7 @@ export default function Sidebar() {
         { icon: ShoppingBag, label: '매입관리', path: '/purchase', color: 'text-orange-400' },
         { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
+        { icon: Landmark, label: '은행계좌 연동', path: '/finance/bank-sync', color: 'text-indigo-400' },
     ];
 
     const superAdminMenuItems = [
@@ -186,7 +187,7 @@ export default function Sidebar() {
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/employees', '/hr/retirement', '/hr/foreign-worker-guide', '/hr/dashboard', '/hr/job-posting', '/hr/fax'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
-    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'].some(p => location.pathname.startsWith(p));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync'].some(p => location.pathname.startsWith(p));
     const isProductActive = productSubItems.some(item => location.pathname === item.path);
 
     // ── Premium menu item renderer ──

@@ -871,3 +871,85 @@ class DevWorkLog(SQLModel, table=True):
     status: str = Field(default="completed")  # draft, completed
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class BankAccount(SQLModel, table=True):
+    """은행 계좌 (팝빌 이지펀뱅크 연동 대상).
+
+    - 사업장당 여러 계좌 등록 가능
+    - 팝빌 계좌조회 정액제에 실제 등록된 계좌만 sync 가능
+    - account_number: 외부 표시는 마스킹, 실제 조회는 API 호출시만 사용
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "bank_code", "account_number", name="uq_bankacc_biz_bank_num"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+
+    bank_code: str = Field(index=True)          # 팝빌 은행코드 (예: '0088' 신한)
+    bank_name: str                               # '신한은행' 등
+    account_number: str                          # 전체 계좌번호 (평문, 응답시 마스킹)
+    account_type: str = Field(default="P")       # 'P' 개인 / 'C' 법인
+    alias: Optional[str] = None                  # 사용자 별칭 (예: '소단신한은행')
+    memo: Optional[str] = None
+
+    # 팝빌 사용기간 / 다음 결제일 (정액제)
+    popbill_use_start: Optional[datetime.date] = None
+    popbill_use_end: Optional[datetime.date] = None
+    next_billing_date: Optional[datetime.date] = None
+    popbill_state: Optional[str] = None          # 'active' / 'inactive' / 'unregistered'
+
+    last_sync_at: Optional[datetime.datetime] = None
+    last_sync_status: Optional[str] = None       # 'success' / 'failed'
+    last_sync_error: Optional[str] = None
+
+    is_active: bool = Field(default=True)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class BankTransaction(SQLModel, table=True):
+    """은행 거래내역 (팝빌 이지펀뱅크 search 결과 raw 저장).
+
+    - tid 는 팝빌이 발급하는 거래고유번호(거래일시+행번호 조합). UNIQUE 제약으로 중복 적재 방지
+    - classified_as 로 매출/매입/지출/이체/미분류 구분
+    - 분류 후 linked_revenue_id / linked_expense_id 로 원장과 연결 (양방향 추적)
+    """
+    __table_args__ = (
+        UniqueConstraint("account_id", "tid", name="uq_banktx_account_tid"),
+        Index("ix_banktx_account_date", "account_id", "trans_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    account_id: int = Field(foreign_key="bankaccount.id", index=True)
+
+    # 팝빌 거래 식별
+    tid: str = Field(index=True)                 # 팝빌 거래고유번호
+    trans_date: datetime.date = Field(index=True)
+    trans_time: Optional[str] = None             # 'HHMMSS'
+    trans_dt: Optional[datetime.datetime] = None # 합성된 datetime
+
+    # 금액
+    in_amount: int = Field(default=0)            # 입금액
+    out_amount: int = Field(default=0)           # 출금액
+    balance: Optional[int] = None                # 거래후 잔액
+
+    # 상대방 / 적요
+    remark1: Optional[str] = None                # 거래내역1 (송금자/수취인)
+    remark2: Optional[str] = None                # 거래내역2 (은행제공 설명)
+    remark3: Optional[str] = None                # 거래내역3 (메모)
+    remark4: Optional[str] = None
+
+    # 분류
+    classified_as: str = Field(default="unclassified", index=True)
+    # 'revenue'(매출) / 'expense'(지출) / 'purchase'(매입) / 'transfer'(이체/내부) / 'excluded'(제외) / 'unclassified'
+    classified_by: Optional[str] = None          # 'auto' / 'manual' / 'rule'
+    classified_at: Optional[datetime.datetime] = None
+
+    linked_revenue_id: Optional[int] = Field(default=None, foreign_key="revenue.id", index=True)
+    linked_expense_id: Optional[int] = Field(default=None, foreign_key="expense.id", index=True)
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id", index=True)
+
+    user_memo: Optional[str] = None              # 사용자가 단 메모
+    raw_json: Optional[str] = None               # 팝빌 응답 원본 (보관용)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now, index=True)

@@ -56,6 +56,7 @@ const ForeignWorkerGuide = React.lazy(() => import('./pages/ForeignWorkerGuide')
 const HRDashboard = React.lazy(() => import('./pages/HRDashboard'));
 const JobPosting = React.lazy(() => import('./pages/JobPosting'));
 const FaxTransmission = React.lazy(() => import('./pages/FaxTransmission'));
+const BankSync = React.lazy(() => import('./pages/BankSync'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -156,6 +157,7 @@ export default function App() {
               <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
               <Route path="/purchase" element={<ProtectedRoute adminOnly><PurchaseManagement /></ProtectedRoute>} />
               <Route path="/finance/delivery" element={<ProtectedRoute adminOnly><DeliveryAppDashboard /></ProtectedRoute>} />
+              <Route path="/finance/bank-sync" element={<ProtectedRoute adminOnly><BankSync /></ProtectedRoute>} />
               <Route path="/purchase-requests" element={<ProtectedRoute adminOnly><PurchaseRequests /></ProtectedRoute>} />
               <Route path="/emergency-contacts" element={<ProtectedRoute adminOnly><EmergencyContactsAdmin /></ProtectedRoute>} />
               <Route path="/announcements" element={<ProtectedRoute adminOnly><AnnouncementsAdmin /></ProtectedRoute>} />
