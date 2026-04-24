@@ -104,6 +104,31 @@ def _ymd(d) -> str:
     return re.sub(r"\D", "", s)[:8]
 
 
+def _attr(obj, *names):
+    """팝빌 SDK 응답 객체에서 여러 속성명 중 첫 번째로 존재하는 값 반환.
+    SDK 버전별 camelCase/PascalCase 차이를 흡수."""
+    if obj is None:
+        return None
+    for n in names:
+        v = getattr(obj, n, None)
+        if v is not None:
+            return v
+        # dict 응답도 대비
+        if isinstance(obj, dict) and n in obj:
+            return obj[n]
+    return None
+
+
+def _to_int(v) -> int:
+    """콤마·통화표시 포함 문자열을 안전하게 int 로 변환. 실패 시 0."""
+    if v is None:
+        return 0
+    try:
+        return int(str(v).replace(",", "").replace("원", "").strip() or 0)
+    except (ValueError, TypeError):
+        return 0
+
+
 # ============================================================
 # Provider 추상
 # ============================================================
@@ -256,26 +281,28 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
         PopbillException = self._popbill_exc()
         try:
             svc = self._get_svc()
-            # SDK 2.x: ListAccount(CorpNum, UserID=None) → [EasyFinBankAccount]
-            rows = svc.ListAccount(self.corp_num, self.user_id) or []
+            rows = svc.listBankAccount(self.corp_num, self.user_id) or []
         except PopbillException as pe:
             raise RuntimeError(f"Popbill[{getattr(pe, 'code', '')}] {getattr(pe, 'message', pe)}")
 
         out: List[BankAccountInfo] = []
         for r in rows:
-            bank_code = getattr(r, "BankCode", None) or getattr(r, "bankCode", None) or ""
-            acc = getattr(r, "AccountNumber", None) or getattr(r, "accountNumber", None) or ""
+            # 팝빌 Python SDK 는 lowerCamelCase 로 응답 속성 노출
+            bank_code = _attr(r, "bankCode", "BankCode") or ""
+            acc = _attr(r, "accountNumber", "AccountNumber") or ""
             out.append(BankAccountInfo(
                 bank_code=str(bank_code),
                 account_number=str(acc),
-                account_type=str(getattr(r, "AccountType", "") or getattr(r, "accountType", "") or "P"),
-                alias=getattr(r, "AccountName", None) or getattr(r, "accountName", None),
-                memo=getattr(r, "Memo", None) or getattr(r, "memo", None),
-                state=getattr(r, "State", None) or getattr(r, "state", None),
-                regist_dt=getattr(r, "RegDT", None) or getattr(r, "regDT", None),
-                use_period_start=getattr(r, "ContractStartDate", None) or getattr(r, "UsePeriodStart", None),
-                use_period_end=getattr(r, "ContractEndDate", None) or getattr(r, "UsePeriodEnd", None),
-                next_billing_date=getattr(r, "ContractEndDate", None) or getattr(r, "NextBillingDate", None),
+                account_type=str(_attr(r, "accountType", "AccountType") or "P"),
+                alias=_attr(r, "accountName", "AccountName"),
+                memo=_attr(r, "memo", "Memo"),
+                state=_attr(r, "state", "State"),
+                regist_dt=_attr(r, "regDT", "RegDT"),
+                # 사용기간: 팝빌 응답의 'contractStartDate' / 'contractEndDate' 또는
+                # 'usePeriodStart' / 'usePeriodEnd'. SDK 버전에 따라 다를 수 있어 fallback.
+                use_period_start=_attr(r, "contractStartDate", "ContractStartDate", "usePeriodStart"),
+                use_period_end=_attr(r, "contractEndDate", "ContractEndDate", "usePeriodEnd"),
+                next_billing_date=_attr(r, "nextBillingDate", "NextBillingDate"),
             ))
         return out
 
@@ -283,32 +310,91 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
         PopbillException = self._popbill_exc()
         try:
             svc = self._get_svc()
-            v = svc.GetBalance(self.corp_num)
+            v = svc.getBalance(self.corp_num)
             return float(v) if v is not None else None
         except PopbillException as pe:
-            logger.warning("GetBalance 실패: %s", pe)
+            logger.warning("getBalance 실패: %s", pe)
             return None
         except Exception as e:
-            logger.warning("GetBalance 예외: %s", e)
+            logger.warning("getBalance 예외: %s", e)
             return None
 
     def check_account_validity(self, bank_code: str, account_number: str) -> dict:
+        """계좌 존재/정액제 상태 확인 — getBankAccountInfo + getFlatRateState 조합."""
         PopbillException = self._popbill_exc()
         try:
             svc = self._get_svc()
-            # SDK 버전에 따라 CheckAccountValidity 존재 여부 분기
-            if hasattr(svc, "CheckAccountValidity"):
-                r = svc.CheckAccountValidity(self.corp_num, bank_code, _normalize(account_number), self.user_id)
-                code = getattr(r, "code", None) or getattr(r, "Code", None)
-                msg = getattr(r, "message", None) or getattr(r, "Message", None) or str(r)
-                return {"ok": code in (1, "1", None), "code": code, "message": msg}
-            return {"ok": True, "note": "SDK no-op"}
+            info = svc.getBankAccountInfo(self.corp_num, bank_code, _normalize(account_number), self.user_id)
+            state = None
+            try:
+                fr = svc.getFlatRateState(self.corp_num, bank_code, _normalize(account_number), self.user_id)
+                state = _attr(fr, "state", "State")
+            except PopbillException:
+                pass
+            return {
+                "ok": True,
+                "bank_name": _attr(info, "bankCodeName", "bankName"),
+                "account_name": _attr(info, "accountName"),
+                "flat_rate_state": state,
+            }
         except PopbillException as pe:
             return {"ok": False, "code": getattr(pe, "code", None), "message": getattr(pe, "message", str(pe))}
         except Exception as e:
             return {"ok": False, "message": f"{e}"}
 
-    # ---------- search ----------
+    # ---------- search (async job pattern) ----------
+    #
+    # 팝빌 이지펀뱅크 거래내역 조회는 2단계 비동기 패턴:
+    #   1) requestJob(...) → JobID 발급 (수집 작업 큐잉)
+    #   2) getJobState(JobID) 폴링 → jobState == 3(완료)
+    #   3) search(JobID, ...) 로 결과 페이지네이션
+    # 이지펀뱅크 Job 은 정액제 기간내 범위에서만 수집 가능.
+
+    def _request_job(self, bank_code: str, account_number: str, start_date, end_date) -> str:
+        PopbillException = self._popbill_exc()
+        s = _ymd(start_date)
+        e = _ymd(end_date)
+        if not s or not e:
+            raise RuntimeError("시작/종료일자 형식 오류")
+        try:
+            svc = self._get_svc()
+            job_id = svc.requestJob(self.corp_num, bank_code, _normalize(account_number), s, e, self.user_id)
+            return str(job_id or "").strip()
+        except PopbillException as pe:
+            raise RuntimeError(f"Popbill[{getattr(pe, 'code', '')}] requestJob 실패: {getattr(pe, 'message', pe)}")
+
+    def _wait_job(self, job_id: str, timeout_sec: int = 60, poll_interval: float = 1.5) -> dict:
+        """jobState:  1=수집대기, 2=수집중, 3=수집완료, 4=수집실패.
+        Returns dict with {state, err_code, err_message, collect_count, regist_dt}.
+        """
+        import time
+        PopbillException = self._popbill_exc()
+        deadline = time.time() + timeout_sec
+        last = None
+        while time.time() < deadline:
+            try:
+                svc = self._get_svc()
+                r = svc.getJobState(self.corp_num, job_id, self.user_id)
+                state_raw = _attr(r, "jobState", "JobState")
+                state = int(state_raw) if state_raw is not None else None
+                err_code = _attr(r, "errorCode", "ErrorCode")
+                err_msg = _attr(r, "errorReason", "ErrorReason")
+                last = {
+                    "state": state,
+                    "err_code": err_code,
+                    "err_message": err_msg,
+                    "collect_count": _attr(r, "collectCount", "CollectCount"),
+                    "result_count": _attr(r, "resultCount", "ResultCount"),
+                    "regist_dt": _attr(r, "regDT", "RegDT"),
+                }
+                if state == 3:
+                    return last
+                if state == 4:
+                    raise RuntimeError(f"팝빌 수집 실패: [{err_code}] {err_msg}")
+            except PopbillException as pe:
+                raise RuntimeError(f"Popbill[{getattr(pe, 'code', '')}] getJobState 실패: {getattr(pe, 'message', pe)}")
+            time.sleep(poll_interval)
+        raise RuntimeError(f"팝빌 수집 타임아웃 ({timeout_sec}s). 마지막 상태: {last}")
 
     def search(
         self,
@@ -316,94 +402,98 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
         account_number: str,
         start_date,
         end_date,
-        order: str = "D",
+        order: str = "A",
         page: int = 1,
         per_page: int = 500,
     ) -> BankSearchResult:
+        """requestJob → poll → search 를 한번에 수행. 모든 페이지 결과 누적 반환.
+
+        주의: page/per_page 파라미터는 응답 메타데이터 용도로만 유지 (기존 시그니처 호환).
+        실제로는 내부에서 모든 페이지를 순회하며 누적.
+        정액제 내에서는 requestJob 자체는 무료이므로 단일 호출에 1 Job 만 소모.
+        """
         PopbillException = self._popbill_exc()
-        s = _ymd(start_date)
-        e = _ymd(end_date)
-        if not s or not e:
-            return BankSearchResult(ok=False, error="시작/종료일자 형식 오류")
 
+        # Step 1–2: Job 큐잉 + 완료대기
         try:
-            svc = self._get_svc()
-            # Search(CorpNum, BankCode, AccountNumber, SDate, EDate, Order='D', Page=1, PerPage=500, UserID=None)
-            resp = svc.Search(
-                self.corp_num,
-                bank_code,
-                _normalize(account_number),
-                s,
-                e,
-                order,
-                page,
-                per_page,
-                self.user_id,
-            )
-        except PopbillException as pe:
-            return BankSearchResult(ok=False, error=f"Popbill[{getattr(pe, 'code', '')}] {getattr(pe, 'message', pe)}")
-        except Exception as e2:
-            return BankSearchResult(ok=False, error=f"조회 오류: {e2}")
+            job_id = self._request_job(bank_code, account_number, start_date, end_date)
+            if not job_id:
+                return BankSearchResult(ok=False, error="requestJob 응답 비어있음")
+            self._wait_job(job_id, timeout_sec=90, poll_interval=1.5)
+        except Exception as e:
+            return BankSearchResult(ok=False, error=str(e))
 
-        rows_raw = getattr(resp, "list", None) or getattr(resp, "List", None) or []
-        total = int(getattr(resp, "total", 0) or getattr(resp, "Total", 0) or 0)
-        per = int(getattr(resp, "perPage", 0) or getattr(resp, "PerPage", per_page) or per_page)
-        pg = int(getattr(resp, "page", page) or getattr(resp, "Page", page) or page)
-
+        # Step 3: 결과 검색 — 모든 페이지 누적
         out: List[BankTxRow] = []
-        for r in rows_raw:
-            tid = getattr(r, "tid", None) or getattr(r, "TID", None) or ""
-            trans_dt = getattr(r, "trdt", None) or getattr(r, "TrDT", None) or ""  # YYYYMMDDHHMMSS
-            trans_date = (trans_dt or "")[:8]
-            trans_time = (trans_dt or "")[8:14] if len(trans_dt or "") >= 14 else None
-            in_amt = getattr(r, "accIn", None) or getattr(r, "AccIn", None) or 0
-            out_amt = getattr(r, "accOut", None) or getattr(r, "AccOut", None) or 0
-            balance = getattr(r, "balance", None) or getattr(r, "Balance", None)
+        cur_page = 1
+        total = 0
+        per = per_page
+        MAX_PAGES = 40  # 최대 40 × 500 = 20,000건 안전장치
 
+        while cur_page <= MAX_PAGES:
             try:
-                in_i = int(str(in_amt).replace(",", "") or 0)
-            except (ValueError, TypeError):
-                in_i = 0
-            try:
-                out_i = int(str(out_amt).replace(",", "") or 0)
-            except (ValueError, TypeError):
-                out_i = 0
-            try:
-                bal_i = int(str(balance).replace(",", "")) if balance is not None else None
-            except (ValueError, TypeError):
-                bal_i = None
+                svc = self._get_svc()
+                # search(CorpNum, JobID, TradeType, SearchString, Page, PerPage, Order, UserID)
+                # TradeType: 'A'=전체, 'I'=입금, 'O'=출금 / SearchString: '' 전체
+                resp = svc.search(
+                    self.corp_num, job_id, "A", "",
+                    cur_page, per_page, order, self.user_id,
+                )
+            except PopbillException as pe:
+                return BankSearchResult(ok=False, error=f"Popbill[{getattr(pe, 'code', '')}] search 실패: {getattr(pe, 'message', pe)}")
+            except Exception as e2:
+                return BankSearchResult(ok=False, error=f"search 오류: {e2}")
 
-            out.append(BankTxRow(
-                tid=str(tid),
-                trans_date=trans_date,
-                trans_time=trans_time,
-                in_amount=in_i,
-                out_amount=out_i,
-                balance=bal_i,
-                remark1=getattr(r, "remark1", None) or getattr(r, "Remark1", None),
-                remark2=getattr(r, "remark2", None) or getattr(r, "Remark2", None),
-                remark3=getattr(r, "remark3", None) or getattr(r, "Remark3", None),
-                remark4=getattr(r, "remark4", None) or getattr(r, "Remark4", None),
-                raw={
-                    "tid": tid, "trdt": trans_dt,
-                    "accIn": in_amt, "accOut": out_amt, "balance": balance,
-                },
-            ))
-        return BankSearchResult(ok=True, rows=out, total=total, per_page=per, page=pg)
+            rows_raw = _attr(resp, "list", "List") or []
+            total = int(_attr(resp, "total", "Total") or total)
+            per = int(_attr(resp, "perPage", "PerPage") or per)
+
+            if not rows_raw:
+                break
+
+            for r in rows_raw:
+                tid = _attr(r, "tid", "TID") or ""
+                trans_dt = _attr(r, "trdt", "TrDT") or ""  # YYYYMMDDHHMMSS
+                trans_date = (trans_dt or "")[:8]
+                trans_time = (trans_dt or "")[8:14] if len(trans_dt or "") >= 14 else None
+                in_amt = _attr(r, "accIn", "AccIn") or 0
+                out_amt = _attr(r, "accOut", "AccOut") or 0
+                balance = _attr(r, "balance", "Balance")
+
+                out.append(BankTxRow(
+                    tid=str(tid),
+                    trans_date=trans_date,
+                    trans_time=trans_time,
+                    in_amount=_to_int(in_amt),
+                    out_amount=_to_int(out_amt),
+                    balance=_to_int(balance) if balance is not None else None,
+                    remark1=_attr(r, "remark1", "Remark1"),
+                    remark2=_attr(r, "remark2", "Remark2"),
+                    remark3=_attr(r, "remark3", "Remark3"),
+                    remark4=_attr(r, "remark4", "Remark4"),
+                    raw={
+                        "tid": tid, "trdt": trans_dt,
+                        "accIn": in_amt, "accOut": out_amt, "balance": balance,
+                        "job_id": job_id,
+                    },
+                ))
+
+            if len(rows_raw) < per_page:
+                break
+            cur_page += 1
+
+        return BankSearchResult(ok=True, rows=out, total=max(total, len(out)), per_page=per, page=1)
 
     def get_mgt_url(self) -> Optional[str]:
         PopbillException = self._popbill_exc()
         try:
             svc = self._get_svc()
-            # TG = 계좌 관리 페이지
-            if hasattr(svc, "GetAccountMgtURL"):
-                return svc.GetAccountMgtURL(self.corp_num, self.user_id)
-            return None
+            return svc.getBankAccountMgtURL(self.corp_num, self.user_id)
         except PopbillException as pe:
-            logger.warning("GetAccountMgtURL 실패: %s", pe)
+            logger.warning("getBankAccountMgtURL 실패: %s", pe)
             return None
         except Exception as e:
-            logger.warning("GetAccountMgtURL 예외: %s", e)
+            logger.warning("getBankAccountMgtURL 예외: %s", e)
             return None
 
 

@@ -23,16 +23,15 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlmodel import select, and_, or_
+from sqlmodel import select, or_
 
-from models import User, BankAccount, BankTransaction, Revenue, Expense, Vendor, Business
+from models import User, BankAccount, BankTransaction, Revenue, Expense, Vendor
 from routers.auth import get_admin_user
 from services.database_service import DatabaseService
 from services.bank_sync_service import (
     BANK_NAMES,
     BankAccountInfo,
     BankSearchResult,
-    BankTxRow,
     get_provider,
 )
 
@@ -322,78 +321,68 @@ def pull_transactions(
         provider = get_provider()
         inserted = 0
         duplicated = 0
-        page = 1
-        total_fetched = 0
-        MAX_PAGES = 20
 
         try:
-            while page <= MAX_PAGES:
-                res: BankSearchResult = provider.search(
-                    bank_code=acc.bank_code,
-                    account_number=acc.account_number,
-                    start_date=start_d,
-                    end_date=end_d,
-                    order="A",   # 오름차순 (과거→최근) — 누적 적재에 유리
-                    page=page,
-                    per_page=body.per_page,
-                )
-                if not res.ok:
-                    acc.last_sync_status = "failed"
-                    acc.last_sync_error = res.error
-                    acc.last_sync_at = datetime.now()
-                    service.session.add(acc)
-                    service.session.commit()
-                    raise HTTPException(status_code=502, detail=f"거래내역 조회 실패: {res.error}")
+            # provider.search() 가 내부에서 requestJob→poll→모든 페이지 누적.
+            # 팝빌 Job 1회만 소모됨 (정액제 내에서는 무료).
+            res: BankSearchResult = provider.search(
+                bank_code=acc.bank_code,
+                account_number=acc.account_number,
+                start_date=start_d,
+                end_date=end_d,
+                order="A",           # 오름차순 (과거→최근)
+                page=1,
+                per_page=body.per_page,
+            )
+            if not res.ok:
+                acc.last_sync_status = "failed"
+                acc.last_sync_error = res.error
+                acc.last_sync_at = datetime.now()
+                service.session.add(acc)
+                service.session.commit()
+                raise HTTPException(status_code=502, detail=f"거래내역 조회 실패: {res.error}")
 
-                if not res.rows:
-                    break
-
-                for r in res.rows:
-                    total_fetched += 1
-                    existing = service.session.exec(
-                        select(BankTransaction).where(
-                            BankTransaction.account_id == acc.id,
-                            BankTransaction.tid == r.tid,
-                        )
-                    ).first()
-                    if existing:
-                        duplicated += 1
-                        continue
-
-                    td = _ymd_to_date(r.trans_date) or start_d
-                    tdt = None
-                    if r.trans_date and r.trans_time and len(r.trans_time) == 6:
-                        try:
-                            tdt = datetime(
-                                td.year, td.month, td.day,
-                                int(r.trans_time[:2]), int(r.trans_time[2:4]), int(r.trans_time[4:6]),
-                            )
-                        except (ValueError, TypeError):
-                            tdt = None
-
-                    tx = BankTransaction(
-                        business_id=bid,
-                        account_id=acc.id,
-                        tid=r.tid,
-                        trans_date=td,
-                        trans_time=r.trans_time,
-                        trans_dt=tdt,
-                        in_amount=r.in_amount,
-                        out_amount=r.out_amount,
-                        balance=r.balance,
-                        remark1=r.remark1,
-                        remark2=r.remark2,
-                        remark3=r.remark3,
-                        remark4=r.remark4,
-                        raw_json=json.dumps(r.raw, ensure_ascii=False) if r.raw else None,
+            total_fetched = len(res.rows)
+            for r in res.rows:
+                existing = service.session.exec(
+                    select(BankTransaction).where(
+                        BankTransaction.account_id == acc.id,
+                        BankTransaction.tid == r.tid,
                     )
-                    service.session.add(tx)
-                    inserted += 1
+                ).first()
+                if existing:
+                    duplicated += 1
+                    continue
 
-                # 다음 페이지 필요 여부 판단
-                if len(res.rows) < body.per_page:
-                    break
-                page += 1
+                td = _ymd_to_date(r.trans_date) or start_d
+                tdt = None
+                if r.trans_date and r.trans_time and len(r.trans_time) == 6:
+                    try:
+                        tdt = datetime(
+                            td.year, td.month, td.day,
+                            int(r.trans_time[:2]), int(r.trans_time[2:4]), int(r.trans_time[4:6]),
+                        )
+                    except (ValueError, TypeError):
+                        tdt = None
+
+                tx = BankTransaction(
+                    business_id=bid,
+                    account_id=acc.id,
+                    tid=r.tid,
+                    trans_date=td,
+                    trans_time=r.trans_time,
+                    trans_dt=tdt,
+                    in_amount=r.in_amount,
+                    out_amount=r.out_amount,
+                    balance=r.balance,
+                    remark1=r.remark1,
+                    remark2=r.remark2,
+                    remark3=r.remark3,
+                    remark4=r.remark4,
+                    raw_json=json.dumps(r.raw, ensure_ascii=False) if r.raw else None,
+                )
+                service.session.add(tx)
+                inserted += 1
 
             acc.last_sync_at = datetime.now()
             acc.last_sync_status = "success"
@@ -418,7 +407,6 @@ def pull_transactions(
             "total_fetched": total_fetched,
             "inserted": inserted,
             "duplicated": duplicated,
-            "pages_fetched": page,
         }
     finally:
         service.close()
