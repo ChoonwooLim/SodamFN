@@ -174,5 +174,12 @@
 - `a71aa55` Orbitron.yaml에 Popbill env 6개 키 선언 추가
 - **SSH 작업(커밋 외)**: Orbitron devdb `projects.env_vars` JSONB가 AES-256-GCM 암호화라 Orbitron crypto.js로 decrypt→merge→encrypt→UPDATE. 기존 12개 env에 Popbill 6개 추가. `deployer.deploy(project)` 직접 호출로 재배포, 컨테이너 재생성 후 env 반영 확인. 테스트: 김금순→임춘우 재직증명서 PDF → 팝빌 접수번호 `026042417423100001`, sendState=3(전송완료) convState=2(변환완료) result=100 확인
 - **문제 발견 및 해결 (팩스 수신확인 후)**: 팝빌 API가 "전송완료/변환완료" 보고했지만 실제 050 수신기에는 **빈 용지** 도착. 서버 측 PDF 파일 분석 결과 content stream 24byte, XObject 0개, Font 14개 — html2canvas 캡처 실패한 빈 PDF. DOMParser 분리 방식으로 commit `a95174f`에서 한번 수정했으나 여전히 빈 페이지. `e08be9d`로 전환: Dockerfile에 libpango/libpangoft2/libharfbuzz/libfribidi + fonts-nanum/noto-cjk 추가, weasyprint>=60.0 requirements 추가, `GET /hr/certificate/pdf/{cert_type}/{staff_id}` 신설 (기존 4개 HTML 엔드포인트 재사용 → WeasyPrint 변환), 프론트 `buildCertificatePdf()` 단순화(html2pdf.js 제거, axios blob 직접 fetch). 프로덕션 컨테이너에서 WeasyPrint로 임춘우 재직증명서 생성 테스트 → 41KB PDF (2페이지, 텍스트 313자 추출, 한글 정상 렌더) 확인
+- **`08cb84c`** 사용자 수신 확인 후 "직인 빠짐 + 2페이지로 분리" 피드백. 원인: seal_image_url이 상대 URL(`/api/media/...`)이라 WeasyPrint가 컨테이너 내에서 resolve 실패 → `alt="직인"` 텍스트만 표시. `_fetch_image_as_data_uri()` 헬퍼 추가해 FRONTEND_URL(https://sodamfn.twinverse.org)에서 다운받아 base64 data URI로 embed. 동시에 cert-issuer 블록에 page-break-inside:avoid
+- **`f48caf0b`** 스페이싱 축소로 A4 1페이지 수렴: cert-title 28→26px, cert-table padding 10x14→7x12, cert-purpose/date/issuer 마진 전반 축소
+- **`8d3bde09`** cert-wrap의 padding/min-height 중복 문제 해결 — @page margin 20→12mm + cert-wrap padding 0 / min-height 제거. 1페이지 확정
+- **`ca8dbcbe`** 환경설정 탭의 직인 이미지 미리보기 비어 보이는 버그 — `get_business_info` 응답에 seal_image_url 누락되어 있어서 추가
+- **`16981547`** cert-issuer 좌측정렬 (text-align:center → left + padding-left: 25mm)
+- **`ff88fada`** "서류가 서류다워야지" 피드백 반영하여 전면 재디자인: 이중 프레임(border 2px + outline 1px offset 4px), 타이틀 명조체 30px letter-spacing 14px + 이중선 divider, 섹션 헤더 검은 배경 + 흰 글자, 발급자 블록 양분(좌측 사업장정보 + 우측 대표자+직인), cert-date 명조체, 로고 워터마크 중앙 6% 투명도, `_issuer_block(business)` 헬퍼로 4개 증명서 통일
+- **`a410f261`** 워터마크 로고 크기 5배 (120mm → 600mm), cert-wrap에 overflow:hidden 추가해 페이지 바깥 클리핑
 
 ---
