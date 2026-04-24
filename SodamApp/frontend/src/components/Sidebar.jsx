@@ -25,7 +25,7 @@ export default function Sidebar() {
         if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
         const hrPaths = ['/employees', '/hr/retirement', '/hr/foreign-worker-guide', '/hr/dashboard', '/hr/job-posting', '/hr/fax'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
-        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery'];
+        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
         const productPaths = ['/products/'];
         if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
@@ -117,6 +117,7 @@ export default function Sidebar() {
         { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
         { icon: Landmark, label: '은행계좌 연동', path: '/finance/bank-sync', color: 'text-indigo-400' },
+        { icon: FileText, label: '전자세금계산서', path: '/finance/tax-invoice', color: 'text-rose-400' },
     ];
 
     const superAdminMenuItems = [
@@ -187,7 +188,7 @@ export default function Sidebar() {
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/employees', '/hr/retirement', '/hr/foreign-worker-guide', '/hr/dashboard', '/hr/job-posting', '/hr/fax'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
-    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync'].some(p => location.pathname.startsWith(p));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice'].some(p => location.pathname.startsWith(p));
     const isProductActive = productSubItems.some(item => location.pathname === item.path);
 
     // ── Premium menu item renderer ──

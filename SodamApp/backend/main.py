@@ -127,6 +127,9 @@ app.include_router(biz_check.router, prefix="/api")
 from routers import account_check
 app.include_router(account_check.router, prefix="/api")
 
+from routers import taxinvoice
+app.include_router(taxinvoice.router, prefix="/api")
+
 from routers import bank_sync
 app.include_router(bank_sync.router, prefix="/api")
 
