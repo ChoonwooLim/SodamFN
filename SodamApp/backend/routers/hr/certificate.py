@@ -163,21 +163,65 @@ def _render_seal_svg(seal_style: str, seal_text: str) -> str:
 """.strip()
 
 
+def _fetch_image_as_data_uri(url: str) -> Optional[str]:
+    """이미지 URL(상대/절대)을 다운받아 data:image/...;base64 URI로 변환.
+
+    WeasyPrint는 컨테이너 내부에서 상대 URL이나 외부 호스트를 resolve하지
+    못하는 경우가 있어 증명서 PDF 생성 시 직인 이미지가 로드되지 않고
+    `alt` 텍스트만 남는 문제가 발생. data URI로 inline 하면 네트워크
+    의존성 없이 확실히 embed됨.
+    """
+    import base64
+    import os
+    try:
+        import requests
+    except Exception:
+        return None
+
+    if not url:
+        return None
+
+    # Build absolute URL candidates
+    candidates: list[str] = []
+    if url.startswith("http://") or url.startswith("https://"):
+        candidates.append(url)
+    else:
+        path = url if url.startswith("/") else "/" + url
+        frontend = (os.getenv("FRONTEND_URL") or "").rstrip("/")
+        if frontend:
+            candidates.append(f"{frontend}{path}")
+        candidates.append(f"http://localhost:3788{path}")
+
+    for cand in candidates:
+        try:
+            resp = requests.get(cand, timeout=5, verify=True)
+            if resp.ok and resp.content:
+                content_type = (resp.headers.get("content-type") or "image/png").split(";")[0].strip()
+                b64 = base64.b64encode(resp.content).decode("ascii")
+                return f"data:{content_type};base64,{b64}"
+        except Exception:
+            continue
+    return None
+
+
 def _seal_block(business) -> str:
     """Return the HTML snippet that replaces the placeholder seal span.
 
     Priority:
-    1. seal_image_url (uploaded image file) — highest fidelity
+    1. seal_image_url (uploaded image file) — 다운받아 data URI로 embed
     2. seal_style SVG rendered inline (default fallback)
     """
     settings = _parse_business_settings(business)
     seal_image_url = (settings.get("seal_image_url") or "").strip()
     if seal_image_url:
-        return (
-            f'<span class="cert-seal-img">'
-            f'<img src="{_svg_escape(seal_image_url)}" alt="직인" />'
-            f'</span>'
-        )
+        data_uri = _fetch_image_as_data_uri(seal_image_url)
+        if data_uri:
+            return (
+                f'<span class="cert-seal-img">'
+                f'<img src="{data_uri}" alt="직인" />'
+                f'</span>'
+            )
+        # 이미지 로드 실패 시 SVG fallback (alt 텍스트 "직인" 대신)
     seal_style = settings.get("seal_style", "seal-11")
     seal_text = settings.get("seal_text") or (business.name if business else "") or ""
     svg = _render_seal_svg(seal_style, seal_text)
@@ -261,6 +305,12 @@ def _base_css() -> str:
             margin-top: 30px;
             font-size: 16px;
             line-height: 2.2;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .cert-purpose, .cert-statement, .cert-date {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .cert-seal-img {
             display: inline-block;
@@ -269,6 +319,11 @@ def _base_css() -> str:
             margin-left: 12px;
             vertical-align: middle;
             transform: rotate(-6deg);
+        }
+        .cert-seal-img img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
         .cert-seal-img svg {
             width: 100%;
