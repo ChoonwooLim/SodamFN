@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText, ImagePlus, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText, ImagePlus, ShieldCheck, AlertCircle, Loader2, Sparkles } from 'lucide-react';
 import api from '../api';
 import './VendorInfoManagement.css';
 
@@ -25,6 +25,10 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
     const [bizChecking, setBizChecking] = useState(false);
     const [bizResult, setBizResult] = useState(null); // { ok, state_label, tax_type_label, state_date, error }
 
+    // 기업정보 조회 (Popbill BizInfoCheckService) — 자동채움용
+    const [bizInfoFetching, setBizInfoFetching] = useState(false);
+    const [bizInfo, setBizInfo] = useState(null);
+
     const handleBizCheck = async () => {
         const raw = (vendorInfo.business_reg_number || '').replace(/\D/g, '');
         if (raw.length !== 10) {
@@ -45,6 +49,38 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
             setBizChecking(false);
         }
     };
+
+    const handleBizInfoFetch = async () => {
+        const raw = (vendorInfo.business_reg_number || '').replace(/\D/g, '');
+        if (raw.length !== 10) {
+            setBizInfo({ ok: false, error: '사업자번호 10자리를 입력하세요.' });
+            return;
+        }
+        if (!window.confirm('기업정보 조회는 건당 약 88원이 발생합니다. 진행할까요?')) return;
+        setBizInfoFetching(true);
+        setBizInfo(null);
+        try {
+            const res = await api.post('/bizinfo-check', { corp_num: raw });
+            setBizInfo(res.data);
+            // 비어있는 필드만 자동 채움 (기존 값 덮어쓰지 않음)
+            if (res.data?.ok) {
+                const patch = {};
+                if (!vendorInfo.phone && res.data.phone) patch.phone = res.data.phone;
+                if (!vendorInfo.address && res.data.address) patch.address = res.data.address;
+                if (Object.keys(patch).length > 0) {
+                    setVendorInfo({ ...vendorInfo, ...patch });
+                }
+            }
+        } catch (e) {
+            setBizInfo({
+                ok: false,
+                error: e?.response?.data?.detail || '조회 중 오류가 발생했습니다.',
+            });
+        } finally {
+            setBizInfoFetching(false);
+        }
+    };
+
 
     // Products State
     const [products, setProducts] = useState([]);
@@ -315,10 +351,34 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                             opacity: bizChecking ? 0.6 : 1,
                                             whiteSpace: 'nowrap',
                                         }}
-                                        title="팝빌 사업자등록상태 조회"
+                                        title="팝빌 사업자등록상태 조회 (건당 ~30원)"
                                     >
                                         {bizChecking ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                                        {bizChecking ? '조회 중...' : '자동확인'}
+                                        {bizChecking ? '조회 중...' : '상태확인'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleBizInfoFetch}
+                                        disabled={bizInfoFetching || (vendorInfo.business_reg_number || '').replace(/\D/g, '').length !== 10}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            padding: '0 14px',
+                                            borderRadius: 8,
+                                            border: '1px solid #6366f1',
+                                            background: '#eef2ff',
+                                            color: '#4338ca',
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: bizInfoFetching ? 'wait' : 'pointer',
+                                            opacity: bizInfoFetching ? 0.6 : 1,
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                        title="팝빌 기업정보 조회 - 상호/주소/전화/업태/종목 자동채움 (건당 ~88원)"
+                                    >
+                                        {bizInfoFetching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                        {bizInfoFetching ? '조회 중...' : '자동채움'}
                                     </button>
                                 </div>
                                 {bizResult && (
@@ -349,6 +409,43 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                                 : <><AlertCircle size={14} /> {bizResult.state_label || '확인됨'} — 거래 주의 {bizResult.state_date ? `(변경일 ${bizResult.state_date})` : ''}</>
                                         ) : (
                                             <><AlertCircle size={14} /> {bizResult.error || '조회 실패'}</>
+                                        )}
+                                    </div>
+                                )}
+                                {bizInfo && (
+                                    <div style={{
+                                        marginTop: 8,
+                                        padding: 12,
+                                        borderRadius: 8,
+                                        fontSize: 12,
+                                        border: bizInfo.ok ? '1px solid #c7d2fe' : '1px solid #fecaca',
+                                        background: bizInfo.ok ? '#eef2ff' : '#fef2f2',
+                                        color: bizInfo.ok ? '#3730a3' : '#b91c1c',
+                                    }}>
+                                        {bizInfo.ok ? (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 6 }}>
+                                                    <Sparkles size={14} /> 기업정보 조회 성공
+                                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6366f1' }}>
+                                                        빈 필드는 자동채움, 기존 값은 유지
+                                                    </span>
+                                                </div>
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, color: '#312e81' }}>
+                                                    {bizInfo.company_name && <div><b>상호</b>: {bizInfo.company_name}</div>}
+                                                    {bizInfo.ceo_name && <div><b>대표자</b>: {bizInfo.ceo_name}</div>}
+                                                    {bizInfo.biz_class && <div><b>업태</b>: {bizInfo.biz_class}</div>}
+                                                    {bizInfo.biz_type && <div><b>종목</b>: {bizInfo.biz_type}</div>}
+                                                    {bizInfo.phone && <div><b>전화</b>: {bizInfo.phone}</div>}
+                                                    {bizInfo.company_size && <div><b>규모</b>: {bizInfo.company_size}</div>}
+                                                    {bizInfo.address && <div style={{ gridColumn: '1 / -1' }}><b>주소</b>: {bizInfo.address}</div>}
+                                                    {bizInfo.establish_date && <div><b>설립일</b>: {bizInfo.establish_date}</div>}
+                                                    {bizInfo.listed_market && <div><b>상장시장</b>: {bizInfo.listed_market}</div>}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <AlertCircle size={14} /> {bizInfo.error || '기업정보 조회 실패'}
+                                            </div>
                                         )}
                                     </div>
                                 )}
