@@ -339,6 +339,36 @@ class BusinessDocument(SQLModel, table=True):
     uploaded_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 
+class FaxTransmission(SQLModel, table=True):
+    """팩스 전송 이력.
+
+    source_type: 'certificate'(자동생성 증명서) / 'upload'(직접 업로드) / 'business_doc'(보관함)
+    status: 'pending' / 'sending' / 'success' / 'failed'
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+
+    target_number: str = Field(index=True)
+    target_name: Optional[str] = None
+    subject: Optional[str] = None
+
+    source_type: str = "upload"   # certificate / upload / business_doc
+    source_ref: Optional[str] = None  # 예: 'employment:2' 또는 BusinessDocument.id
+    file_path: str
+    original_filename: str
+    page_count: Optional[int] = None
+
+    status: str = Field(default="pending", index=True)
+    provider: Optional[str] = None           # 'stub' / 'phaxio' / ...
+    provider_tx_id: Optional[str] = None
+    error_message: Optional[str] = None
+
+    created_by_user_id: Optional[int] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now, index=True)
+    sent_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None
+
+
 class WorkLocation(SQLModel, table=True):
     """매장 위치 및 Geofence 설정"""
     id: Optional[int] = Field(default=None, primary_key=True)

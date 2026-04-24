@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Upload, CheckSquare, Eye, Trash2, Loader2, X, ChevronLeft, ChevronRight, FileText, Image, File, Printer, Award } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Upload, CheckSquare, Eye, Trash2, Loader2, X, ChevronLeft, ChevronRight, FileText, Image, File, Printer, Award, Send } from 'lucide-react';
 import api from '../../api';
 
 const DOC_TYPES = [
@@ -162,6 +163,7 @@ export default function DocumentTab({
     const [uploadingType, setUploadingType] = useState(null);
     const [preview, setPreview] = useState(null); // { docs, index }
     const [certLoading, setCertLoading] = useState(null);
+    const navigate = useNavigate();
 
     const handleGenerateCert = async (type) => {
         if (!staffId) return;
@@ -345,28 +347,49 @@ export default function DocumentTab({
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex items-center gap-3 mb-5 border-b pb-4">
                     <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Printer size={24} /></div>
-                    <div>
+                    <div className="flex-1">
                         <h2 className="text-lg font-bold text-slate-800">증명서 발급</h2>
-                        <p className="text-xs text-slate-400">클릭하면 인쇄용 증명서가 새 창에서 열립니다.</p>
+                        <p className="text-xs text-slate-400">인쇄하거나 바로 팩스로 전송할 수 있습니다.</p>
                     </div>
+                    <button
+                        onClick={() => navigate('/hr/fax')}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-bold rounded-lg hover:from-indigo-700 hover:to-violet-700 shadow-sm"
+                    >
+                        <Send size={14} /> 팩스 전송 페이지
+                    </button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {CERT_TYPES.map(cert => {
                         const Icon = cert.icon;
                         const isLoading = certLoading === cert.key;
                         return (
-                            <button
+                            <div
                                 key={cert.key}
-                                onClick={() => handleGenerateCert(cert.key)}
-                                disabled={isLoading}
-                                className="text-left p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all disabled:opacity-50"
+                                className="p-4 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all"
                             >
                                 <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${cert.color} flex items-center justify-center mb-2.5`}>
                                     {isLoading ? <Loader2 size={14} className="text-white animate-spin" /> : <Icon size={14} className="text-white" />}
                                 </div>
                                 <p className="text-sm font-bold text-slate-800">{cert.label}</p>
-                                <p className="text-[10px] text-slate-400 mt-0.5">{cert.desc}</p>
-                            </button>
+                                <p className="text-[10px] text-slate-400 mt-0.5 mb-2.5">{cert.desc}</p>
+                                <div className="flex gap-1.5">
+                                    <button
+                                        onClick={() => handleGenerateCert(cert.key)}
+                                        disabled={isLoading}
+                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-[11px] font-bold hover:bg-slate-100 disabled:opacity-40"
+                                        title="인쇄"
+                                    >
+                                        <Printer size={12} /> 인쇄
+                                    </button>
+                                    <button
+                                        onClick={() => navigate(`/hr/fax?staff_id=${staffId}&cert=${cert.key}`)}
+                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[11px] font-bold hover:bg-indigo-100"
+                                        title="팩스로 전송"
+                                    >
+                                        <Send size={12} /> 팩스
+                                    </button>
+                                </div>
+                            </div>
                         );
                     })}
                 </div>

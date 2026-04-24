@@ -115,6 +115,9 @@ app.include_router(worklog.router, prefix="/api/superadmin")
 from routers import business_docs
 app.include_router(business_docs.router, prefix="/api")
 
+from routers import fax
+app.include_router(fax.router, prefix="/api")
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""
