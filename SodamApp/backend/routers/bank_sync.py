@@ -290,8 +290,27 @@ def diagnose(
         def _run(name: str, fn):
             step = {"name": f"{prefix}{name}", "env_label": label or "default", "ok": False}
             try:
-                step["result"] = fn()
-                step["ok"] = True
+                res = fn()
+                step["result"] = res
+                # 반환 dict 안에 ok=False 또는 skipped 가 있으면 외부적으로도 실패로 표시
+                if isinstance(res, dict):
+                    if res.get("ok") is False:
+                        step["ok"] = False
+                        step["error_type"] = "PopbillError"
+                        msg_parts = []
+                        if res.get("code") is not None:
+                            msg_parts.append(f"[{res['code']}]")
+                        if res.get("message"):
+                            msg_parts.append(str(res["message"]))
+                        step["error"] = " ".join(msg_parts) or "ok=False (상세 없음)"
+                    elif "skipped" in res:
+                        step["ok"] = False
+                        step["error_type"] = "Skipped"
+                        step["error"] = str(res["skipped"])
+                    else:
+                        step["ok"] = True
+                else:
+                    step["ok"] = True
             except Exception as e:
                 step["error_type"] = type(e).__name__
                 step["error"] = str(e)
