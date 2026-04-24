@@ -202,6 +202,7 @@ def get_status(admin: User = Depends(get_admin_user)):
 @router.get("/diagnose")
 def diagnose(
     account_id: Optional[int] = Query(None, description="requestJob/getJobState 테스트에 쓸 DB 계좌 ID"),
+    env: str = Query("live", description="live | test | both — 진단할 팝빌 환경"),
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
@@ -212,10 +213,15 @@ def diagnose(
 
     account_id 가 주어지면 해당 계좌에 대해 requestJob + getJobState 1회 테스트
     추가 수행 (폴링 없이 즉시 반환, CF 타임아웃 회피).
+
+    env='both' 로 호출하면 live / test 양쪽 환경 모두에서 동일 체크를 실행해
+    나란히 비교 결과 반환.
     """
     import os
     import traceback
     from datetime import date, timedelta
+
+    from services.bank_sync_service import PopbillEasyFinBankProvider, _attr
 
     result = {
         "env": {
@@ -232,91 +238,106 @@ def diagnose(
         "checks": [],
     }
 
+    # 기본 (default) provider — env 기반
     try:
-        provider = get_provider()
-        result["provider"] = provider.name
-        result["is_test_mode"] = getattr(provider, "is_test", None)
+        default_provider = get_provider()
+        result["provider"] = default_provider.name
+        result["is_test_mode"] = getattr(default_provider, "is_test", None)
     except Exception as e:
         result["provider_init_error"] = f"{type(e).__name__}: {e}"
         return result
 
-    def _run(name: str, fn):
-        step = {"name": name, "ok": False}
+    # 어떤 환경들을 테스트할지 결정
+    targets: List[tuple] = []  # [(label, provider)]
+    if env == "test":
         try:
-            step["result"] = fn()
-            step["ok"] = True
+            targets.append(("test", PopbillEasyFinBankProvider(force_is_test=True)))
         except Exception as e:
-            step["error_type"] = type(e).__name__
-            step["error"] = str(e)
-            step["traceback"] = traceback.format_exc().splitlines()[-5:]
-        result["checks"].append(step)
+            result["provider_init_error"] = f"test provider init 실패: {e}"
+            return result
+    elif env == "both":
+        try:
+            targets.append(("live", PopbillEasyFinBankProvider(force_is_test=False)))
+            targets.append(("test", PopbillEasyFinBankProvider(force_is_test=True)))
+        except Exception as e:
+            result["provider_init_error"] = f"both provider init 실패: {e}"
+            return result
+    else:  # "live" 또는 미지정 — 기본 provider 사용 (env 반영)
+        targets.append(("", default_provider))
 
-    _run("getBalance", lambda: provider.get_balance())
-    _run("getBankAccountMgtURL", lambda: provider.get_mgt_url())
-    _run("listBankAccount", lambda: [
-        {
-            "bank_code": a.bank_code, "bank_name": a.bank_name,
-            "account_number": a.account_number, "alias": a.alias,
-            "state": a.state,
-            "use_start": a.use_period_start, "use_end": a.use_period_end,
-        }
-        for a in provider.list_accounts()
-    ])
-
-    # 추가 테스트: account_id 주어지면 requestJob + getJobState 1회 테스트 (폴링 없음)
+    # 계좌 정보 미리 조회 (account_id 기준)
+    target_account: Optional[BankAccount] = None
     if account_id is not None:
-        from services.bank_sync_service import PopbillEasyFinBankProvider
         bid = _resolve_bid(admin, x_view_as_business)
         svc = DatabaseService()
         try:
             acc = svc.session.get(BankAccount, account_id)
-            if not acc or acc.business_id != bid:
-                result["checks"].append({
-                    "name": "requestJob",
-                    "ok": False,
-                    "error_type": "LookupError",
-                    "error": f"account_id={account_id} 를 찾을 수 없음",
-                })
-                return result
+            if acc and acc.business_id == bid:
+                target_account = acc
         finally:
             svc.close()
+        if target_account is None:
+            result["checks"].append({
+                "name": "requestJob",
+                "ok": False,
+                "error_type": "LookupError",
+                "error": f"account_id={account_id} 를 찾을 수 없음",
+            })
 
-        # getBankAccountInfo 단일 테스트 (권한 세분화 확인)
-        def _test_info():
-            if not isinstance(provider, PopbillEasyFinBankProvider):
-                return {"skipped": "not popbill provider"}
-            return provider.check_account_validity(acc.bank_code, acc.account_number)
-        _run("getBankAccountInfo", _test_info)
+    for label, provider in targets:
+        prefix = f"[{label}] " if label else ""
 
-        # requestJob 1회 (폴링 없음)
-        job_id_holder = {"job_id": None}
+        def _run(name: str, fn):
+            step = {"name": f"{prefix}{name}", "env_label": label or "default", "ok": False}
+            try:
+                step["result"] = fn()
+                step["ok"] = True
+            except Exception as e:
+                step["error_type"] = type(e).__name__
+                step["error"] = str(e)
+                step["traceback"] = traceback.format_exc().splitlines()[-5:]
+            result["checks"].append(step)
 
-        def _test_request_job():
-            if not isinstance(provider, PopbillEasyFinBankProvider):
-                return {"skipped": "not popbill provider"}
-            sdate = date.today() - timedelta(days=7)
-            edate = date.today()
-            job_id = provider._request_job(acc.bank_code, acc.account_number, sdate, edate)
-            job_id_holder["job_id"] = job_id
-            return {"job_id": job_id, "start_date": sdate.isoformat(), "end_date": edate.isoformat()}
-        _run("requestJob", _test_request_job)
-
-        # getJobState 1회 (폴링 없음) — requestJob 성공 시만
-        def _test_job_state():
-            if not job_id_holder["job_id"]:
-                return {"skipped": "requestJob 실패로 스킵"}
-            svc2 = provider._get_svc()
-            from services.bank_sync_service import _attr
-            r = svc2.getJobState(provider.corp_num, job_id_holder["job_id"], provider.user_id)
-            return {
-                "jobState": _attr(r, "jobState", "JobState"),
-                "errorCode": _attr(r, "errorCode", "ErrorCode"),
-                "errorReason": _attr(r, "errorReason", "ErrorReason"),
-                "collectCount": _attr(r, "collectCount", "CollectCount"),
-                "resultCount": _attr(r, "resultCount", "ResultCount"),
-                "regDT": _attr(r, "regDT", "RegDT"),
+        _run("getBalance", lambda p=provider: p.get_balance())
+        _run("getBankAccountMgtURL", lambda p=provider: p.get_mgt_url())
+        _run("listBankAccount", lambda p=provider: [
+            {
+                "bank_code": a.bank_code, "bank_name": a.bank_name,
+                "account_number": a.account_number, "alias": a.alias,
+                "state": a.state,
+                "use_start": a.use_period_start, "use_end": a.use_period_end,
             }
-        _run("getJobState (1회)", _test_job_state)
+            for a in p.list_accounts()
+        ])
+
+        if target_account is not None and isinstance(provider, PopbillEasyFinBankProvider):
+            _run("getBankAccountInfo",
+                 lambda p=provider: p.check_account_validity(target_account.bank_code, target_account.account_number))
+
+            job_id_holder = {"job_id": None}
+
+            def _test_request_job(p=provider):
+                sdate = date.today() - timedelta(days=7)
+                edate = date.today()
+                jid = p._request_job(target_account.bank_code, target_account.account_number, sdate, edate)
+                job_id_holder["job_id"] = jid
+                return {"job_id": jid, "start_date": sdate.isoformat(), "end_date": edate.isoformat()}
+            _run("requestJob", _test_request_job)
+
+            def _test_job_state(p=provider):
+                if not job_id_holder["job_id"]:
+                    return {"skipped": "requestJob 실패로 스킵"}
+                svc2 = p._get_svc()
+                r = svc2.getJobState(p.corp_num, job_id_holder["job_id"], p.user_id)
+                return {
+                    "jobState": _attr(r, "jobState", "JobState"),
+                    "errorCode": _attr(r, "errorCode", "ErrorCode"),
+                    "errorReason": _attr(r, "errorReason", "ErrorReason"),
+                    "collectCount": _attr(r, "collectCount", "CollectCount"),
+                    "resultCount": _attr(r, "resultCount", "ResultCount"),
+                    "regDT": _attr(r, "regDT", "RegDT"),
+                }
+            _run("getJobState (1회)", _test_job_state)
 
     return result
 

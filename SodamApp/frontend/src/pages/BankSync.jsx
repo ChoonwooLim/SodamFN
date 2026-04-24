@@ -88,17 +88,20 @@ export default function BankSync() {
         }
     }
 
-    async function runDiagnose() {
+    const [diagEnv, setDiagEnv] = useState('live'); // 'live' | 'test' | 'both'
+
+    async function runDiagnose(envOverride) {
+        const env = envOverride || diagEnv;
+        setDiagEnv(env);
         setDiagOpen(true);
         setDiagLoading(true);
         setDiag(null);
         try {
-            // 등록된 계좌가 있으면 그 계좌 ID 로 requestJob/getJobState 추가 테스트
             const firstAccId = accounts[0]?.id;
-            const url = firstAccId
-                ? `/bank-sync/diagnose?account_id=${firstAccId}`
-                : '/bank-sync/diagnose';
-            const res = await api.get(url);
+            const params = new URLSearchParams();
+            if (firstAccId) params.append('account_id', firstAccId);
+            params.append('env', env);
+            const res = await api.get(`/bank-sync/diagnose?${params.toString()}`);
             setDiag(res.data);
         } catch (e) {
             setDiag({ _fetch_error: e.response?.data?.detail || e.message });
@@ -347,6 +350,7 @@ export default function BankSync() {
                 <DiagnoseModal
                     data={diag}
                     loading={diagLoading}
+                    env={diagEnv}
                     onClose={() => setDiagOpen(false)}
                     onRerun={runDiagnose}
                 />
@@ -484,10 +488,22 @@ function ManualAddModal({ form, setForm, loading, result, bankNames, onClose, on
     );
 }
 
-function DiagnoseModal({ data, loading, onClose, onRerun }) {
+function DiagnoseModal({ data, loading, env, onClose, onRerun }) {
+    const ENV_OPTIONS = [
+        { key: 'live', label: 'Live (실서비스)', color: 'bg-emerald-100 text-emerald-700' },
+        { key: 'test', label: 'Test (테스트)', color: 'bg-amber-100 text-amber-700' },
+        { key: 'both', label: '양쪽 비교', color: 'bg-indigo-100 text-indigo-700' },
+    ];
+    const checksByEnv = (data?.checks || []).reduce((acc, c) => {
+        const k = c.env_label || 'default';
+        if (!acc[k]) acc[k] = [];
+        acc[k].push(c);
+        return acc;
+    }, {});
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 z-50 flex items-start justify-center px-4 pt-12 overflow-y-auto">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-6 mb-12">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full p-6 mb-12">
                 <div className="flex items-start justify-between mb-4">
                     <div>
                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -504,6 +520,24 @@ function DiagnoseModal({ data, loading, onClose, onRerun }) {
                     >
                         <XIcon size={18} />
                     </button>
+                </div>
+
+                <div className="flex gap-2 mb-4 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider self-center mr-1">환경</span>
+                    {ENV_OPTIONS.map(opt => (
+                        <button
+                            key={opt.key}
+                            onClick={() => onRerun(opt.key)}
+                            disabled={loading}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                                env === opt.key
+                                    ? opt.color + ' ring-2 ring-offset-1 ring-slate-300'
+                                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                            } disabled:opacity-50`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
                 </div>
 
                 {loading ? (
@@ -562,6 +596,24 @@ function DiagnoseModal({ data, loading, onClose, onRerun }) {
 
                         <section>
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">팝빌 API 호출 결과</h4>
+                            {Object.keys(checksByEnv).length > 1 && (
+                                <div className="grid grid-cols-2 gap-4 mb-3">
+                                    {['live', 'test'].filter(k => checksByEnv[k]).map(k => {
+                                        const pass = checksByEnv[k].filter(c => c.ok).length;
+                                        const total = checksByEnv[k].length;
+                                        return (
+                                            <div key={k} className={`p-3 rounded-lg ${k === 'live' ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+                                                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                                                    {k === 'live' ? 'Live 실서비스' : 'Test 테스트환경'}
+                                                </div>
+                                                <div className="text-lg font-bold text-slate-800">
+                                                    {pass}/{total} 통과
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 {(data.checks || []).map((c, i) => (
                                     <details

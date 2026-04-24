@@ -237,17 +237,21 @@ class DevStubProvider(BaseBankProvider):
 class PopbillEasyFinBankProvider(BaseBankProvider):
     name = "popbill"
 
-    def __init__(self):
+    def __init__(self, force_is_test: Optional[bool] = None):
         self.link_id = os.getenv("POPBILL_LINK_ID", "").strip()
         self.secret_key = os.getenv("POPBILL_SECRET_KEY", "").strip()
         self.corp_num = _normalize(os.getenv("POPBILL_CORP_NUM", ""))
         # 계좌조회는 실서비스 가입 완료된 상태이므로 기본 false
         # 단, biz_check 등이 test 로 돌아갈 수 있으므로 독립 스위치 허용
-        bank_test = os.getenv("POPBILL_BANK_IS_TEST")
-        if bank_test is not None:
-            self.is_test = bank_test.strip().lower() in ("1", "true", "yes")
+        # force_is_test 인자가 주어지면 env 보다 우선 (진단용 오버라이드)
+        if force_is_test is not None:
+            self.is_test = force_is_test
         else:
-            self.is_test = False  # 계좌조회는 실서비스 기본
+            bank_test = os.getenv("POPBILL_BANK_IS_TEST")
+            if bank_test is not None:
+                self.is_test = bank_test.strip().lower() in ("1", "true", "yes")
+            else:
+                self.is_test = False  # 계좌조회는 실서비스 기본
         self.user_id = os.getenv("POPBILL_USER_ID", "").strip() or None
         self._svc = None
 
