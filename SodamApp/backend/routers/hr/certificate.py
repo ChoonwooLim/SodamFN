@@ -228,106 +228,209 @@ def _seal_block(business) -> str:
     return f'<span class="cert-seal-img">{svg}</span>'
 
 
+def _watermark_block(business) -> str:
+    """회사 로고를 워터마크로 배경에 깔기 (로고 없으면 빈 문자열)."""
+    if not business or not getattr(business, "logo_url", None):
+        return ""
+    data_uri = _fetch_image_as_data_uri(business.logo_url)
+    if not data_uri:
+        return ""
+    return f'<div class="cert-watermark"><img src="{data_uri}" alt="" /></div>'
+
+
+def _issuer_block(business) -> str:
+    """발급자 블록 — 좌측 사업장 정보 + 우측 대표자/직인.
+
+    한국 전통 증명서 배치를 반영. 모든 증명서(재직/경력/급여/퇴직) 공용.
+    """
+    biz_name = (business.name if business else "-") or "-"
+    biz_number = (business.business_number if business and business.business_number else "-") or "-"
+    biz_owner = (business.owner_name if business and business.owner_name else "-") or "-"
+    biz_address = (business.address if business and business.address else "-") or "-"
+    biz_phone = (business.phone if business and business.phone else "-") or "-"
+    seal_html = _seal_block(business)
+    return f"""
+    <div class="cert-issuer">
+        <div class="cert-issuer-info">
+            <p class="biz-name">{biz_name}</p>
+            <p>사업자등록번호 : {biz_number}</p>
+            <p>주 &nbsp;&nbsp;&nbsp; 소 : {biz_address}</p>
+            <p>전 화 번 호 : {biz_phone}</p>
+        </div>
+        <div class="cert-issuer-owner">
+            <span>대 표 자 &nbsp;&nbsp;{biz_owner}</span>
+            {seal_html}
+        </div>
+    </div>
+    """
+
+
 def _base_css() -> str:
-    """Shared print-friendly CSS for all certificates."""
+    """공식 한국 증명서 스타일 — 이중 프레임, 명조체 타이틀, 로고 워터마크."""
     return """
         @page {
             size: A4;
-            margin: 12mm 15mm 12mm 15mm;
+            margin: 15mm 15mm 15mm 15mm;
         }
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Malgun Gothic', '맑은 고딕', 'Nanum Gothic', sans-serif;
+            font-family: 'Malgun Gothic', '맑은 고딕', 'Nanum Gothic', 'Noto Sans KR', sans-serif;
             font-size: 14px;
-            line-height: 1.8;
-            color: #000;
+            line-height: 1.7;
+            color: #1a1a1a;
             background: #fff;
         }
         .certificate-wrap {
             width: 100%;
             margin: 0 auto;
-            padding: 0;
             background: #fff;
             position: relative;
+            padding: 14mm 12mm;
+            border: 2px solid #1a1a1a;
+            outline: 1px solid #1a1a1a;
+            outline-offset: 4px;
+            min-height: calc(297mm - 32mm);
+        }
+        .cert-watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -48%);
+            width: 120mm;
+            height: 120mm;
+            opacity: 0.06;
+            z-index: 0;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cert-watermark img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            filter: grayscale(100%);
+        }
+        .cert-content {
+            position: relative;
+            z-index: 1;
         }
         .cert-title {
             text-align: center;
-            font-size: 26px;
-            font-weight: bold;
-            letter-spacing: 10px;
-            margin-bottom: 28px;
-            padding-bottom: 12px;
-            border-bottom: 3px double #333;
+            font-family: 'Nanum Myeongjo', 'Noto Serif KR', 'Batang', serif;
+            font-size: 30px;
+            font-weight: 900;
+            letter-spacing: 14px;
+            margin-bottom: 10px;
+            padding-bottom: 14px;
+            color: #111;
+            text-indent: 14px; /* letter-spacing으로 텍스트 오른쪽으로 치우치는 것 보정 */
+        }
+        .cert-title-rule {
+            height: 0;
+            border-top: 3px solid #1a1a1a;
+            border-bottom: 1px solid #1a1a1a;
+            padding-top: 4px;
+            margin-bottom: 24px;
         }
         .cert-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
         .cert-table th,
         .cert-table td {
-            border: 1px solid #333;
-            padding: 7px 12px;
+            border: 1px solid #2a2a2a;
+            padding: 9px 12px;
             text-align: left;
             vertical-align: middle;
             font-size: 13.5px;
         }
         .cert-table th {
-            background-color: #f5f5f5;
-            font-weight: bold;
+            background-color: #f0f0f0;
+            font-weight: 700;
             width: 140px;
             text-align: center;
+            letter-spacing: 2px;
+            color: #1a1a1a;
+        }
+        .cert-section-header {
+            background-color: #1a1a1a !important;
+            color: #fff !important;
+            font-size: 14px !important;
+            letter-spacing: 6px;
+            padding: 10px !important;
+            text-align: center !important;
+            font-weight: 700;
         }
         .cert-purpose {
             text-align: center;
-            font-size: 15px;
-            margin: 22px 0 12px;
-            line-height: 1.7;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 22px 0 8px;
+            line-height: 1.6;
+            letter-spacing: 2px;
         }
-        .cert-statement {
-            text-align: center;
-            font-size: 15px;
-            margin: 20px 0;
-            line-height: 1.7;
+        .cert-purpose .purpose-sub {
+            font-size: 14px;
+            font-weight: 400;
+            margin-top: 6px;
+            color: #333;
+            letter-spacing: 1px;
         }
         .cert-date {
             text-align: center;
-            font-size: 15px;
-            margin: 22px 0 16px;
+            font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
+            font-size: 17px;
+            font-weight: 700;
+            margin: 18px 0 24px;
+            letter-spacing: 4px;
+            color: #1a1a1a;
         }
         .cert-issuer {
-            text-align: left;
-            margin-top: 18px;
-            padding-left: 25mm;
-            font-size: 15px;
-            line-height: 1.8;
+            font-size: 14.5px;
+            line-height: 1.85;
             page-break-inside: avoid;
             break-inside: avoid;
+            margin-top: 6px;
         }
-        .cert-issuer p {
-            margin: 4px 0;
+        .cert-issuer-info {
+            text-align: left;
+            padding-left: 20mm;
         }
-        .cert-issuer .cert-owner-line {
+        .cert-issuer-info p {
+            margin: 3px 0;
+            letter-spacing: 0.5px;
+        }
+        .cert-issuer-info .biz-name {
+            font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            margin-bottom: 6px;
+        }
+        .cert-issuer-owner {
             display: flex;
+            justify-content: flex-end;
             align-items: center;
-            gap: 10px;
-            margin-top: 10px;
+            gap: 14px;
+            margin-top: 14px;
+            padding-right: 18mm;
+            font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: 3px;
         }
-        .cert-purpose, .cert-statement, .cert-date {
+        .cert-purpose, .cert-date {
             page-break-inside: avoid;
             break-inside: avoid;
         }
         .cert-seal-img {
             display: inline-block;
-            width: 72px;
-            height: 72px;
-            margin-left: 12px;
+            width: 78px;
+            height: 78px;
             vertical-align: middle;
-            transform: rotate(-6deg);
+            transform: rotate(-5deg);
         }
         .cert-seal-img img {
             width: 100%;
@@ -339,27 +442,16 @@ def _base_css() -> str:
             height: 100%;
             display: block;
         }
-        .cert-footer {
-            position: absolute;
-            bottom: 20mm;
-            left: 15mm;
-            right: 15mm;
-            text-align: center;
-            font-size: 11px;
-            color: #999;
-            border-top: 1px solid #ddd;
-            padding-top: 8px;
-        }
-        @media print {
-            body { background: #fff; }
-            .certificate-wrap { padding: 0; }
-            .cert-footer { position: fixed; bottom: 10mm; }
-        }
     """
 
 
-def _build_html(title: str, body: str) -> str:
-    """Wrap body content in full HTML document with print CSS."""
+def _build_html(title: str, body: str, business=None) -> str:
+    """Wrap body content in full HTML document with print CSS.
+
+    body는 <h1 class="cert-title"> ... 본문 ... {issuer} 형식. certificate-wrap에
+    워터마크 레이어와 cert-content 레이어를 감싸서 삽입.
+    """
+    watermark = _watermark_block(business) if business is not None else ""
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -370,7 +462,10 @@ def _build_html(title: str, body: str) -> str:
 </head>
 <body>
 <div class="certificate-wrap">
+{watermark}
+<div class="cert-content">
 {body}
+</div>
 </div>
 </body>
 </html>"""
@@ -397,20 +492,14 @@ def generate_employment_certificate(
     period_str = f"{_fmt_date(staff.start_date)} ~ {period_end}"
 
     biz_name = business.name if business else "-"
-    biz_number = business.business_number or "-" if business else "-"
-    biz_owner = business.owner_name or "-" if business else "-"
-    biz_address = business.address or "-" if business else "-"
-    biz_phone = business.phone or "-" if business else "-"
-    seal_html = _seal_block(business)
 
     body = f"""
     <h1 class="cert-title">재 직 증 명 서</h1>
+    <div class="cert-title-rule"></div>
 
     <table class="cert-table">
         <tbody>
-            <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">인 적 사 항</th>
-            </tr>
+            <tr><th colspan="4" class="cert-section-header">인 적 사 항</th></tr>
             <tr>
                 <th>성 명</th>
                 <td>{staff.name}</td>
@@ -430,9 +519,7 @@ def generate_employment_certificate(
 
     <table class="cert-table">
         <tbody>
-            <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">재 직 사 항</th>
-            </tr>
+            <tr><th colspan="4" class="cert-section-header">재 직 사 항</th></tr>
             <tr>
                 <th>소 속</th>
                 <td>{biz_name}</td>
@@ -457,27 +544,16 @@ def generate_employment_certificate(
     </table>
 
     <div class="cert-purpose">
-        <p>위 사실을 증명합니다.</p>
-        <p style="margin-top:10px;">용 도 : {purpose}</p>
+        위 사실을 증명합니다.
+        <div class="purpose-sub">용 도 : {purpose}</div>
     </div>
 
-    <div class="cert-date">
-        <p>{_fmt_date(today)}</p>
-    </div>
+    <div class="cert-date">{_fmt_date(today)}</div>
 
-    <div class="cert-issuer">
-        <p>사 업 장 명 : {biz_name}</p>
-        <p>사업자등록번호 : {biz_number}</p>
-        <p>주 소 : {biz_address}</p>
-        <p>전 화 번 호 : {biz_phone}</p>
-        <p style="margin-top:15px;">
-            대 표 자 : {biz_owner}
-            {seal_html}
-        </p>
-    </div>
+    {_issuer_block(business)}
     """
 
-    html = _build_html("재직증명서", body)
+    html = _build_html("재직증명서", body, business=business)
     return {"status": "success", "html": html, "title": "재직증명서"}
 
 
@@ -526,11 +602,12 @@ def generate_career_certificate(
 
     body = f"""
     <h1 class="cert-title">경 력 증 명 서</h1>
+    <div class="cert-title-rule"></div>
 
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">인 적 사 항</th>
+                <th colspan="4" class="cert-section-header">인 적 사 항</th>
             </tr>
             <tr>
                 <th>성 명</th>
@@ -552,7 +629,7 @@ def generate_career_certificate(
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">경 력 사 항</th>
+                <th colspan="4" class="cert-section-header">경 력 사 항</th>
             </tr>
             <tr>
                 <th>근무처</th>
@@ -582,27 +659,16 @@ def generate_career_certificate(
     </table>
 
     <div class="cert-purpose">
-        <p>위 사실을 증명합니다.</p>
-        <p style="margin-top:10px;">용 도 : {purpose}</p>
+        위 사실을 증명합니다.
+        <div class="purpose-sub">용 도 : {purpose}</div>
     </div>
 
-    <div class="cert-date">
-        <p>{_fmt_date(today)}</p>
-    </div>
+    <div class="cert-date">{_fmt_date(today)}</div>
 
-    <div class="cert-issuer">
-        <p>사 업 장 명 : {biz_name}</p>
-        <p>사업자등록번호 : {biz_number}</p>
-        <p>주 소 : {biz_address}</p>
-        <p>전 화 번 호 : {biz_phone}</p>
-        <p style="margin-top:15px;">
-            대 표 자 : {biz_owner}
-            {seal_html}
-        </p>
-    </div>
+    {_issuer_block(business)}
     """
 
-    html = _build_html("경력증명서", body)
+    html = _build_html("경력증명서", body, business=business)
     return {"status": "success", "html": html, "title": "경력증명서"}
 
 
@@ -669,11 +735,12 @@ def generate_salary_certificate(
 
     body = f"""
     <h1 class="cert-title">급 여 확 인 서</h1>
+    <div class="cert-title-rule"></div>
 
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">인 적 사 항</th>
+                <th colspan="4" class="cert-section-header">인 적 사 항</th>
             </tr>
             <tr>
                 <th>성 명</th>
@@ -699,7 +766,7 @@ def generate_salary_certificate(
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="5" style="text-align:center; background-color:#e8e8e8; font-size:15px;">급 여 내 역 (최근 {count}개월)</th>
+                <th colspan="5" class="cert-section-header">급 여 내 역 (최근 {count}개월)</th>
             </tr>
             <tr>
                 <th style="text-align:center; width:100px;">급여월</th>
@@ -725,27 +792,16 @@ def generate_salary_certificate(
     </table>
 
     <div class="cert-purpose">
-        <p>위 사실을 증명합니다.</p>
-        <p style="margin-top:10px;">용 도 : {purpose}</p>
+        위 사실을 증명합니다.
+        <div class="purpose-sub">용 도 : {purpose}</div>
     </div>
 
-    <div class="cert-date">
-        <p>{_fmt_date(today)}</p>
-    </div>
+    <div class="cert-date">{_fmt_date(today)}</div>
 
-    <div class="cert-issuer">
-        <p>사 업 장 명 : {biz_name}</p>
-        <p>사업자등록번호 : {biz_number}</p>
-        <p>주 소 : {biz_address}</p>
-        <p>전 화 번 호 : {biz_phone}</p>
-        <p style="margin-top:15px;">
-            대 표 자 : {biz_owner}
-            {seal_html}
-        </p>
-    </div>
+    {_issuer_block(business)}
     """
 
-    html = _build_html("급여확인서", body)
+    html = _build_html("급여확인서", body, business=business)
     return {"status": "success", "html": html, "title": "급여확인서"}
 
 
@@ -798,7 +854,7 @@ def generate_retirement_certificate(
         <table class="cert-table">
             <tbody>
                 <tr>
-                    <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">퇴 직 금 정 보</th>
+                    <th colspan="4" class="cert-section-header">퇴 직 금 정 보</th>
                 </tr>
                 <tr>
                     <th>퇴직금액</th>
@@ -820,7 +876,7 @@ def generate_retirement_certificate(
         <table class="cert-table">
             <tbody>
                 <tr>
-                    <th colspan="2" style="text-align:center; background-color:#e8e8e8; font-size:15px;">퇴 직 금 정 보</th>
+                    <th colspan="2" class="cert-section-header">퇴 직 금 정 보</th>
                 </tr>
                 <tr>
                     <th>퇴직금</th>
@@ -839,11 +895,12 @@ def generate_retirement_certificate(
 
     body = f"""
     <h1 class="cert-title">퇴 직 증 명 서</h1>
+    <div class="cert-title-rule"></div>
 
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">인 적 사 항</th>
+                <th colspan="4" class="cert-section-header">인 적 사 항</th>
             </tr>
             <tr>
                 <th>성 명</th>
@@ -865,7 +922,7 @@ def generate_retirement_certificate(
     <table class="cert-table">
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">근 무 사 항</th>
+                <th colspan="4" class="cert-section-header">근 무 사 항</th>
             </tr>
             <tr>
                 <th>소 속</th>
@@ -899,27 +956,16 @@ def generate_retirement_certificate(
     {retirement_info}
 
     <div class="cert-purpose">
-        <p>위 사실을 증명합니다.</p>
-        <p style="margin-top:10px;">용 도 : {purpose}</p>
+        위 사실을 증명합니다.
+        <div class="purpose-sub">용 도 : {purpose}</div>
     </div>
 
-    <div class="cert-date">
-        <p>{_fmt_date(today)}</p>
-    </div>
+    <div class="cert-date">{_fmt_date(today)}</div>
 
-    <div class="cert-issuer">
-        <p>사 업 장 명 : {biz_name}</p>
-        <p>사업자등록번호 : {biz_number}</p>
-        <p>주 소 : {biz_address}</p>
-        <p>전 화 번 호 : {biz_phone}</p>
-        <p style="margin-top:15px;">
-            대 표 자 : {biz_owner}
-            {seal_html}
-        </p>
-    </div>
+    {_issuer_block(business)}
     """
 
-    html = _build_html("퇴직증명서", body)
+    html = _build_html("퇴직증명서", body, business=business)
     return {"status": "success", "html": html, "title": "퇴직증명서"}
 
 
