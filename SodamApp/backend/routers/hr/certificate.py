@@ -233,7 +233,7 @@ def _base_css() -> str:
     return """
         @page {
             size: A4;
-            margin: 20mm 15mm 20mm 15mm;
+            margin: 12mm 15mm 12mm 15mm;
         }
         * {
             margin: 0;
@@ -248,10 +248,9 @@ def _base_css() -> str:
             background: #fff;
         }
         .certificate-wrap {
-            width: 210mm;
-            min-height: 297mm;
+            width: 100%;
             margin: 0 auto;
-            padding: 20mm 15mm;
+            padding: 0;
             background: #fff;
             position: relative;
         }
