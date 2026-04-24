@@ -148,6 +148,15 @@ class PullIn(BaseModel):
     per_page: int = Field(default=500, ge=1, le=1000)
 
 
+class ManualAccountIn(BaseModel):
+    bank_code: str = Field(..., description="팝빌 은행코드 (예: '0088' 신한)")
+    account_number: str = Field(..., description="계좌번호 (하이픈 허용, 자동 제거)")
+    account_type: str = Field(default="P", description="'P' 개인 / 'C' 법인")
+    alias: Optional[str] = Field(None, description="별칭 (예: '소단신한은행')")
+    memo: Optional[str] = None
+    skip_verify: bool = Field(default=False, description="getBankAccountInfo 검증 스킵 (권한 이슈 시)")
+
+
 class TxUpdateIn(BaseModel):
     classified_as: Optional[str] = Field(None, description="revenue/expense/purchase/transfer/excluded/unclassified")
     vendor_id: Optional[int] = None
@@ -272,6 +281,91 @@ def list_accounts(
             select(BankAccount).where(BankAccount.business_id == bid).order_by(BankAccount.id)
         ).all()
         return [_acc_to_dict(r) for r in rows]
+    finally:
+        service.close()
+
+
+@router.post("/accounts/manual")
+def add_account_manual(
+    body: ManualAccountIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """계좌를 수동 입력해 DB 에 등록.
+
+    - listBankAccount 권한 이슈 우회용
+    - 기본: getBankAccountInfo 로 팝빌에서 계좌 존재여부 검증 (실패해도 skip_verify 로 강제 등록 가능)
+    - 검증 성공 시 반환된 계좌명을 alias 기본값으로 사용
+    """
+    from services.bank_sync_service import PopbillEasyFinBankProvider, BANK_NAMES
+
+    bid = _resolve_bid(admin, x_view_as_business)
+    bank_code = str(body.bank_code).strip()
+    acc_num = re.sub(r"\D", "", str(body.account_number))
+    if not bank_code or not acc_num:
+        raise HTTPException(status_code=400, detail="은행코드와 계좌번호를 입력하세요.")
+    if bank_code not in BANK_NAMES:
+        raise HTTPException(status_code=400, detail=f"알 수 없는 은행코드: {bank_code}")
+
+    provider = get_provider()
+
+    # 검증 단계 (skip_verify=False 일 때만)
+    verify_result = None
+    if not body.skip_verify and isinstance(provider, PopbillEasyFinBankProvider):
+        verify_result = provider.check_account_validity(bank_code, acc_num)
+        if not verify_result.get("ok"):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "message": "계좌 검증 실패",
+                    "popbill": verify_result,
+                    "hint": "권한 이슈가 의심되면 skip_verify=true 로 강제 등록 가능",
+                },
+            )
+
+    service = DatabaseService()
+    try:
+        existing = service.session.exec(
+            select(BankAccount).where(
+                BankAccount.business_id == bid,
+                BankAccount.bank_code == bank_code,
+                BankAccount.account_number == acc_num,
+            )
+        ).first()
+        if existing:
+            # 이미 있으면 메타만 업데이트
+            if body.alias:
+                existing.alias = body.alias
+            if body.memo is not None:
+                existing.memo = body.memo
+            if verify_result and verify_result.get("account_name") and not existing.alias:
+                existing.alias = verify_result["account_name"]
+            existing.updated_at = datetime.now()
+            if verify_result and verify_result.get("flat_rate_state"):
+                existing.popbill_state = str(verify_result["flat_rate_state"])
+            service.session.add(existing)
+            service.session.commit()
+            service.session.refresh(existing)
+            return {"created": False, "updated": True, "account": _acc_to_dict(existing), "verify": verify_result}
+
+        alias = body.alias
+        if not alias and verify_result and verify_result.get("account_name"):
+            alias = verify_result["account_name"]
+
+        acc = BankAccount(
+            business_id=bid,
+            bank_code=bank_code,
+            bank_name=BANK_NAMES.get(bank_code, bank_code),
+            account_number=acc_num,
+            account_type=body.account_type or "P",
+            alias=alias,
+            memo=body.memo,
+            popbill_state=(str(verify_result["flat_rate_state"]) if verify_result and verify_result.get("flat_rate_state") else "active"),
+        )
+        service.session.add(acc)
+        service.session.commit()
+        service.session.refresh(acc)
+        return {"created": True, "updated": False, "account": _acc_to_dict(acc), "verify": verify_result}
     finally:
         service.close()
 

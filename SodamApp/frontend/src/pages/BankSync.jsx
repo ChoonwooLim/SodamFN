@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon } from 'lucide-react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus } from 'lucide-react';
 import api from '../api';
 
 const TABS = [
@@ -56,6 +56,37 @@ export default function BankSync() {
     const [diagOpen, setDiagOpen] = useState(false);
     const [diag, setDiag] = useState(null);
     const [diagLoading, setDiagLoading] = useState(false);
+
+    // Manual account add
+    const [manualOpen, setManualOpen] = useState(false);
+    const [manualForm, setManualForm] = useState({
+        bank_code: '0088',
+        account_number: '',
+        account_type: 'P',
+        alias: '',
+        skip_verify: false,
+    });
+    const [manualLoading, setManualLoading] = useState(false);
+    const [manualResult, setManualResult] = useState(null);
+
+    async function handleManualAdd() {
+        setManualLoading(true);
+        setManualResult(null);
+        try {
+            const res = await api.post('/bank-sync/accounts/manual', manualForm);
+            setManualResult({ type: 'success', data: res.data });
+            fetchAccounts();
+        } catch (e) {
+            setManualResult({
+                type: 'error',
+                text: typeof e.response?.data?.detail === 'string'
+                    ? e.response.data.detail
+                    : JSON.stringify(e.response?.data?.detail || e.message, null, 2),
+            });
+        } finally {
+            setManualLoading(false);
+        }
+    }
 
     async function runDiagnose() {
         setDiagOpen(true);
@@ -277,6 +308,7 @@ export default function BankSync() {
                         onPull={openPullModal}
                         onDelete={handleDeleteAccount}
                         onDiagnose={runDiagnose}
+                        onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
                     />
                 ) : (
                     <TransactionsTab
@@ -314,6 +346,135 @@ export default function BankSync() {
                     onRerun={runDiagnose}
                 />
             )}
+
+            {manualOpen && (
+                <ManualAddModal
+                    form={manualForm}
+                    setForm={setManualForm}
+                    loading={manualLoading}
+                    result={manualResult}
+                    bankNames={status?.bank_names}
+                    onClose={() => setManualOpen(false)}
+                    onSubmit={handleManualAdd}
+                />
+            )}
+        </div>
+    );
+}
+
+function ManualAddModal({ form, setForm, loading, result, bankNames, onClose, onSubmit }) {
+    const banks = bankNames || {
+        '0088': '신한은행', '0004': '국민은행', '0020': '우리은행', '0081': '하나은행',
+        '0011': '농협은행', '0003': '기업은행', '0090': '카카오뱅크', '0089': '케이뱅크', '0092': '토스뱅크',
+    };
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center px-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                <div className="flex items-start justify-between mb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800">계좌 수동 추가</h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                            listBankAccount 권한 이슈 우회용. 팝빌 관리 페이지에서 확인한 계좌 정보를 직접 입력합니다.
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">은행</label>
+                            <select
+                                value={form.bank_code}
+                                onChange={e => setForm({ ...form, bank_code: e.target.value })}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                            >
+                                {Object.entries(banks).map(([code, name]) => (
+                                    <option key={code} value={code}>{name} ({code})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">유형</label>
+                            <select
+                                value={form.account_type}
+                                onChange={e => setForm({ ...form, account_type: e.target.value })}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                            >
+                                <option value="P">개인</option>
+                                <option value="C">법인</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">계좌번호 (하이픈 허용)</label>
+                        <input
+                            type="text"
+                            value={form.account_number}
+                            onChange={e => setForm({ ...form, account_number: e.target.value })}
+                            placeholder="110-357-XXXXXXX"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-mono"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">별칭 (선택)</label>
+                        <input
+                            type="text"
+                            value={form.alias || ''}
+                            onChange={e => setForm({ ...form, alias: e.target.value })}
+                            placeholder="예: 소단신한은행"
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                        />
+                    </div>
+                    <label className="flex items-start gap-2 text-xs text-slate-600 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.skip_verify}
+                            onChange={e => setForm({ ...form, skip_verify: e.target.checked })}
+                            className="mt-0.5"
+                        />
+                        <span>
+                            <b>getBankAccountInfo 검증 스킵</b>
+                            <span className="text-slate-400 block mt-0.5">
+                                기본은 팝빌에 계좌 정보를 조회해 검증합니다. 이것도 같은 권한 에러가 나면 체크해서 강제 저장하세요 (거래내역 수집은 별도 API 라 작동할 수 있음).
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
+                {result?.type === 'success' && (
+                    <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs mb-4">
+                        <div className="font-semibold">✅ 등록 완료</div>
+                        <pre className="mt-1 text-[10px] overflow-x-auto">{JSON.stringify(result.data, null, 2)}</pre>
+                    </div>
+                )}
+                {result?.type === 'error' && (
+                    <div className="p-3 bg-rose-50 text-rose-700 rounded-xl text-xs mb-4">
+                        <div className="font-semibold">❌ 실패</div>
+                        <pre className="mt-1 whitespace-pre-wrap font-mono">{result.text}</pre>
+                    </div>
+                )}
+
+                <div className="flex gap-2">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-200"
+                    >
+                        닫기
+                    </button>
+                    <button
+                        onClick={onSubmit}
+                        disabled={loading || !form.account_number}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                        등록
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
@@ -465,7 +626,7 @@ function DiagnoseModal({ data, loading, onClose, onRerun }) {
     );
 }
 
-function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose }) {
+function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose, onManualAdd }) {
     return (
         <div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -476,6 +637,14 @@ function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull,
                 >
                     {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
                     팝빌에서 계좌 동기화
+                </button>
+                <button
+                    onClick={onManualAdd}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all"
+                    title="listBankAccount 권한 이슈 우회: 계좌 정보 수동 입력"
+                >
+                    <Plus size={14} />
+                    계좌 수동 추가
                 </button>
                 <button
                     onClick={onOpenMgtUrl}
