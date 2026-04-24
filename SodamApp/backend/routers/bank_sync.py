@@ -200,14 +200,22 @@ def get_status(admin: User = Depends(get_admin_user)):
 
 
 @router.get("/diagnose")
-def diagnose(admin: User = Depends(get_admin_user)):
+def diagnose(
+    account_id: Optional[int] = Query(None, description="requestJob/getJobState 테스트에 쓸 DB 계좌 ID"),
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
     """팝빌 연결 진단 — 각 API 호출을 개별로 실행하고 결과/에러를 JSON 으로 반환.
 
     502/500 에러가 Cloudflare 에 가려져도 이 엔드포인트는 항상 200 으로 응답해
     각 단계의 성공/실패를 클라이언트 UI 에 노출시킴.
+
+    account_id 가 주어지면 해당 계좌에 대해 requestJob + getJobState 1회 테스트
+    추가 수행 (폴링 없이 즉시 반환, CF 타임아웃 회피).
     """
     import os
     import traceback
+    from datetime import date, timedelta
 
     result = {
         "env": {
@@ -254,6 +262,61 @@ def diagnose(admin: User = Depends(get_admin_user)):
         }
         for a in provider.list_accounts()
     ])
+
+    # 추가 테스트: account_id 주어지면 requestJob + getJobState 1회 테스트 (폴링 없음)
+    if account_id is not None:
+        from services.bank_sync_service import PopbillEasyFinBankProvider
+        bid = _resolve_bid(admin, x_view_as_business)
+        svc = DatabaseService()
+        try:
+            acc = svc.session.get(BankAccount, account_id)
+            if not acc or acc.business_id != bid:
+                result["checks"].append({
+                    "name": "requestJob",
+                    "ok": False,
+                    "error_type": "LookupError",
+                    "error": f"account_id={account_id} 를 찾을 수 없음",
+                })
+                return result
+        finally:
+            svc.close()
+
+        # getBankAccountInfo 단일 테스트 (권한 세분화 확인)
+        def _test_info():
+            if not isinstance(provider, PopbillEasyFinBankProvider):
+                return {"skipped": "not popbill provider"}
+            return provider.check_account_validity(acc.bank_code, acc.account_number)
+        _run("getBankAccountInfo", _test_info)
+
+        # requestJob 1회 (폴링 없음)
+        job_id_holder = {"job_id": None}
+
+        def _test_request_job():
+            if not isinstance(provider, PopbillEasyFinBankProvider):
+                return {"skipped": "not popbill provider"}
+            sdate = date.today() - timedelta(days=7)
+            edate = date.today()
+            job_id = provider._request_job(acc.bank_code, acc.account_number, sdate, edate)
+            job_id_holder["job_id"] = job_id
+            return {"job_id": job_id, "start_date": sdate.isoformat(), "end_date": edate.isoformat()}
+        _run("requestJob", _test_request_job)
+
+        # getJobState 1회 (폴링 없음) — requestJob 성공 시만
+        def _test_job_state():
+            if not job_id_holder["job_id"]:
+                return {"skipped": "requestJob 실패로 스킵"}
+            svc2 = provider._get_svc()
+            from services.bank_sync_service import _attr
+            r = svc2.getJobState(provider.corp_num, job_id_holder["job_id"], provider.user_id)
+            return {
+                "jobState": _attr(r, "jobState", "JobState"),
+                "errorCode": _attr(r, "errorCode", "ErrorCode"),
+                "errorReason": _attr(r, "errorReason", "ErrorReason"),
+                "collectCount": _attr(r, "collectCount", "CollectCount"),
+                "resultCount": _attr(r, "resultCount", "ResultCount"),
+                "regDT": _attr(r, "regDT", "RegDT"),
+            }
+        _run("getJobState (1회)", _test_job_state)
 
     return result
 

@@ -93,7 +93,12 @@ export default function BankSync() {
         setDiagLoading(true);
         setDiag(null);
         try {
-            const res = await api.get('/bank-sync/diagnose');
+            // 등록된 계좌가 있으면 그 계좌 ID 로 requestJob/getJobState 추가 테스트
+            const firstAccId = accounts[0]?.id;
+            const url = firstAccId
+                ? `/bank-sync/diagnose?account_id=${firstAccId}`
+                : '/bank-sync/diagnose';
+            const res = await api.get(url);
             setDiag(res.data);
         } catch (e) {
             setDiag({ _fetch_error: e.response?.data?.detail || e.message });
