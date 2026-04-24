@@ -290,14 +290,15 @@ def _base_css() -> str:
             outline: 1px solid #1a1a1a;
             outline-offset: 4px;
             min-height: calc(297mm - 32mm);
+            overflow: hidden;
         }
         .cert-watermark {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -48%);
-            width: 120mm;
-            height: 120mm;
+            width: 600mm;
+            height: 600mm;
             opacity: 0.06;
             z-index: 0;
             pointer-events: none;
