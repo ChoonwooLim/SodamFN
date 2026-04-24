@@ -1,6 +1,22 @@
-import { FileText, MessageSquare, Trash2, CreditCard } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, MessageSquare, Trash2, CreditCard, ShieldCheck, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
 import api from '../../api';
+
+const POPBILL_BANKS = [
+    { code: '0088', name: '신한은행' }, { code: '0004', name: '국민은행' },
+    { code: '0003', name: '기업은행' }, { code: '0011', name: '농협은행' },
+    { code: '0020', name: '우리은행' }, { code: '0081', name: '하나은행' },
+    { code: '0023', name: 'SC제일은행' }, { code: '0027', name: '한국씨티은행' },
+    { code: '0002', name: '산업은행' }, { code: '0007', name: '수협은행' },
+    { code: '0031', name: '대구은행' }, { code: '0032', name: '부산은행' },
+    { code: '0034', name: '광주은행' }, { code: '0037', name: '전북은행' },
+    { code: '0039', name: '경남은행' }, { code: '0045', name: '새마을금고' },
+    { code: '0048', name: '신협' }, { code: '0050', name: '저축은행' },
+    { code: '0064', name: '산림조합' }, { code: '0071', name: '우체국' },
+    { code: '0089', name: '케이뱅크' }, { code: '0090', name: '카카오뱅크' },
+    { code: '0092', name: '토스뱅크' },
+];
 
 export default function ContractTab({
     formData,
@@ -19,6 +35,53 @@ export default function ContractTab({
     handleEditContract,
     editingContractId,
 }) {
+    // 예금주 자동확인 (Popbill AccountCheckService)
+    const [acctChecking, setAcctChecking] = useState(false);
+    const [acctResult, setAcctResult] = useState(null); // { ok, account_holder, bank_name, error }
+
+    useEffect(() => {
+        // 입력 변경 시 이전 결과 자동 소거
+        setAcctResult(null);
+    }, [formData.bank_name, formData.account_number]);
+
+    const handleAccountCheck = async () => {
+        const bankInput = (formData.bank_name || '').trim();
+        const accRaw = (formData.account_number || '').replace(/\D/g, '');
+        if (!bankInput) {
+            setAcctResult({ ok: false, error: '은행을 선택하세요.' });
+            return;
+        }
+        if (accRaw.length < 6) {
+            setAcctResult({ ok: false, error: '계좌번호를 입력하세요.' });
+            return;
+        }
+        setAcctChecking(true);
+        setAcctResult(null);
+        try {
+            const res = await api.post('/account-check', {
+                bank_name: bankInput,
+                account_number: accRaw,
+            });
+            setAcctResult(res.data);
+            // 조회 성공 시 예금주 필드 비어있으면 자동 채움
+            if (res.data?.ok && res.data.account_holder && !formData.account_holder) {
+                setFormData({ ...formData, account_holder: res.data.account_holder });
+            }
+        } catch (e) {
+            setAcctResult({
+                ok: false,
+                error: e?.response?.data?.detail || '조회 중 오류가 발생했습니다.',
+            });
+        } finally {
+            setAcctChecking(false);
+        }
+    };
+
+    const holderMismatch = acctResult?.ok
+        && acctResult.account_holder
+        && formData.account_holder
+        && !formData.account_holder.includes(acctResult.account_holder.replace('(STUB)', '').trim())
+        && !acctResult.account_holder.replace('(STUB)', '').trim().includes(formData.account_holder);
     return (
         <>
             {/* Employment & Payment */}
@@ -191,16 +254,76 @@ export default function ContractTab({
                     </div>
 
                     {/* 급여 계좌 */}
-                    <div className="space-y-3">
-                        <label className="block text-sm font-medium text-slate-500">급여 계좌</label>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="block text-sm font-medium text-slate-500">급여 계좌</label>
+                            <button
+                                type="button"
+                                onClick={handleAccountCheck}
+                                disabled={acctChecking || !formData.bank_name || (formData.account_number || '').replace(/\D/g, '').length < 6}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                                title="팝빌 예금주 자동확인 (건당 ~30원)"
+                            >
+                                {acctChecking ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                                {acctChecking ? '조회 중...' : '예금주 자동확인'}
+                            </button>
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
-                            <input type="text" name="bank_name" value={formData.bank_name || ''} onChange={handleChange} placeholder="은행명"
-                                className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
+                            <select
+                                name="bank_name"
+                                value={formData.bank_name || ''}
+                                onChange={handleChange}
+                                className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                            >
+                                <option value="">은행 선택</option>
+                                {POPBILL_BANKS.map((b) => (
+                                    <option key={b.code} value={b.name}>{b.name}</option>
+                                ))}
+                                {/* 기존 데이터가 목록에 없으면 그대로 유지 */}
+                                {formData.bank_name && !POPBILL_BANKS.some(b => b.name === formData.bank_name) && (
+                                    <option value={formData.bank_name}>{formData.bank_name}</option>
+                                )}
+                            </select>
                             <input type="text" name="account_number" value={formData.account_number || ''} onChange={handleChange} placeholder="계좌번호"
                                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                             <input type="text" name="account_holder" value={formData.account_holder || ''} onChange={handleChange} placeholder="예금주"
                                 className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
                         </div>
+                        {/* 조회 결과 배너 */}
+                        {acctResult && (
+                            <div className={`flex items-start gap-2 p-2.5 rounded-lg text-xs ${
+                                !acctResult.ok
+                                    ? 'bg-red-50 text-red-700 border border-red-200'
+                                    : holderMismatch
+                                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                        : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                            }`}>
+                                {!acctResult.ok ? (
+                                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                                ) : holderMismatch ? (
+                                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
+                                ) : (
+                                    <CheckCircle2 size={14} className="flex-shrink-0 mt-0.5" />
+                                )}
+                                <div className="flex-1">
+                                    {!acctResult.ok ? (
+                                        <span className="font-medium">{acctResult.error || '조회 실패'}</span>
+                                    ) : (
+                                        <>
+                                            <span className="font-bold">확인된 예금주: {acctResult.account_holder}</span>
+                                            {holderMismatch && (
+                                                <span className="ml-2 text-amber-700">
+                                                    ⚠️ 입력한 예금주({formData.account_holder})와 다릅니다!
+                                                </span>
+                                            )}
+                                            {acctResult.check_date && (
+                                                <span className="ml-2 text-slate-500">({acctResult.check_date.slice(0, 8)})</span>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
