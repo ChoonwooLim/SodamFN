@@ -5,6 +5,7 @@ Generates Korean HR certificate documents as HTML strings for frontend rendering
 """
 
 from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import Response
 from sqlmodel import Session, select
 from datetime import date, datetime
 from typing import Optional
@@ -856,3 +857,68 @@ def generate_retirement_certificate(
 
     html = _build_html("퇴직증명서", body)
     return {"status": "success", "html": html, "title": "퇴직증명서"}
+
+
+# ──────────────────────────────────────────────
+# 5. PDF 직접 반환 (서버사이드 WeasyPrint 렌더링)
+# ──────────────────────────────────────────────
+
+_CERT_GENERATORS = {
+    "employment": generate_employment_certificate,
+    "career": generate_career_certificate,
+    "salary": generate_salary_certificate,
+    "retirement": generate_retirement_certificate,
+}
+
+
+@router.get("/pdf/{cert_type}/{staff_id}")
+def generate_certificate_pdf(
+    cert_type: str,
+    staff_id: int,
+    purpose: str = Query(default="제출용", description="증명서 용도"),
+    admin: AuthUser = Depends(get_admin_user),
+    bid: Optional[int] = Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """증명서 HTML을 WeasyPrint로 PDF 변환해 바로 스트림 반환.
+
+    프론트에서 html2pdf.js로 빈 페이지가 생성되던 문제 해결. 이 엔드포인트는
+    응답 body가 PDF 바이트이므로 axios로 받을 때 `responseType: 'blob'` 필수.
+    """
+    if cert_type not in _CERT_GENERATORS:
+        raise HTTPException(status_code=400, detail=f"지원하지 않는 증명서 종류: {cert_type}")
+
+    # Reuse the existing HTML endpoint function (call as plain python)
+    result = _CERT_GENERATORS[cert_type](
+        staff_id=staff_id,
+        purpose=purpose,
+        _admin=admin,
+        bid=bid,
+        session=session,
+    )
+    html = result.get("html", "")
+    title = result.get("title", "증명서")
+
+    try:
+        from weasyprint import HTML as WHTML  # type: ignore
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"서버에 WeasyPrint 설치가 필요합니다: {e}",
+        )
+
+    try:
+        pdf_bytes = WHTML(string=html).write_pdf()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF 생성 실패: {e}")
+
+    import urllib.parse
+    filename_enc = urllib.parse.quote(f"{title}.pdf")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{filename_enc}",
+            "Cache-Control": "no-store",
+        },
+    )
