@@ -300,8 +300,9 @@ def _base_css() -> str:
             margin: 22px 0 16px;
         }
         .cert-issuer {
-            text-align: center;
+            text-align: left;
             margin-top: 18px;
+            padding-left: 25mm;
             font-size: 15px;
             line-height: 1.8;
             page-break-inside: avoid;
@@ -309,6 +310,12 @@ def _base_css() -> str:
         }
         .cert-issuer p {
             margin: 4px 0;
+        }
+        .cert-issuer .cert-owner-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
         }
         .cert-purpose, .cert-statement, .cert-date {
             page-break-inside: avoid;
