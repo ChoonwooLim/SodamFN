@@ -138,10 +138,160 @@ class KoreanGenericProvider(BaseFaxProvider):
         )
 
 
+class PopbillProvider(BaseFaxProvider):
+    """팝빌(Linkhub) FAX API 연동.
+
+    https://developers.popbill.com/api-reference/fax
+
+    필요 환경변수:
+      POPBILL_LINK_ID       - 팝빌 발급 LinkID (영문, 예: SODAM)
+      POPBILL_SECRET_KEY    - 팝빌 발급 SecretKey (최초 1회만 노출)
+      POPBILL_CORP_NUM      - 사업자등록번호 (10자리, 하이픈 제거 자동)
+      POPBILL_SENDER_NUMBER - 사전등록된 발신번호 (하이픈 제거)
+      POPBILL_IS_TEST       - "true" | "false" (기본 true)
+      POPBILL_USER_ID       - 팝빌 회원 ID (선택, 감사용)
+    """
+    name = "popbill"
+
+    def __init__(self):
+        self.link_id = os.getenv("POPBILL_LINK_ID", "").strip()
+        self.secret_key = os.getenv("POPBILL_SECRET_KEY", "").strip()
+        self.corp_num = re.sub(r"\D", "", os.getenv("POPBILL_CORP_NUM", ""))
+        self.sender_num = re.sub(r"\D", "", os.getenv("POPBILL_SENDER_NUMBER", ""))
+        self.is_test = (os.getenv("POPBILL_IS_TEST", "true").strip().lower() in ("1", "true", "yes"))
+        self.user_id = os.getenv("POPBILL_USER_ID", "").strip() or None
+        self._service = None
+
+    def _get_service(self):
+        if self._service is not None:
+            return self._service
+        if not self.link_id or not self.secret_key:
+            raise RuntimeError("POPBILL_LINK_ID / POPBILL_SECRET_KEY 가 설정되지 않았습니다.")
+        try:
+            from popbill import FaxService  # type: ignore
+        except ImportError as e:
+            raise RuntimeError(
+                "popbill SDK가 설치되지 않았습니다. requirements.txt에 popbill 포함 후 재설치하세요."
+            ) from e
+        svc = FaxService(self.link_id, self.secret_key)
+        svc.IsTest = self.is_test
+        # 팝빌 IP 제한은 선택 기능. 프록시/컨테이너 환경에서는 꺼둠 권장.
+        svc.IPRestrictOnOff = False
+        svc.UseStaticIP = False
+        svc.UseGAIP = False
+        svc.UseLocalTimeYN = True
+        self._service = svc
+        return svc
+
+    def send(
+        self,
+        *,
+        target_number: str,
+        file_path_or_url: str,
+        file_bytes: Optional[bytes] = None,
+        original_filename: Optional[str] = None,
+        caller_id: Optional[str] = None,
+        subject: Optional[str] = None,
+    ) -> FaxResult:
+        if not self.corp_num or len(self.corp_num) != 10:
+            return FaxResult(ok=False, error="POPBILL_CORP_NUM (사업자번호 10자리)가 설정되지 않았습니다.")
+        sender = re.sub(r"\D", "", caller_id or "") or self.sender_num
+        if not sender:
+            return FaxResult(ok=False, error="발신번호(POPBILL_SENDER_NUMBER)가 설정되지 않았습니다.")
+        receiver = re.sub(r"\D", "", target_number)
+        if not receiver:
+            return FaxResult(ok=False, error="수신번호가 비어있습니다.")
+
+        # 팝빌 SDK는 파일 경로를 요구하므로 bytes → 임시파일로 저장.
+        import tempfile
+        tmp_path = None
+        try:
+            if file_bytes:
+                suffix = os.path.splitext(original_filename or "fax.pdf")[1] or ".pdf"
+                fd, tmp_path = tempfile.mkstemp(prefix="popbill_fax_", suffix=suffix)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(file_bytes)
+                file_path = tmp_path
+            elif file_path_or_url and not file_path_or_url.startswith("http"):
+                file_path = file_path_or_url.lstrip("/")
+                if not os.path.isabs(file_path):
+                    file_path = os.path.abspath(file_path)
+            else:
+                return FaxResult(
+                    ok=False,
+                    error="팝빌은 로컬 파일만 지원합니다. file_bytes 또는 로컬 경로를 전달하세요.",
+                )
+
+            svc = self._get_service()
+
+            try:
+                from popbill import PopbillException  # type: ignore
+            except ImportError:
+                PopbillException = Exception  # type: ignore
+
+            try:
+                receipt_num = svc.sendFax(
+                    self.corp_num,
+                    sender,
+                    receiver,
+                    "",  # ReceiverName — 서버 측에서 직접 비워 호출
+                    file_path,
+                    None,  # ReserveDT
+                    self.user_id,
+                    None,  # SenderName
+                    False,  # adsYN
+                    (subject or "")[:60] if subject else None,
+                )
+                return FaxResult(ok=True, provider_tx_id=str(receipt_num))
+            except PopbillException as pe:
+                code = getattr(pe, "code", None)
+                msg = getattr(pe, "message", str(pe))
+                return FaxResult(ok=False, error=f"Popbill[{code}] {msg}")
+            except Exception as e:
+                return FaxResult(ok=False, error=f"Popbill 전송 오류: {e}")
+        finally:
+            if tmp_path:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+    def get_balance(self) -> Optional[float]:
+        """현재 팝빌 포인트 잔액. 디버깅/어드민 화면용."""
+        try:
+            svc = self._get_service()
+            return float(svc.getBalance(self.corp_num))
+        except Exception:
+            return None
+
+    def get_result(self, receipt_num: str) -> Optional[dict]:
+        """팩스 전송 결과 조회 (재확인용)."""
+        try:
+            svc = self._get_service()
+            rows = svc.getFaxResult(self.corp_num, receipt_num, self.user_id)
+            if not rows:
+                return None
+            r = rows[0]
+            # sendState: 1=대기, 2=전송중, 3=전송완료, 4=전송실패
+            return {
+                "sendState": getattr(r, "sendState", None),
+                "convState": getattr(r, "convState", None),
+                "receiveNum": getattr(r, "receiveNum", None),
+                "receiptNum": getattr(r, "receiptNum", None),
+                "sendNum": getattr(r, "sendNum", None),
+                "sendDT": getattr(r, "sendDT", None),
+                "resultDT": getattr(r, "resultDT", None),
+                "result": getattr(r, "result", None),
+            }
+        except Exception:
+            return None
+
+
 _PROVIDERS = {
     "stub": DevStubProvider,
     "phaxio": PhaxioProvider,
     "korean_generic": KoreanGenericProvider,
+    "popbill": PopbillProvider,
 }
 
 

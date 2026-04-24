@@ -43,3 +43,6 @@ starlette==0.35.1
 gunicorn
 
 python-dotenv
+
+# Popbill SDK (팩스·문자·세금계산서·계좌조회 등 팝빌 연동)
+popbill>=1.64.0
