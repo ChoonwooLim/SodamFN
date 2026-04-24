@@ -124,15 +124,41 @@ export default function FaxTransmission() {
         const res = await api.get(`/hr/certificate/${selectedCertType}/${selectedStaffId}`);
         if (!res.data?.html) throw new Error('증명서 HTML을 가져오지 못했습니다.');
 
-        // Render into hidden iframe so html2pdf can snapshot it
+        // 증명서 HTML은 <html>/<head>/<body>가 모두 포함된 완전문서.
+        // <div> 안에 통째로 넣으면 브라우저가 중첩 html/body를 무시해 빈 페이지가 됨.
+        // → style 태그들과 body 내용을 분리해서 main document 컨테이너에 주입.
+        const parser = new DOMParser();
+        const parsed = parser.parseFromString(res.data.html, 'text/html');
+
+        const styleContent = Array.from(parsed.querySelectorAll('style'))
+            .map((s) => s.textContent)
+            .join('\n');
+        const bodyContent = parsed.body ? parsed.body.innerHTML : res.data.html;
+
         const container = document.createElement('div');
         container.style.position = 'fixed';
         container.style.left = '-10000px';
         container.style.top = '0';
         container.style.width = '210mm';
-        container.style.background = '#fff';
-        container.innerHTML = res.data.html;
+        container.style.background = '#ffffff';
+
+        if (styleContent) {
+            const styleEl = document.createElement('style');
+            styleEl.textContent = styleContent;
+            container.appendChild(styleEl);
+        }
+
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = bodyContent;
+        container.appendChild(contentDiv);
+
         document.body.appendChild(container);
+
+        // 이미지/폰트 로딩 대기 (특히 직인 img + 한글폰트)
+        await new Promise((resolve) => setTimeout(resolve, 250));
+        try {
+            await document.fonts?.ready;
+        } catch { /* ignore */ }
 
         try {
             const html2pdf = (await import('html2pdf.js')).default;
@@ -141,7 +167,7 @@ export default function FaxTransmission() {
                     margin: 0,
                     filename: `${CERT_TYPES.find((c) => c.key === selectedCertType)?.label || '문서'}.pdf`,
                     image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                    html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false },
                     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 })
                 .from(container)
