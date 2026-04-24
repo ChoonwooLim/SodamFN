@@ -29,3 +29,9 @@
 | 2026-04-19 | 셈하나 개발 로드맵 Phase 2 최신화 — 회사직인·구인등록·휴가 자가 신청 등 반영 | feat | DevelopmentRoadmap.jsx |
 | 2026-04-19 | [HEAD] DevWorkLog 고정 엔트리 전면 재작성 (14섹션, ai_summary 16개) | infra | DevWorkLog(id=4) |
 | 2026-04-19 | /end 스킬에 [HEAD] DevWorkLog 고정 콘텐츠 업그레이드 단계(3-8) 추가 | infra | ~/.claude/skills/end/SKILL.md |
+| 2026-04-24 | 환경설정 '회사정보 관리' 탭 신설 (15개 회사 기본정보 + 12유형 공식문서 보관함 + 직인 이미지 업로드) | feat | CompanyInfoSettings.jsx, business_docs.py, models.py, auth.py |
+| 2026-04-24 | 증명서 직인 렌더링 개선 (SVG seal-11 "English Traditional" 추가 + 4종 증명서 placeholder → 실제 직인 자동 삽입) | feat | CompanySeal.jsx, certificate.py |
+| 2026-04-24 | /hr/fax 팩스 전송 메뉴 신설 (증명서 자동생성·회사 보관함·직접 업로드 3종 소스 + 전송 이력 관리 + URL 딥링크) | feat | FaxTransmission.jsx, fax.py, fax_service.py, models.py, Sidebar.jsx, App.jsx, DocumentTab.jsx |
+| 2026-04-24 | FAX 프로바이더 추상화 + PopbillProvider 구현 (팝빌 SDK 래핑, 한글 E.164 변환, getBalance/get_result 헬퍼) | feat | fax_service.py, requirements.txt |
+| 2026-04-24 | Orbitron.yaml에 Popbill FAX env 6개 키 선언 추가 (값은 Orbitron 대시보드/Secrets) | infra | Orbitron.yaml |
+| 2026-04-24 | 서버사이드 PDF 렌더링 전환 (WeasyPrint + Dockerfile에 libpango/fonts-nanum 등 시스템 의존성 추가) | infra | Dockerfile, requirements.txt, certificate.py, FaxTransmission.jsx |

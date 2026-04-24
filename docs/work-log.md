@@ -149,3 +149,30 @@
 - `~/.claude/skills/end/SKILL.md` 3-8단계 추가: `[HEAD]` 로 시작하는 DevWorkLog 엔트리가 있을 때만 실행되는 opt-in 단계. 신규 라우터/모델/페이지/컴포넌트/메뉴/인프라 변화 발생 시 HEAD 콘텐츠를 전면 재작성하도록 가이드. 핵심 규칙 3번에 `[HEAD]` 마커 추가
 
 ---
+
+## 2026-04-24
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 환경설정에 '회사정보 관리' 탭 신설 — 15개 기본정보 + 12유형 공식문서 보관함 + 직인 이미지 업로드 | 완료 |
+| feat | 재직/경력/급여/퇴직 증명서 직인 렌더링 개선 — SVG seal-11 "English Traditional" 추가, 모든 증명서에 실제 직인 자동 삽입 | 완료 |
+| feat | `/hr/fax` 팩스 전송 메뉴 신설 — 증명서 자동생성 / 회사 보관함 / 직접 업로드 3종 소스 + 전송 이력 | 완료 |
+| feat | FAX 프로바이더 추상화 + PopbillProvider 구현 (팝빌 SDK 래핑) | 완료 |
+| fix | 증명서 HTML → PDF 변환 시 빈 페이지 생성 버그 (DOMParser로 style/body 분리 주입) | 완료 |
+| infra | Orbitron.yaml 팝빌 env 선언 + Orbitron DB에 AES-256-GCM 암호화 env 직접 주입 후 재배포 | 완료 |
+| style | 재직증명서 양식 정리 시도 → revert (원복) | 완료 |
+
+### 세부 내용
+
+- `fae1c23` / `be5499f` 재직증명서 출력 양식 정리 시도 후 원복
+- `733bf74` Settings "회사정보 관리" 탭: 사업장명/번호/대표자(한글·영문)/업태/종목/주소/전화/이메일/팩스/홈페이지/개업일/관할세무서 15필드 편집. `BusinessDocument` 모델 신설(12유형). `/auth/business-settings` 확장(직접 필드+settings_json 병합). `/business-docs` CRUD + 직인 이미지 업로드/삭제. `certificate.py` SVG seal-11 "English Traditional" 추가 + `_render_seal_svg()`/`_seal_block()` 헬퍼, 4개 증명서에서 placeholder → 실제 SVG/img 교체. 소담김밥 Business 1 DB에 실값 주입(639-12-01514 / 홍지연 / 02-452-6570 / 서울시 광진구 능동로 110 스타시티 영촌빌딩 B208호)
+- `92076de` 팩스 전송 기능 전체 스택: `FaxTransmission` 모델(테넌트 격리), `services/fax_service.py` BaseFaxProvider + DevStubProvider + PhaxioProvider + KoreanGenericProvider, `routers/fax.py` send/history/get/retry/delete/providers. `FaxTransmission.jsx` 신규 페이지(받는번호/수신자/제목 + 3종 소스 + 이력 패널 + URL 딥링크). Sidebar HR 서브메뉴에 "팩스 전송", DocumentTab 증명서 카드마다 인쇄/팩스 버튼 분리. html2pdf.js 0.14 dep
+- `deb3980` PopbillProvider — popbill>=1.64.0 SDK 래핑, sendFax 호출, file_bytes → 임시파일, PopbillException 래핑, getBalance()/get_result() 헬퍼
+- `a95174f` PDF 빈페이지 버그 수정 — 기존 코드가 완전 HTML 문서를 `<div>`에 innerHTML로 넣어 브라우저가 중첩 html/body 무시. DOMParser로 `<style>` + body.innerHTML 분리해 별도 주입. document.fonts.ready + 250ms 대기
+- `a71aa55` Orbitron.yaml에 Popbill env 6개 키 선언 추가
+- **SSH 작업(커밋 외)**: Orbitron devdb `projects.env_vars` JSONB가 AES-256-GCM 암호화라 Orbitron crypto.js로 decrypt→merge→encrypt→UPDATE. 기존 12개 env에 Popbill 6개 추가. `deployer.deploy(project)` 직접 호출로 재배포, 컨테이너 재생성 후 env 반영 확인. 테스트: 김금순→임춘우 재직증명서 PDF → 팝빌 접수번호 `026042417423100001`, sendState=3(전송완료) convState=2(변환완료) result=100 확인
+- **문제 발견 및 해결 (팩스 수신확인 후)**: 팝빌 API가 "전송완료/변환완료" 보고했지만 실제 050 수신기에는 **빈 용지** 도착. 서버 측 PDF 파일 분석 결과 content stream 24byte, XObject 0개, Font 14개 — html2canvas 캡처 실패한 빈 PDF. DOMParser 분리 방식으로 commit `a95174f`에서 한번 수정했으나 여전히 빈 페이지. `e08be9d`로 전환: Dockerfile에 libpango/libpangoft2/libharfbuzz/libfribidi + fonts-nanum/noto-cjk 추가, weasyprint>=60.0 requirements 추가, `GET /hr/certificate/pdf/{cert_type}/{staff_id}` 신설 (기존 4개 HTML 엔드포인트 재사용 → WeasyPrint 변환), 프론트 `buildCertificatePdf()` 단순화(html2pdf.js 제거, axios blob 직접 fetch). 프로덕션 컨테이너에서 WeasyPrint로 임춘우 재직증명서 생성 테스트 → 41KB PDF (2페이지, 텍스트 313자 추출, 한글 정상 렌더) 확인
+
+---
