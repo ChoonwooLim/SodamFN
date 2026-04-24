@@ -431,6 +431,7 @@ def get_business_info(bid: int):
             "region": business.region or "",
             "seal_style": settings.get("seal_style", "seal-01"),
             "seal_text": settings.get("seal_text", business.name or ""),
+            "seal_image_url": settings.get("seal_image_url", ""),
             # Extended (stored inside settings_json for flexibility)
             "email": settings.get("email", ""),
             "fax": settings.get("fax", ""),
