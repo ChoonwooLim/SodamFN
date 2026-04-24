@@ -257,25 +257,25 @@ def _base_css() -> str:
         }
         .cert-title {
             text-align: center;
-            font-size: 28px;
+            font-size: 26px;
             font-weight: bold;
-            letter-spacing: 12px;
-            margin-bottom: 40px;
-            padding-bottom: 15px;
+            letter-spacing: 10px;
+            margin-bottom: 28px;
+            padding-bottom: 12px;
             border-bottom: 3px double #333;
         }
         .cert-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .cert-table th,
         .cert-table td {
             border: 1px solid #333;
-            padding: 10px 14px;
+            padding: 7px 12px;
             text-align: left;
             vertical-align: middle;
-            font-size: 14px;
+            font-size: 13.5px;
         }
         .cert-table th {
             background-color: #f5f5f5;
@@ -285,28 +285,31 @@ def _base_css() -> str:
         }
         .cert-purpose {
             text-align: center;
-            font-size: 16px;
-            margin: 40px 0 20px;
-            line-height: 2;
+            font-size: 15px;
+            margin: 22px 0 12px;
+            line-height: 1.7;
         }
         .cert-statement {
             text-align: center;
-            font-size: 16px;
-            margin: 30px 0;
-            line-height: 2;
+            font-size: 15px;
+            margin: 20px 0;
+            line-height: 1.7;
         }
         .cert-date {
             text-align: center;
-            font-size: 16px;
-            margin: 40px 0 30px;
+            font-size: 15px;
+            margin: 22px 0 16px;
         }
         .cert-issuer {
             text-align: center;
-            margin-top: 30px;
-            font-size: 16px;
-            line-height: 2.2;
+            margin-top: 18px;
+            font-size: 15px;
+            line-height: 1.8;
             page-break-inside: avoid;
             break-inside: avoid;
+        }
+        .cert-issuer p {
+            margin: 4px 0;
         }
         .cert-purpose, .cert-statement, .cert-date {
             page-break-inside: avoid;
