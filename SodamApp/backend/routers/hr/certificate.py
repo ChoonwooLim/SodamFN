@@ -8,6 +8,8 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlmodel import Session, select
 from datetime import date, datetime
 from typing import Optional
+from html import escape
+import json
 
 from routers.auth import get_admin_user
 from models import User as AuthUser, Staff, Business, Payroll
@@ -43,6 +45,32 @@ def _mask_resident(rn: Optional[str]) -> str:
     return rn
 
 
+def _h(value: Optional[object], default: str = "-") -> str:
+    """Escape user/business data before embedding it in certificate HTML."""
+    if value is None or value == "":
+        return default
+    return escape(str(value), quote=True)
+
+
+def _business_settings(business: Optional[Business]) -> dict:
+    """Parse Business.settings_json safely for document display settings."""
+    if not business or not business.settings_json:
+        return {}
+    try:
+        parsed = json.loads(business.settings_json)
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _business_display_name(business: Optional[Business]) -> str:
+    """Prefer configured Korean seal/display text for formal documents."""
+    if not business:
+        return "-"
+    settings = _business_settings(business)
+    return settings.get("seal_text") or business.name or "-"
+
+
 def _get_staff_and_business(
     staff_id: int,
     bid: Optional[int],
@@ -66,7 +94,7 @@ def _base_css() -> str:
     return """
         @page {
             size: A4;
-            margin: 20mm 15mm 20mm 15mm;
+            margin: 12mm 13mm;
         }
         * {
             margin: 0;
@@ -75,52 +103,79 @@ def _base_css() -> str:
         }
         body {
             font-family: 'Malgun Gothic', '맑은 고딕', 'Nanum Gothic', sans-serif;
-            font-size: 14px;
-            line-height: 1.8;
+            font-size: 15px;
+            line-height: 1.55;
             color: #000;
             background: #fff;
         }
         .certificate-wrap {
-            width: 210mm;
-            min-height: 297mm;
+            width: 184mm;
+            min-height: 273mm;
             margin: 0 auto;
-            padding: 20mm 15mm;
+            padding: 6mm 0 0;
             background: #fff;
             position: relative;
         }
         .cert-title {
             text-align: center;
-            font-size: 28px;
-            font-weight: bold;
+            font-size: 31px;
+            font-weight: 900;
             letter-spacing: 12px;
-            margin-bottom: 40px;
-            padding-bottom: 15px;
-            border-bottom: 3px double #333;
+            text-indent: 12px;
+            margin: 22mm 0 13mm;
+            padding-bottom: 9mm;
+            border-bottom: 4px double #111;
         }
         .cert-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 30px;
+            table-layout: fixed;
+            margin-bottom: 13mm;
+            border-top: 2px solid #111;
+            border-bottom: 2px solid #111;
         }
         .cert-table th,
         .cert-table td {
-            border: 1px solid #333;
-            padding: 10px 14px;
+            border: 1.5px solid #111;
+            padding: 8px 13px;
             text-align: left;
             vertical-align: middle;
-            font-size: 14px;
+            height: 13mm;
+            font-size: 15px;
         }
         .cert-table th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-            width: 140px;
+            background-color: #fff;
+            font-weight: 900;
+            width: 31mm;
             text-align: center;
+        }
+        .cert-table td {
+            font-weight: 600;
+        }
+        .cert-table .section-title {
+            height: 12mm;
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-indent: 8px;
+            text-align: center;
+            background: #fff !important;
+        }
+        .cert-table .label-col {
+            width: 31mm;
+        }
+        .cert-table .value-col {
+            width: 46mm;
+        }
+        .cert-table .wide-value-col {
+            width: auto;
         }
         .cert-purpose {
             text-align: center;
             font-size: 16px;
-            margin: 40px 0 20px;
+            margin: 22mm 0 16mm;
             line-height: 2;
+            font-weight: 600;
         }
         .cert-statement {
             text-align: center;
@@ -131,26 +186,50 @@ def _base_css() -> str:
         .cert-date {
             text-align: center;
             font-size: 16px;
-            margin: 40px 0 30px;
+            margin: 0 0 19mm;
+            font-weight: 700;
         }
         .cert-issuer {
-            text-align: center;
-            margin-top: 30px;
+            width: 94mm;
+            margin: 0 auto;
             font-size: 16px;
-            line-height: 2.2;
+            line-height: 2.05;
+            font-weight: 700;
+        }
+        .cert-issuer p {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 8mm;
+            white-space: nowrap;
+        }
+        .issuer-label {
+            display: inline-block;
+            min-width: 36mm;
+            text-align: right;
+            letter-spacing: 3px;
+            text-indent: 3px;
+        }
+        .issuer-value {
+            display: inline-block;
+            margin-left: 4mm;
+            white-space: normal;
+        }
+        .issuer-representative {
+            margin-top: 8mm;
         }
         .cert-seal {
             display: inline-block;
-            width: 70px;
-            height: 70px;
-            border: 2px solid #c00;
+            width: 18mm;
+            height: 18mm;
+            border: 2px solid #a50022;
             border-radius: 50%;
             text-align: center;
-            line-height: 66px;
-            color: #c00;
-            font-size: 14px;
-            font-weight: bold;
-            margin-left: 10px;
+            line-height: calc(18mm - 4px);
+            color: #a50022;
+            font-size: 13px;
+            font-weight: 900;
+            margin-left: 8mm;
             vertical-align: middle;
         }
         .cert-footer {
@@ -166,7 +245,11 @@ def _base_css() -> str:
         }
         @media print {
             body { background: #fff; }
-            .certificate-wrap { padding: 0; }
+            .certificate-wrap {
+                width: auto;
+                min-height: auto;
+                padding: 0;
+            }
             .cert-footer { position: fixed; bottom: 10mm; }
         }
     """
@@ -210,81 +293,110 @@ def generate_employment_certificate(
     period_end = "현재" if staff.status == "재직" else _fmt_date(staff.contract_end_date or today)
     period_str = f"{_fmt_date(staff.start_date)} ~ {period_end}"
 
-    biz_name = business.name if business else "-"
+    biz_name = _business_display_name(business)
     biz_number = business.business_number or "-" if business else "-"
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
     biz_phone = business.phone or "-" if business else "-"
 
+    staff_name = _h(staff.name)
+    staff_birth = _h(_fmt_date(staff.birth_date) if staff.birth_date else "-")
+    staff_resident = _h(_mask_resident(staff.resident_number))
+    staff_address = _h(staff.address)
+    staff_role = _h(staff.role)
+    staff_contract_type = _h(staff.contract_type)
+    staff_status = _h(staff.status)
+    staff_job = _h(staff.job_description)
+    biz_name_html = _h(biz_name)
+    biz_number_html = _h(biz_number)
+    biz_owner_html = _h(biz_owner)
+    biz_address_html = _h(biz_address)
+    biz_phone_html = _h(biz_phone)
+    period_html = _h(period_str)
+    purpose_html = _h(purpose)
+    today_html = _h(_fmt_date(today))
+
     body = f"""
     <h1 class="cert-title">재 직 증 명 서</h1>
 
     <table class="cert-table">
+        <colgroup>
+            <col class="label-col">
+            <col class="value-col">
+            <col class="label-col">
+            <col class="wide-value-col">
+        </colgroup>
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">인 적 사 항</th>
+                <th colspan="4" class="section-title">인 적 사 항</th>
             </tr>
             <tr>
                 <th>성 명</th>
-                <td>{staff.name}</td>
+                <td>{staff_name}</td>
                 <th>생년월일</th>
-                <td>{_fmt_date(staff.birth_date) if staff.birth_date else "-"}</td>
+                <td>{staff_birth}</td>
             </tr>
             <tr>
                 <th>주민등록번호</th>
-                <td colspan="3">{_mask_resident(staff.resident_number)}</td>
+                <td colspan="3">{staff_resident}</td>
             </tr>
             <tr>
                 <th>주 소</th>
-                <td colspan="3">{staff.address or "-"}</td>
+                <td colspan="3">{staff_address}</td>
             </tr>
         </tbody>
     </table>
 
     <table class="cert-table">
+        <colgroup>
+            <col class="label-col">
+            <col class="wide-value-col">
+            <col class="label-col">
+            <col class="value-col">
+        </colgroup>
         <tbody>
             <tr>
-                <th colspan="4" style="text-align:center; background-color:#e8e8e8; font-size:15px;">재 직 사 항</th>
+                <th colspan="4" class="section-title">재 직 사 항</th>
             </tr>
             <tr>
                 <th>소 속</th>
-                <td>{biz_name}</td>
+                <td>{biz_name_html}</td>
                 <th>직 위</th>
-                <td>{staff.role}</td>
+                <td>{staff_role}</td>
             </tr>
             <tr>
                 <th>고용형태</th>
-                <td>{staff.contract_type}</td>
+                <td>{staff_contract_type}</td>
                 <th>재직상태</th>
-                <td>{staff.status}</td>
+                <td>{staff_status}</td>
             </tr>
             <tr>
                 <th>재직기간</th>
-                <td colspan="3">{period_str}</td>
+                <td colspan="3">{period_html}</td>
             </tr>
             <tr>
                 <th>담당업무</th>
-                <td colspan="3">{staff.job_description or "-"}</td>
+                <td colspan="3">{staff_job}</td>
             </tr>
         </tbody>
     </table>
 
     <div class="cert-purpose">
         <p>위 사실을 증명합니다.</p>
-        <p style="margin-top:10px;">용 도 : {purpose}</p>
+        <p style="margin-top:10px;">용 도 : {purpose_html}</p>
     </div>
 
     <div class="cert-date">
-        <p>{_fmt_date(today)}</p>
+        <p>{today_html}</p>
     </div>
 
     <div class="cert-issuer">
-        <p>사 업 장 명 : {biz_name}</p>
-        <p>사업자등록번호 : {biz_number}</p>
-        <p>주 소 : {biz_address}</p>
-        <p>전 화 번 호 : {biz_phone}</p>
-        <p style="margin-top:15px;">
-            대 표 자 : {biz_owner}
+        <p><span class="issuer-label">사 업 장 명</span> : <span class="issuer-value">{biz_name_html}</span></p>
+        <p><span class="issuer-label">사업자등록번호</span> : <span class="issuer-value">{biz_number_html}</span></p>
+        <p><span class="issuer-label">주 소</span> : <span class="issuer-value">{biz_address_html}</span></p>
+        <p><span class="issuer-label">전 화 번 호</span> : <span class="issuer-value">{biz_phone_html}</span></p>
+        <p class="issuer-representative">
+            <span class="issuer-label">대 표 자</span> : <span class="issuer-value">{biz_owner_html}</span>
             <span class="cert-seal">직인</span>
         </p>
     </div>
@@ -330,7 +442,7 @@ def generate_career_certificate(
         duration_parts.append(f"{days}일")
     duration_str = " ".join(duration_parts) if duration_parts else "1일"
 
-    biz_name = business.name if business else "-"
+    biz_name = _business_display_name(business)
     biz_number = business.business_number or "-" if business else "-"
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
@@ -472,7 +584,7 @@ def generate_salary_certificate(
     count = len(payrolls)
     avg_net = total_net // count if count > 0 else 0
 
-    biz_name = business.name if business else "-"
+    biz_name = _business_display_name(business)
     biz_number = business.business_number or "-" if business else "-"
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
@@ -641,7 +753,7 @@ def generate_retirement_certificate(
         </table>
         """
 
-    biz_name = business.name if business else "-"
+    biz_name = _business_display_name(business)
     biz_number = business.business_number or "-" if business else "-"
     biz_owner = business.owner_name or "-" if business else "-"
     biz_address = business.address or "-" if business else "-"
