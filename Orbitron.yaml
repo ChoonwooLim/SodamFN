@@ -63,6 +63,22 @@ services:
         value: "superadmin"
       - key: SUPERADMIN_PASSWORD
         value: "admin1234"
+      # ─────────────────────────────────────────────
+      # Popbill FAX (2026-04-24 테스트 환경 연동)
+      # SecretKey는 Orbitron Secrets로 설정 — YAML에 실제 값 금지
+      # ─────────────────────────────────────────────
+      - key: FAX_PROVIDER
+        value: "popbill"
+      - key: POPBILL_LINK_ID
+        value: "SODAM"
+      - key: POPBILL_SECRET_KEY
+        value: ""  # ⚠️ Orbitron Secrets에 설정
+      - key: POPBILL_CORP_NUM
+        value: "6391201514"
+      - key: POPBILL_SENDER_NUMBER
+        value: "0224526570"
+      - key: POPBILL_IS_TEST
+        value: "true"
     healthCheck:
       path: /api/health
       interval: 30
