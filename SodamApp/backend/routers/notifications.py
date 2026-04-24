@@ -146,6 +146,17 @@ def get_plus_friend_mgt_url(_admin: User = Depends(get_admin_user)):
     return {"url": url}
 
 
+@router.get("/urls/sender-number")
+def get_sender_number_mgt_url(_admin: User = Depends(get_admin_user)):
+    provider = get_provider()
+    if not isinstance(provider, PopbillNotificationProvider):
+        raise HTTPException(status_code=400, detail="popbill 프로바이더가 활성화되어야 이용 가능합니다.")
+    url = provider.get_sender_number_mgt_url()
+    if not url:
+        raise HTTPException(status_code=500, detail="팝빌 관리 URL 발급 실패")
+    return {"url": url}
+
+
 @router.get("/balance")
 def get_balance(_admin: User = Depends(get_admin_user)):
     provider = get_provider()

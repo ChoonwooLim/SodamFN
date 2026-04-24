@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Globe, Gauge, Briefcase, Send, Landmark } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Globe, Gauge, Briefcase, Send, Landmark, MessageCircle } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -154,6 +154,7 @@ export default function Sidebar() {
         { icon: Briefcase, label: '구인등록', path: '/hr/job-posting', color: 'text-orange-400' },
         { icon: Wallet, label: '퇴직금 지급관리', path: '/hr/retirement', color: 'text-blue-400' },
         { icon: Send, label: '팩스 전송', path: '/hr/fax', color: 'text-violet-400' },
+        { icon: MessageCircle, label: '알림톡 관리', path: '/hr/notifications', color: 'text-yellow-400' },
         { icon: Globe, label: '외국인 고용안내', path: '/hr/foreign-worker-guide', color: 'text-cyan-400' },
     ];
 
