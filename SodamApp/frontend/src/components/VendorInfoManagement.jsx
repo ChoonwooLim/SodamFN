@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText, ImagePlus } from 'lucide-react';
+import { X, Plus, Trash2, Edit2, Check, Package, Building2, Save, Phone, MapPin, FileText, ImagePlus, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import api from '../api';
 import './VendorInfoManagement.css';
 
@@ -20,6 +20,31 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
     });
     const [infoSaving, setInfoSaving] = useState(false);
     const [infoSaved, setInfoSaved] = useState(false);
+
+    // 사업자등록상태 조회 (Popbill ClosedownService)
+    const [bizChecking, setBizChecking] = useState(false);
+    const [bizResult, setBizResult] = useState(null); // { ok, state_label, tax_type_label, state_date, error }
+
+    const handleBizCheck = async () => {
+        const raw = (vendorInfo.business_reg_number || '').replace(/\D/g, '');
+        if (raw.length !== 10) {
+            setBizResult({ ok: false, error: '사업자번호 10자리를 입력하세요.' });
+            return;
+        }
+        setBizChecking(true);
+        setBizResult(null);
+        try {
+            const res = await api.post('/biz-check', { corp_num: raw });
+            setBizResult(res.data);
+        } catch (e) {
+            setBizResult({
+                ok: false,
+                error: e?.response?.data?.detail || '조회 중 오류가 발생했습니다.',
+            });
+        } finally {
+            setBizChecking(false);
+        }
+    };
 
     // Products State
     const [products, setProducts] = useState([]);
@@ -255,17 +280,78 @@ export default function VendorInfoManagement({ vendor, onClose, onVendorUpdate }
                                     <FileText size={14} />
                                     사업자등록번호
                                 </label>
-                                <input
-                                    type="text"
-                                    value={vendorInfo.business_reg_number}
-                                    onChange={(e) => setVendorInfo({
-                                        ...vendorInfo,
-                                        business_reg_number: formatBizNumber(e.target.value)
-                                    })}
-                                    placeholder="예: 123-45-67890"
-                                    className="field-input"
-                                    maxLength={12}
-                                />
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <input
+                                        type="text"
+                                        value={vendorInfo.business_reg_number}
+                                        onChange={(e) => {
+                                            setVendorInfo({
+                                                ...vendorInfo,
+                                                business_reg_number: formatBizNumber(e.target.value)
+                                            });
+                                            setBizResult(null);
+                                        }}
+                                        placeholder="예: 123-45-67890"
+                                        className="field-input"
+                                        maxLength={12}
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleBizCheck}
+                                        disabled={bizChecking || (vendorInfo.business_reg_number || '').replace(/\D/g, '').length !== 10}
+                                        style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            padding: '0 14px',
+                                            borderRadius: 8,
+                                            border: '1px solid #cbd5e1',
+                                            background: '#f8fafc',
+                                            color: '#0f172a',
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: bizChecking ? 'wait' : 'pointer',
+                                            opacity: bizChecking ? 0.6 : 1,
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                        title="팝빌 사업자등록상태 조회"
+                                    >
+                                        {bizChecking ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                                        {bizChecking ? '조회 중...' : '자동확인'}
+                                    </button>
+                                </div>
+                                {bizResult && (
+                                    <div style={{
+                                        marginTop: 8,
+                                        padding: '8px 12px',
+                                        borderRadius: 8,
+                                        fontSize: 12,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        ...(bizResult.ok
+                                            ? {
+                                                background: bizResult.state === '01' ? '#ecfdf5' : '#fef2f2',
+                                                color: bizResult.state === '01' ? '#047857' : '#b91c1c',
+                                                border: `1px solid ${bizResult.state === '01' ? '#86efac' : '#fecaca'}`,
+                                            }
+                                            : {
+                                                background: '#fefce8',
+                                                color: '#a16207',
+                                                border: '1px solid #fde68a',
+                                            }
+                                        ),
+                                    }}>
+                                        {bizResult.ok ? (
+                                            bizResult.state === '01'
+                                                ? <><Check size={14} /> {bizResult.state_label || '정상(등록)'} · {bizResult.tax_type_label || '과세유형 미지정'}</>
+                                                : <><AlertCircle size={14} /> {bizResult.state_label || '확인됨'} — 거래 주의 {bizResult.state_date ? `(변경일 ${bizResult.state_date})` : ''}</>
+                                        ) : (
+                                            <><AlertCircle size={14} /> {bizResult.error || '조회 실패'}</>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div className="info-actions">
                                 <button
