@@ -258,3 +258,239 @@ def aggregate_all(year: int, request: Request, bg: BackgroundTasks,
     biz_id = get_bid_from_token(request)
     bg.add_task(_aggregate_all_bg, biz_id, year, session)
     return {"status": "scheduled", "year": year}
+
+
+# ─────────── Document upload & parse ───────────
+
+ALLOWED_KINDS = {"simplified", "withholding_receipt", "other"}
+MAX_PDF_BYTES = 10 * 1024 * 1024  # 10MB
+
+
+def _storage_key_for_doc(doc: YearEndDocument) -> str:
+    """YearEndDocument → R2 storage key (업로드 시 사용한 패턴 재구성)."""
+    return (
+        f"yearend/{doc.business_id}/{doc.year}/{doc.staff_id}/"
+        f"{doc.kind}_{doc.file_hash[:12]}.pdf"
+    )
+
+
+def _parse_document_sync(doc_id: int, session: Session) -> None:
+    """Background task: 업로드된 PDF 파싱 → DB 저장."""
+    from models import YearEndDocument, YearEndReport, YearEndSimplified
+    import tempfile, requests
+
+    doc = session.get(YearEndDocument, doc_id)
+    if not doc:
+        return
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            resp = requests.get(doc.file_url, timeout=30)
+            resp.raise_for_status()
+            tmp.write(resp.content)
+            tmp_path = tmp.name
+
+        if doc.kind == "withholding_receipt":
+            data = parser.parse_withholding_receipt(tmp_path)
+            r = session.exec(
+                select(YearEndReport).where(YearEndReport.staff_id == doc.staff_id,
+                                            YearEndReport.year == doc.year)
+            ).first()
+            if r is None:
+                r = YearEndReport(business_id=doc.business_id, staff_id=doc.staff_id,
+                                  year=doc.year)
+                session.add(r); session.flush()
+            r.confirmed_doc_id = doc.id
+            r.confirmed_total_pay = data.total_pay
+            r.confirmed_taxes_paid = data.taxes_paid_at_work
+            r.decided_tax = data.decided_tax
+            r.refund_amount = data.refund_amount
+            r.confirmed_at = datetime.utcnow()
+            if r.status in ("draft", "aggregated"):
+                r.status = "uploaded"
+
+        elif doc.kind == "simplified":
+            data = parser.parse_simplified(tmp_path)
+            existing = session.exec(
+                select(YearEndSimplified).where(YearEndSimplified.document_id == doc.id)
+            ).first()
+            if existing is None:
+                existing = YearEndSimplified(
+                    document_id=doc.id, staff_id=doc.staff_id, year=doc.year,
+                )
+                session.add(existing)
+            for f in ["insurance_amount", "medical_amount", "education_amount",
+                      "donation_amount", "house_loan_principal", "house_loan_interest",
+                      "pension_amount", "irp_amount", "credit_card_amount",
+                      "debit_card_amount", "traditional_market", "public_transport",
+                      "cultural_amount"]:
+                setattr(existing, f, getattr(data, f, 0))
+            existing.raw_extracted_text = data.raw_text
+            existing.parsed_at = datetime.utcnow()
+
+        doc.parse_status = "parsed"
+        doc.parsed_at = datetime.utcnow()
+        doc.parse_error = None
+        session.commit()
+        logger.info("yearend parse OK doc_id=%s kind=%s", doc.id, doc.kind)
+
+    except Exception as e:
+        doc.parse_status = "error"
+        doc.parse_error = str(e)[:500]
+        session.commit()
+        logger.error("yearend parse FAIL doc_id=%s: %s", doc.id, e)
+    finally:
+        if tmp_path:
+            try:
+                import os as _os
+                _os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
+@router.post("/{year}/employees/{staff_id}/documents")
+async def upload_document(
+    year: int, staff_id: int,
+    request: Request, bg: BackgroundTasks,
+    file: UploadFile = File(...),
+    kind: str = Form(...),
+    session: Session = Depends(get_session),
+    user: User = Depends(get_admin_user),
+):
+    biz_id = get_bid_from_token(request)
+
+    if kind not in ALLOWED_KINDS:
+        raise HTTPException(400, f"kind 는 {ALLOWED_KINDS} 중 하나")
+
+    if (file.content_type or "").lower() != "application/pdf":
+        raise HTTPException(400, "PDF 파일만 업로드 가능")
+
+    content = await file.read()
+    if len(content) > MAX_PDF_BYTES:
+        raise HTTPException(413, "10MB 이하 PDF만 허용")
+
+    file_hash = hashlib.sha256(content).hexdigest()
+
+    # 중복 체크
+    dup = session.exec(
+        select(YearEndDocument).where(
+            YearEndDocument.staff_id == staff_id,
+            YearEndDocument.year == year,
+            YearEndDocument.kind == kind,
+            YearEndDocument.file_hash == file_hash,
+        )
+    ).first()
+    if dup:
+        raise HTTPException(409, "동일 파일이 이미 업로드되어 있습니다")
+
+    # R2/미디어 서버 저장 — storage_service.upload_file(BinaryIO, key, content_type)
+    storage = get_storage()
+    key = f"yearend/{biz_id}/{year}/{staff_id}/{kind}_{file_hash[:12]}.pdf"
+    file_url = storage.upload_file(io.BytesIO(content), key, content_type="application/pdf")
+
+    doc = YearEndDocument(
+        business_id=biz_id, staff_id=staff_id, year=year, kind=kind,
+        file_url=file_url, original_filename=file.filename or "upload.pdf",
+        file_size=len(content), file_hash=file_hash,
+        uploaded_by_user_id=user.id, uploaded_at=datetime.utcnow(),
+    )
+    session.add(doc)
+    _ensure_report(session, biz_id, staff_id, year)
+    session.commit()
+    session.refresh(doc)
+
+    ip, ua = audit.extract_actor_meta(request)
+    audit.log_action(
+        session=session, business_id=biz_id, staff_id=staff_id, year=year,
+        action="upload", actor_user_id=user.id, actor_role="admin",
+        document_id=doc.id, actor_ip=ip, user_agent=ua,
+        detail=json.dumps({"kind": kind, "filename": file.filename}, ensure_ascii=False),
+    )
+    session.commit()
+
+    bg.add_task(_parse_document_sync, doc.id, session)
+
+    return {
+        "id": doc.id, "kind": doc.kind, "file_url": doc.file_url,
+        "parse_status": doc.parse_status, "filename": doc.original_filename,
+    }
+
+
+@router.get("/{year}/employees/{staff_id}/documents")
+def list_documents(year: int, staff_id: int, request: Request,
+                   session: Session = Depends(get_session),
+                   user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    docs = session.exec(
+        select(YearEndDocument).where(
+            YearEndDocument.staff_id == staff_id, YearEndDocument.year == year
+        ).order_by(YearEndDocument.uploaded_at.desc())
+    ).all()
+    return [{
+        "id": d.id, "kind": d.kind, "filename": d.original_filename,
+        "uploaded_at": d.uploaded_at.isoformat(), "parse_status": d.parse_status,
+        "parse_error": d.parse_error, "file_url": d.file_url, "file_size": d.file_size,
+    } for d in docs]
+
+
+@router.delete("/documents/{document_id}")
+def delete_document(document_id: int, request: Request,
+                    session: Session = Depends(get_session),
+                    user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    doc = session.get(YearEndDocument, document_id)
+    if not doc or doc.business_id != biz_id:
+        raise HTTPException(404, "문서를 찾을 수 없습니다")
+
+    try:
+        # storage_service.delete_file 은 key 를 받음 (URL 아님) → 업로드 패턴 재구성
+        get_storage().delete_file(_storage_key_for_doc(doc))
+    except Exception as e:
+        logger.warning("storage delete failed for doc_id=%s: %s", doc.id, e)
+
+    ip, ua = audit.extract_actor_meta(request)
+    audit.log_action(
+        session=session, business_id=biz_id, staff_id=doc.staff_id, year=doc.year,
+        action="delete", actor_user_id=user.id, actor_role="admin",
+        document_id=document_id, actor_ip=ip, user_agent=ua,
+    )
+    session.delete(doc)
+    session.commit()
+    return {"deleted": document_id}
+
+
+@router.post("/documents/{document_id}/reparse")
+def reparse_document(document_id: int, request: Request, bg: BackgroundTasks,
+                     session: Session = Depends(get_session),
+                     user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    doc = session.get(YearEndDocument, document_id)
+    if not doc or doc.business_id != biz_id:
+        raise HTTPException(404)
+    doc.parse_status = "pending"; doc.parse_error = None
+    session.commit()
+    bg.add_task(_parse_document_sync, document_id, session)
+    return {"status": "scheduled", "document_id": document_id}
+
+
+# ─────────── Reconcile ───────────
+
+@router.post("/{year}/employees/{staff_id}/reconcile")
+def trigger_reconcile(year: int, staff_id: int, request: Request,
+                      session: Session = Depends(get_session),
+                      user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    r = session.exec(
+        select(YearEndReport).where(YearEndReport.staff_id == staff_id,
+                                    YearEndReport.year == year)
+    ).first()
+    if r is None:
+        raise HTTPException(404, "report 없음 — 먼저 집계 또는 업로드 필요")
+    status, diff = reconciler.reconcile(r)
+    r.reconciliation_status = status
+    r.reconciliation_diff = diff
+    if r.status in ("uploaded", "aggregated"):
+        r.status = "reconciled"
+    session.commit()
+    return {"reconciliation_status": status, "reconciliation_diff": diff}
