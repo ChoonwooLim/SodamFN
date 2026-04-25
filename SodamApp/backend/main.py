@@ -148,6 +148,9 @@ app.include_router(yearend.router, prefix="/api")
 from routers import staff_yearend
 app.include_router(staff_yearend.router, prefix="/api/staff")
 
+from routers import sales_guide
+app.include_router(sales_guide.router, prefix="/api")
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""
