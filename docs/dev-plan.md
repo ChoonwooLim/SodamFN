@@ -12,6 +12,7 @@
 | 4 | HR SaaS 전문화 (Phase 1~8) | 완료 | 2026-04-19 |
 | 5 | 팝빌 통합 연동 (11개 서비스 단계적 활용) | 진행중 | 2026-05~06 |
 | 6 | 연말정산 Phase 1 — 자체 집계 + 업로드본 대조 (경로 C 하이브리드) | 완료 | 2026-04-25 |
+| 7 | 외부 통합 전략 — 팝빌+CODEF 하이브리드 (조회/수집=CODEF 점진 도입) | 시작 | 2026-05~07 |
 
 ## 팝빌 통합 스케줄 (2026-04-24 확립)
 
@@ -61,6 +62,48 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 - ⏸️ 카카오 친구톡 (광고성) — 미구현
 - ⏸️ 휴대폰본인인증 — 미구현
 
+## 외부 통합 전략 — 팝빌 + CODEF 하이브리드 (2026-04-25 결정)
+
+**Why**: 2026-04-25 팝빌 EasyFinBank `-99010016` 차단 사건 → 단일 provider 의존 리스크 회피.
+
+**원칙**: 팝빌 = 발급/전송 ASP, CODEF = 마이데이터 조회/수집. 경쟁자 아니라 보완재.
+
+### 도메인별 채택
+
+| 영역 | 채택 | 비고 |
+|---|---|---|
+| 팩스·세금계산서·알림톡·현금영수증 발행 | **팝빌** | 발행기관 자격 필요 영역, 팝빌 강점 |
+| 사업자등록·기업정보·예금주조회 | 팝빌 | 이미 운영 중 (Phase B/C/G) |
+| 홈택스 수집 | 팝빌 → CODEF 마이그레이션 검토 | 데이터 신선도 비교 후 |
+| **계좌 거래내역** | **CODEF primary**, 팝빌 backup | 팝빌 차단 보험 |
+| **카드 사업자 매출** (CREFIA 우회) | **CODEF only** | 팝빌 미제공, 신규 가치 |
+| **4대보험 자격득실/지원금** | **CODEF only** | 인사관리 자동화 |
+| 부동산 등기부 | CODEF | 우선순위 낮음 |
+
+### 어댑터 패턴 표준
+
+```
+backend/services/{domain}/
+├── popbill_provider.py
+├── codef_provider.py
+└── factory.py    # env BANK_SYNC_PROVIDER=popbill|codef
+```
+
+→ 한 채널 차단 시 즉시 전환 가능. 단일 장애점 회피.
+
+### 실행 우선순위
+
+1. CODEF DEMO 가입 (3개월 무료 일 100건)
+2. **카드 사업자 매출 통합** (CODEF only, 가장 큰 신규 가치)
+3. **EasyFinBank 백업** (CodefProvider, 팝빌 차단 보험)
+4. **4대보험 자격득실** (직원 입사 자동 검증)
+5. 팝빌 정액제 4종(월 45만원) 사용량 검토 → 활용 빈도 낮은 모듈 해지
+
+### 참조
+
+- 깊이 비교: `C:/WORK/llm-wiki/40-Tools/Popbill-vs-CODEF.md` (10항목 분석)
+- 통합 결정 SSOT: `C:/WORK/llm-wiki/60-Projects/SodamFN.md` § 9. 외부 통합 전략
+
 ## 기능 목록
 
 | 기능 | 상태 | 담당 | 메모 |
@@ -96,3 +139,7 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 | 연말정산 환급/추가납부 표시 + 대조 검증 | 완료 | - | ±1k OK / ±10k Warning / 초과 Mismatch (services/yearend/reconciler) |
 | 연말정산 직원앱 본인 조회/다운로드 + 감사 로그 | 완료 | - | /api/staff/yearend/* + YearEndAuditLog |
 | 연말정산 자체 세법 계산 (Phase A 업그레이드) | 미시작 | - | StubTaxCalculator → StandardKoreanTaxCalculator 교체 (Roadmap Phase 4) |
+| CODEF 가입 + DEMO PoC | 시작 예정 | - | 3개월 무료 일 100건. 팝빌 EasyFinBank 백업 우선 검증 |
+| CODEF 카드 사업자 매출 통합 | 미시작 | - | /v1/kr/card/common/b/approval — CREFIA 우회 핵심 |
+| CODEF EasyFinBank 백업 (CodefProvider) | 미시작 | - | services/bank_sync/codef_provider.py + factory + env 스위치 |
+| CODEF 4대보험 자격득실 자동 검증 | 미시작 | - | Staff 입사 시 자동 토글 |
