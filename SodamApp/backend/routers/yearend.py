@@ -494,3 +494,191 @@ def trigger_reconcile(year: int, staff_id: int, request: Request,
         r.status = "reconciled"
     session.commit()
     return {"reconciliation_status": status, "reconciliation_diff": diff}
+
+
+# ─────────── PDF generation ───────────
+
+def _build_pdf_response(*, report, staff, business, simplified, mask_rn: bool,
+                        income_type: str, is_draft: bool, filename: str) -> Response:
+    if income_type == "business":
+        html = generator.render_business_income_html(
+            report=report, staff=staff, business=business,
+            is_draft=is_draft, mask_resident_number=mask_rn,
+        )
+    else:
+        html = generator.render_withholding_html(
+            report=report, staff=staff, business=business,
+            simplified=simplified, is_draft=is_draft,
+            mask_resident_number=mask_rn,
+        )
+    pdf_bytes = generator.html_to_pdf(html)
+    headers = {
+        "Content-Disposition": f'attachment; filename*=UTF-8\'\'{filename}',
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+
+
+@router.get("/{year}/employees/{staff_id}/draft-receipt.pdf")
+def download_draft_pdf(year: int, staff_id: int, request: Request,
+                       session: Session = Depends(get_session),
+                       user: User = Depends(get_admin_user)):
+    from urllib.parse import quote
+    biz_id = get_bid_from_token(request)
+
+    report = session.exec(
+        select(YearEndReport).where(YearEndReport.staff_id == staff_id,
+                                    YearEndReport.year == year)
+    ).first()
+    if report is None:
+        raise HTTPException(404, "report 없음")
+    staff = session.get(Staff, staff_id)
+    business = session.get(Business, biz_id)
+    simplified = session.exec(
+        select(YearEndSimplified).where(YearEndSimplified.staff_id == staff_id,
+                                        YearEndSimplified.year == year)
+    ).first()
+
+    label = "근로소득" if report.income_type == "earned" else "사업소득"
+    filename = quote(f"{label}원천징수영수증_{year}_{staff.name}_초안.pdf")
+
+    ip, ua = audit.extract_actor_meta(request)
+    audit.log_action(
+        session=session, business_id=biz_id, staff_id=staff_id, year=year,
+        action="regenerate", actor_user_id=user.id, actor_role="admin",
+        actor_ip=ip, user_agent=ua,
+    )
+    session.commit()
+
+    return _build_pdf_response(
+        report=report, staff=staff, business=business, simplified=simplified,
+        mask_rn=False, income_type=report.income_type,
+        is_draft=True, filename=filename,
+    )
+
+
+@router.get("/{year}/employees/{staff_id}/draft-receipt.preview")
+def preview_draft_html(year: int, staff_id: int, request: Request,
+                       session: Session = Depends(get_session),
+                       user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    report = session.exec(
+        select(YearEndReport).where(YearEndReport.staff_id == staff_id,
+                                    YearEndReport.year == year)
+    ).first()
+    if report is None:
+        raise HTTPException(404)
+    staff = session.get(Staff, staff_id)
+    business = session.get(Business, biz_id)
+    simplified = session.exec(
+        select(YearEndSimplified).where(YearEndSimplified.staff_id == staff_id,
+                                        YearEndSimplified.year == year)
+    ).first()
+    if report.income_type == "business":
+        html = generator.render_business_income_html(
+            report=report, staff=staff, business=business,
+            is_draft=True, mask_resident_number=False,
+        )
+    else:
+        html = generator.render_withholding_html(
+            report=report, staff=staff, business=business, simplified=simplified,
+            is_draft=True, mask_resident_number=False,
+        )
+    return Response(content=html, media_type="text/html; charset=utf-8")
+
+
+# ─────────── Distribute / Revoke ───────────
+
+@router.post("/{year}/employees/{staff_id}/distribute")
+def distribute_report(year: int, staff_id: int, request: Request,
+                      session: Session = Depends(get_session),
+                      user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    report = session.exec(
+        select(YearEndReport).where(YearEndReport.staff_id == staff_id,
+                                    YearEndReport.year == year)
+    ).first()
+    if report is None:
+        raise HTTPException(404)
+    if report.reconciliation_status == "mismatch":
+        raise HTTPException(400, "대조 불일치 상태에서는 직원앱 노출 불가")
+    report.distributed_to_staff = True
+    report.distributed_at = datetime.utcnow()
+    if report.status != "distributed":
+        report.status = "distributed"
+    ip, ua = audit.extract_actor_meta(request)
+    audit.log_action(
+        session=session, business_id=biz_id, staff_id=staff_id, year=year,
+        action="distribute", actor_user_id=user.id, actor_role="admin",
+        actor_ip=ip, user_agent=ua,
+    )
+    session.commit()
+    return _serialize_report(report)
+
+
+@router.post("/{year}/employees/{staff_id}/revoke")
+def revoke_report(year: int, staff_id: int, request: Request,
+                  session: Session = Depends(get_session),
+                  user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    report = session.exec(
+        select(YearEndReport).where(YearEndReport.staff_id == staff_id,
+                                    YearEndReport.year == year)
+    ).first()
+    if report is None:
+        raise HTTPException(404)
+    report.distributed_to_staff = False
+    if report.status == "distributed":
+        report.status = "reconciled"
+    ip, ua = audit.extract_actor_meta(request)
+    audit.log_action(
+        session=session, business_id=biz_id, staff_id=staff_id, year=year,
+        action="revoke", actor_user_id=user.id, actor_role="admin",
+        actor_ip=ip, user_agent=ua,
+    )
+    session.commit()
+    return _serialize_report(report)
+
+
+# ─────────── Audit logs ───────────
+
+@router.get("/{year}/employees/{staff_id}/audit-logs")
+def get_audit_logs(year: int, staff_id: int, request: Request,
+                   limit: int = Query(50, ge=1, le=500),
+                   offset: int = Query(0, ge=0),
+                   session: Session = Depends(get_session),
+                   user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    rows = session.exec(
+        select(YearEndAuditLog)
+        .where(YearEndAuditLog.business_id == biz_id,
+               YearEndAuditLog.staff_id == staff_id,
+               YearEndAuditLog.year == year)
+        .order_by(YearEndAuditLog.occurred_at.desc())
+        .offset(offset).limit(limit)
+    ).all()
+    return [{
+        "id": r.id, "action": r.action, "actor_role": r.actor_role,
+        "actor_user_id": r.actor_user_id, "actor_ip": r.actor_ip,
+        "occurred_at": r.occurred_at.isoformat(), "detail": r.detail,
+        "document_id": r.document_id,
+    } for r in rows]
+
+
+@router.get("/{year}/audit-logs")
+def get_year_audit_logs(year: int, request: Request,
+                         limit: int = Query(100, ge=1, le=1000),
+                         offset: int = Query(0, ge=0),
+                         session: Session = Depends(get_session),
+                         user: User = Depends(get_admin_user)):
+    biz_id = get_bid_from_token(request)
+    rows = session.exec(
+        select(YearEndAuditLog)
+        .where(YearEndAuditLog.business_id == biz_id,
+               YearEndAuditLog.year == year)
+        .order_by(YearEndAuditLog.occurred_at.desc())
+        .offset(offset).limit(limit)
+    ).all()
+    return [{
+        "id": r.id, "staff_id": r.staff_id, "action": r.action,
+        "actor_role": r.actor_role, "occurred_at": r.occurred_at.isoformat(),
+    } for r in rows]
