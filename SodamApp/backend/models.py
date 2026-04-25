@@ -953,3 +953,99 @@ class BankTransaction(SQLModel, table=True):
     user_memo: Optional[str] = None              # 사용자가 단 메모
     raw_json: Optional[str] = None               # 팝빌 응답 원본 (보관용)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now, index=True)
+
+
+# --- Year-End Tax Settlement (연말정산 Phase 1) ---
+
+class YearEndReport(SQLModel, table=True):
+    """직원·연도별 연말정산 마스터 (자체 집계 + 업로드본 정본 + 대조 결과)."""
+    __table_args__ = (UniqueConstraint("staff_id", "year", name="uq_yearend_staff_year"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    year: int = Field(index=True)
+    income_type: str = Field(default="earned")  # "earned" / "business"
+
+    aggregated_at: Optional[datetime.datetime] = None
+    total_pay_year: int = 0
+    taxable_pay: int = 0
+    nontaxable_pay: int = 0
+    taxes_withheld_total: int = 0
+    insurance_4major_total: int = 0
+
+    confirmed_doc_id: Optional[int] = Field(default=None, foreign_key="yearenddocument.id")
+    confirmed_total_pay: Optional[int] = None
+    confirmed_taxes_paid: Optional[int] = None
+    decided_tax: Optional[int] = None
+    refund_amount: Optional[int] = None
+    confirmed_at: Optional[datetime.datetime] = None
+
+    reconciliation_status: str = Field(default="pending")  # pending/ok/warning/mismatch
+    reconciliation_diff: int = 0
+
+    status: str = Field(default="draft")  # draft/aggregated/uploaded/reconciled/distributed
+    distributed_to_staff: bool = Field(default=False)
+    distributed_at: Optional[datetime.datetime] = None
+
+
+class YearEndDocument(SQLModel, table=True):
+    """업로드된 PDF 문서 (간소화 자료 / 원천징수영수증)."""
+    __table_args__ = (
+        UniqueConstraint("staff_id", "year", "kind", "file_hash", name="uq_yedoc_unique"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    year: int = Field(index=True)
+    kind: str  # "simplified" / "withholding_receipt" / "other"
+    file_url: str
+    original_filename: str
+    file_size: int
+    file_hash: str = Field(index=True)
+    uploaded_by_user_id: int = Field(foreign_key="user.id")
+    uploaded_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    parse_status: str = Field(default="pending")  # pending/parsed/error
+    parse_error: Optional[str] = None
+    parsed_at: Optional[datetime.datetime] = None
+
+
+class YearEndSimplified(SQLModel, table=True):
+    """홈택스 간소화 자료 13개 카테고리 합계."""
+    __table_args__ = (UniqueConstraint("document_id", name="uq_yes_doc"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    document_id: int = Field(foreign_key="yearenddocument.id")
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    year: int = Field(index=True)
+
+    insurance_amount: int = 0
+    medical_amount: int = 0
+    education_amount: int = 0
+    donation_amount: int = 0
+    house_loan_principal: int = 0
+    house_loan_interest: int = 0
+    pension_amount: int = 0
+    irp_amount: int = 0
+    credit_card_amount: int = 0
+    debit_card_amount: int = 0
+    traditional_market: int = 0
+    public_transport: int = 0
+    cultural_amount: int = 0
+
+    raw_extracted_text: Optional[str] = None
+    parsed_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class YearEndAuditLog(SQLModel, table=True):
+    """연말정산 다운로드/배포 감사 로그."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    staff_id: int = Field(foreign_key="staff.id", index=True)
+    year: int = Field(index=True)
+    document_id: Optional[int] = Field(default=None, foreign_key="yearenddocument.id")
+    action: str  # upload/view/download/regenerate/distribute/revoke/reparse/delete
+    actor_user_id: int = Field(foreign_key="user.id")
+    actor_role: str  # "admin" / "staff_self"
+    actor_ip: Optional[str] = None
+    user_agent: Optional[str] = None
+    occurred_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    detail: Optional[str] = None
