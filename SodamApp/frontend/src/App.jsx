@@ -61,6 +61,7 @@ const TaxInvoice = React.lazy(() => import('./pages/TaxInvoice'));
 const HomeTaxCollect = React.lazy(() => import('./pages/HomeTaxCollect'));
 const KakaoNotifications = React.lazy(() => import('./pages/KakaoNotifications'));
 const CashBill = React.lazy(() => import('./pages/CashBill'));
+const YearEnd = React.lazy(() => import('./pages/YearEnd'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -201,6 +202,7 @@ export default function App() {
               <Route path="/hr/job-posting" element={<ProtectedRoute adminOnly><JobPosting /></ProtectedRoute>} />
               <Route path="/hr/fax" element={<ProtectedRoute adminOnly><FaxTransmission /></ProtectedRoute>} />
               <Route path="/hr/payroll-ledger" element={<Navigate to="/employees" replace />} />
+              <Route path="/yearend" element={<ProtectedRoute adminOnly><YearEnd /></ProtectedRoute>} />
               <Route path="/more" element={<ProtectedRoute adminOnly><MoreMenu /></ProtectedRoute>} />
               <Route path="/design-plan" element={<ProtectedRoute adminOnly><DesignPlan /></ProtectedRoute>} />
               <Route path="/ai-system-design" element={<ProtectedRoute adminOnly><AISystemDesign /></ProtectedRoute>} />
