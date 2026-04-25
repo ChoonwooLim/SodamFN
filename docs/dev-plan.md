@@ -17,52 +17,48 @@
 LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 호출 가능.
 아래 순서대로 단계별 구현.
 
-### Phase A — 카카오 알림톡/문자 (2순위) · 진행중
+### Phase A — 카카오 알림톡/문자 (2순위) · **코드완료** / 카카오 검수 대기
 
 - **가치**: 직원 알림용 SMS 대체 → 건당 10원 → 7원. 월 수백건 기준 의미 있음
-- **구현**: `services/notification_service.py` (Popbill KakaoService 래핑) + `NotificationHistory` 모델 + `/api/notifications` 라우터 + 이력 페이지 · 프로바이더 추상화 (stub/popbill) 팩스와 동일 패턴
-- **사용자 선행작업**: ①카카오톡 비즈 채널(플러스친구) 개설 ②팝빌에 채널 연결 ③알림톡 템플릿 등록 → 카카오 심사 (영업일 2~3일)
-- **통합**: 출근 지각 / 급여 이체 완료 / 연차 승인·반려 / 계약 만료 임박 / 수습 종료 5가지 트리거 자동 발송
+- **구현 완료 (2026-04-25)**: `services/notification_service.py` 374줄(KakaoService + MessageService 래핑) + `NotificationHistory` 모델 + `/api/notifications` 11엔드포인트 + `pages/KakaoNotifications.jsx` 관리 UI(잔액/템플릿 검수현황/발송통계 + 팝빌 관리 3종 바로가기 + 빠른 테스트 발송 모달). payroll/contract/purchase_requests에서 사용 중.
+- **사용자 선행작업**: ①카카오 비즈센터 플러스친구 채널 ②팝빌에 채널 연결 ③발신번호 등록 ④템플릿 검수 (1-3 영업일)
+- **활성화**: 검수 통과 후 `NOTIFICATION_PROVIDER=popbill` 전환 → 즉시 사용
 
-### Phase B — 사업자등록상태 조회 (3순위)
+### Phase B — 사업자등록상태 조회 (3순위) · **완료**
 
-- **가치**: 거래처 등록 시 자동 검증 → 휴·폐업 거래처 감지 → 세금계산서 발행 오류 예방
-- **구현**: `services/biz_check_service.py` (ClosedownService) + 거래처 등록 폼에 "자동 확인" 버튼 + 월별 일괄 점검 크론
-- **요금**: 건당 ~30원 · 선행작업 없음 (바로 구현 가능)
+- **구현 완료 (2026-04-25)**: `services/biz_check_service.py` ClosedownService 래핑(check_one/check_many) + `/api/biz-check` 단건+배치 + `VendorInfoManagement.jsx` "상태확인" 버튼 + 결과 배너
+- **요금**: 건당 ~30원 · 즉시 작동 가능
 
-### Phase C — 예금주조회 (4순위)
+### Phase C — 예금주조회 (4순위) · **완료**
 
-- **가치**: 급여이체·퇴직금 오입금 방지. 직원 계좌 등록 시 즉시 명의 확인
-- **구현**: AccountCheckService 래핑 → 직원 기본정보 탭/퇴직금 탭 계좌 입력란에 "명의 확인" 버튼 추가
-- **요금**: 건당 ~50원 · 선행작업 없음
+- **구현 완료 (2026-04-25)**: `services/account_check_service.py` AccountCheckService 래핑(BANK_NAMES 23개 + 별칭 매핑) + `/api/account-check` + `ContractTab.jsx` 급여계좌 영역 강화(은행 드롭다운 + "예금주 자동확인" + 불일치 amber 경고)
+- **요금**: 건당 ~50원
 
-### Phase D — 전자세금계산서 (5순위)
+### Phase D — 전자세금계산서 (5순위) · **완료**
 
-- **가치**: 매출 세금계산서 홈택스 자동 전송, 거래처에 이메일/팩스 발송
-- **구현**: TaxinvoiceService 래핑 + 세금계산서 발행 페이지 + 수정/취소 · 파일 첨부 · 템플릿 관리
-- **요금**: 건당 ~110원 · 선행작업: 공동인증서 팝빌 등록
-- **범위**: 큰 작업. 별도 세션 할당
+- **구현 완료 (2026-04-25)**: `services/taxinvoice_service.py` TaxinvoiceService 래핑(RegistIssue/getInfo/search/PopbillURL) + `routers/taxinvoice.py` 6엔드포인트(공급자는 현재 Business 자동 prefill) + `pages/TaxInvoice.jsx` 발행 페이지(팝빌 4종 바로가기 + 빠른 발행 폼 + VAT 10% 자동 계산 + 90일 이력)
+- **선행작업**: 팝빌 인증서 등록 (CERT 바로가기 사용)
+- **요금**: 건당 ~110원
 
-### Phase E — 홈택스 수집 (세금계산서 + 현금영수증) (6순위)
+### Phase E — 홈택스 수집 (6순위) · **완료**
 
-- **가치**: 월말 세무사 제출 자료 자동 수집 · 매입 세금계산서 누락 방지
-- **구현**: HTTaxinvoiceService + HTCashbillService + 월별 자동 수집 크론 + 조회/다운로드 UI
-- **요금**: 건당 ~70원 or 정액제 · 선행작업: 홈택스 공동인증서 등록
+- **구현 완료 (2026-04-25)**: `services/hometax_service.py` HTTaxinvoiceService 래핑(부서사용자 인증 + RequestJob/JobState/Search/Summary 비동기 모델) + `routers/hometax.py` 12엔드포인트 + `pages/HomeTaxCollect.jsx` 5단계 워크플로우(인증→수집요청→폴링 3초 주기→요약→리스트+CSV)
+- **선행작업**: 홈택스 부서사용자 ID 발급 (마이홈택스 → 부서사용자 관리)
+- **현금영수증 수집(HTCashbillService)은 별도 세션**
 
-### Phase F — 계좌조회 (7순위)
+### Phase F — 계좌조회 (7순위) · **코드완료** / 팝빌 모듈 활성화 차단
 
-- **가치**: 통장 거래내역 자동 수집 → 매출/매입 자동 분류
-- **구현**: EasyFinBankService + 거래내역 자동 집계
-- **요금**: 건당 ~30원 · 선행작업: 은행 **빠른조회서비스** 신청 (신한은행 지점 방문 서류 제출, 영업일 3~5일)
-- **후순위 이유**: 은행 신청 부담 있어 필수 아님
+- **구현 완료 (2026-04-25)**: `services/bank_sync_service.py` EasyFinBankService 래핑 + 30+ 엔드포인트 + 7섹션 UI(현재 상태/계좌 목록/수동 추가/진단/거래조회/거래목록/엑셀 업로드)
+- **현재 상태**: 정액제 결제 완료 (2026-04-24, 신한 110-357-7XXXXX, ~05-24)했지만 live 환경에서 `listBankAccount` / `getBankAccountInfo` / `requestJob` 모두 `Popbill[-99010016] 사용할 수 없는 서비스` 차단. `getBalance` / `getBankAccountMgtURL`만 정상 → API 모듈 활성화 누락 패턴
+- **다음 액션**: 팝빌 1:1 문의 답변 대기. 활성화 승인 → 수집/자동분류 검증 / 거부 → Excel 업로드 자동화로 선회
 
-### Phase G — 기타 (8순위)
+### Phase G — 기타 (8순위) · **부분 완료**
 
-- 전자명세서 (거래명세서·청구서·견적서·발주서·입금표·영수증)
-- 현금영수증 발행
-- 기업정보 조회 (거래처 등록 자동 채우기)
-- 카카오 친구톡 (광고성)
-- 필요 시점에 개별 구현
+- ✅ **기업정보 조회 (BizInfoCheck)** — `services/bizinfo_check_service.py` + 거래처 "자동채움" 버튼(상호/대표/업태/종목/주소/규모/설립일 등)
+- ✅ **현금영수증 발행 (Cashbill)** — `services/cashbill_service.py` + `pages/CashBill.jsx` 빠른 발행 페이지(소득공제용/지출증빙용 + VAT 자동 계산 + 90일 이력)
+- ⏸️ 전자명세서 (거래명세서·청구서·견적서·발주서·입금표·영수증) — 미구현
+- ⏸️ 카카오 친구톡 (광고성) — 미구현
+- ⏸️ 휴대폰본인인증 — 미구현
 
 ## 기능 목록
 
@@ -85,3 +81,11 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 | HR 대시보드 | 완료 | - | 인력현황, 연차현황, 알림 통합 |
 | 증명서 자동발급 (4종) | 완료 | - | 재직/경력/급여확인/퇴직 HTML |
 | 5인 미만/이상 사업장 모드 | 완료 | - | 간편/전체 기능 자동 분리 |
+| 팝빌 알림톡 발송 인프라 (Phase A) | 코드완료 | - | 카카오 검수 통과 후 popbill 활성 |
+| 팝빌 사업자등록상태 조회 (Phase B) | 완료 | - | 거래처 "상태확인" 버튼 |
+| 팝빌 예금주조회 (Phase C) | 완료 | - | 급여계좌 입력 시 "예금주 자동확인" |
+| 팝빌 전자세금계산서 발행 (Phase D) | 완료 | - | /finance/tax-invoice |
+| 팝빌 홈택스 자동 수집 (Phase E) | 완료 | - | /finance/hometax · 부서사용자 ID 등록 필요 |
+| 팝빌 계좌조회 (Phase F) | 코드완료 | - | -99010016 차단, 팝빌 답변 대기 |
+| 팝빌 기업정보 자동채움 (Phase G) | 완료 | - | 거래처 "자동채움" 버튼 |
+| 팝빌 현금영수증 발행 (Phase G) | 완료 | - | /finance/cashbill |

@@ -183,3 +183,62 @@
 - **`a410f261`** 워터마크 로고 크기 5배 (120mm → 600mm), cert-wrap에 overflow:hidden 추가해 페이지 바깥 클리핑
 
 ---
+
+## 2026-04-25
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|---|---|---|
+| feat | 팝빌 알림톡/SMS 전송 기반 (Phase A) | 완료 |
+| feat | 팝빌 사업자등록상태 자동 조회 (Phase B / 3순위) | 완료 |
+| feat | 팝빌 이지펀뱅크 계좌조회 자동 수집 기반 (Phase C) | 코드 완료 / API -99010016 차단 |
+| fix  | bank-sync 팝빌 SDK 메서드명/시그니처 재구성 (500 에러) | 완료 |
+| feat | bank-sync 진단 엔드포인트/UI (test vs live 자가 판별) | 완료 |
+| fix  | bank-sync 진단 모달 에러 상세 자동 펼침 + 가독성 | 완료 |
+| feat | bank-sync 계좌 수동 추가 우회 (listBankAccount 권한 회피) | 완료 |
+| feat | bank-sync 진단에 requestJob/getJobState 1회 테스트 | 완료 |
+| feat | bank-sync live/test 환경 나란히 비교 진단 (force_is_test) | 완료 |
+| fix  | bank-sync 진단 UI 내부 ok=False/skipped도 실패 인식 | 완료 |
+| feat | 예금주조회 API + 급여계좌 자동확인 UI (4순위) | 완료 |
+| feat | 전자세금계산서 발행/이력 (5순위 · Phase D) | 완료 |
+| feat | 기업정보(BizInfoCheck) 자동채움 (8순위) | 완료 |
+| feat | 홈택스 전자세금계산서 자동 수집 (6순위 · Phase E) | 완료 |
+| feat | 알림톡 관리 UI 페이지 신설 (2순위 골격 보강) | 완료 |
+| feat | 현금영수증 발행/이력/취소 (우선순위 외) | 완료 |
+
+### 세부 내용
+
+**1) 새벽 — 팝빌 인프라 5건 (a864384c → 73dc72a4)**
+
+- `a864384c` Phase A 카카오 알림톡 + SMS 기반 — `services/notification_service.py` 374줄(KakaoService + MessageService 래핑, stub/popbill 프로바이더), `routers/notifications.py` 11 엔드포인트, `NotificationHistory` 모델 신설. payroll/contract/purchase_requests에서 `NotificationService.send_*` 사용. NOTIFICATION_PROVIDER=stub 기본값(카카오 검수 통과 후 popbill로 전환).
+- `cb3ac2f8` Phase B 사업자등록상태 — `services/biz_check_service.py` ClosedownService 래핑(check_one/check_many), `/api/biz-check` 단건+배치 엔드포인트. `VendorInfoManagement.jsx`에 "자동확인" 버튼 + 결과 배너(state '01' 정상 → 녹색, 그 외 → 적색).
+- `7da0637c` ~ `73dc72a4` Phase C 이지펀뱅크 7커밋 — `services/bank_sync_service.py` EasyFinBankService 래핑(BANK_NAMES 23개, BankAccountInfo/BankTxRow dataclass, listBankAccount/getBankAccountInfo/requestJob/getJobState/search/summary 6 메서드), `routers/bank_sync.py` 30+ 엔드포인트, BankAccount/BankTransaction 모델 신설. `pages/BankSync.jsx` 7섹션 UI(현재 상태/계좌 목록/수동 추가/진단/거래조회/거래목록/엑셀 업로드). **현장 발견**: live 환경에서 `listBankAccount` / `getBankAccountInfo` / `requestJob` 모두 `Popbill[-99010016] 사용할 수 없는 서비스` 차단. `getBalance`/`getBankAccountMgtURL`만 정상. → 정액제 결제는 됐지만 API 모듈 활성화 누락 패턴. 팝빌 1:1 문의 발송 후 답변 대기.
+
+**2) 오전 후반 — 팝빌 신규 6 모듈 (034cbe1e → d364feb6)**
+
+- `034cbe1e` 예금주조회 — `services/account_check_service.py` AccountCheckService 래핑(BANK_NAME_TO_CODE 역매핑 + 별칭 dict), `/api/account-check` POST/status/banks. `ContractTab.jsx` 급여계좌 입력 UI 강화: 은행명 input → 23개 드롭다운, "예금주 자동확인" 버튼, 조회 결과 배너(불일치 시 amber 경고). 빈 예금주 필드 자동 채움.
+- `1c568740` 전자세금계산서 — `services/taxinvoice_service.py` TaxinvoiceService 래핑(TaxinvoiceDraft + TaxinvoiceDetail dataclass + RegistIssue/getInfo/search/getPopbillURL), `routers/taxinvoice.py` 6 엔드포인트(발행 시 공급자는 현재 Business 자동 prefill). `pages/TaxInvoice.jsx` — 팝빌 4종 바로가기(TBOX/SBOX/WRITE/CERT) + 빠른 발행 폼(공급받는자 + 품목 동적 추가, VAT 10% 자동 계산) + 90일 발행 이력.
+- `135ce078` 기업정보 — `services/bizinfo_check_service.py` BizInfoCheckService 래핑(상호/대표/업태/종목/주소/규모/설립일 등 10+ 필드), `/api/bizinfo-check`. `VendorInfoManagement.jsx`에 기존 "상태확인" 옆 "자동채움" 버튼 추가 — 빈 phone/address만 자동 입력 + 결과 배너로 업태/종목/규모/설립일 등 표시. 건당 88원 confirm 다이얼로그.
+- `06a000ca` 홈택스 수집 — `services/hometax_service.py` HTTaxinvoiceService 래핑(부서사용자 등록/삭제/login-check + RequestJob/JobState/Search/Summary 비동기 모델), `routers/hometax.py` 12 엔드포인트(quick-range 프리셋: 이번달/지난달/3개월). `pages/HomeTaxCollect.jsx` 5단계 워크플로우(인증→수집요청→폴링 3초 주기→요약→리스트+CSV).
+- `2a0eb8f4` 알림톡 관리 UI — `routers/notifications.py`에 `GET /urls/sender-number` 엔드포인트 1개 추가. `pages/KakaoNotifications.jsx` 신설 — 잔액/템플릿 검수현황(P/A+S/R)/발송통계 카드 3개, 팝빌 관리 3종(플친/템플릿/발신번호) 바로가기, 템플릿 목록(상태배지 + 본문 미리보기 + 코드 복사) + 발송 이력 + 빠른 테스트 발송 모달.
+- `d364feb6` 현금영수증 — `services/cashbill_service.py` CashbillService 래핑(소득공제용/지출증빙용 + 거래옵션 일반/도서공연/대중교통), `routers/cashbill.py` 7 엔드포인트(issue/cancel/search/info/popbill-url/issuer/status). `pages/CashBill.jsx` — 거래용도 토글 + 식별번호 placeholder 자동 전환(사업자번호 vs 휴대폰) + VAT 10% 자동 계산 + 90일 이력.
+
+### 인프라 변경
+
+- 신규 백엔드 라우터 6개: `account_check.py` `bank_sync.py` `biz_check.py` `bizinfo_check.py` `cashbill.py` `hometax.py` `taxinvoice.py` (notification은 이전부터 존재, 6개 신규 + bank_sync 1개 = 7개 main.py에 신규 등록)
+- 신규 서비스 7개: 위 라우터들의 `services/*_service.py` 짝
+- 신규 프론트 페이지 4개: `BankSync.jsx` `CashBill.jsx` `HomeTaxCollect.jsx` `KakaoNotifications.jsx` `TaxInvoice.jsx` (5개)
+- Sidebar 경영관리에 4개 메뉴 추가: 은행계좌 연동 / 전자세금계산서 / 현금영수증 / 홈택스 수집
+- Sidebar HR에 1개 메뉴 추가: 알림톡 관리
+- 신규 모델: `NotificationHistory` `BankAccount` `BankTransaction`
+
+### 다음 세션 인계
+
+- **팝빌 1:1 문의 답변 대기**: live 환경 EasyFinBank `-99010016`. 답변 받으면 분기:
+  - 활성화 승인 → 수집/자동분류 검증
+  - 거부 → Excel 업로드 자동화로 선회
+- **2순위 알림톡 외부 절차**: 카카오 비즈센터 플러스친구 채널 + 발신번호 + 템플릿 검수 진행 필요. 코드는 검수 통과 즉시 사용 가능한 상태.
+- 같은 모듈 활성화 차단 가능성 — 답변에 AccountCheck/Taxinvoice/HTTaxinvoice/Cashbill도 함께 확인 권장.
+
+---

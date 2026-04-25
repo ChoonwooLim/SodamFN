@@ -24,3 +24,6 @@
 | 2026-04-24 | WeasyPrint PDF에 업로드한 직인 이미지가 `직인` 텍스트로만 표시 | settings_json.seal_image_url이 상대 URL(`/api/media/...`)이라 WeasyPrint가 컨테이너 내부에서 resolve 실패 → `<img>` alt 텍스트로 fallback | `_fetch_image_as_data_uri()` 헬퍼로 FRONTEND_URL 기준 다운받아 base64 data URI embed. 실패 시 SVG fallback | certificate.py |
 | 2026-04-24 | 증명서가 2페이지로 분리되어 1페이지에 대표자·직인이 없음 | cert-issuer 블록이 page-break-inside:avoid라 1페이지에 공간 부족 시 2페이지로 통째로 밀림 | @page margin 20→12mm, cert-wrap padding/min-height 제거, 전반 스페이싱 축소로 A4 1페이지 수렴 | certificate.py |
 | 2026-04-24 | 환경설정 → 회사정보 관리 탭의 직인 이미지 미리보기가 업로드 후에도 비어 보임 | `get_business_info` 응답에 `seal_image_url` 필드 누락. 실제 DB에는 저장됨(증명서 PDF에는 반영 확인) | auth.py::get_business_info 응답에 settings.seal_image_url 포함 | auth.py |
+| 2026-04-25 | bank-sync API 호출 시 500 에러 (팝빌 SDK 메서드명 불일치) | EasyFinBankService 실제 메서드명/시그니처 확인 없이 추측한 이름·인자 순서로 호출 | popbill SDK 소스 참조해 listBankAccount/getBankAccountInfo/requestJob/getJobState/search/summary 시그니처 재구성 | bank_sync_service.py |
+| 2026-04-25 | bank-sync 진단 모달의 에러 상세가 작은 글씨/접힘 상태로 출력 | nested error 객체 details가 디폴트 collapsed + 폰트 작음 | 에러 발생 시 자동 펼침, 폰트 12→14, 코드 블록 가독성 개선 | BankSync.jsx |
+| 2026-04-25 | bank-sync 진단 결과가 내부 ok=False/skipped여도 UI에 "성공"으로 표시 | 최상위 ok 플래그만 보고 success 분기 → 내부 step 단위 실패 누락 | step별 ok=False or status='skipped' 검사 추가, 하나라도 실패면 전체 실패 | BankSync.jsx |

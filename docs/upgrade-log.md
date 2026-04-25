@@ -35,3 +35,13 @@
 | 2026-04-24 | FAX 프로바이더 추상화 + PopbillProvider 구현 (팝빌 SDK 래핑, 한글 E.164 변환, getBalance/get_result 헬퍼) | feat | fax_service.py, requirements.txt |
 | 2026-04-24 | Orbitron.yaml에 Popbill FAX env 6개 키 선언 추가 (값은 Orbitron 대시보드/Secrets) | infra | Orbitron.yaml |
 | 2026-04-24 | 서버사이드 PDF 렌더링 전환 (WeasyPrint + Dockerfile에 libpango/fonts-nanum 등 시스템 의존성 추가) | infra | Dockerfile, requirements.txt, certificate.py, FaxTransmission.jsx |
+| 2026-04-25 | 팝빌 알림톡/SMS 발송 기반 (KakaoService+MessageService 래핑, stub/popbill 프로바이더, 11 엔드포인트, NotificationHistory 모델) | feat | notification_service.py, notifications.py, models.py |
+| 2026-04-25 | 팝빌 사업자등록상태 조회 (ClosedownService 래핑, 거래처 등록 시 "자동확인" 버튼 + 결과 배너) | feat | biz_check_service.py, biz_check.py, VendorInfoManagement.jsx |
+| 2026-04-25 | 팝빌 이지펀뱅크 계좌조회 자동 수집 기반 (EasyFinBankService 래핑, 30+ 엔드포인트, 7섹션 UI) — live -99010016 차단 확인 | feat | bank_sync_service.py, bank_sync.py, BankSync.jsx, models.py |
+| 2026-04-25 | bank-sync 진단 인프라 (live/test 비교 + JobID 1회 테스트 + 계좌 수동 추가 우회 + 진단 UI 강화) | feat | bank_sync.py, BankSync.jsx |
+| 2026-04-25 | 예금주조회 (AccountCheckService 래핑, 23개 은행 드롭다운, 급여계좌 입력 시 "예금주 자동확인" + 불일치 경고) | feat | account_check_service.py, account_check.py, ContractTab.jsx |
+| 2026-04-25 | 전자세금계산서 발행 (TaxinvoiceService RegistIssue, 공급자 자동 prefill, 품목 동적 추가, VAT 10% 자동 계산, 90일 이력) | feat | taxinvoice_service.py, taxinvoice.py, TaxInvoice.jsx, App.jsx, Sidebar.jsx |
+| 2026-04-25 | 기업정보(BizInfoCheck) 자동채움 (상호/대표/업태/종목/주소/규모/설립일 10+ 필드, 거래처 빈 phone/address 자동 입력) | feat | bizinfo_check_service.py, bizinfo_check.py, VendorInfoManagement.jsx |
+| 2026-04-25 | 홈택스 전자세금계산서 자동 수집 (HTTaxinvoiceService, 부서사용자 등록 + RequestJob 비동기 폴링 모델, 12 엔드포인트, CSV 다운로드) | feat | hometax_service.py, hometax.py, HomeTaxCollect.jsx, App.jsx, Sidebar.jsx |
+| 2026-04-25 | 알림톡 관리 UI 페이지 (잔액/템플릿 검수현황/발송통계 + 팝빌 관리 3종 바로가기 + 빠른 테스트 발송 모달) | feat | notifications.py(/urls/sender-number), KakaoNotifications.jsx, App.jsx, Sidebar.jsx |
+| 2026-04-25 | 현금영수증 발행/취소 (CashbillService, 소득공제용/지출증빙용 토글, 식별번호 placeholder 자동 전환, 90일 이력) | feat | cashbill_service.py, cashbill.py, CashBill.jsx, App.jsx, Sidebar.jsx |

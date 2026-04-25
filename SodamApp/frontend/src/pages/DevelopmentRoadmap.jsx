@@ -245,6 +245,12 @@ const phases = [
                     { text: 'POS 시스템 실시간 연동', done: false },
                     { text: '온라인 뱅킹 Open API (계좌 조회/이체)', done: false },
                     { text: '세무사/노무사 협업 포털', done: false },
+                    { text: '팝빌 팩스 전송 (FaxService) — 증명서·서류 즉시 팩스', done: true },
+                    { text: '팝빌 알림톡 관리 UI (KakaoNotifications) — 잔액·템플릿·발송이력', done: true },
+                    { text: '팝빌 사업자등록상태 조회 (ClosedownService) — 거래처 자동확인', done: true },
+                    { text: '팝빌 예금주조회 (AccountCheckService) — 급여이체 오입금 방지', done: true },
+                    { text: '팝빌 기업정보 자동채움 (BizInfoCheckService) — 거래처 prefill', done: true },
+                    { text: '팝빌 EasyFinBank 계좌조회 인프라 — API 모듈 활성화 대기 중', done: false },
                 ],
             },
             {
@@ -317,12 +323,15 @@ const phases = [
             },
             {
                 name: '부가가치세 신고',
-                status: 'planned',
+                status: 'in-progress',
                 items: [
                     { text: '전자세금계산서 발행/수취 연동', done: false },
                     { text: '카드 매출/매입 자동 집계', done: false },
                     { text: '부가세 신고서 자동 작성', done: false },
                     { text: '예정/확정 신고 일정 알림', done: false },
+                    { text: '팝빌 전자세금계산서 발행 (TaxinvoiceService)', done: true },
+                    { text: '팝빌 현금영수증 발행 (CashbillService)', done: true },
+                    { text: '팝빌 홈택스 매출/매입 자동 수집 (HTTaxinvoiceService)', done: true },
                 ],
             },
             {
