@@ -1,6 +1,7 @@
 """영업관리 비즈니스 로직 — sync-status, stats."""
+from datetime import date
 from sqlmodel import Session, select
-from models import Business, Staff, ElectronicContract
+from models import Business, Staff, ElectronicContract, SalesGuideProgress
 
 
 def compute_sync_status(session: Session, business_id: int) -> dict[str, dict]:
@@ -62,3 +63,116 @@ def compute_sync_status(session: Session, business_id: int) -> dict[str, dict]:
             "label": "사업자등록번호",
         },
     }
+
+
+def compute_stats(
+    session: Session,
+    business_id: int,
+    catalog: dict,
+    sync: dict,
+) -> dict:
+    """카테고리별·전체 진행률 계산.
+
+    Args:
+        session: SQLModel session
+        business_id: 사업장 ID
+        catalog: {category_key: {label: str, items: [{key, required, renewalCycle, syncWith?}, ...]}}
+        sync: compute_sync_status() 결과
+
+    Returns:
+        {
+            "overall": {"completed": int, "total": int, "percent": int},
+            "categories": [
+                {"key", "required_total", "required_completed", "percent", "alerts"},
+                ...
+            ],
+        }
+
+    완료 판정 우선순위:
+        1. sync 100% → 자동 완료 (renewalCycle 무관)
+        2. is_completed=True + (renewalCycle 없거나 expires_at > today) → 완료
+        3. 그 외 → 미완료
+        만료 30일 이내 → expiring_soon alert 추가 (완료 카운트는 유지)
+    """
+    progresses = session.exec(
+        select(SalesGuideProgress).where(SalesGuideProgress.business_id == business_id)
+    ).all()
+    progress_by_key = {p.item_key: p for p in progresses}
+
+    today = date.today()
+    categories_out = []
+    overall_completed = 0
+    overall_total = 0
+
+    for cat_key, cat in catalog.items():
+        required_items = [i for i in cat["items"] if i.get("required")]
+        completed_count = 0
+        alerts = []
+
+        for item in required_items:
+            is_complete, alert = _evaluate_item(
+                item,
+                progress_by_key.get(item["key"]),
+                sync,
+                today,
+            )
+            if is_complete:
+                completed_count += 1
+            if alert:
+                alerts.append(alert)
+
+        total = len(required_items)
+        percent = round(completed_count / total * 100) if total else 0
+        categories_out.append({
+            "key": cat_key,
+            "required_total": total,
+            "required_completed": completed_count,
+            "percent": percent,
+            "alerts": alerts,
+        })
+        overall_completed += completed_count
+        overall_total += total
+
+    overall_percent = round(overall_completed / overall_total * 100) if overall_total else 0
+
+    return {
+        "overall": {
+            "completed": overall_completed,
+            "total": overall_total,
+            "percent": overall_percent,
+        },
+        "categories": categories_out,
+    }
+
+
+def _evaluate_item(item: dict, progress, sync: dict, today: date) -> tuple[bool, dict | None]:
+    """단일 항목의 완료 여부 + alert 평가.
+
+    Returns: (is_complete: bool, alert: dict | None)
+    """
+    # 1. sync 100% → 자동 완료
+    sync_key = item.get("syncWith")
+    if sync_key and sync_key in sync:
+        s = sync[sync_key]
+        if s["total"] > 0 and s["completed"] >= s["total"]:
+            return True, None
+
+    # 2. 명시적 완료 체크
+    if not progress or not progress.is_completed:
+        return False, None
+
+    # 3. 갱신주기 처리
+    if item.get("renewalCycle"):
+        if not progress.expires_at:
+            return False, None  # 만료일 미입력 → 미완료
+        if progress.expires_at < today:
+            return False, None  # 만료
+        days_to_expire = (progress.expires_at - today).days
+        if days_to_expire <= 30:
+            return True, {
+                "item_key": item["key"],
+                "type": "expiring_soon",
+                "days": days_to_expire,
+            }
+
+    return True, None
