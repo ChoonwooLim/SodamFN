@@ -11,6 +11,7 @@
 | 3 | 서류 관리 및 전자계약 | 완료 | - |
 | 4 | HR SaaS 전문화 (Phase 1~8) | 완료 | 2026-04-19 |
 | 5 | 팝빌 통합 연동 (11개 서비스 단계적 활용) | 진행중 | 2026-05~06 |
+| 6 | 연말정산 Phase 1 — 자체 집계 + 업로드본 대조 (경로 C 하이브리드) | 완료 | 2026-04-25 |
 
 ## 팝빌 통합 스케줄 (2026-04-24 확립)
 
@@ -89,3 +90,9 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 | 팝빌 계좌조회 (Phase F) | 코드완료 | - | -99010016 차단, 팝빌 답변 대기 |
 | 팝빌 기업정보 자동채움 (Phase G) | 완료 | - | 거래처 "자동채움" 버튼 |
 | 팝빌 현금영수증 발행 (Phase G) | 완료 | - | /finance/cashbill |
+| 연말정산 직원별 연간 소득·세금 집계 | 완료 | - | Payroll 12개월 자동 합산 (services/yearend/aggregator) |
+| 연말정산 원천징수영수증 PDF 생성 (별지24/23) | 완료 | - | WeasyPrint HTML→PDF, /yearend/{year}/employees/{id}/draft-receipt.pdf |
+| 연말정산 간소화 자료 PDF 업로드/파싱 | 완료 | - | 13 카테고리 합계 자동 추출 (services/yearend/parser) |
+| 연말정산 환급/추가납부 표시 + 대조 검증 | 완료 | - | ±1k OK / ±10k Warning / 초과 Mismatch (services/yearend/reconciler) |
+| 연말정산 직원앱 본인 조회/다운로드 + 감사 로그 | 완료 | - | /api/staff/yearend/* + YearEndAuditLog |
+| 연말정산 자체 세법 계산 (Phase A 업그레이드) | 미시작 | - | StubTaxCalculator → StandardKoreanTaxCalculator 교체 (Roadmap Phase 4) |

@@ -45,3 +45,11 @@
 | 2026-04-25 | 홈택스 전자세금계산서 자동 수집 (HTTaxinvoiceService, 부서사용자 등록 + RequestJob 비동기 폴링 모델, 12 엔드포인트, CSV 다운로드) | feat | hometax_service.py, hometax.py, HomeTaxCollect.jsx, App.jsx, Sidebar.jsx |
 | 2026-04-25 | 알림톡 관리 UI 페이지 (잔액/템플릿 검수현황/발송통계 + 팝빌 관리 3종 바로가기 + 빠른 테스트 발송 모달) | feat | notifications.py(/urls/sender-number), KakaoNotifications.jsx, App.jsx, Sidebar.jsx |
 | 2026-04-25 | 현금영수증 발행/취소 (CashbillService, 소득공제용/지출증빙용 토글, 식별번호 placeholder 자동 전환, 90일 이력) | feat | cashbill_service.py, cashbill.py, CashBill.jsx, App.jsx, Sidebar.jsx |
+| 2026-04-25 | 연말정산 Phase 1 — pytest 인프라 + 4 신규 모델 (YearEndReport/Document/Simplified/AuditLog) | feat | requirements.txt, pytest.ini, tests/conftest.py, models.py |
+| 2026-04-25 | 연말정산 Phase 1 — services/yearend/ 패키지 6 모듈 (aggregator/parser/reconciler/tax_calculator/audit/generator) + 23 unit tests | feat | services/yearend/*.py, tests/yearend/test_*.py |
+| 2026-04-25 | 연말정산 Phase 1 — 별지24/23호 Jinja2 템플릿 + WeasyPrint HTML→PDF (tax_calculator Stub 어댑터로 Phase A 업그레이드 가능) | feat | templates/yearend/*.html.j2, services/yearend/generator.py |
+| 2026-04-25 | 연말정산 Phase 1 — admin 라우터 16 엔드포인트 (요약/집계/문서업로드+파싱/대조/PDF/배포/감사) + Orbitron WeasyPrint OS 의존성 | feat | routers/yearend.py, main.py, Orbitron.yaml |
+| 2026-04-25 | 연말정산 Phase 1 — staff_yearend 라우터 5 엔드포인트 (직원본인 조회+다운로드+감사로그 자동 기록) | feat | routers/staff_yearend.py, main.py |
+| 2026-04-25 | 연말정산 Phase 1 — 어드민 YearEnd 페이지 + EmployeeDetailModal + 5 서브 컴포넌트 (대조 banner/간소화 13카테고리 표/문서 업로드/감사 로그) | feat | pages/YearEnd.jsx, components/yearend/*.jsx, Sidebar.jsx, App.jsx |
+| 2026-04-25 | 연말정산 Phase 1 — 직원앱 MyYearEnd 페이지 + 홈 진입 카드 (distributed years 있을 때만 노출, 본인 PDF blob 다운로드) | feat | staff-app/src/pages/MyYearEnd.jsx, App.jsx, Home.jsx |
+| 2026-04-25 | 연말정산 Phase 1 — DevelopmentRoadmap 4개 항목 done 표시 (Phase 1 완료, Phase 4 자체 세법 계산은 planned 유지) | feat | DevelopmentRoadmap.jsx |

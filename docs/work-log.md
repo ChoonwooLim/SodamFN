@@ -242,3 +242,95 @@
 - 같은 모듈 활성화 차단 가능성 — 답변에 AccountCheck/Taxinvoice/HTTaxinvoice/Cashbill도 함께 확인 권장.
 
 ---
+
+## 2026-04-25 (오후 세션 — 연말정산 Phase 1)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| docs | 연말정산 Phase 1 설계 명세 (12 sections + Q&A 부록) | 완료 |
+| docs | 연말정산 구현 계획서 (17 tasks, 3700 lines) | 완료 |
+| feat | pytest 인프라 (프로젝트 최초 테스트 셋업) | 완료 |
+| feat | 4 신규 모델 (YearEndReport/Document/Simplified/AuditLog) | 완료 |
+| feat | services/yearend/ 패키지 (aggregator/parser/reconciler/tax_calculator/audit/generator) — 23 unit tests | 완료 |
+| feat | 별지24/23호 Jinja2 템플릿 + WeasyPrint HTML→PDF | 완료 |
+| feat | admin 라우터 16 엔드포인트 (요약/집계/문서업로드+파싱/대조/PDF/배포/감사) | 완료 |
+| feat | staff_yearend 라우터 5 엔드포인트 (직원본인 조회+다운로드+감사) | 완료 |
+| feat | 어드민 YearEnd 페이지 + EmployeeDetailModal + 5 서브 컴포넌트 | 완료 |
+| feat | 직원앱 MyYearEnd 페이지 + 홈 진입 카드 | 완료 |
+| feat | DevelopmentRoadmap "연말정산 지원" 4 항목 done 표시 | 완료 |
+| fix  | get_bid_from_token Depends 누락 (16 endpoints, Staff 0건 버그) | 완료 |
+
+### 세부 내용
+
+**Brainstorming → Spec (935877fe)**
+
+8개 결정사항 합의:
+- Q1 범위: 4개 항목(연간조회/원천징수영수증/간소화 PDF/환급 표시) 모두 처리
+- Q2 경로 C(하이브리드): 자체 집계 + 업로드본 정본. 차후 A(자체 세법 계산) 업그레이드용 `tax_calculator.py` 어댑터 분리
+- Q3 대상자: 근로(별지24호) + 사업소득자 3.3%(별지23호). 일용직 제외
+- Q4 간소화 PDF: 13 카테고리 합계만 파싱
+- Q5 환급/추가납부: 추출 + 자체 집계 대조 검증 (±1k OK / ±10k Warning / 그 외 Mismatch)
+- Q6 자체 발행 PDF: 별지24/23호 유사 레이아웃, WeasyPrint HTML→PDF
+- Q7 직원앱 노출: 본인 다운로드 + 감사 로그
+- Q8 다년 모델: 2025년 백필은 일반 업로드 흐름
+
+→ `docs/superpowers/specs/2026-04-25-yearend-tax-phase1-design.md`
+
+**Plan (9d8f1f76)**
+
+17-task 단계별 구현 계획. TDD 적용: 로직(parser/aggregator/reconciler/tax_calculator/audit/generator). 매뉴얼 검증: 라우터·UI.
+
+→ `docs/superpowers/plans/2026-04-25-yearend-tax-phase1.md`
+
+**Implementation (16 commits, Subagent-Driven Development)**
+
+Stage 0-1 (29736bde, 23e18b8a): pytest 인프라(conftest StaticPool 인메모리) + 4 모델 추가(`YearEndReport/Document/Simplified/AuditLog`). 5 tests pass.
+
+Stage 2 (4f3c061f, e1f0ae4a, 85029c03, c86b5408, 841f8428, 2b846f03): 6 서비스 모듈 — `services/yearend/` 패키지. 23 unit tests pass.
+- aggregator: Payroll 12개월 합산 → 자체 집계 dict + `refresh_snapshot` (status 전이)
+- parser: 별지24호(이름/주민번호/총급여/결정세액/기납부세액/차감징수세액/4대보험) + 간소화(13 카테고리 dict 매칭). 텍스트 fixture 기반 테스트(실 PDF는 Task 17 매뉴얼)
+- reconciler: ±1k/±10k 임계값 분류
+- tax_calculator: Phase C `StubTaxCalculator` (uploaded → confirmed, 없으면 self_aggregated). Phase A 자리표시자 `NotImplementedError`
+- audit: `log_action` + `extract_actor_meta` (Request 객체 IP/UA 추출)
+- generator: Jinja2 템플릿 2종(별지24/23호 유사) + `html_to_pdf` (WeasyPrint)
+
+Stage 3 (dd0d1a94, 48f75b1a, 9bd549ed, ada7de29): admin 라우터 21 엔드포인트(yearend.py 16 + staff_yearend.py 5). storage 메서드는 실제 시그니처 확인 후 `upload_file(BinaryIO, key, content_type)` / `delete_file(key)` 사용. Orbitron.yaml build command 에 WeasyPrint OS 의존성 + 한글 폰트(libpango/libcairo/fonts-noto-cjk) 추가.
+
+Stage 4 (cd5b8c0e, 88ad1634): 어드민 프론트 — `pages/YearEnd.jsx`(연도 셀렉터/대시보드/직원 테이블/모달) + 5 컴포넌트(`ReconciliationBanner`/`SimplifiedTable`/`DocumentUploader`/`AuditLogList`/`EmployeeDetailModal`). axios `api` 사용(authFetch 가 아님 발견 후 적용). PDF는 `responseType: 'blob'`.
+
+Stage 5 (922028b1): 직원앱 — `pages/MyYearEnd.jsx`(본인 요약/문서/초안 PDF). 홈 화면 conditional 카드 (distributed years count > 0 일 때만). staff-app 자체 CSS 디자인 시스템(`.action-card`) 매칭.
+
+Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" status `planned → done`, 4 items `done: true`. Phase 4 "연말정산 자동화"(자체 세법 계산)는 그대로 planned.
+
+**Bug Fix (9c783873)**
+
+배포 후 어드민 페이지에서 "대상 직원이 없습니다" 출력. 원인: 16개 엔드포인트 모두 `biz_id = get_bid_from_token(request)` 식 직접 호출 → `get_bid_from_token` 은 FastAPI Header dependency 함수 → Request 객체 첫 인자로 전달 시 내부 예외로 항상 None 반환 → `Staff.business_id == None` 필터링 → 0 row. 다른 라우터(cashbill 등)의 패턴 `bid: int = Depends(get_bid_from_token)` 으로 16개 모두 변경. DB 라이브 쿼리 재검증: biz_id=1 staff 19명 정상 조회.
+
+### 인프라 변경
+
+- 신규 백엔드 패키지: `services/yearend/` (6 모듈, 약 1,200 줄) + `templates/yearend/` (2 Jinja2 템플릿)
+- 신규 백엔드 라우터: `routers/yearend.py` + `routers/staff_yearend.py` (총 21 엔드포인트)
+- 신규 모델: `YearEndReport`/`YearEndDocument`/`YearEndSimplified`/`YearEndAuditLog` (4 테이블, PostgreSQL `init_db()` 자동 생성)
+- 신규 프론트 페이지: 어드민 `YearEnd.jsx` + 5 컴포넌트, 직원앱 `MyYearEnd.jsx`
+- Sidebar HR 그룹에 "연말정산 지원" 메뉴 추가
+- 신규 의존성: `pytest`, `pytest-asyncio`, `Jinja2`, (이미 있던) `weasyprint`
+- pytest 인프라(`tests/`, `conftest.py`, `pytest.ini`) — 프로젝트 최초 테스트 셋업
+- Orbitron 배포: build command 에 `libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf2.0-0 libffi-dev shared-mime-info fonts-noto-cjk fonts-noto-cjk-extra` 추가
+
+### 다음 세션 인계
+
+- **배포 검증**: Orbitron 자동 배포 완료. 어드민 `/yearend` 19명 직원 정상 조회 확인됨. 추가 검증 시나리오:
+  - "전체 일괄 집계" → Payroll 54건 기반 자체 집계 결과 확인
+  - 한 직원에 별지24호 PDF 업로드 → 파싱 결과(결정세액/차감징수액)와 자체 집계 대조 검증
+  - 직원앱 로그인 후 본인 PDF 다운로드(R2 + 감사 로그 자동 기록 확인)
+- **Fixture 사용 시 주의**: `tests/yearend/fixtures/sample_*.txt` 는 합성 데이터. 실 PDF 와 텍스트 layout 차이 가능 (`주(현)근무지` 라인의 다중 컬럼 등) → 실 PDF 1개 파싱 검증 필요
+- **알려진 deferred 이슈**:
+  - BackgroundTasks 가 request-scoped session 사용 — 장시간 작업 시 fresh `Session(engine)` 권장
+  - 감사 로그 어드민 조회 UI 미구현 (DB 에는 기록됨)
+  - `datetime.utcnow()` deprecation warning 6건 — 기존 코드베이스 패턴, 추후 `datetime.now(datetime.UTC)` 마이그레이션 권장
+  - Orbitron build command apt-get 권한 검증 필요 (Python 런타임 정책 확인 시)
+- **Phase A 업그레이드 경로**: 향후 자체 세법 계산 도입 시 `services/yearend/tax_calculator.py` 의 `StubTaxCalculator` → `StandardKoreanTaxCalculator` 교체. 다른 모듈(aggregator/parser/generator/reconciler/audit) 변경 없이 재사용
+
+---
