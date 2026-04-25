@@ -52,7 +52,6 @@ const DeliveryAppDashboard = React.lazy(() => import('./pages/DeliveryAppDashboa
 const MoreMenu = React.lazy(() => import('./pages/MoreMenu'));
 const DesignPlan = React.lazy(() => import('./pages/DesignPlan'));
 const AISystemDesign = React.lazy(() => import('./pages/AISystemDesign'));
-const ForeignWorkerGuide = React.lazy(() => import('./pages/ForeignWorkerGuide'));
 const HRDashboard = React.lazy(() => import('./pages/HRDashboard'));
 const JobPosting = React.lazy(() => import('./pages/JobPosting'));
 const FaxTransmission = React.lazy(() => import('./pages/FaxTransmission'));
@@ -62,6 +61,8 @@ const HomeTaxCollect = React.lazy(() => import('./pages/HomeTaxCollect'));
 const KakaoNotifications = React.lazy(() => import('./pages/KakaoNotifications'));
 const CashBill = React.lazy(() => import('./pages/CashBill'));
 const YearEnd = React.lazy(() => import('./pages/YearEnd'));
+const SalesGuideHome = React.lazy(() => import('./pages/sales-guide/SalesGuideHome'));
+const SalesGuideCategoryPage = React.lazy(() => import('./pages/sales-guide/CategoryPage'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -197,7 +198,9 @@ export default function App() {
               <Route path="/hr/retirement" element={<ProtectedRoute adminOnly><RetirementPay /></ProtectedRoute>} />
               <Route path="/retirement-calc" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
               <Route path="/retirement-calc/:staffId" element={<ProtectedRoute adminOnly><RetirementPayCalc /></ProtectedRoute>} />
-              <Route path="/hr/foreign-worker-guide" element={<ProtectedRoute adminOnly><ForeignWorkerGuide /></ProtectedRoute>} />
+              <Route path="/hr/foreign-worker-guide" element={<Navigate to="/sales-guide/hr" replace />} />
+              <Route path="/sales-guide" element={<ProtectedRoute adminOnly><SalesGuideHome /></ProtectedRoute>} />
+              <Route path="/sales-guide/:category" element={<ProtectedRoute adminOnly><SalesGuideCategoryPage /></ProtectedRoute>} />
               <Route path="/hr/dashboard" element={<ProtectedRoute adminOnly><HRDashboard /></ProtectedRoute>} />
               <Route path="/hr/job-posting" element={<ProtectedRoute adminOnly><JobPosting /></ProtectedRoute>} />
               <Route path="/hr/fax" element={<ProtectedRoute adminOnly><FaxTransmission /></ProtectedRoute>} />
