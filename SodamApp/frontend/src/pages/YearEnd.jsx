@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import EmployeeDetailModal from '../components/yearend/EmployeeDetailModal';
 
 export default function YearEnd() {
   const [year, setYear] = useState(new Date().getFullYear() - 1); // 전년도 기본
   const [summary, setSummary] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
-  // eslint-disable-next-line no-unused-vars
-  const [selected, setSelected] = useState(null); // Task 14: EmployeeDetailModal 연결 예정
+  const [selected, setSelected] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -156,7 +156,14 @@ export default function YearEnd() {
         )}
       </div>
 
-      {/* Task 14에서 EmployeeDetailModal 추가 예정 */}
+      {selected && (
+        <EmployeeDetailModal
+          year={year}
+          staff={selected}
+          onClose={() => setSelected(null)}
+          onChange={load}
+        />
+      )}
     </div>
   );
 }
