@@ -49,3 +49,7 @@ popbill>=1.64.0
 
 # HTML → PDF 렌더링 (증명서 팩스 전송용)
 weasyprint>=60.0
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.25.0
