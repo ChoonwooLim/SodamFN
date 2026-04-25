@@ -334,3 +334,100 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 - **Phase A 업그레이드 경로**: 향후 자체 세법 계산 도입 시 `services/yearend/tax_calculator.py` 의 `StubTaxCalculator` → `StandardKoreanTaxCalculator` 교체. 다른 모듈(aggregator/parser/generator/reconciler/audit) 변경 없이 재사용
 
 ---
+
+## 2026-04-25 (저녁 세션 — 영업관리 V1 신규 메뉴)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| docs | 영업관리 설계 명세 (브레인스토밍 7라운드, 12 합의사항) | 완료 |
+| docs | 영업관리 구현 계획서 (22 task, 3923줄) | 완료 |
+| feat | SalesGuideProgress 모델 + 4 모델 테스트 | 완료 |
+| feat | sync-status 4 자동 카운트 (보건증/4대보험/근로계약/사업자번호) | 완료 |
+| feat | compute_stats 카테고리 진행률 (만료/sync 처리) | 완료 |
+| feat | 라우터 4 엔드포인트 + main.py 등록 | 완료 |
+| feat | kimbap.js 38 항목 마스터 데이터 (1226줄) | 완료 |
+| feat | useSalesGuide 훅 + 5 React 컴포넌트 (617줄) | 완료 |
+| feat | SalesGuideHome + CategoryPage + App.jsx 라우트 + redirect | 완료 |
+| feat | 사이드바 새 그룹 + 빨간 배지 + 외국인고용 메뉴/페이지 정리 | 완료 |
+
+### 세부 내용
+
+**Brainstorming (7835b4dd)**
+
+7라운드 Q&A 합의 결과:
+- 사이드바 위치: 새 최상위 그룹 "영업관리" (메인 다음, 상품관리 위)
+- 6 카테고리 모두 1차 노출, 운영팁은 골격만 (콘텐츠 V2.3 점진)
+- 데이터: SodamFN 자체 보유 + 정부 사이트 deep-link
+- UI 모티브: gaongn.net `/certifications` 카드+모달
+- 인터랙션: L3 (체크리스트 + 핵심 날짜). L4 자동알림은 V2.1
+- 콘텐츠 저장: 정적 JS (kimbap.js) + DB 진행상태만
+- 외국인고용 가이드: HR 메뉴 폐지 → 영업관리/인력·노무로 이주
+- business_docs 5종: 영업관리 항목 카드에서 직접 업로드 가능
+- SYNC-LINK 5개 핵심 자동 카운트
+
+→ `docs/superpowers/specs/2026-04-25-sales-guide-design.md`
+
+**Plan (6ea34528)**
+
+22 task 단계별 구현 계획. 백엔드 TDD (5 task), 콘텐츠 작성 (6 task), 프론트엔드 매뉴얼 검증 (11 task).
+
+→ `docs/superpowers/plans/2026-04-25-sales-guide.md`
+
+**Implementation (10 commits, Subagent-Driven Development)**
+
+- **Stage 0-1 (dece1ab0, 1a95896a)**: pytest venv 설치 + tests/sales_guide/ 패키지 + SalesGuideProgress 모델 (UniqueConstraint business_id+item_key). 4 모델 테스트 PASS.
+
+- **Stage 2-4 (d9ef607d, 5bf8c910, bc6b03d3)**: services/sales_guide.py — compute_sync_status (4 카운트: 활성 직원 status="재직" 기준 보건증 partial, 4대보험 partial, signed ElectronicContract 보유 직원, business_number 1/0). compute_stats — 필수 항목만 진행률 반영, sync 100% 자동완료, 만료 다운그레이드, 만료 30일 alert. 11 + 4 = 15 단위 테스트 PASS.
+
+  주의: hr.hygiene_certificates 는 사업장 단위 위생교육 모델 부재로 V1 제외. 데이터 파일에서 syncWith 제거, 수동 체크리스트로 동작.
+
+- **Stage 5 (cb15b556)**: routers/sales_guide.py 4 엔드포인트 + CATALOG_FOR_STATS (38 항목 메타). 모든 endpoint `Depends(get_bid_from_token)` + `Depends(get_admin_user)`. yearend 16-endpoint 버그 패턴 회피. main.py 라우터 등록.
+
+- **Stage 6 (7a1478a3)**: kimbap.js 1226줄 — 38 항목 6 카테고리. 각 항목: title/required/renewalCycle/authority/processingDays/legalBasis/description/steps/documents/tips/deepLinks/internalLinks/syncWith/mergedDocs/dateFields. 외국인 고용 콘텐츠 흡수.
+
+- **Stage 7 (d8ef7586)**: useSalesGuide 훅 (3 API 병렬 페치 + patchItem 뮤테이터) + 5 컴포넌트 (DeepLinkButton/ProgressCard/ItemCard/DateInputDrawer/ItemDetailModal — 5섹션 모달, business_docs 통합 업로드). business_docs 엔드포인트 plan과 다른 점 발견하여 수정 (`/business-docs` POST, `doc_type` Form field).
+
+- **Stage 8 (6c2ba6fa)**: 2 페이지 (SalesGuideHome 6 카테고리 그리드 + 진행률 헤더 + 1차방문 배너 / CategoryPage 단일 컴포넌트 + 5 필터 + 모달) + App.jsx 2 라우트 + foreign-worker-guide → /sales-guide/hr Navigate redirect.
+
+- **Stage 9-10 (4e53f90b)**: Sidebar 새 최상위 "영업관리" 그룹 (7 하위 메뉴: 랜딩 + 6 카테고리). useEffect로 /sales-guide/stats 페치 → 라벨에 (미완료+만료임박) 카운트 빨간 배지. HR hrSubItems 외국인고용 제거, hrPaths 정리. ForeignWorkerGuide.jsx 페이지 자체 삭제 (App.jsx redirect만 남음).
+
+### 인프라 변경
+
+- 신규 백엔드 라우터: `routers/sales_guide.py` (4 엔드포인트)
+- 신규 백엔드 서비스: `services/sales_guide.py` (compute_sync_status + compute_stats)
+- 신규 모델: `SalesGuideProgress` (PostgreSQL `init_db()` 자동 생성)
+- 신규 프론트엔드 페이지: `pages/sales-guide/SalesGuideHome.jsx` + `CategoryPage.jsx`
+- 신규 프론트엔드 컴포넌트: `components/sales-guide/` (5 컴포넌트)
+- 신규 프론트엔드 훅: `hooks/useSalesGuide.js`
+- 신규 정적 데이터: `data/sales-guide/index.js` + `kimbap.js` (38 항목)
+- 사이드바 새 최상위 그룹 "영업관리" + HR 외국인고용 메뉴 제거
+- pages/ForeignWorkerGuide.jsx 삭제
+
+### 검증 결과
+
+- Backend pytest: 15/15 PASS (모델 4 + sync 7 + stats 4)
+- Frontend npm run build: 성공 (14.27초). SalesGuideHome 4.6KB chunk + useSalesGuide 40KB chunk
+- 라우트 등록 확인: 4개 endpoint (`/api/sales-guide/progress` GET/PATCH, sync-status, stats)
+- 12 git commit, push 완료 (`4e53f90b`)
+
+### 다음 세션 인계
+
+- **Orbitron 배포 트리거 필요** (사용자 작업): 백엔드 + 프론트엔드 재배포. PostgreSQL `init_db()` 가 sales_guide_progress 테이블 자동 생성.
+- **운영 환경 매뉴얼 검증 7 시나리오** (Task 21):
+  - 신규 사업장 첫 진입 → 6 카테고리 + 1차방문 배너
+  - 항목 완료 토글 + 갱신주기 만료일 입력 → 진행률 변동
+  - 보건증 항목 → 직원 N/M sync 카운트 표시
+  - 사업자등록 → biz_registration 업로드 → Settings 회사정보 동기화
+  - `/hr/foreign-worker-guide` 직접 진입 → `/sales-guide/hr` redirect
+  - 모바일 뷰 (1열 + 풀스크린 모달)
+  - 사이드바 빨간 배지 카운트 정확성
+- **알려진 V1 제약**:
+  - 운영팁 7항목 본문 placeholder ("준비 중") — V2.3 점진 작성
+  - 자동 알림 cron 없음 — V2.1 (만료일 기록은 가능)
+  - 휴게음식점 1 종 하드코딩 — V2.2 업종 확장 (cafe/chicken)
+  - hr.hygiene_certificates 위생교육 sync 비활성 (사업장 단위 모델 부재)
+- **콘텐츠 출처 주의**: kimbap.js 의 정부 사이트 URL 은 정부24 개편 시 깨질 수 있음. V2 자동 점검 cron 검토.
+
+---

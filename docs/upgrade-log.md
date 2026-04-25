@@ -53,3 +53,13 @@
 | 2026-04-25 | 연말정산 Phase 1 — 어드민 YearEnd 페이지 + EmployeeDetailModal + 5 서브 컴포넌트 (대조 banner/간소화 13카테고리 표/문서 업로드/감사 로그) | feat | pages/YearEnd.jsx, components/yearend/*.jsx, Sidebar.jsx, App.jsx |
 | 2026-04-25 | 연말정산 Phase 1 — 직원앱 MyYearEnd 페이지 + 홈 진입 카드 (distributed years 있을 때만 노출, 본인 PDF blob 다운로드) | feat | staff-app/src/pages/MyYearEnd.jsx, App.jsx, Home.jsx |
 | 2026-04-25 | 연말정산 Phase 1 — DevelopmentRoadmap 4개 항목 done 표시 (Phase 1 완료, Phase 4 자체 세법 계산은 planned 유지) | feat | DevelopmentRoadmap.jsx |
+| 2026-04-25 | 영업관리 V1 — 설계 명세 작성 (브레인스토밍 7라운드 합의: 6 카테고리/L3 인터랙션/SYNC-LINK 5개/MERGE-DOCS 5종/외국인고용 이주) | docs | docs/superpowers/specs/2026-04-25-sales-guide-design.md (603줄) |
+| 2026-04-25 | 영업관리 V1 — 구현 계획서 작성 (22 task: 백엔드 5 + 콘텐츠 6 + 프론트 11) | docs | docs/superpowers/plans/2026-04-25-sales-guide.md (3923줄) |
+| 2026-04-25 | 영업관리 V1 — SalesGuideProgress 모델 (1 사업장 × 1 item_key UniqueConstraint, completed_at/expires_at/notes/updated_by) | feat | models.py, tests/sales_guide/test_models.py (4 tests PASS) |
+| 2026-04-25 | 영업관리 V1 — sync-status 4개 자동 카운트 (보건증·4대보험·근로계약·사업자번호. 위생교육은 사업장 단위 모델 부재로 V1 제외) | feat | services/sales_guide.py compute_sync_status, tests/sales_guide/test_sync_status.py (7 tests PASS) |
+| 2026-04-25 | 영업관리 V1 — compute_stats 카테고리별 진행률 (필수 항목만 카운트, sync 100% 자동완료, 만료 다운그레이드, 만료 30일 alert) | feat | services/sales_guide.py compute_stats + _evaluate_item, tests/sales_guide/test_stats.py (4 tests PASS) |
+| 2026-04-25 | 영업관리 V1 — FastAPI 라우터 4 엔드포인트 (GET /progress, PATCH /progress/{key} upsert, GET /sync-status, GET /stats with CATALOG_FOR_STATS 6 카테고리 38 항목 메타) | feat | routers/sales_guide.py, main.py |
+| 2026-04-25 | 영업관리 V1 — 휴게음식점 마스터 데이터 38 항목 6 카테고리 (인허가7/배달8/결제5/세무6/인력5/운영팁7 골격) — gaongn.net 풍 카드+모달 콘텐츠 (steps/documents/tips/deepLinks) | feat | frontend/src/data/sales-guide/index.js + kimbap.js (1226줄) |
+| 2026-04-25 | 영업관리 V1 — useSalesGuide 훅 + 5 컴포넌트 (DeepLinkButton/ProgressCard/ItemCard/DateInputDrawer/ItemDetailModal — gaongn.net /certifications 풍 5섹션 모달, business_docs 통합 업로드) | feat | frontend/src/hooks/useSalesGuide.js, components/sales-guide/*.jsx (617줄) |
+| 2026-04-25 | 영업관리 V1 — SalesGuideHome 랜딩 + CategoryPage (6 카테고리 단일 컴포넌트, 필터 5종, ItemDetailModal) + App.jsx 라우트 (/sales-guide, /sales-guide/:category) + /hr/foreign-worker-guide redirect | feat | pages/sales-guide/SalesGuideHome.jsx + CategoryPage.jsx, App.jsx |
+| 2026-04-25 | 영업관리 V1 — 사이드바 새 최상위 그룹 "영업관리" (메인 다음, 7 하위 메뉴) + /sales-guide/stats 페치 → 라벨 빨간 배지 (미완료+만료임박 카운트) + HR 외국인고용 메뉴 제거 + ForeignWorkerGuide.jsx 페이지 삭제 | feat | components/Sidebar.jsx, pages/ForeignWorkerGuide.jsx 삭제 |
