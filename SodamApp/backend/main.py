@@ -142,6 +142,9 @@ app.include_router(cashbill.router, prefix="/api")
 from routers import bank_sync
 app.include_router(bank_sync.router, prefix="/api")
 
+from routers import yearend
+app.include_router(yearend.router, prefix="/api")
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""
