@@ -19,6 +19,7 @@ const InstallGuide = lazy(() => import('./pages/InstallGuide'));
 const OpenChecklist = lazy(() => import('./pages/OpenChecklist'));
 const InventoryCheck = lazy(() => import('./pages/InventoryCheck'));
 const Leave = lazy(() => import('./pages/Leave'));
+const MyYearEnd = lazy(() => import('./pages/MyYearEnd'));
 
 function PageLoader() {
   return (
@@ -92,6 +93,7 @@ export default function App() {
               <Route path="/open-checklist" element={<ProtectedRoute><OpenChecklist /></ProtectedRoute>} />
               <Route path="/inventory-check" element={<ProtectedRoute><InventoryCheck /></ProtectedRoute>} />
               <Route path="/leave" element={<ProtectedRoute><Leave /></ProtectedRoute>} />
+              <Route path="/yearend" element={<ProtectedRoute><MyYearEnd /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

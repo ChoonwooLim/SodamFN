@@ -4,7 +4,7 @@ import api from '../api';
 import {
     Clock, FileSignature, FileText, Wallet, MapPin, ShoppingCart, Phone, Megaphone,
     Coffee, LogOut as LogOutIcon, Loader2, ShieldCheck, ShieldX, AlertTriangle, Timer,
-    MessageSquarePlus, MessageCircle, ClipboardList, Palmtree
+    MessageSquarePlus, MessageCircle, ClipboardList, Palmtree, Receipt
 } from 'lucide-react';
 
 export default function Home() {
@@ -14,6 +14,7 @@ export default function Home() {
     const [status, setStatus] = useState({ checked_in: false, checked_out: false });
     const [monthlySummary, setMonthlySummary] = useState(null);
     const [pendingContracts, setPendingContracts] = useState(0);
+    const [yearEndCount, setYearEndCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [announcements, setAnnouncements] = useState([]);
     const [expandedAnn, setExpandedAnn] = useState(null);
@@ -34,7 +35,7 @@ export default function Home() {
                 setStaffId(payload.staff_id);
 
                 if (payload.staff_id) {
-                    const [statusRes, summaryRes, contractsRes] = await Promise.allSettled([
+                    const [statusRes, summaryRes, contractsRes, yearEndRes] = await Promise.allSettled([
                         api.get(`/hr/attendance/status/${payload.staff_id}`),
                         (() => {
                             const now = new Date();
@@ -42,6 +43,7 @@ export default function Home() {
                             return api.get(`/hr/attendance/monthly-summary/${payload.staff_id}/${m}`);
                         })(),
                         api.get('/contracts/my'),
+                        api.get('/staff/yearend/years'),
                     ]);
 
                     if (statusRes.status === 'fulfilled') setStatus(statusRes.value.data.data);
@@ -50,6 +52,9 @@ export default function Home() {
                     if (contractsRes.status === 'fulfilled') {
                         const pending = contractsRes.value.data.data.filter(c => c.status !== 'signed').length;
                         setPendingContracts(pending);
+                    }
+                    if (yearEndRes.status === 'fulfilled' && Array.isArray(yearEndRes.value.data)) {
+                        setYearEndCount(yearEndRes.value.data.length);
                     }
                 }
             } catch (e) { console.error(e); }
@@ -344,6 +349,17 @@ export default function Home() {
                     </div>
                     <span className="action-card-label">휴가 신청</span>
                 </div>
+                {yearEndCount > 0 && (
+                    <div className="action-card" onClick={() => navigate('/yearend')}>
+                        <div className="action-card-icon" style={{ background: '#fee2e2', color: '#b91c1c' }}>
+                            <Receipt size={24} />
+                        </div>
+                        <span className="action-card-label">연말정산</span>
+                        <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>
+                            {yearEndCount}건
+                        </span>
+                    </div>
+                )}
             </div>
         </div>
     );
