@@ -106,8 +106,8 @@ def _serialize_report(r: YearEndReport) -> dict:
 @router.get("/{year}/summary")
 def get_year_summary(year: int, request: Request,
                      session: Session = Depends(get_session),
-                     user: User = Depends(get_admin_user)) -> YearSummary:
-    biz_id = get_bid_from_token(request)
+                     user: User = Depends(get_admin_user),
+                     biz_id: Optional[int] = Depends(get_bid_from_token)) -> YearSummary:
     staffs = session.exec(
         select(Staff).where(Staff.business_id == biz_id, Staff.status == "재직")
     ).all()
@@ -140,8 +140,8 @@ def get_year_summary(year: int, request: Request,
 @router.get("/{year}/employees", response_model=List[EmployeeRow])
 def list_employees(year: int, request: Request,
                    session: Session = Depends(get_session),
-                   user: User = Depends(get_admin_user)) -> List[EmployeeRow]:
-    biz_id = get_bid_from_token(request)
+                   user: User = Depends(get_admin_user),
+                   biz_id: Optional[int] = Depends(get_bid_from_token)) -> List[EmployeeRow]:
     staffs = session.exec(
         select(Staff).where(Staff.business_id == biz_id)
     ).all()
@@ -176,8 +176,8 @@ def list_employees(year: int, request: Request,
 @router.get("/{year}/employees/{staff_id}", response_model=ReportDetail)
 def get_employee_report(year: int, staff_id: int, request: Request,
                         session: Session = Depends(get_session),
-                        user: User = Depends(get_admin_user)) -> ReportDetail:
-    biz_id = get_bid_from_token(request)
+                        user: User = Depends(get_admin_user),
+                        biz_id: Optional[int] = Depends(get_bid_from_token)) -> ReportDetail:
     r = _ensure_report(session, biz_id, staff_id, year)
     session.commit()
 
@@ -230,8 +230,8 @@ def get_employee_report(year: int, staff_id: int, request: Request,
 @router.post("/{year}/employees/{staff_id}/aggregate")
 def trigger_aggregate(year: int, staff_id: int, request: Request,
                       session: Session = Depends(get_session),
-                      user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                      user: User = Depends(get_admin_user),
+                      biz_id: Optional[int] = Depends(get_bid_from_token)):
     report = aggregator.refresh_snapshot(
         business_id=biz_id, staff_id=staff_id, year=year, session=session
     )
@@ -254,8 +254,8 @@ def _aggregate_all_bg(biz_id: int, year: int, session: Session):
 @router.post("/{year}/aggregate-all")
 def aggregate_all(year: int, request: Request, bg: BackgroundTasks,
                   session: Session = Depends(get_session),
-                  user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                  user: User = Depends(get_admin_user),
+                  biz_id: Optional[int] = Depends(get_bid_from_token)):
     bg.add_task(_aggregate_all_bg, biz_id, year, session)
     return {"status": "scheduled", "year": year}
 
@@ -357,9 +357,8 @@ async def upload_document(
     kind: str = Form(...),
     session: Session = Depends(get_session),
     user: User = Depends(get_admin_user),
+    biz_id: Optional[int] = Depends(get_bid_from_token),
 ):
-    biz_id = get_bid_from_token(request)
-
     if kind not in ALLOWED_KINDS:
         raise HTTPException(400, f"kind 는 {ALLOWED_KINDS} 중 하나")
 
@@ -420,8 +419,8 @@ async def upload_document(
 @router.get("/{year}/employees/{staff_id}/documents")
 def list_documents(year: int, staff_id: int, request: Request,
                    session: Session = Depends(get_session),
-                   user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                   user: User = Depends(get_admin_user),
+                   biz_id: Optional[int] = Depends(get_bid_from_token)):
     docs = session.exec(
         select(YearEndDocument).where(
             YearEndDocument.staff_id == staff_id, YearEndDocument.year == year
@@ -437,8 +436,8 @@ def list_documents(year: int, staff_id: int, request: Request,
 @router.delete("/documents/{document_id}")
 def delete_document(document_id: int, request: Request,
                     session: Session = Depends(get_session),
-                    user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                    user: User = Depends(get_admin_user),
+                    biz_id: Optional[int] = Depends(get_bid_from_token)):
     doc = session.get(YearEndDocument, document_id)
     if not doc or doc.business_id != biz_id:
         raise HTTPException(404, "문서를 찾을 수 없습니다")
@@ -463,8 +462,8 @@ def delete_document(document_id: int, request: Request,
 @router.post("/documents/{document_id}/reparse")
 def reparse_document(document_id: int, request: Request, bg: BackgroundTasks,
                      session: Session = Depends(get_session),
-                     user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                     user: User = Depends(get_admin_user),
+                     biz_id: Optional[int] = Depends(get_bid_from_token)):
     doc = session.get(YearEndDocument, document_id)
     if not doc or doc.business_id != biz_id:
         raise HTTPException(404)
@@ -479,8 +478,8 @@ def reparse_document(document_id: int, request: Request, bg: BackgroundTasks,
 @router.post("/{year}/employees/{staff_id}/reconcile")
 def trigger_reconcile(year: int, staff_id: int, request: Request,
                       session: Session = Depends(get_session),
-                      user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                      user: User = Depends(get_admin_user),
+                      biz_id: Optional[int] = Depends(get_bid_from_token)):
     r = session.exec(
         select(YearEndReport).where(YearEndReport.staff_id == staff_id,
                                     YearEndReport.year == year)
@@ -521,9 +520,9 @@ def _build_pdf_response(*, report, staff, business, simplified, mask_rn: bool,
 @router.get("/{year}/employees/{staff_id}/draft-receipt.pdf")
 def download_draft_pdf(year: int, staff_id: int, request: Request,
                        session: Session = Depends(get_session),
-                       user: User = Depends(get_admin_user)):
+                       user: User = Depends(get_admin_user),
+                       biz_id: Optional[int] = Depends(get_bid_from_token)):
     from urllib.parse import quote
-    biz_id = get_bid_from_token(request)
 
     report = session.exec(
         select(YearEndReport).where(YearEndReport.staff_id == staff_id,
@@ -559,8 +558,8 @@ def download_draft_pdf(year: int, staff_id: int, request: Request,
 @router.get("/{year}/employees/{staff_id}/draft-receipt.preview")
 def preview_draft_html(year: int, staff_id: int, request: Request,
                        session: Session = Depends(get_session),
-                       user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                       user: User = Depends(get_admin_user),
+                       biz_id: Optional[int] = Depends(get_bid_from_token)):
     report = session.exec(
         select(YearEndReport).where(YearEndReport.staff_id == staff_id,
                                     YearEndReport.year == year)
@@ -591,8 +590,8 @@ def preview_draft_html(year: int, staff_id: int, request: Request,
 @router.post("/{year}/employees/{staff_id}/distribute")
 def distribute_report(year: int, staff_id: int, request: Request,
                       session: Session = Depends(get_session),
-                      user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                      user: User = Depends(get_admin_user),
+                      biz_id: Optional[int] = Depends(get_bid_from_token)):
     report = session.exec(
         select(YearEndReport).where(YearEndReport.staff_id == staff_id,
                                     YearEndReport.year == year)
@@ -618,8 +617,8 @@ def distribute_report(year: int, staff_id: int, request: Request,
 @router.post("/{year}/employees/{staff_id}/revoke")
 def revoke_report(year: int, staff_id: int, request: Request,
                   session: Session = Depends(get_session),
-                  user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                  user: User = Depends(get_admin_user),
+                  biz_id: Optional[int] = Depends(get_bid_from_token)):
     report = session.exec(
         select(YearEndReport).where(YearEndReport.staff_id == staff_id,
                                     YearEndReport.year == year)
@@ -646,8 +645,8 @@ def get_audit_logs(year: int, staff_id: int, request: Request,
                    limit: int = Query(50, ge=1, le=500),
                    offset: int = Query(0, ge=0),
                    session: Session = Depends(get_session),
-                   user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                   user: User = Depends(get_admin_user),
+                   biz_id: Optional[int] = Depends(get_bid_from_token)):
     rows = session.exec(
         select(YearEndAuditLog)
         .where(YearEndAuditLog.business_id == biz_id,
@@ -669,8 +668,8 @@ def get_year_audit_logs(year: int, request: Request,
                          limit: int = Query(100, ge=1, le=1000),
                          offset: int = Query(0, ge=0),
                          session: Session = Depends(get_session),
-                         user: User = Depends(get_admin_user)):
-    biz_id = get_bid_from_token(request)
+                         user: User = Depends(get_admin_user),
+                         biz_id: Optional[int] = Depends(get_bid_from_token)):
     rows = session.exec(
         select(YearEndAuditLog)
         .where(YearEndAuditLog.business_id == biz_id,
