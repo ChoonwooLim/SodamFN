@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Globe, Gauge, Briefcase, Send, Landmark, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Gauge, Briefcase, Send, Landmark, MessageCircle, Sparkles, Lightbulb } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -13,6 +13,8 @@ export default function Sidebar() {
     const [hrOpen, setHrOpen] = useState(false);
     const [plOpen, setPlOpen] = useState(false);
     const [productOpen, setProductOpen] = useState(false);
+    const [salesGuideOpen, setSalesGuideOpen] = useState(false);
+    const [salesGuideAlerts, setSalesGuideAlerts] = useState(0);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
     const [businesses, setBusinesses] = useState([]);
@@ -23,12 +25,25 @@ export default function Sidebar() {
     useEffect(() => {
         const boardPaths = ['/board', '/open-checklist', '/inventory-check-admin'];
         if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
-        const hrPaths = ['/employees', '/hr/retirement', '/hr/foreign-worker-guide', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'];
+        const hrPaths = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
         const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/hometax', '/finance/cashbill'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
         const productPaths = ['/products/'];
         if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
+        if (location.pathname.startsWith('/sales-guide')) setSalesGuideOpen(true);
+    }, [location.pathname]);
+
+    useEffect(() => {
+        api.get('/sales-guide/stats').then((res) => {
+            const overall = res.data.overall;
+            const incomplete = overall.total - overall.completed;
+            const expiring = res.data.categories.reduce(
+                (sum, c) => sum + (c.alerts?.length ?? 0),
+                0
+            );
+            setSalesGuideAlerts(incomplete + expiring);
+        }).catch(() => setSalesGuideAlerts(0));
     }, [location.pathname]);
 
     const token = localStorage.getItem('token');
@@ -157,7 +172,16 @@ export default function Sidebar() {
         { icon: Send, label: '팩스 전송', path: '/hr/fax', color: 'text-violet-400' },
         { icon: MessageCircle, label: '알림톡 관리', path: '/hr/notifications', color: 'text-yellow-400' },
         { icon: FileCheck, label: '연말정산 지원', path: '/yearend', color: 'text-teal-400' },
-        { icon: Globe, label: '외국인 고용안내', path: '/hr/foreign-worker-guide', color: 'text-cyan-400' },
+    ];
+
+    const salesGuideSubItems = [
+        { icon: Sparkles, label: '랜딩 (전체)', path: '/sales-guide', color: 'text-purple-400' },
+        { icon: FileCheck, label: '인허가·신고', path: '/sales-guide/permits', color: 'text-emerald-400' },
+        { icon: Truck, label: '배달·온라인', path: '/sales-guide/delivery-apps', color: 'text-amber-400' },
+        { icon: CreditCard, label: '결제·POS', path: '/sales-guide/payment', color: 'text-violet-400' },
+        { icon: Receipt, label: '세무·회계', path: '/sales-guide/tax', color: 'text-rose-400' },
+        { icon: Users, label: '인력·노무', path: '/sales-guide/hr', color: 'text-blue-400' },
+        { icon: Lightbulb, label: '운영팁', path: '/sales-guide/operations', color: 'text-yellow-400' },
     ];
 
     const bottomMenuItems = isSuperAdmin
@@ -191,9 +215,10 @@ export default function Sidebar() {
     };
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
-    const isHrActive = ['/employees', '/hr/retirement', '/hr/foreign-worker-guide', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
+    const isHrActive = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
     const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/hometax', '/finance/cashbill'].some(p => location.pathname.startsWith(p));
     const isProductActive = productSubItems.some(item => location.pathname === item.path);
+    const isSalesGuideActive = location.pathname.startsWith('/sales-guide');
 
     // ── Premium menu item renderer ──
     const renderMenuItem = (item) => {
@@ -345,6 +370,30 @@ export default function Sidebar() {
                     <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">메인</span>
                 </div>
                 {mainMenuItems.map(renderMenuItem)}
+
+                {/* Section: Sales Guide (영업관리) */}
+                {(user.role === 'admin' || isViewingBusiness) && (
+                    <>
+                        {renderSubmenu(
+                            (
+                                <span className="inline-flex items-center gap-2">
+                                    영업관리
+                                    {salesGuideAlerts > 0 && (
+                                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-semibold rounded-full bg-red-500 text-white">
+                                            {salesGuideAlerts}
+                                        </span>
+                                    )}
+                                </span>
+                            ),
+                            Sparkles,
+                            salesGuideOpen,
+                            setSalesGuideOpen,
+                            isSalesGuideActive,
+                            salesGuideSubItems,
+                            'text-purple-400'
+                        )}
+                    </>
+                )}
 
                 {/* Section: Product Management */}
                 {(user.role === 'admin' || isViewingBusiness) && (
