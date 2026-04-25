@@ -48,12 +48,12 @@ const phases = [
             },
             {
                 name: '연말정산 지원',
-                status: 'planned',
+                status: 'done',
                 items: [
-                    { text: '직원별 연간 소득·세금 현황 조회', done: false },
-                    { text: '근로소득원천징수영수증 생성', done: false },
-                    { text: '연말정산 간소화 데이터 연동 (PDF 업로드)', done: false },
-                    { text: '연말정산 환급/추가납부 자동 계산', done: false },
+                    { text: '직원별 연간 소득·세금 현황 조회', done: true },
+                    { text: '근로소득원천징수영수증 생성', done: true },
+                    { text: '연말정산 간소화 데이터 연동 (PDF 업로드)', done: true },
+                    { text: '연말정산 환급/추가납부 자동 계산', done: true },
                 ],
             },
         ],
