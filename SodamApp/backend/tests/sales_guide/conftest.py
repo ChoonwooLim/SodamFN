@@ -64,3 +64,23 @@ def sample_staff_inactive(session, sample_business):
     session.add(s)
     session.commit()
     return s
+
+
+@pytest.fixture
+def sample_contracts(session, sample_staff_5):
+    """5명 활성 직원 중 3명만 signed 계약 보유"""
+    from models import ElectronicContract
+    contracts = []
+    for i, staff in enumerate(sample_staff_5):
+        if i < 3:
+            c = ElectronicContract(
+                staff_id=staff.id,
+                business_id=staff.business_id,
+                title=f"근로계약서_{i}",
+                content="표준 근로계약 내용",
+                status="signed",
+            )
+            session.add(c)
+            contracts.append(c)
+    session.commit()
+    return contracts

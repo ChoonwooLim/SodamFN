@@ -45,3 +45,19 @@ def test_inactive_staff_excluded(session, sample_business, sample_staff_5, sampl
     result = compute_sync_status(session, sample_business.id)
     assert result["hr.health_certificates"]["total"] == 5  # NOT 6
     assert result["hr.insurance_4major"]["total"] == 5
+
+
+def test_contracts_partial(session, sample_business, sample_contracts):
+    """5명 활성 직원 중 3명 signed 계약 → hr.contracts 3/5"""
+    from services.sales_guide import compute_sync_status
+    result = compute_sync_status(session, sample_business.id)
+    assert result["hr.contracts"]["completed"] == 3
+    assert result["hr.contracts"]["total"] == 5
+
+
+def test_contracts_zero(session, sample_business, sample_staff_5):
+    """계약 없으면 0/5"""
+    from services.sales_guide import compute_sync_status
+    result = compute_sync_status(session, sample_business.id)
+    assert result["hr.contracts"]["completed"] == 0
+    assert result["hr.contracts"]["total"] == 5
