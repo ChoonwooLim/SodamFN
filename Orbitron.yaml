@@ -15,7 +15,19 @@ services:
     runtime: python
     rootDir: SodamApp/backend
     build:
-      command: "pip install -r requirements.txt"
+      # WeasyPrint runtime deps (libpango/libcairo) + Korean fonts for 연말정산 PDF
+      command: |
+        apt-get update && apt-get install -y \
+          libpango-1.0-0 \
+          libpangoft2-1.0-0 \
+          libcairo2 \
+          libgdk-pixbuf2.0-0 \
+          libffi-dev \
+          shared-mime-info \
+          fonts-noto-cjk \
+          fonts-noto-cjk-extra \
+          && rm -rf /var/lib/apt/lists/*
+        pip install -r requirements.txt
     start:
       command: "gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --timeout 300 --bind 0.0.0.0:$PORT"
     env:
