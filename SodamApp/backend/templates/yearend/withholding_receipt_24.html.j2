@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>근로소득원천징수영수증 — {{ staff.name }} ({{ report.year }})</title>
+  <style>
+    @page { size: A4; margin: 18mm; }
+    body { font-family: "Pretendard", "Noto Sans KR", sans-serif; font-size: 10pt; color: #1e293b; }
+    .header { background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+              color: white; padding: 16px 20px; border-radius: 6px 6px 0 0; }
+    .header h1 { margin: 0; font-size: 18pt; letter-spacing: -0.02em; }
+    .header .meta { margin-top: 6px; font-size: 9pt; opacity: 0.9; }
+    .watermark-draft { color: #b91c1c; font-weight: 700; margin-left: 8px; }
+    table.box { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    table.box th, table.box td { border: 1px solid #cbd5e1; padding: 6px 10px; vertical-align: top; }
+    table.box th { background: #f1f5f9; text-align: left; width: 28%; font-weight: 600; }
+    .section-title { background: #334155; color: white; padding: 6px 10px; margin-top: 16px;
+                     font-weight: 600; font-size: 11pt; }
+    .amount { text-align: right; font-variant-numeric: tabular-nums; }
+    .footer-note { margin-top: 16px; padding: 10px; border-left: 3px solid #94a3b8;
+                   background: #f8fafc; font-size: 9pt; color: #475569; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>근로소득원천징수영수증
+    {% if is_draft %}<span class="watermark-draft">[초안]</span>{% endif %}
+  </h1>
+  <div class="meta">
+    발행처: {{ business.name }} (사업자등록번호 {{ business.business_number or '-' }})<br/>
+    발행일: {{ issued_at }} | 귀속연도: {{ report.year }}
+  </div>
+</div>
+
+<div class="section-title">① 인적사항</div>
+<table class="box">
+  <tr><th>성명</th><td>{{ staff.name }}</td><th>주민등록번호</th><td>{{ resident_number_display }}</td></tr>
+  <tr><th>주소</th><td colspan="3">{{ staff.address or '-' }}</td></tr>
+  <tr><th>부양가족 수</th><td>{{ staff.dependents_count or 1 }}명</td><th>자녀(8~20세)</th><td>{{ staff.children_count or 0 }}명</td></tr>
+</table>
+
+<div class="section-title">② 근무처별 소득명세</div>
+<table class="box">
+  <tr><th>근무처</th><td>{{ business.name }}</td></tr>
+  <tr><th>사업자등록번호</th><td>{{ business.business_number or '-' }}</td></tr>
+  <tr><th>대표자</th><td>{{ business.owner_name or '-' }}</td></tr>
+  <tr><th>근무기간</th><td>{{ work_period_from }} ~ {{ work_period_to }}</td></tr>
+</table>
+
+<div class="section-title">③ 소득명세</div>
+<table class="box">
+  <tr><th>총급여</th><td class="amount">{{ "{:,}".format(report.total_pay_year) }} 원</td></tr>
+  <tr><th>비과세소득</th><td class="amount">{{ "{:,}".format(report.nontaxable_pay) }} 원</td></tr>
+  <tr><th>과세대상급여</th><td class="amount">{{ "{:,}".format(report.taxable_pay) }} 원</td></tr>
+</table>
+
+<div class="section-title">④ 공제명세</div>
+<table class="box">
+  <tr><th>4대보험 합계</th><td class="amount">{{ "{:,}".format(report.insurance_4major_total) }} 원</td></tr>
+  {% if simplified %}
+  <tr><th>보장성보험료</th><td class="amount">{{ "{:,}".format(simplified.insurance_amount) }} 원</td></tr>
+  <tr><th>의료비</th><td class="amount">{{ "{:,}".format(simplified.medical_amount) }} 원</td></tr>
+  <tr><th>교육비</th><td class="amount">{{ "{:,}".format(simplified.education_amount) }} 원</td></tr>
+  <tr><th>기부금</th><td class="amount">{{ "{:,}".format(simplified.donation_amount) }} 원</td></tr>
+  <tr><th>연금저축</th><td class="amount">{{ "{:,}".format(simplified.pension_amount) }} 원</td></tr>
+  <tr><th>신용카드 합계</th><td class="amount">{{ "{:,}".format(simplified.credit_card_amount + simplified.debit_card_amount) }} 원</td></tr>
+  {% endif %}
+</table>
+
+<div class="section-title">⑤ 세액명세</div>
+<table class="box">
+  <tr><th>결정세액</th><td class="amount">
+    {% if report.decided_tax is not none %}{{ "{:,}".format(report.decided_tax) }} 원{% else %}(업로드본 미반영){% endif %}
+  </td></tr>
+  <tr><th>기납부세액 (자체 집계)</th><td class="amount">{{ "{:,}".format(report.taxes_withheld_total) }} 원</td></tr>
+  {% if report.confirmed_taxes_paid is not none %}
+  <tr><th>기납부세액 (업로드본)</th><td class="amount">{{ "{:,}".format(report.confirmed_taxes_paid) }} 원</td></tr>
+  {% endif %}
+  <tr><th>차감징수세액</th><td class="amount">
+    {% if report.refund_amount is not none %}
+      {{ "{:,}".format(report.refund_amount) }} 원
+      {% if report.refund_amount < 0 %}<span style="color:#059669"> (환급)</span>
+      {% elif report.refund_amount > 0 %}<span style="color:#b91c1c"> (추가납부)</span>{% endif %}
+    {% else %}(업로드본 미반영){% endif %}
+  </td></tr>
+</table>
+
+<div class="footer-note">
+  본 서류는 셈하나(SEMHANA) 시스템에서 발행한 <strong>초안</strong>입니다.
+  정식 원천징수영수증은 홈택스 또는 세무대리인을 통해 발급받으십시오.
+  세부 항목은 연말정산 결과에 따라 변경될 수 있습니다.
+</div>
+
+</body>
+</html>
