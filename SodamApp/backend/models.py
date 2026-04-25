@@ -1049,3 +1049,27 @@ class YearEndAuditLog(SQLModel, table=True):
     user_agent: Optional[str] = None
     occurred_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     detail: Optional[str] = None
+
+
+# --- 영업관리 (Sales Guide) ---
+
+class SalesGuideProgress(SQLModel, table=True):
+    """영업관리 항목별 사업장 진행상태.
+    1 사업장 × 1 항목 = 1 row.
+    item_key 는 frontend 정적 콘텐츠 (sales-guide/kimbap.js) 의 항목 ID 와 일치.
+    예: "permits.business_registration", "delivery.baemin"
+    """
+    __tablename__ = "sales_guide_progress"
+    __table_args__ = (UniqueConstraint("business_id", "item_key"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    item_key: str = Field(index=True, max_length=100)
+
+    is_completed: bool = Field(default=False)
+    completed_at: Optional[datetime.date] = None
+    expires_at: Optional[datetime.date] = None
+    notes: Optional[str] = None
+
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_by: Optional[int] = Field(default=None, foreign_key="user.id")
