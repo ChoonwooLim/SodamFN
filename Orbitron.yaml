@@ -91,6 +91,10 @@ services:
         value: "0224526570"
       - key: POPBILL_IS_TEST
         value: "true"
+      - key: POPBILL_USER_ID
+        value: "sodam2025"  # 일반회원 ID — popbill-url 발급/회원 식별 호출에 필요
+      - key: NOTIFICATION_PROVIDER
+        value: "popbill"  # SMS/카카오 알림톡 활성. stub 으로 토글하면 로그만 남고 미발송
       # ─────────────────────────────────────────────
       # Popbill 계좌조회 (EasyFinBank)
       # 2026-04-27 현재: TEST 환경으로 검증 진행 중 (LIVE -99010016 차단 유지)

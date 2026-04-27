@@ -157,7 +157,7 @@ class PopbillAccountCheckProvider(BaseAccountCheckProvider):
 
         try:
             svc = self._get_svc()
-            r = svc.CheckAccountInfo(self.corp_num, code, acc, self.user_id)
+            r = svc.checkAccountInfo(self.corp_num, code, acc, self.user_id)
             holder = (
                 getattr(r, "accountName", None)
                 or getattr(r, "AccountName", None)
