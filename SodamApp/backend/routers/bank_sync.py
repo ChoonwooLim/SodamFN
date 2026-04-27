@@ -569,6 +569,98 @@ def sync_accounts_from_popbill(
         service.close()
 
 
+def _do_pull(
+    service: DatabaseService,
+    acc: BankAccount,
+    business_id: int,
+    start_d: date,
+    end_d: date,
+    per_page: int = 500,
+) -> dict:
+    """단일 계좌의 거래내역 pull + 자동 분류. /pull, /refresh-all 공용.
+
+    호출자 책임: commit / rollback / HTTP 상태코드 매핑.
+    실패시 RuntimeError raise (acc.last_sync_status 는 호출자가 갱신).
+    """
+    provider = get_provider()
+    new_txs: List[BankTransaction] = []
+    inserted = 0
+    duplicated = 0
+
+    res: BankSearchResult = provider.search(
+        bank_code=acc.bank_code,
+        account_number=acc.account_number,
+        start_date=start_d,
+        end_date=end_d,
+        order="A",
+        page=1,
+        per_page=per_page,
+    )
+    if not res.ok:
+        raise RuntimeError(res.error or "팝빌 조회 실패")
+
+    total_fetched = len(res.rows)
+    for r in res.rows:
+        existing = service.session.exec(
+            select(BankTransaction).where(
+                BankTransaction.account_id == acc.id,
+                BankTransaction.tid == r.tid,
+            )
+        ).first()
+        if existing:
+            duplicated += 1
+            continue
+
+        td = _ymd_to_date(r.trans_date) or start_d
+        tdt = None
+        if r.trans_date and r.trans_time and len(r.trans_time) == 6:
+            try:
+                tdt = datetime(
+                    td.year, td.month, td.day,
+                    int(r.trans_time[:2]), int(r.trans_time[2:4]), int(r.trans_time[4:6]),
+                )
+            except (ValueError, TypeError):
+                tdt = None
+
+        tx = BankTransaction(
+            business_id=business_id,
+            account_id=acc.id,
+            tid=r.tid,
+            trans_date=td,
+            trans_time=r.trans_time,
+            trans_dt=tdt,
+            in_amount=r.in_amount,
+            out_amount=r.out_amount,
+            balance=r.balance,
+            remark1=r.remark1,
+            remark2=r.remark2,
+            remark3=r.remark3,
+            remark4=r.remark4,
+            raw_json=json.dumps(r.raw, ensure_ascii=False) if r.raw else None,
+        )
+        service.session.add(tx)
+        new_txs.append(tx)
+        inserted += 1
+
+    service.session.flush()  # tx.id 확보
+    classify_counts = _classify_txs(service, business_id, new_txs, only_unclassified=True)
+
+    acc.last_sync_at = datetime.now()
+    acc.last_sync_status = "success"
+    acc.last_sync_error = None
+    service.session.add(acc)
+
+    return {
+        "account_id": acc.id,
+        "start_date": start_d.isoformat(),
+        "end_date": end_d.isoformat(),
+        "total_fetched": total_fetched,
+        "inserted": inserted,
+        "duplicated": duplicated,
+        "auto_classified": classify_counts,
+    }
+
+
 @router.post("/accounts/{account_id}/pull")
 def pull_transactions(
     account_id: int,
@@ -576,11 +668,7 @@ def pull_transactions(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """지정 계좌의 거래내역을 팝빌에서 가져와 BankTransaction 에 upsert.
-
-    - 중복: (account_id, tid) UNIQUE 로 스킵
-    - 페이지네이션: 응답이 per_page 채우면 page++ 반복 (최대 20페이지)
-    """
+    """지정 계좌의 거래내역을 팝빌에서 가져와 BankTransaction 에 upsert + 자동 분류."""
     bid = _resolve_bid(admin, x_view_as_business)
 
     start_d = _parse_date(body.start_date) if body.start_date else date.today() - timedelta(days=7)
@@ -596,87 +684,18 @@ def pull_transactions(
         if not acc or acc.business_id != bid:
             raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다.")
 
-        provider = get_provider()
-        inserted = 0
-        duplicated = 0
-        new_txs: List[BankTransaction] = []
-        classify_counts: dict = {"revenue": 0, "expense": 0, "purchase": 0, "transfer": 0, "learned": 0, "skip": 0}
-
         try:
-            # provider.search() 가 내부에서 requestJob→poll→모든 페이지 누적.
-            # 팝빌 Job 1회만 소모됨 (정액제 내에서는 무료).
-            res: BankSearchResult = provider.search(
-                bank_code=acc.bank_code,
-                account_number=acc.account_number,
-                start_date=start_d,
-                end_date=end_d,
-                order="A",           # 오름차순 (과거→최근)
-                page=1,
-                per_page=body.per_page,
-            )
-            if not res.ok:
-                acc.last_sync_status = "failed"
-                acc.last_sync_error = res.error
-                acc.last_sync_at = datetime.now()
-                service.session.add(acc)
-                service.session.commit()
-                raise HTTPException(status_code=502, detail=f"거래내역 조회 실패: {res.error}")
-
-            total_fetched = len(res.rows)
-            for r in res.rows:
-                existing = service.session.exec(
-                    select(BankTransaction).where(
-                        BankTransaction.account_id == acc.id,
-                        BankTransaction.tid == r.tid,
-                    )
-                ).first()
-                if existing:
-                    duplicated += 1
-                    continue
-
-                td = _ymd_to_date(r.trans_date) or start_d
-                tdt = None
-                if r.trans_date and r.trans_time and len(r.trans_time) == 6:
-                    try:
-                        tdt = datetime(
-                            td.year, td.month, td.day,
-                            int(r.trans_time[:2]), int(r.trans_time[2:4]), int(r.trans_time[4:6]),
-                        )
-                    except (ValueError, TypeError):
-                        tdt = None
-
-                tx = BankTransaction(
-                    business_id=bid,
-                    account_id=acc.id,
-                    tid=r.tid,
-                    trans_date=td,
-                    trans_time=r.trans_time,
-                    trans_dt=tdt,
-                    in_amount=r.in_amount,
-                    out_amount=r.out_amount,
-                    balance=r.balance,
-                    remark1=r.remark1,
-                    remark2=r.remark2,
-                    remark3=r.remark3,
-                    remark4=r.remark4,
-                    raw_json=json.dumps(r.raw, ensure_ascii=False) if r.raw else None,
-                )
-                service.session.add(tx)
-                new_txs.append(tx)
-                inserted += 1
-
-            # 신규 적재된 tx 만 자동 분류 (학습 패턴 + 키워드 + 벤더 매칭).
-            # 기존 분류된 거래는 건드리지 않음.
-            service.session.flush()  # tx.id 확보
-            classify_counts = _classify_txs(service, bid, new_txs, only_unclassified=True)
-
+            result = _do_pull(service, acc, bid, start_d, end_d, body.per_page)
+            service.session.commit()
+            return result
+        except RuntimeError as e:
+            service.session.rollback()
+            acc.last_sync_status = "failed"
+            acc.last_sync_error = str(e)
             acc.last_sync_at = datetime.now()
-            acc.last_sync_status = "success"
-            acc.last_sync_error = None
             service.session.add(acc)
             service.session.commit()
-        except HTTPException:
-            raise
+            raise HTTPException(status_code=502, detail=f"거래내역 조회 실패: {e}")
         except Exception as e:
             service.session.rollback()
             acc.last_sync_status = "failed"
@@ -685,15 +704,79 @@ def pull_transactions(
             service.session.add(acc)
             service.session.commit()
             raise HTTPException(status_code=500, detail=f"거래내역 적재 오류: {e}")
+    finally:
+        service.close()
 
+
+@router.post("/refresh-all")
+def refresh_all(
+    days: int = Query(7, ge=1, le=30, description="조회 기간 (일). 기본 7일"),
+    skip_recent_minutes: int = Query(
+        20, ge=0, le=120,
+        description="최근 X분 내 갱신된 계좌는 스킵 (정기 호출 중복 방지). 기본 20분"
+    ),
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """현재 사업장의 모든 활성 계좌를 일괄 갱신 + 자동 분류.
+
+    21분 단위 자동 갱신 (프론트엔드 setInterval / 외부 cron) 등 정기 호출용.
+    skip_recent_minutes 내에 갱신된 계좌는 자동 스킵 → 중복 호출 안전.
+    각 계좌 단위로 try/except 하여 한 계좌 실패가 전체를 막지 않음.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    end_d = date.today()
+    start_d = end_d - timedelta(days=days)
+    skip_threshold = datetime.now() - timedelta(minutes=skip_recent_minutes)
+
+    service = DatabaseService()
+    try:
+        accs = service.session.exec(
+            select(BankAccount).where(
+                BankAccount.business_id == bid,
+                BankAccount.is_active == True,  # noqa: E712
+            ).order_by(BankAccount.id)
+        ).all()
+
+        results = []
+        for acc in accs:
+            if acc.last_sync_at and acc.last_sync_at > skip_threshold:
+                results.append({
+                    "account_id": acc.id,
+                    "status": "skipped",
+                    "reason": f"{skip_recent_minutes}분 내 갱신됨 (last_sync_at={acc.last_sync_at.isoformat()})",
+                })
+                continue
+            try:
+                r = _do_pull(service, acc, bid, start_d, end_d, 500)
+                service.session.commit()
+                results.append({"status": "ok", **r})
+            except Exception as e:
+                service.session.rollback()
+                acc.last_sync_status = "failed"
+                acc.last_sync_error = str(e)
+                acc.last_sync_at = datetime.now()
+                service.session.add(acc)
+                service.session.commit()
+                results.append({"account_id": acc.id, "status": "failed", "error": str(e)})
+
+        total_inserted = sum(r.get("inserted", 0) for r in results if r.get("status") == "ok")
+
+        def _sum_classified(r):
+            ac = r.get("auto_classified") or {}
+            return sum(v for k, v in ac.items() if k != "skip")
+
+        total_classified = sum(_sum_classified(r) for r in results if r.get("status") == "ok")
         return {
-            "account_id": acc.id,
-            "start_date": start_d.isoformat(),
-            "end_date": end_d.isoformat(),
-            "total_fetched": total_fetched,
-            "inserted": inserted,
-            "duplicated": duplicated,
-            "auto_classified": classify_counts,
+            "ran_at": datetime.now().isoformat(),
+            "days": days,
+            "total_accounts": len(accs),
+            "ok": sum(1 for r in results if r.get("status") == "ok"),
+            "skipped": sum(1 for r in results if r.get("status") == "skipped"),
+            "failed": sum(1 for r in results if r.get("status") == "failed"),
+            "total_inserted": total_inserted,
+            "total_classified": total_classified,
+            "results": results,
         }
     finally:
         service.close()

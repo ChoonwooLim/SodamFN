@@ -1,11 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock } from 'lucide-react';
 import api from '../api';
 
-const TABS = [
-    { key: 'accounts', label: '등록 계좌' },
-    { key: 'transactions', label: '거래내역' },
-];
+const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
 
 const CLASSIFIED_LABELS = {
     unclassified: { label: '미분류', color: 'bg-slate-100 text-slate-600' },
@@ -68,6 +65,20 @@ export default function BankSync() {
     });
     const [manualLoading, setManualLoading] = useState(false);
     const [manualResult, setManualResult] = useState(null);
+
+    // Auto-refresh (페이지 열려있는 동안 N분 단위 일괄 갱신)
+    const [autoRefresh, setAutoRefresh] = useState(() => {
+        try {
+            const saved = localStorage.getItem(AUTO_REFRESH_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch (e) { /* ignore */ }
+        return { enabled: false, intervalMinutes: 21 };
+    });
+    const [lastRefresh, setLastRefresh] = useState(null);  // { at: Date, data }
+    const [refreshing, setRefreshing] = useState(false);
+    const [nextRefreshAt, setNextRefreshAt] = useState(null);  // unix ms
+    const [countdown, setCountdown] = useState(0);
+    const refreshIdRef = useRef(0);
 
     async function handleManualAdd() {
         setManualLoading(true);
@@ -260,6 +271,85 @@ export default function BankSync() {
         return s;
     }, [txs]);
 
+    // 거래내역 탭 타이틀 — 필터된 계좌가 있으면 "{은행명} 거래내역", 단일 계좌면 그 계좌, 아니면 "거래내역"
+    const txTabLabel = useMemo(() => {
+        if (filter.account_id) {
+            const acc = accounts.find(a => a.id === parseInt(filter.account_id));
+            if (acc) return `${acc.bank_name} 거래내역`;
+        }
+        if (accounts.length === 1) {
+            return `${accounts[0].bank_name} 거래내역`;
+        }
+        return '거래내역';
+    }, [filter.account_id, accounts]);
+
+    const tabs = useMemo(() => ([
+        { key: 'accounts', label: '등록 계좌' },
+        { key: 'transactions', label: txTabLabel },
+    ]), [txTabLabel]);
+
+    // localStorage 저장
+    useEffect(() => {
+        try {
+            localStorage.setItem(AUTO_REFRESH_KEY, JSON.stringify(autoRefresh));
+        } catch (e) { /* ignore */ }
+    }, [autoRefresh]);
+
+    // 자동 갱신 setInterval (페이지 열려있는 동안)
+    useEffect(() => {
+        if (!autoRefresh.enabled) {
+            setNextRefreshAt(null);
+            return;
+        }
+        const intervalMs = Math.max(1, autoRefresh.intervalMinutes) * 60 * 1000;
+        const myId = ++refreshIdRef.current;
+
+        const tick = async () => {
+            if (refreshIdRef.current !== myId) return;  // 새 effect 가 떴으면 중단
+            setRefreshing(true);
+            try {
+                const res = await api.post('/bank-sync/refresh-all', null, {
+                    params: { days: 7, skip_recent_minutes: Math.max(0, autoRefresh.intervalMinutes - 1) }
+                });
+                if (refreshIdRef.current !== myId) return;
+                setLastRefresh({ at: new Date(), data: res.data });
+                fetchAccounts();
+                if (tab === 'transactions') fetchTxs();
+            } catch (e) {
+                if (refreshIdRef.current !== myId) return;
+                setLastRefresh({ at: new Date(), error: e.response?.data?.detail || e.message });
+            } finally {
+                if (refreshIdRef.current === myId) {
+                    setRefreshing(false);
+                    setNextRefreshAt(Date.now() + intervalMs);
+                }
+            }
+        };
+
+        // 토글 ON 직후 한 번 즉시 실행 (단, 최근 갱신 보호 로직은 백엔드가 처리)
+        tick();
+        const id = setInterval(tick, intervalMs);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoRefresh.enabled, autoRefresh.intervalMinutes]);
+
+    // 카운트다운 타이머
+    useEffect(() => {
+        if (!nextRefreshAt) { setCountdown(0); return; }
+        const id = setInterval(() => {
+            const left = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+            setCountdown(left);
+        }, 1000);
+        return () => clearInterval(id);
+    }, [nextRefreshAt]);
+
+    function fmtCountdown(secs) {
+        if (!secs) return '-';
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    }
+
     return (
         <div className="min-h-screen bg-slate-50">
             <div className="max-w-6xl mx-auto px-6 py-8 pb-32">
@@ -300,8 +390,8 @@ export default function BankSync() {
                     </div>
                 )}
 
-                <div className="flex gap-2 mb-6">
-                    {TABS.map(t => (
+                <div className="flex flex-wrap items-center gap-2 mb-6">
+                    {tabs.map(t => (
                         <button
                             key={t.key}
                             onClick={() => setTab(t.key)}
@@ -314,6 +404,14 @@ export default function BankSync() {
                             {t.label}
                         </button>
                     ))}
+                    <AutoRefreshControl
+                        autoRefresh={autoRefresh}
+                        setAutoRefresh={setAutoRefresh}
+                        refreshing={refreshing}
+                        lastRefresh={lastRefresh}
+                        countdown={countdown}
+                        fmtCountdown={fmtCountdown}
+                    />
                 </div>
 
                 {tab === 'accounts' ? (
@@ -376,6 +474,62 @@ export default function BankSync() {
                     onClose={() => setManualOpen(false)}
                     onSubmit={handleManualAdd}
                 />
+            )}
+        </div>
+    );
+}
+
+function AutoRefreshControl({ autoRefresh, setAutoRefresh, refreshing, lastRefresh, countdown, fmtCountdown }) {
+    const enabled = autoRefresh.enabled;
+    const minutes = autoRefresh.intervalMinutes;
+    return (
+        <div className={`ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            enabled
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-white border-slate-200 text-slate-500'
+        }`}>
+            <button
+                onClick={() => setAutoRefresh(s => ({ ...s, enabled: !s.enabled }))}
+                className={`flex items-center gap-1.5 ${enabled ? 'text-emerald-700' : 'text-slate-500'}`}
+                title={enabled ? '자동 갱신 끄기' : '자동 갱신 켜기'}
+            >
+                <Power size={13} className={enabled ? 'text-emerald-600' : 'text-slate-400'} />
+                자동 갱신
+            </button>
+            <span className="text-slate-300">·</span>
+            <label className="flex items-center gap-1">
+                <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={minutes}
+                    onChange={e => setAutoRefresh(s => ({ ...s, intervalMinutes: Math.max(1, Math.min(60, parseInt(e.target.value) || 21)) }))}
+                    className="w-12 px-1.5 py-0.5 bg-white/60 border border-slate-200 rounded text-center text-xs"
+                />
+                분
+            </label>
+            {enabled && (
+                <>
+                    <span className="text-slate-300">·</span>
+                    <span className="flex items-center gap-1">
+                        {refreshing ? (
+                            <>
+                                <Loader2 size={12} className="animate-spin" /> 갱신 중
+                            </>
+                        ) : (
+                            <>
+                                <Clock size={12} /> 다음 {fmtCountdown(countdown)}
+                            </>
+                        )}
+                    </span>
+                </>
+            )}
+            {lastRefresh && (
+                <span className="text-slate-400 text-[10px] ml-1" title={lastRefresh.error || JSON.stringify(lastRefresh.data)}>
+                    {lastRefresh.error
+                        ? `❌ ${lastRefresh.at.toLocaleTimeString('ko-KR')}`
+                        : `✓ ${lastRefresh.at.toLocaleTimeString('ko-KR')} · 신규 ${lastRefresh.data?.total_inserted ?? 0}`}
+                </span>
             )}
         </div>
     );
