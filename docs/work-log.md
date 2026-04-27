@@ -442,6 +442,8 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 | fix  | is_test 결정 로직 fallback 추가 (POPBILL_BANK_IS_TEST 미설정 시 POPBILL_IS_TEST 따라감) | 완료 |
 | feat | bank-sync 자동분류 → 매출관리/매입관리(DailyExpense) 연동 + 키워드 보강 + 학습 패턴 + on-pull 자동분류 | 완료 |
 | feat | bank-sync 21분 단위 자동 갱신 + 거래내역 탭 타이틀 동적 변경 (계좌별) | 완료 |
+| fix  | sidebar useEffect 가 superadmin 토큰으로 /sales-guide/stats 호출해 401 → 강제 로그아웃 회귀 (영업관리 V1 도입 시 발생) | 완료 |
+| fix  | 팝빌 6모듈 TEST 환경 라우터 라이브 검증 — account_check 메서드명 오타 + .env/Orbitron.yaml 환경변수 누락 2건 (POPBILL_USER_ID, NOTIFICATION_PROVIDER) 보완 | 완료 |
 
 ### 세부 내용
 
@@ -469,6 +471,23 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 - **거래내역 탭 타이틀 동적 변경** (사용자 요청): 단일 계좌 등록 시 "신한은행 거래내역", 거래내역 탭 필터 적용 시 해당 계좌 은행명, 다중+미필터 시 "거래내역" 그대로. `txTabLabel` useMemo + `tabs` useMemo 재계산.
 - **AutoRefreshControl 컴포넌트**: 탭 우측, ON/OFF Power 토글 + 분 input(1~60, 기본 21) + 카운트다운 MM:SS + 마지막 갱신 시각/신규건수. `localStorage(bankSyncAutoRefresh_v1)` 영속화. `useEffect` `setInterval` 로 페이지 열려있는 동안 21분마다 `/refresh-all` 호출, 백엔드는 `skip_recent_minutes=interval-1` 로 중복 방지.
 
+**4) Sidebar 강제 로그아웃 회귀 fix (3890192f)**
+
+- **증상**: SuperAdmin 으로 로그인 → 잠깐 페이지 떴다가 즉시 `/login` 으로 튕김. 일반 admin 은 정상.
+- **원인**: 4/25 영업관리 V1 도입 시 추가된 `Sidebar.jsx` useEffect 가 모든 페이지에서 `GET /api/sales-guide/stats` 호출. SuperAdmin 은 `business_id` 없고 `X-View-As-Business` 헤더도 없어 401 → `api.js` 인터셉터가 토큰 비우고 강제 로그아웃.
+- **수정**: useEffect 진입 시 `role === 'superadmin' && !viewAsBid` 면 호출 스킵 + alerts=0. view-as 로 매장 선택한 후엔 정상 호출. dependency 에 `viewAsBid` 추가.
+
+**5) 팝빌 6모듈 TEST 환경 라우터 라이브 검증 (180c577d)**
+
+- **목적**: 1:1 문의로 활성화 요청한 7종 (전자세금계산서/전자명세서/사업자등록상태/예금주조회/기업정보/SMS/카카오 알림톡) API 키 열림 여부 확인. 메모리상 LIVE 활성화 답변 대기였던 게 실제로 어디까지 통하는지 라이브로 진단.
+- **검증 도구**: `backend/scratch_popbill_routers.py` 신규 (untracked, 일회성). 슈퍼관리자 로그인 → DB 첫 사업장으로 `X-View-As-Business` 헤더 부여 → 6개 모듈 `/status`·무료 GET·단건 비용 호출 일괄 점검. 본문 파싱하여 `200 OK` 인데 `ok:false` 면 ⚠️ 표기.
+- **선결 도구**: `backend/scratch_popbill_healthcheck.py` 로 LIVE/TEST 환경의 `getBalance` 9개 모듈 직접 호출 — LIVE 전부 `-99010016`, TEST 전부 ✅. LinkID(SODAM)/SecretKey 자체는 두 환경 모두 유효.
+- **발견 1 — 코드 버그**: `account_check_service.py:160` 가 `svc.CheckAccountInfo(...)` (PascalCase) 호출. SDK 1.64.1은 `checkAccountInfo` (lowerCamelCase) — `AttributeError` 로 예금주조회 코드가 깨져있던 상태. 1줄 fix.
+- **발견 2 — env 누락 2건**: `POPBILL_USER_ID=sodam2025` 미설정으로 `taxinvoice/popbill-url` 가 `-10000038 회원의 아이디가 아닙니다`. `NOTIFICATION_PROVIDER=popbill` 미설정으로 notifications 만 stub 폴백되어 `urls/template-mgt|plus-friend|sender-number` 가 400. `.env` + `Orbitron.yaml` 동시 추가.
+- **결과**: 6모듈 /status 모두 popbill 활성, `/issuer`·`/popbill-url`·`/banks`·`/balance`·`/templates`·`/urls/*` 전부 200 통과. 단건 호출도 SDK 함수 도달까지 정상.
+- **새 차단점 — `-99910002 [POPBILL_TEST]`**: 6모듈 모두 실제 API 호출 시 동일 코드로 차단. 의미는 "LinkID 등록됐지만 상품별 권한 토글 OFF". `getBalance` 통과 + `popbill-url` 발급 통과여도 **상품 호출은 별도 활성화 필요**. **TEST 환경에서도 EasyFinBank 외 8개 모듈은 미부여 상태**.
+- **메모리 정정**: 메모리 `project_popbill_fax.md` 의 "팩스 운영 중" 표현은 부정확 — `getBalance` 만 통과한 부분 검증이었음. 새 메모리 `project_popbill_modules.md` 로 9모듈 매트릭스 + 차단 코드 의미(-99010016 vs -99910002 vs -10000038) SSOT 작성.
+
 ### 인프라 변경
 
 - 신규 백엔드 엔드포인트: `POST /api/bank-sync/refresh-all`
@@ -494,8 +513,10 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
   - 24/7 백그라운드 자동 갱신 — 현재는 페이지 열려있을 때만. Orbitron cron 으로 `/refresh-all` 호출 추가 검토
   - 학습 패턴 정확도 — 80% threshold 가 적절한지 운영 데이터로 튜닝
   - 출금 default expense 분류 — 사람 이름 송금이 인건비/매입 어느 쪽인지 사용자 보정 후 학습 인계
-- **팝빌 LIVE 활성화 후속**:
-  - 1:1 문의로 견적서 7종 (전자세금계산서/전자명세서/사업자등록상태/예금주조회/기업정보/SMS/알림톡+친구톡) 일괄 LIVE 활성화 요청 메시지 초안 작성 완료 (사용자 발송 대기)
+- **팝빌 LIVE+TEST 활성화 후속** (이번 세션 검증으로 갱신):
+  - 1:1 문의 발송 시 본문에 **LIVE 환경 활성화 + TEST 환경 상품 권한 부여** 양쪽 명시 필요. 이번 라이브 검증으로 TEST 환경에서도 EasyFinBank 외 8개 모듈은 `-99910002` (상품 권한 미부여) 차단 확인.
+  - 권한 풀리면 코드는 즉시 작동 가능 — 6모듈 라우터/관리자UI 흐름 100% 검증 완료. `scratch_popbill_routers.py` 재실행으로 통과 여부 즉시 확인 가능.
+  - 전자명세서(StatementService) 라우터·서비스 미구현 — 권한 풀린 뒤 별개 신규 개발 트랙(6종 양식 등록 포함).
   - LIVE 활성화 완료 후 `POPBILL_BANK_IS_TEST=false` 토글 + 계좌 재등록 필요 (test/live 데이터 분리)
 
 ---
