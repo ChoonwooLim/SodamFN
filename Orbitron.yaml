@@ -92,12 +92,13 @@ services:
       - key: POPBILL_IS_TEST
         value: "true"
       # ─────────────────────────────────────────────
-      # Popbill 계좌조회 (EasyFinBank) — 실서비스(정액제)
-      # 계좌조회는 팝빌 정액제 결제를 완료한 실서비스이므로 test=false 고정
-      # 신한은행 소단(110-357-7XXXXX) 등록, 사용기간 2026-04-24 ~ 2026-05-24
+      # Popbill 계좌조회 (EasyFinBank)
+      # 2026-04-27 현재: TEST 환경으로 검증 진행 중 (LIVE -99010016 차단 유지)
+      # TEST 등록계좌: 신한 110-357-7***** 사용기간 2026-04-27 ~ 2026-06-04
+      # 검증 완료 후 LIVE 활성화되면 "false" 로 토글 + 계좌 재등록 필요
       # ─────────────────────────────────────────────
       - key: POPBILL_BANK_IS_TEST
-        value: "false"
+        value: "true"
       - key: BANK_SYNC_PROVIDER
         value: ""  # 빈값 = 자동(LINK_ID/SECRET_KEY 있으면 popbill, 없으면 stub)
     healthCheck:

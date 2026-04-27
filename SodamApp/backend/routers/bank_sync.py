@@ -184,15 +184,25 @@ def get_status(admin: User = Depends(get_admin_user)):
         logger.warning("포인트 잔액 조회 실패: %s", e)
 
     is_stub = provider.name == "stub"
-    note = (
-        "⚠️ STUB 모드. 실제 팝빌 연결 없이 더미 데이터 반환. "
-        "POPBILL_LINK_ID/SECRET_KEY 설정 시 자동으로 popbill 활성."
-        if is_stub
-        else "✅ 실제 팝빌 계좌조회 연결 (정액제 기반, 실서비스)."
-    )
+    is_test = bool(getattr(provider, "is_test", False))
+
+    if is_stub:
+        note = (
+            "⚠️ STUB 모드. 실제 팝빌 연결 없이 더미 데이터 반환. "
+            "POPBILL_LINK_ID/SECRET_KEY 설정 시 자동으로 popbill 활성."
+        )
+    elif is_test:
+        note = (
+            "🧪 팝빌 TEST 환경 연결. test.popbill.com 의 시뮬레이션 데이터로 동작합니다. "
+            "검증 완료 후 LIVE 활성화 시 POPBILL_BANK_IS_TEST=false 로 토글하세요."
+        )
+    else:
+        note = "✅ 팝빌 LIVE 환경 연결 (정액제 기반, 실서비스)."
+
     return {
         "active": provider.name,
         "is_stub": is_stub,
+        "is_test": is_test,
         "balance_point": balance,
         "note": note,
         "bank_names": BANK_NAMES,

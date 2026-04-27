@@ -276,15 +276,25 @@ export default function BankSync() {
                         </div>
                     </div>
                     {status && (
-                        <div className={`px-3 py-2 rounded-xl text-xs font-semibold ${status.is_stub ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {status.is_stub ? 'STUB 모드' : '실서비스 연결됨'}
+                        <div className={`px-3 py-2 rounded-xl text-xs font-semibold ${
+                            status.is_stub ? 'bg-amber-100 text-amber-700'
+                            : status.is_test ? 'bg-sky-100 text-sky-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                            {status.is_stub ? 'STUB 모드'
+                                : status.is_test ? '🧪 TEST 모드'
+                                : '✅ LIVE 연결됨'}
                             {status.balance_point != null && ` · ${status.balance_point.toLocaleString('ko-KR')}P`}
                         </div>
                     )}
                 </header>
 
                 {status && (
-                    <div className={`mb-6 p-3 rounded-xl text-xs flex items-start gap-2 ${status.is_stub ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-emerald-50 border border-emerald-200 text-emerald-800'}`}>
+                    <div className={`mb-6 p-3 rounded-xl text-xs flex items-start gap-2 ${
+                        status.is_stub ? 'bg-amber-50 border border-amber-200 text-amber-800'
+                        : status.is_test ? 'bg-sky-50 border border-sky-200 text-sky-800'
+                        : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                    }`}>
                         <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
                         <span>{status.note}</span>
                     </div>
