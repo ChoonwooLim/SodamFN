@@ -233,6 +233,15 @@ def diagnose(
 
     from services.bank_sync_service import PopbillEasyFinBankProvider, _attr
 
+    bank_test_raw = os.getenv("POPBILL_BANK_IS_TEST", "")
+    fax_test_raw = os.getenv("POPBILL_IS_TEST", "")
+    if bank_test_raw.strip() != "":
+        is_test_source = "POPBILL_BANK_IS_TEST"
+    elif fax_test_raw.strip() != "":
+        is_test_source = "POPBILL_IS_TEST (fallback)"
+    else:
+        is_test_source = "default (false=LIVE)"
+
     result = {
         "env": {
             "POPBILL_LINK_ID": bool(os.getenv("POPBILL_LINK_ID", "").strip()),
@@ -240,9 +249,10 @@ def diagnose(
             "POPBILL_SECRET_KEY_len": len(os.getenv("POPBILL_SECRET_KEY", "").strip()),
             "POPBILL_CORP_NUM": os.getenv("POPBILL_CORP_NUM", ""),
             "POPBILL_USER_ID": os.getenv("POPBILL_USER_ID", ""),
-            "POPBILL_IS_TEST": os.getenv("POPBILL_IS_TEST", ""),
-            "POPBILL_BANK_IS_TEST": os.getenv("POPBILL_BANK_IS_TEST", ""),
+            "POPBILL_IS_TEST": fax_test_raw,
+            "POPBILL_BANK_IS_TEST": bank_test_raw,
             "BANK_SYNC_PROVIDER": os.getenv("BANK_SYNC_PROVIDER", ""),
+            "is_test_source": is_test_source,
         },
         "provider": None,
         "checks": [],

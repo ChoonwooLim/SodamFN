@@ -241,17 +241,21 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
         self.link_id = os.getenv("POPBILL_LINK_ID", "").strip()
         self.secret_key = os.getenv("POPBILL_SECRET_KEY", "").strip()
         self.corp_num = _normalize(os.getenv("POPBILL_CORP_NUM", ""))
-        # 계좌조회는 실서비스 가입 완료된 상태이므로 기본 false
-        # 단, biz_check 등이 test 로 돌아갈 수 있으므로 독립 스위치 허용
-        # force_is_test 인자가 주어지면 env 보다 우선 (진단용 오버라이드)
+        # is_test 결정 우선순위:
+        #   1) force_is_test 인자 (진단 모달에서 환경별 비교용 강제 오버라이드)
+        #   2) POPBILL_BANK_IS_TEST env (계좌조회 전용 명시적 토글)
+        #   3) POPBILL_IS_TEST env fallback (FAX 등 다른 서비스와 동일 환경 따라감)
+        #      — Orbitron 대시보드에 변수 하나만 설정해도 일관 동작하도록 fallback
+        #   4) 기본 False (LIVE)
         if force_is_test is not None:
             self.is_test = force_is_test
         else:
             bank_test = os.getenv("POPBILL_BANK_IS_TEST")
-            if bank_test is not None:
+            if bank_test is not None and bank_test.strip() != "":
                 self.is_test = bank_test.strip().lower() in ("1", "true", "yes")
             else:
-                self.is_test = False  # 계좌조회는 실서비스 기본
+                fallback = os.getenv("POPBILL_IS_TEST", "").strip().lower()
+                self.is_test = fallback in ("1", "true", "yes")
         self.user_id = os.getenv("POPBILL_USER_ID", "").strip() or None
         self._svc = None
 
