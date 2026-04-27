@@ -946,8 +946,11 @@ class BankTransaction(SQLModel, table=True):
     classified_by: Optional[str] = None          # 'auto' / 'manual' / 'rule'
     classified_at: Optional[datetime.datetime] = None
 
+    # 레거시: revenue/expense 테이블 링크 (현재는 dailyexpense 통합으로 사용 안 함)
     linked_revenue_id: Optional[int] = Field(default=None, foreign_key="revenue.id", index=True)
     linked_expense_id: Optional[int] = Field(default=None, foreign_key="expense.id", index=True)
+    # 신규: 매출관리/매입관리 화면이 읽는 DailyExpense 통합 테이블 링크
+    linked_daily_id: Optional[int] = Field(default=None, foreign_key="dailyexpense.id", index=True)
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id", index=True)
 
     user_memo: Optional[str] = None              # 사용자가 단 메모

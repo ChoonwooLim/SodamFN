@@ -25,7 +25,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlmodel import select, or_
 
-from models import User, BankAccount, BankTransaction, Revenue, Expense, Vendor
+from collections import Counter, defaultdict
+
+from models import User, BankAccount, BankTransaction, Vendor, DailyExpense
 from routers.auth import get_admin_user
 from services.database_service import DatabaseService
 from services.bank_sync_service import (
@@ -597,6 +599,8 @@ def pull_transactions(
         provider = get_provider()
         inserted = 0
         duplicated = 0
+        new_txs: List[BankTransaction] = []
+        classify_counts: dict = {"revenue": 0, "expense": 0, "purchase": 0, "transfer": 0, "learned": 0, "skip": 0}
 
         try:
             # provider.search() 가 내부에서 requestJob→poll→모든 페이지 누적.
@@ -658,7 +662,13 @@ def pull_transactions(
                     raw_json=json.dumps(r.raw, ensure_ascii=False) if r.raw else None,
                 )
                 service.session.add(tx)
+                new_txs.append(tx)
                 inserted += 1
+
+            # 신규 적재된 tx 만 자동 분류 (학습 패턴 + 키워드 + 벤더 매칭).
+            # 기존 분류된 거래는 건드리지 않음.
+            service.session.flush()  # tx.id 확보
+            classify_counts = _classify_txs(service, bid, new_txs, only_unclassified=True)
 
             acc.last_sync_at = datetime.now()
             acc.last_sync_status = "success"
@@ -683,6 +693,7 @@ def pull_transactions(
             "total_fetched": total_fetched,
             "inserted": inserted,
             "duplicated": duplicated,
+            "auto_classified": classify_counts,
         }
     finally:
         service.close()
@@ -800,74 +811,286 @@ def update_transaction(
 
 
 def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
-    """tx.classified_as 에 맞춰 Revenue/Expense 레코드 생성/갱신.
+    """tx.classified_as 에 맞춰 DailyExpense 레코드 생성/갱신/삭제.
 
-    - revenue: 입금액을 Revenue(channel='은행입금') 로 등록. description 에 remark1
-    - expense: 출금액을 Expense(category='기타') 로 등록. vendor_id 있으면 연결
-    - 기존 linked 가 있으면 금액만 업데이트
-    - transfer/excluded/unclassified: 링크 해제
+    - revenue: 입금액 → DailyExpense + revenue Vendor 자동 매칭/생성 → 매출관리에 표시
+    - expense/purchase: 출금액 → DailyExpense (vendor_id null 허용) → 매입관리에 표시
+    - 기존 linked 있으면 갱신 (분류 변경시)
+    - transfer/excluded/unclassified: 기존 link 제거
+
+    레거시: linked_revenue_id / linked_expense_id 필드는 보존(기존 데이터 호환).
+    실제 화면 연동은 linked_daily_id 통해 수행.
     """
-    # 먼저 기존 링크 제거 (분류 바뀔 때)
+    sess = service.session
+
+    # 1) 기존 DailyExpense 링크 정리 — 분류가 바뀌면 항상 새로 만든다
+    if tx.linked_daily_id:
+        old = sess.get(DailyExpense, tx.linked_daily_id)
+        if old:
+            sess.delete(old)
+        tx.linked_daily_id = None
+
+    # 2) 분류가 transfer/excluded/unclassified 면 링크만 제거하고 종료
     if tx.classified_as in ("transfer", "excluded", "unclassified"):
-        if tx.linked_revenue_id:
-            r = service.session.get(Revenue, tx.linked_revenue_id)
-            if r:
-                service.session.delete(r)
-            tx.linked_revenue_id = None
-        if tx.linked_expense_id:
-            e = service.session.get(Expense, tx.linked_expense_id)
-            if e:
-                service.session.delete(e)
-            tx.linked_expense_id = None
         return
 
+    # 3) 매출 (입금)
     if tx.classified_as == "revenue" and tx.in_amount > 0:
-        desc = tx.remark1 or tx.remark2 or "은행입금"
-        if tx.linked_revenue_id:
-            r = service.session.get(Revenue, tx.linked_revenue_id)
-            if r:
-                r.date = tx.trans_date
-                r.amount = tx.in_amount
-                r.description = desc
-                r.channel = "은행입금"
-                service.session.add(r)
-                return
-        rev = Revenue(
-            date=tx.trans_date,
-            channel="은행입금",
-            amount=tx.in_amount,
-            description=desc,
-            business_id=tx.business_id,
+        channel_name, vcategory, payment = _resolve_revenue_channel(tx.remark1, tx.remark2)
+        vendor = _get_or_create_vendor(
+            sess, tx.business_id, channel_name, "revenue", category=vcategory
         )
-        service.session.add(rev)
-        service.session.flush()
-        tx.linked_revenue_id = rev.id
-
-    elif tx.classified_as in ("expense", "purchase") and tx.out_amount > 0:
-        desc = tx.remark1 or tx.remark2 or "은행출금"
-        category = "매입" if tx.classified_as == "purchase" else "기타"
-        if tx.linked_expense_id:
-            e = service.session.get(Expense, tx.linked_expense_id)
-            if e:
-                e.date = tx.trans_date
-                e.amount = tx.out_amount
-                e.category = category
-                e.description = desc
-                e.vendor_id = tx.vendor_id
-                service.session.add(e)
-                return
-        exp = Expense(
+        de = DailyExpense(
+            business_id=tx.business_id,
             date=tx.trans_date,
+            vendor_name=channel_name,
+            vendor_id=vendor.id,
+            amount=tx.in_amount,
+            category=vcategory,
+            payment_method=payment,
+            note=(tx.remark1 or "") + ((" / " + tx.remark2) if tx.remark2 else ""),
+        )
+        sess.add(de)
+        sess.flush()
+        tx.linked_daily_id = de.id
+        return
+
+    # 4) 매입/지출 (출금)
+    if tx.classified_as in ("expense", "purchase") and tx.out_amount > 0:
+        vendor_name = tx.remark1 or tx.remark2 or "은행출금"
+        category = "매입" if tx.classified_as == "purchase" else "기타비용"
+        de = DailyExpense(
+            business_id=tx.business_id,
+            date=tx.trans_date,
+            vendor_name=vendor_name,
+            vendor_id=tx.vendor_id,  # 매칭 안된 경우 None — 매입관리는 null 허용
             amount=tx.out_amount,
             category=category,
-            payment_method="은행이체",
-            description=desc,
-            vendor_id=tx.vendor_id,
-            business_id=tx.business_id,
+            payment_method="이체",
+            note=(tx.remark1 or "") + ((" / " + tx.remark2) if tx.remark2 else ""),
         )
-        service.session.add(exp)
-        service.session.flush()
-        tx.linked_expense_id = exp.id
+        sess.add(de)
+        sess.flush()
+        tx.linked_daily_id = de.id
+
+
+# ============================================================
+# 매출 채널 매핑 (입금 remark → 표준 채널명/카테고리)
+# 우선순위: 위에서 아래 순서대로 first-match
+# ============================================================
+
+REVENUE_CHANNEL_MAP: List[tuple] = [
+    # (키워드, 표준 vendor_name, Vendor.category, payment_method)
+    # 배달앱 — delivery 카테고리
+    ("쿠팡이츠", "쿠팡이츠", "delivery", "Card"),
+    ("쿠팡페이", "쿠팡이츠", "delivery", "Card"),
+    ("쿠팡", "쿠팡이츠", "delivery", "Card"),
+    ("배달의민족", "배달의민족", "delivery", "Card"),
+    ("배달의민", "배달의민족", "delivery", "Card"),
+    ("배민", "배달의민족", "delivery", "Card"),
+    ("요기요", "요기요", "delivery", "Card"),
+    ("음식배달", "음식배달", "delivery", "Card"),
+    # 페이먼트/간편결제 — store 카테고리
+    ("카카오페이", "카카오페이", "store", "Card"),
+    ("네이버페이", "네이버페이", "store", "Card"),
+    ("네이버", "네이버페이", "store", "Card"),
+    ("토스", "토스페이", "store", "Card"),
+    ("서울페이", "서울페이", "store", "Card"),
+    ("제로페이", "제로페이", "store", "Card"),
+    # 카드 매입 정산 — store 카테고리
+    ("카드매입", "카드매입", "store", "Card"),
+    ("매입대금", "카드매입", "store", "Card"),
+    ("매출표", "카드매입", "store", "Card"),
+    ("BC카드", "카드매입", "store", "Card"),
+    ("신한카드", "카드매입", "store", "Card"),
+    ("KB국민카드", "카드매입", "store", "Card"),
+    ("국민카드", "카드매입", "store", "Card"),
+    ("삼성카드", "카드매입", "store", "Card"),
+    ("현대카드", "카드매입", "store", "Card"),
+    ("롯데카드", "카드매입", "store", "Card"),
+    ("하나카드", "카드매입", "store", "Card"),
+    ("NH카드", "카드매입", "store", "Card"),
+    ("우리카드", "카드매입", "store", "Card"),
+    ("나이스결제", "카드매입", "store", "Card"),
+    ("NICE", "카드매입", "store", "Card"),
+    ("KG이니시스", "카드매입", "store", "Card"),
+    ("이니시스", "카드매입", "store", "Card"),
+    # 카드 매입 약식 패턴 (팝빌 test 데이터에서 관측: "FB자금"/"FB이체"/"원신한")
+    # 입금 한정으로 적용되므로 출금 건은 영향 없음
+    ("원신한", "카드매입", "store", "Card"),
+    ("FB자금", "카드매입", "store", "Card"),
+    ("FB이체", "카드매입", "store", "Card"),
+]
+
+TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
+
+
+def _resolve_revenue_channel(remark1: Optional[str], remark2: Optional[str]) -> tuple:
+    """입금 remark → (vendor_name, category, payment_method). 미매칭이면 ('기타매출', 'store', 'Card')."""
+    text = " ".join(filter(None, [remark1, remark2])).strip()
+    for keyword, name, category, payment in REVENUE_CHANNEL_MAP:
+        if keyword in text:
+            return name, category, payment
+    return "기타매출", "store", "Card"
+
+
+def _get_or_create_vendor(
+    session,
+    business_id: int,
+    name: str,
+    vendor_type: str,
+    category: Optional[str] = None,
+) -> Vendor:
+    """이름+타입+사업장 기준으로 Vendor 조회. 없으면 자동 생성."""
+    v = session.exec(
+        select(Vendor).where(
+            Vendor.business_id == business_id,
+            Vendor.vendor_type == vendor_type,
+            Vendor.name == name,
+        )
+    ).first()
+    if v:
+        return v
+    v = Vendor(
+        name=name,
+        vendor_type=vendor_type,
+        category=category,
+        business_id=business_id,
+    )
+    session.add(v)
+    session.flush()
+    return v
+
+
+# ============================================================
+# 분류 헬퍼 — 단일 tx 분류 + 학습 패턴 빌드
+# ============================================================
+
+def _build_learned_remark_map(session, business_id: int, threshold: float = 0.8) -> dict:
+    """과거 분류된 BankTransaction 의 remark1 → classified_as 합의 매핑.
+
+    threshold(기본 80%) 이상 동일 분류로 합의된 remark1 만 채택.
+    수동 분류('manual')는 자동분류('auto')보다 우선 가중 (manual 1건 = auto 2건).
+    """
+    rows = session.exec(
+        select(BankTransaction).where(
+            BankTransaction.business_id == business_id,
+            BankTransaction.classified_as != "unclassified",
+            BankTransaction.remark1.isnot(None),
+        )
+    ).all()
+    by_remark = defaultdict(Counter)
+    for r in rows:
+        if not r.remark1:
+            continue
+        weight = 2 if (r.classified_by == "manual") else 1
+        by_remark[r.remark1][r.classified_as] += weight
+
+    result = {}
+    for remark, counter in by_remark.items():
+        total = sum(counter.values())
+        if total == 0:
+            continue
+        top, count = counter.most_common(1)[0]
+        if count / total >= threshold:
+            result[remark] = top
+    return result
+
+
+def _classify_one_tx(
+    tx: BankTransaction,
+    vendor_by_name: dict,
+    learned_remarks: dict,
+) -> Optional[str]:
+    """단일 tx 분류 결정. classified_as 반환 또는 None(미분류 유지).
+
+    부수효과: matched expense vendor 가 있으면 tx.vendor_id 설정.
+    실제 분류 적용/링크 생성은 호출자 책임.
+    """
+    remark = " ".join(filter(None, [tx.remark1, tx.remark2, tx.remark3])).strip()
+    if not remark:
+        return None
+
+    # 1) 학습 패턴 (가장 강한 시그널 — 과거 분류 인계)
+    if tx.remark1 and tx.remark1 in learned_remarks:
+        return learned_remarks[tx.remark1]
+
+    # 2) 이체 키워드 (revenue 키워드보다 우선)
+    if any(k in remark for k in TRANSFER_KEYWORDS):
+        return "transfer"
+
+    # 3) 입금 → 매출 (channel map 매칭 또는 미매칭 시 unclassified 유지)
+    if tx.in_amount > 0:
+        # 입금은 채널 매핑 시도 (매칭 실패시 기타매출 처리는 _materialize_link에서)
+        # 키워드 매칭이 1개라도 되면 revenue 로 분류
+        for keyword, _name, _cat, _pay in REVENUE_CHANNEL_MAP:
+            if keyword in remark:
+                return "revenue"
+        # 매칭 안 되면 미분류 유지 (자동 default 매출은 보수적으로 비활성)
+        return None
+
+    # 4) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
+    if tx.out_amount > 0:
+        for name, v in vendor_by_name.items():
+            if name and name in remark:
+                tx.vendor_id = v.id
+                if v.vendor_type == "expense" and v.category in ("식자재", "매입"):
+                    return "purchase"
+                return "expense"
+        # 미매칭 출금 — 기본 expense 로 자동 분류 (학습/수동으로 보정)
+        return "expense"
+
+    return None
+
+
+def _classify_txs(
+    service: DatabaseService,
+    business_id: int,
+    txs: List[BankTransaction],
+    only_unclassified: bool = True,
+) -> dict:
+    """txs 리스트를 받아 분류 + DailyExpense 링크 생성.
+
+    Returns counts dict: {revenue, expense, purchase, transfer, learned, skip}
+    """
+    counts = {"revenue": 0, "expense": 0, "purchase": 0, "transfer": 0, "learned": 0, "skip": 0}
+    if not txs:
+        return counts
+
+    sess = service.session
+    now = datetime.now()
+
+    vendors = sess.exec(
+        select(Vendor).where(Vendor.business_id == business_id)
+    ).all()
+    vendor_by_name = {v.name.strip(): v for v in vendors if v.name}
+
+    learned_remarks = _build_learned_remark_map(sess, business_id)
+
+    for tx in txs:
+        if only_unclassified and tx.classified_as != "unclassified":
+            continue
+
+        new_class = _classify_one_tx(tx, vendor_by_name, learned_remarks)
+        if not new_class:
+            counts["skip"] += 1
+            continue
+
+        # 학습 패턴 적용 시 카운트 분리
+        is_learned = bool(tx.remark1 and tx.remark1 in learned_remarks)
+
+        tx.classified_as = new_class
+        tx.classified_by = "learned" if is_learned else "auto"
+        tx.classified_at = now
+        _materialize_link(service, tx)
+        sess.add(tx)
+
+        if is_learned:
+            counts["learned"] += 1
+        elif new_class in counts:
+            counts[new_class] += 1
+
+    return counts
 
 
 @router.post("/transactions/auto-classify")
@@ -876,25 +1099,20 @@ def auto_classify(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """간단한 규칙 기반 자동 분류.
+    """규칙 기반 자동 분류 (학습 패턴 + 채널 매핑 + 벤더 매칭 + 출금 default).
 
-    규칙 (확장 예정):
-      - 입금(in_amount > 0) + remark1 ∈ {쿠팡이츠, 배달의민족, 요기요, 네이버페이,
-          카드매입, 매입대금, BC카드, 신한카드, ...} → revenue
-      - 출금(out_amount > 0) + vendor_id 매칭되면 expense/purchase
-      - 이체/내부이체/내계좌 등 키워드 → transfer
-      - 기타는 unclassified 유지 (수동)
+    분류 우선순위 (_classify_one_tx 안에서):
+      1. 학습 패턴: 이 사업장에서 같은 remark1 으로 분류된 과거 이력 (>=80% 합의)
+      2. 이체 키워드 → transfer
+      3. 입금 + REVENUE_CHANNEL_MAP 매칭 → revenue (채널별 Vendor 자동 생성)
+      4. 출금 + 벤더 매칭 → expense/purchase (vendor.vendor_type/category 따라 결정)
+      5. 출금 + 미매칭 → expense (기본값. 사용자가 수동 보정 가능)
+
+    분류된 tx 는 즉시 DailyExpense 레코드를 생성/갱신하여
+    매출관리(/revenue) · 매입관리(/purchase) 화면에 자동 노출.
     """
     bid = _resolve_bid(admin, x_view_as_business)
     service = DatabaseService()
-
-    REVENUE_KEYWORDS = [
-        "쿠팡이츠", "쿠팡", "배달의민족", "배달의민", "요기요", "네이버페이", "네이버",
-        "카카오페이", "카드매입", "매입대금", "BC카드", "신한카드", "KB국민카드",
-        "삼성카드", "현대카드", "롯데카드", "하나카드", "NH카드", "우리카드",
-        "나이스결제", "NICE", "KG이니시스", "이니시스", "토스",
-    ]
-    TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체"]
 
     try:
         stmt = select(BankTransaction).where(BankTransaction.business_id == bid)
@@ -908,61 +1126,7 @@ def auto_classify(
             stmt = stmt.where(BankTransaction.classified_as == "unclassified")
 
         rows = service.session.exec(stmt).all()
-
-        counts = {"revenue": 0, "expense": 0, "purchase": 0, "transfer": 0, "skip": 0}
-        now = datetime.now()
-
-        # 벤더명 매핑 (expense 후보)
-        vendors = service.session.exec(
-            select(Vendor).where(Vendor.business_id == bid)
-        ).all()
-        vendor_by_name = {v.name.strip(): v for v in vendors if v.name}
-
-        for tx in rows:
-            remark = " ".join(filter(None, [tx.remark1, tx.remark2, tx.remark3])).strip()
-            if not remark:
-                counts["skip"] += 1
-                continue
-
-            # 이체 키워드 우선
-            if any(k in remark for k in TRANSFER_KEYWORDS):
-                tx.classified_as = "transfer"
-                tx.classified_by = "auto"
-                tx.classified_at = now
-                counts["transfer"] += 1
-                service.session.add(tx)
-                continue
-
-            if tx.in_amount > 0:
-                if any(k in remark for k in REVENUE_KEYWORDS):
-                    tx.classified_as = "revenue"
-                    tx.classified_by = "auto"
-                    tx.classified_at = now
-                    _materialize_link(service, tx)
-                    counts["revenue"] += 1
-                    service.session.add(tx)
-                    continue
-                counts["skip"] += 1
-                continue
-
-            if tx.out_amount > 0:
-                matched_vendor = None
-                for name, v in vendor_by_name.items():
-                    if name and name in remark:
-                        matched_vendor = v
-                        break
-                if matched_vendor:
-                    tx.vendor_id = matched_vendor.id
-                    tx.classified_as = "purchase" if matched_vendor.vendor_type == "expense" and matched_vendor.category in ("식자재", "매입") else "expense"
-                    tx.classified_by = "auto"
-                    tx.classified_at = now
-                    _materialize_link(service, tx)
-                    counts[tx.classified_as] += 1
-                    service.session.add(tx)
-                    continue
-
-            counts["skip"] += 1
-
+        counts = _classify_txs(service, bid, rows, only_unclassified=body.only_unclassified)
         service.session.commit()
         return {"processed": len(rows), "counts": counts}
     finally:
