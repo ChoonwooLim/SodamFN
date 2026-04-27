@@ -431,3 +431,71 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 - **콘텐츠 출처 주의**: kimbap.js 의 정부 사이트 URL 은 정부24 개편 시 깨질 수 있음. V2 자동 점검 cron 검토.
 
 ---
+
+## 2026-04-27
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 팝빌 EasyFinBank TEST 환경 검증 진입 (POPBILL_BANK_IS_TEST 토글 + UI 모드 라벨 STUB/TEST/LIVE 3색) | 완료 |
+| fix  | is_test 결정 로직 fallback 추가 (POPBILL_BANK_IS_TEST 미설정 시 POPBILL_IS_TEST 따라감) | 완료 |
+| feat | bank-sync 자동분류 → 매출관리/매입관리(DailyExpense) 연동 + 키워드 보강 + 학습 패턴 + on-pull 자동분류 | 완료 |
+| feat | bank-sync 21분 단위 자동 갱신 + 거래내역 탭 타이틀 동적 변경 (계좌별) | 완료 |
+
+### 세부 내용
+
+**1) 팝빌 EasyFinBank TEST 환경 검증 (320e38cf, 88dd7814)**
+
+- **배경**: 2026-04-24 정액제 결제 후 LIVE 환경 `-99010016 사용할 수 없는 서비스` 차단 지속. 팝빌 1:1 답변으로 TEST 환경에서 검증 진행 권고. 사용자가 test.popbill.com 에 신한 110-357-7***** 등록(사용기간 ~2026-06-04, 시뮬레이션 거래 411건 보유).
+- **320e38cf**: `Orbitron.yaml` `POPBILL_BANK_IS_TEST: "false"` → `"true"` + 사유 주석. `routers/bank_sync.py` `/status` 응답에 `is_test` 필드 추가, `BankSync.jsx` 헤더 배지·안내 박스를 STUB(amber)/TEST(sky)/LIVE(emerald) 3색 분기.
+- **88dd7814 (fix)**: Orbitron 대시보드는 `Orbitron.yaml` env 자동 주입 안 됨 → 사용자가 새 변수 추가 안 하면 (empty) 상태. 해결: `services/bank_sync_service.py` `__init__` 에서 `POPBILL_BANK_IS_TEST` 미설정 시 `POPBILL_IS_TEST` (이미 설정됨) fallback. 진단 응답에 `is_test_source` 필드 추가 (POPBILL_BANK_IS_TEST / POPBILL_IS_TEST(fallback) / default 식별).
+- **결과**: 재배포 후 자동 TEST 모드 진입, 5/5 진단 통과, 411건 거래 적재 성공.
+
+**2) 자동 분류 → 매출/매입관리 DailyExpense 연동 (d8059968)**
+
+- **결정적 버그**: `_materialize_link` 가 구식 `Revenue`/`Expense` 테이블에 INSERT 했지만 매출관리(/revenue/daily) · 매입관리(/api/purchase/daily) 화면은 `DailyExpense` 만 읽음 → 분류해도 화면에 안 보였음.
+- **스키마**: `BankTransaction.linked_daily_id INTEGER` 신규 컬럼 + `init_db._run_migrations` 자동 ALTER TABLE (레거시 linked_revenue_id/linked_expense_id 보존).
+- **헬퍼 분리**: `_resolve_revenue_channel(remark1, remark2)` 매핑, `_get_or_create_vendor` revenue/expense Vendor 자동 생성, `_classify_one_tx` 단일 tx 분류, `_classify_txs` 배치+학습 패턴 적용, `_build_learned_remark_map` (manual 가중치 2배, 80% threshold).
+- **REVENUE_CHANNEL_MAP 31개 키워드** — 배달앱(쿠팡이츠/배달의민족/요기요/음식배달) · 페이먼트(카카오페이/네이버페이/토스/서울페이/제로페이) · 카드매입(BC/신한/KB국민/삼성/현대/롯데/하나/NH/우리 + 매출표) · 팝빌 test 데이터 패턴(원신한/FB자금/FB이체).
+- **출금 default expense**: vendor 매칭 실패 시 vendor_id=NULL + remark1을 vendor_name으로 → 매입관리에 표시 가능.
+- **/pull 자동 분류**: `service.session.flush()` 후 `_classify_txs(only_unclassified=True)` 호출. 응답에 `auto_classified` 카운트 포함.
+- **auto_classify endpoint 리팩터**: 동일 `_classify_txs` 헬퍼 재사용. 구식 키워드 인라인 코드 제거.
+
+**3) 21분 자동 갱신 + 거래내역 탭 타이틀 동적 변경 (5b56b50b)**
+
+- **`_do_pull` 헬퍼 추출**: `pull_transactions` 의 단일계좌 pull 로직을 함수로 분리. `/pull`, `/refresh-all` 공용.
+- **`POST /api/bank-sync/refresh-all`**: 사업장의 모든 활성 계좌 일괄 갱신 + 자동분류. `skip_recent_minutes` (기본 20분) 파라미터로 중복 호출 방지. 계좌별 try/except 격리. 응답: total_accounts/ok/skipped/failed/total_inserted/total_classified.
+- **거래내역 탭 타이틀 동적 변경** (사용자 요청): 단일 계좌 등록 시 "신한은행 거래내역", 거래내역 탭 필터 적용 시 해당 계좌 은행명, 다중+미필터 시 "거래내역" 그대로. `txTabLabel` useMemo + `tabs` useMemo 재계산.
+- **AutoRefreshControl 컴포넌트**: 탭 우측, ON/OFF Power 토글 + 분 input(1~60, 기본 21) + 카운트다운 MM:SS + 마지막 갱신 시각/신규건수. `localStorage(bankSyncAutoRefresh_v1)` 영속화. `useEffect` `setInterval` 로 페이지 열려있는 동안 21분마다 `/refresh-all` 호출, 백엔드는 `skip_recent_minutes=interval-1` 로 중복 방지.
+
+### 인프라 변경
+
+- 신규 백엔드 엔드포인트: `POST /api/bank-sync/refresh-all`
+- 신규 DB 컬럼: `banktransaction.linked_daily_id` (auto-migration)
+- 신규 환경변수 사용: `POPBILL_BANK_IS_TEST` (Orbitron.yaml 토글 + fallback)
+- Vendor 자동 생성 로직 추가 (revenue 채널별, expense 매칭 실패 시 vendor_id=NULL)
+
+### 검증 결과
+
+- 운영 환경 재배포 후 `is_test_source: POPBILL_IS_TEST (fallback)` 확인, is_test_mode: true 전환
+- 거래내역 수집 정상 (411건 신규 적재, 중복 411건 스킵 검증)
+- 헤더 배지 "🧪 TEST 모드 · 0P" 출력 확인 (사용자 스크린샷)
+- frontend npm run build 성공 (16.69s)
+
+### 다음 세션 인계
+
+- **운영 매뉴얼 검증** (Phase 2 검증 7 시나리오):
+  - "자동 분류" 클릭 → 음식배달/카드매입/카카오페이정산 등이 매출로, 광장동 모바일 출금이 매입으로 분류 확인
+  - /매출관리 페이지 → revenue Vendor 자동 생성된 채널명들이 거래내역과 함께 표시되는지
+  - /매입관리 페이지 → 분류된 매입(vendor_id 매칭 / 미매칭 모두) 표시되는지
+  - 자동 갱신 토글 ON 21분 → 카운트다운 + 첫 즉시 실행 + 21분 후 재실행 검증
+- **알려진 V2 후보**:
+  - 24/7 백그라운드 자동 갱신 — 현재는 페이지 열려있을 때만. Orbitron cron 으로 `/refresh-all` 호출 추가 검토
+  - 학습 패턴 정확도 — 80% threshold 가 적절한지 운영 데이터로 튜닝
+  - 출금 default expense 분류 — 사람 이름 송금이 인건비/매입 어느 쪽인지 사용자 보정 후 학습 인계
+- **팝빌 LIVE 활성화 후속**:
+  - 1:1 문의로 견적서 7종 (전자세금계산서/전자명세서/사업자등록상태/예금주조회/기업정보/SMS/알림톡+친구톡) 일괄 LIVE 활성화 요청 메시지 초안 작성 완료 (사용자 발송 대기)
+  - LIVE 활성화 완료 후 `POPBILL_BANK_IS_TEST=false` 토글 + 계좌 재등록 필요 (test/live 데이터 분리)
+
+---

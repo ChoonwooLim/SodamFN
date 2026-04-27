@@ -49,11 +49,22 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 - **선행작업**: 홈택스 부서사용자 ID 발급 (마이홈택스 → 부서사용자 관리)
 - **현금영수증 수집(HTCashbillService)은 별도 세션**
 
-### Phase F — 계좌조회 (7순위) · **코드완료** / 팝빌 모듈 활성화 차단
+### Phase F — 계좌조회 (7순위) · **TEST 검증 진행 중** (2026-04-27 업데이트)
 
-- **구현 완료 (2026-04-25)**: `services/bank_sync_service.py` EasyFinBankService 래핑 + 30+ 엔드포인트 + 7섹션 UI(현재 상태/계좌 목록/수동 추가/진단/거래조회/거래목록/엑셀 업로드)
-- **현재 상태**: 정액제 결제 완료 (2026-04-24, 신한 110-357-7XXXXX, ~05-24)했지만 live 환경에서 `listBankAccount` / `getBankAccountInfo` / `requestJob` 모두 `Popbill[-99010016] 사용할 수 없는 서비스` 차단. `getBalance` / `getBankAccountMgtURL`만 정상 → API 모듈 활성화 누락 패턴
-- **다음 액션**: 팝빌 1:1 문의 답변 대기. 활성화 승인 → 수집/자동분류 검증 / 거부 → Excel 업로드 자동화로 선회
+- **구현 완료 (2026-04-25)**: `services/bank_sync_service.py` EasyFinBankService 래핑 + 30+ 엔드포인트 + 7섹션 UI
+- **2026-04-27 진전**:
+  - LIVE `-99010016` 차단 지속 → 팝빌 1:1 답변 권고대로 TEST 환경에서 검증 진행
+  - test.popbill.com 에 신한 110-357-7***** 등록(사용기간 ~2026-06-04), 시뮬레이션 거래 411건 적재 검증 완료
+  - `POPBILL_BANK_IS_TEST` toggle + `POPBILL_IS_TEST` fallback → Orbitron 재배포만으로 TEST 모드 자동 진입
+  - 헤더 배지·안내 박스에 STUB/TEST/LIVE 3색 분기
+  - `_materialize_link` 를 `DailyExpense` 기반으로 재작성 → 매출관리/매입관리와 자동분류 결과 연동
+  - `linked_daily_id` 컬럼 신규 + auto-migration, `REVENUE_CHANNEL_MAP` 31개 키워드, 학습 패턴(80% threshold + manual 2배 가중), 출금 default expense
+  - `/pull` 끝에 자동분류 즉시 실행, `/api/bank-sync/refresh-all` 신규(skip_recent_minutes 중복 방지)
+  - 21분 단위 자동 갱신 (`AutoRefreshControl`, localStorage 영속화) + 거래내역 탭 타이틀 동적 변경
+- **다음 액션**:
+  - 운영 매뉴얼 검증 — 자동분류 결과 + 매출관리/매입관리 노출 확인
+  - LIVE 활성화 후 `POPBILL_BANK_IS_TEST=false` 토글 + 계좌 재등록
+  - 24/7 백그라운드 자동 갱신 (Orbitron cron 으로 `/refresh-all` 호출, 현재는 페이지 열려있을 때만)
 
 ### Phase G — 기타 (8순위) · **부분 완료**
 

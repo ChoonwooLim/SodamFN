@@ -267,7 +267,8 @@ const phases = [
                     { text: '팝빌 사업자등록상태 조회 (ClosedownService) — 거래처 자동확인', done: true },
                     { text: '팝빌 예금주조회 (AccountCheckService) — 급여이체 오입금 방지', done: true },
                     { text: '팝빌 기업정보 자동채움 (BizInfoCheckService) — 거래처 prefill', done: true },
-                    { text: '팝빌 EasyFinBank 계좌조회 인프라 — API 모듈 활성화 대기 중', done: false },
+                    { text: '팝빌 EasyFinBank 계좌조회 — TEST 환경 검증 완료(411건 적재) + 자동분류·매출/매입관리 연동 + 21분 자동 갱신. LIVE 활성화 대기', done: true },
+                    { text: '영업관리 V1 — 휴게음식점 38항목 6카테고리 + 진행률 트래킹 + 빨간 배지', done: true },
                 ],
             },
             {
