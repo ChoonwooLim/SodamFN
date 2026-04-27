@@ -35,6 +35,15 @@ export default function Sidebar() {
     }, [location.pathname]);
 
     useEffect(() => {
+        // superadmin 은 사업장 컨텍스트 없으면 /sales-guide/stats 가 401 반환 → api.js
+        // 인터셉터가 강제 로그아웃(/login 리다이렉트) 시키므로 호출 자체를 스킵.
+        // (view-as 매장 선택 후에는 X-View-As-Business 헤더로 정상 호출됨)
+        const role = localStorage.getItem('user_role');
+        const viewAs = localStorage.getItem('view_as_business_id');
+        if (role === 'superadmin' && !viewAs) {
+            setSalesGuideAlerts(0);
+            return;
+        }
         api.get('/sales-guide/stats').then((res) => {
             const overall = res.data.overall;
             const incomplete = overall.total - overall.completed;
@@ -44,7 +53,7 @@ export default function Sidebar() {
             );
             setSalesGuideAlerts(incomplete + expiring);
         }).catch(() => setSalesGuideAlerts(0));
-    }, [location.pathname]);
+    }, [location.pathname, viewAsBid]);
 
     const token = localStorage.getItem('token');
     let user = { role: 'admin', real_name: '관리자', grade: 'admin', profile_image: null };
