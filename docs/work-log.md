@@ -520,3 +520,57 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
   - LIVE 활성화 완료 후 `POPBILL_BANK_IS_TEST=false` 토글 + 계좌 재등록 필요 (test/live 데이터 분리)
 
 ---
+
+## 2026-04-28
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| analysis | 팝빌 활성화 절차 핵심 사실 발견 — **운영전환 신청 폼**이 LIVE 활성화의 유일한 트리거 (1:1 문의는 안내 채널) | 완료 |
+| docs     | 메모리 SSOT `project_popbill_modules.md` 운영전환 신청 섹션 추가 + 9모듈 매트릭스 갱신 (Fax 송신 검증 완료, 발신번호 차이 무시 결정) | 완료 |
+
+### 세부 내용
+
+**1) 팝빌 라이브 재검증 (변화 없음 확인)**
+
+이전 세션의 운영 매뉴얼 검증을 위해 `scratch_popbill_healthcheck.py` 재실행 — 9개 모듈 LIVE/TEST 상태 1시간 30분 전과 100% 동일.
+
+- LIVE 9개 전부 `-99010016 사용할 수 없는 서비스` 유지
+- TEST 환경 `getBalance` 9개 모두 통과 (LinkID 등록은 됨)
+- TEST 환경 실제 호출 가능: 계좌조회·팩스 2개만 (사용자가 팩스 송신 1매 검증 완료한 적 있음을 확인)
+- 4/26 발송한 1:1 문의는 팝빌 측에서 처리 진척 없음
+
+**2) 팩스 송신 검증 사실 정정 + 발신번호 결정**
+
+사용자 피드백으로 메모리 `project_popbill_fax.md` 의 부정확 표현 정정:
+
+- "팩스 운영 중" → 실제로는 TEST 환경에서 송신 1매 검증 완료된 상태 (LIVE 미활성)
+- 발신번호 표기 불일치 (`02-452-6570` vs `02-2452-6570`) — 사용자 결정으로 무시 (팩스 동작에 영향 없음 확인)
+
+**3) 팝빌 1:1 답변 분석 — 핵심 사실 발견**
+
+사용자가 4/26 발송한 1:1 문의 답변 + 후속 질문 답변 두 건을 분석:
+
+- **1차 답변**: "개발이 완료되셨다면 팝빌 개발자센터에서 운영전환 신청을 접수해주시기 바랍니다. <https://developers.popbill.com/customer-center/serviceopen>"
+- **2차 답변**: "운영전환 신청 시 API 상품 다중 선택이 가능하오니 참고해주시기 바랍니다."
+
+→ **결론**: 1:1 문의는 안내·상담 채널이고, **LIVE 활성화의 진짜 트리거는 운영전환 신청 폼 제출**. 이 발견이 라이브 검증 결과(LIVE 9개 -99010016)와 정확히 일치. EasyFinBank 정액제 결제(4/24)도 운영전환 신청과 별개라 -99010016 차단이 지속됐던 이유 설명됨.
+
+### 메모리 갱신
+
+- `project_popbill_modules.md` (SSOT)
+  - 매트릭스 갱신: Fax TEST 송신 검증 완료, EasyFinBank 411건 검증 완료, 7종 미부여
+  - 신설 섹션: "운영전환 신청 (LIVE 활성화의 유일한 경로) — 2026-04-28 확정" — URL, 다중 선택, 처리 절차, 핵심 함정(1:1 문의 ≠ 활성화), SodamFN 미신청 상태 명시
+  - 발신번호 차이 무시 결정 기록
+- `MEMORY.md` 인덱스 — 매트릭스 메모리 줄 갱신
+
+### 다음 세션 인계
+
+- **즉시 진행**: <https://developers.popbill.com/customer-center/serviceopen> 접속 → API 상품 8종 다중 선택 (TaxinvoiceService / StatementService / ClosedownService / AccountCheckService / BizInfoCheckService / MessageService / KakaoService + EasyFinBankService LIVE + FaxService LIVE) → 신청서 제출
+- **신청 후 1~2 영업일 대기** → 팝빌 담당 부서 처리 → 유선/이메일 통보
+- **통보 받은 직후**: `cd backend && python scratch_popbill_routers.py` 재실행으로 단계별 통과 여부 즉시 확인
+- **모두 풀린 후**: `Orbitron.yaml` `POPBILL_IS_TEST: "true"` → `"false"` + Orbitron 재배포
+- **별도 트랙**: 전자명세서(StatementService) 라우터·서비스 신규 개발 (6종 양식 등록 포함)
+
+---
