@@ -527,7 +527,7 @@ def generate_employment_certificate(
             </tr>
             <tr>
                 <th>주 소</th>
-                <td colspan="3">{(business.address if business and business.address else "-") or "-"}</td>
+                <td colspan="3">{staff.address or "-"}</td>
             </tr>
         </tbody>
     </table>
@@ -636,7 +636,7 @@ def generate_career_certificate(
             </tr>
             <tr>
                 <th>주 소</th>
-                <td colspan="3">{(business.address if business and business.address else "-") or "-"}</td>
+                <td colspan="3">{staff.address or "-"}</td>
             </tr>
         </tbody>
     </table>
@@ -929,7 +929,7 @@ def generate_retirement_certificate(
             </tr>
             <tr>
                 <th>주 소</th>
-                <td colspan="3">{(business.address if business and business.address else "-") or "-"}</td>
+                <td colspan="3">{staff.address or "-"}</td>
             </tr>
         </tbody>
     </table>
