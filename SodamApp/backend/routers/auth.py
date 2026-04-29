@@ -439,7 +439,6 @@ def get_business_info(bid: int):
             "opening_date": settings.get("opening_date", ""),
             "owner_title": settings.get("owner_title", "대표"),
             "representative_eng": settings.get("representative_eng", ""),
-            "address_eng": settings.get("address_eng", ""),
             "tax_office": settings.get("tax_office", ""),
             "industry_code": settings.get("industry_code", ""),
         }
@@ -506,7 +505,6 @@ def update_business_settings(
             "opening_date": 20,      # YYYY-MM-DD
             "owner_title": 32,       # 대표 / 대표이사 / CEO
             "representative_eng": 64,
-            "address_eng": 255,
             "tax_office": 64,
             "industry_code": 32,
         }
