@@ -215,10 +215,16 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
             total_base_pay = staff.monthly_salary or 0
             
             # --- 퇴사월 일할 계산 (Proration) ---
-            if staff.end_date and staff.end_date.strftime("%Y-%m") == req.month:
+            # Staff 모델에는 end_date 필드가 없음 — status="퇴사" + contract_end_date 조합으로 판단.
+            # 정규직 계약갱신(status="재직"인데 contract_end_date가 과거)에서 오작동 방지를 위해 status도 함께 체크.
+            if (
+                staff.status == "퇴사"
+                and staff.contract_end_date
+                and staff.contract_end_date.strftime("%Y-%m") == req.month
+            ):
                 from calendar import monthrange
                 days_in_month = monthrange(target_year, target_month)[1]
-                worked_days = min(staff.end_date.day, days_in_month)
+                worked_days = min(staff.contract_end_date.day, days_in_month)
                 total_base_pay = int(total_base_pay * worked_days / days_in_month)
                 
                 work_breakdown.append({
