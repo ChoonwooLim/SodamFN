@@ -15,7 +15,7 @@ def test_calc_direct():
             
             # simulate get_retirement_calculation_detail logic
             payment = session.exec(select(RetirementPayment).where(RetirementPayment.staff_id == staff.id)).first()
-            calc_end_date = payment.end_date if payment else (staff.end_date or date.today())
+            calc_end_date = payment.end_date if payment else (getattr(staff, 'contract_end_date', None) or date.today())
             
             try:
                 legal, w_days, p_accrued, breakdown = _calc_accrued_retirement(staff, calc_end_date)

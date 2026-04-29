@@ -15,7 +15,7 @@ def run_test():
             return
             
         payment = session.exec(select(RetirementPayment).where(RetirementPayment.staff_id == staff_id)).first()
-        calc_end_date = payment.end_date if payment else (staff.end_date or date.today())
+        calc_end_date = payment.end_date if payment else (getattr(staff, 'contract_end_date', None) or date.today())
         
         try:
             print(f"Calling func for {staff.name} end_date {calc_end_date}")
