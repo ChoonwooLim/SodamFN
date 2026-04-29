@@ -444,10 +444,14 @@ class PopbillStatementProvider(BaseStatementProvider):
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": f"SMS 발송 오류: {e}"}
 
-    def get_popbill_url(self, togo: str = "BOX",
+    def get_popbill_url(self, togo: str = "TBOX",
                         user_id: Optional[str] = None) -> str:
         svc = self._get_svc()
-        return svc.getPopbillURL(self.corp_num, user_id or self.user_id or "sodam", togo)
+        # UserID 는 팝빌에 등록된 담당자 ID 여야 함. 잘못된 fallback 으로 -10000038 발생 방지.
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다. (.env / Orbitron.yaml 확인)")
+        return svc.getPopbillURL(self.corp_num, uid, togo)
 
 
 def _info_to_dict(obj) -> dict:

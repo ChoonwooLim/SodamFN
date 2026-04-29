@@ -457,7 +457,7 @@ def send_sms(
 
 @router.get("/popbill-url")
 def popbill_url(
-    togo: str = Query("BOX", description="BOX=발행함 / WRITE=작성 / CERT=인증서등록"),
+    togo: str = Query("TBOX", description="TBOX=발행함 / SBOX=임시저장함 / WRITE=직접작성 / CERT=인증서등록"),
     _admin: User = Depends(get_admin_user),
 ):
     provider = get_provider()

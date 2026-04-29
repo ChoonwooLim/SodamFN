@@ -278,9 +278,10 @@ export default function Statement() {
                         <ExternalLink size={16} className="text-slate-500" />
                         <h2 className="font-semibold text-slate-700 text-sm">팝빌 공식 페이지 바로가기</h2>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                         {[
-                            { togo: 'BOX', label: '발행함', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+                            { togo: 'TBOX', label: '발행함', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+                            { togo: 'SBOX', label: '임시저장함', color: 'bg-slate-50 text-slate-700 hover:bg-slate-100' },
                             { togo: 'WRITE', label: '직접 작성', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
                             { togo: 'CERT', label: '인증서 등록', color: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
                         ].map((b) => (
