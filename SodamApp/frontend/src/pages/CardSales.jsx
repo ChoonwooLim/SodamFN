@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, FileUp, CreditCard, DollarSign, Calendar, TrendingUp, PieChart as PieIcon, List, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Upload, FileUp, CreditCard, DollarSign, Calendar, TrendingUp, PieChart as PieIcon, List, AlertCircle, RefreshCw, Link2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '../api';
 import { formatCurrency } from '../utils/format';
@@ -24,6 +25,25 @@ export default function CardSales() {
         };
     });
     const [msg, setMsg] = useState("");
+    const [syncing, setSyncing] = useState(false);
+
+    const handleCodefSync = async () => {
+        setSyncing(true);
+        setMsg("");
+        try {
+            const res = await api.post('/codef/sync-cards/manual');
+            const r = res.data.report || {};
+            setMsg(
+                `CODEF 자동수집 완료 — 신규 승인 ${r.new_approvals || 0}건, 청구 ${r.new_payments || 0}건` +
+                (r.failed_count > 0 ? ` (실패 ${r.failed_count}건)` : '')
+            );
+            fetchStats();
+        } catch (e) {
+            setMsg(e.response?.data?.detail || 'CODEF 자동수집 실패 — 외부 연동 페이지에서 카드사 등록을 확인해주세요.');
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     const fetchStats = async () => {
         setLoading(true);
@@ -112,6 +132,35 @@ export default function CardSales() {
                     <AlertCircle size={16} /> {msg}
                 </div>
             )}
+
+            {/* CODEF 자동수집 안내 + 빠른 동기화 */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 border border-blue-200 rounded-xl p-4 mb-5 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Link2 size={18} className="text-blue-700" />
+                    </div>
+                    <div>
+                        <div className="text-sm font-semibold text-slate-800">CODEF 자동수집</div>
+                        <div className="text-xs text-slate-600">엑셀 업로드 없이 14개 카드사 매출을 매일 자동으로 가져옵니다.</div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleCodefSync}
+                        disabled={syncing}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm disabled:opacity-50"
+                    >
+                        <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                        지금 동기화
+                    </button>
+                    <Link
+                        to="/external-integration/cards"
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm"
+                    >
+                        카드사 관리
+                    </Link>
+                </div>
+            </div>
 
             {/* Tabs */}
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-5">
