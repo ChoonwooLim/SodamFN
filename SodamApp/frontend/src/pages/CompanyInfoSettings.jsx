@@ -124,6 +124,7 @@ export default function CompanyInfoSettings() {
         name: '', business_number: '', business_type: '음식점', owner_name: '',
         phone: '', address: '', region: '', email: '', fax: '', website: '',
         opening_date: '', owner_title: '대표', representative_eng: '',
+        address_eng: '',
         tax_office: '', industry_code: '',
     });
     const [savingInfo, setSavingInfo] = useState(false);
@@ -174,6 +175,7 @@ export default function CompanyInfoSettings() {
                 opening_date: d.opening_date || '',
                 owner_title: d.owner_title || '대표',
                 representative_eng: d.representative_eng || '',
+                address_eng: d.address_eng || '',
                 tax_office: d.tax_office || '',
                 industry_code: d.industry_code || '',
             }));
@@ -312,10 +314,17 @@ export default function CompanyInfoSettings() {
                     <Field label="지역" value={form.region} onChange={(v) => setForm({ ...form, region: v })} placeholder="예: 서울" />
                     <Field label="관할세무서" value={form.tax_office} onChange={(v) => setForm({ ...form, tax_office: v })} placeholder="예: 광진세무서" />
                     <Field
-                        label="주소"
+                        label="주소 (한글)"
                         value={form.address}
                         onChange={(v) => setForm({ ...form, address: v })}
                         placeholder="예: 서울시 광진구 능동로 110 스타시티 영촌빌딩 B208호"
+                        className="md:col-span-2"
+                    />
+                    <Field
+                        label="주소 (영문)"
+                        value={form.address_eng}
+                        onChange={(v) => setForm({ ...form, address_eng: v })}
+                        placeholder="예: B208, Yeongchon Bldg, 110 Neungdong-ro, Gwangjin-gu, Seoul"
                         className="md:col-span-2"
                     />
                 </div>

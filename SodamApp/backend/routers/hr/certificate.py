@@ -81,6 +81,28 @@ def _parse_business_settings(business) -> dict:
         return {}
 
 
+def _biz_owner_for_cert(business) -> str:
+    """HR 증명서용 대표자명 — settings_json.representative_eng 우선, 없으면 owner_name."""
+    if not business:
+        return "-"
+    settings = _parse_business_settings(business)
+    en = (settings.get("representative_eng") or "").strip()
+    if en:
+        return en
+    return (business.owner_name or "-") or "-"
+
+
+def _biz_address_for_cert(business) -> str:
+    """HR 증명서용 주소 — settings_json.address_eng 우선, 없으면 address."""
+    if not business:
+        return "-"
+    settings = _parse_business_settings(business)
+    en = (settings.get("address_eng") or "").strip()
+    if en:
+        return en
+    return (business.address or "-") or "-"
+
+
 def _svg_escape(s: str) -> str:
     return (
         (s or "")
@@ -245,8 +267,8 @@ def _issuer_block(business) -> str:
     """
     biz_name = (business.name if business else "-") or "-"
     biz_number = (business.business_number if business and business.business_number else "-") or "-"
-    biz_owner = (business.owner_name if business and business.owner_name else "-") or "-"
-    biz_address = (business.address if business and business.address else "-") or "-"
+    biz_owner = _biz_owner_for_cert(business)
+    biz_address = _biz_address_for_cert(business)
     biz_phone = (business.phone if business and business.phone else "-") or "-"
     seal_html = _seal_block(business)
     return f"""
@@ -596,8 +618,8 @@ def generate_career_certificate(
 
     biz_name = business.name if business else "-"
     biz_number = business.business_number or "-" if business else "-"
-    biz_owner = business.owner_name or "-" if business else "-"
-    biz_address = business.address or "-" if business else "-"
+    biz_owner = _biz_owner_for_cert(business)
+    biz_address = _biz_address_for_cert(business)
     biz_phone = business.phone or "-" if business else "-"
     seal_html = _seal_block(business)
 
@@ -729,8 +751,8 @@ def generate_salary_certificate(
 
     biz_name = business.name if business else "-"
     biz_number = business.business_number or "-" if business else "-"
-    biz_owner = business.owner_name or "-" if business else "-"
-    biz_address = business.address or "-" if business else "-"
+    biz_owner = _biz_owner_for_cert(business)
+    biz_address = _biz_address_for_cert(business)
     biz_phone = business.phone or "-" if business else "-"
     seal_html = _seal_block(business)
 
@@ -889,8 +911,8 @@ def generate_retirement_certificate(
 
     biz_name = business.name if business else "-"
     biz_number = business.business_number or "-" if business else "-"
-    biz_owner = business.owner_name or "-" if business else "-"
-    biz_address = business.address or "-" if business else "-"
+    biz_owner = _biz_owner_for_cert(business)
+    biz_address = _biz_address_for_cert(business)
     biz_phone = business.phone or "-" if business else "-"
     seal_html = _seal_block(business)
 
