@@ -46,6 +46,7 @@ else:
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
     _run_codef_phase1_migrations(engine)
+    _run_private_payment_migrations(engine)
 
 def get_session():
     with Session(engine) as session:
@@ -85,3 +86,22 @@ def _run_codef_phase1_migrations(engine_):
         _ensure_column(engine_, table, "synced_at", "TIMESTAMP")
         with engine_.begin() as conn:
             conn.execute(text(f"UPDATE {table} SET source = 'excel' WHERE source IS NULL"))
+
+
+def _run_private_payment_migrations(engine_):
+    """사업주 전용 비공개 지급 정보 마이그레이션 — idempotent.
+
+    Staff 에 private_payment_method / private_actual_payee_* / private_tax_unreported /
+    private_owner_note 6 컬럼을 안전하게 추가.
+    spec: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+    """
+    table = "staff"
+    _ensure_column(engine_, table, "private_payment_method", "VARCHAR DEFAULT 'transfer'")
+    _ensure_column(engine_, table, "private_actual_payee_name", "VARCHAR")
+    _ensure_column(engine_, table, "private_actual_payee_relation", "VARCHAR")
+    _ensure_column(engine_, table, "private_actual_payee_account", "VARCHAR")
+    _ensure_column(engine_, table, "private_tax_unreported", "BOOLEAN DEFAULT FALSE")
+    _ensure_column(engine_, table, "private_owner_note", "TEXT")
+    with engine_.begin() as conn:
+        conn.execute(text("UPDATE staff SET private_payment_method = 'transfer' WHERE private_payment_method IS NULL"))
+        conn.execute(text("UPDATE staff SET private_tax_unreported = FALSE WHERE private_tax_unreported IS NULL"))

@@ -223,7 +223,17 @@ class Staff(SQLModel, table=True):
     doc_health_cert: bool = Field(default=False) # 보건증
     doc_id_copy: bool = Field(default=False) # 신분증 사본
     doc_bank_copy: bool = Field(default=False) # 통장 사본
-    
+
+    # ── 사업주 전용 비공개 지급 정보 (외부 노출 금지) ──
+    # `private_` prefix 일관 사용 → 직렬화 필터·외부 출력에서 단일 패턴으로 차단 가능
+    private_payment_method: str = Field(default="transfer")
+    # 'transfer' = 본인 계좌 이체 (기본) / 'cash' = 현금 / 'other_account' = 타인 명의 계좌
+    private_actual_payee_name: Optional[str] = None
+    private_actual_payee_relation: Optional[str] = None
+    private_actual_payee_account: Optional[str] = None
+    private_tax_unreported: bool = Field(default=False)
+    private_owner_note: Optional[str] = None
+
     # Relationships
     attendances: List["Attendance"] = Relationship(back_populates="staff")
     payrolls: List["Payroll"] = Relationship(back_populates="staff")
