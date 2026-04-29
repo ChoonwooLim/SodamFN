@@ -574,3 +574,119 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 - **별도 트랙**: 전자명세서(StatementService) 라우터·서비스 신규 개발 (6종 양식 등록 포함)
 
 ---
+
+## 2026-04-29
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | **전자명세서(StatementService) 신규 개발** — 6종 양식(거래명세서/청구서/견적서/발주서/입금표/영수증) 발행/검색/추가발송 풀구현 + spec + 라이브 검증 | 완료 |
+| style | Statement.jsx 다크 → 라이트 테마 전면 재디자인 (.impeccable.md 가이드 준수) | 완료 |
+| fix  | togo 'BOX' 비표준 → 'TBOX' 표준화 + UserID fallback 'sodam' 잘못된 값 제거 (RuntimeError 명시화) | 완료 |
+| feat | 전자명세서 양식별 샘플 데이터 + 6종 일괄 샘플 발행 (모니터링·테스트) | 완료 |
+| feat | 전자명세서 잔액 표시·충전 + 미리보기/인쇄/이메일 재전송/취소 운영 풀세트 | 완료 |
+| feat | **전자세금계산서(TaxInvoice) Statement 패턴 일괄 적용** — TaxinvoiceRecord 모델 신규 + 잔액·샘플·미리보기·인쇄·PDF·이메일·취소 6 메서드 추가 + Memo 케이스 fix | 완료 |
+| other | **카카오 알림톡 셋업 외부 진행** — 채널 개설(@sodam2025) + 비즈인증 신청 + 팝빌 발신번호 등록 신청 | 외부 검수 대기 |
+
+### 세부 내용
+
+**1) 전자명세서(StatementService) 신규 개발 (62d95207, bce903fe)**
+
+- **spec**: `docs/superpowers/specs/2026-04-29-statement-design.md` (608줄). 브레인스토밍 4결정: Q1=A(6종 동시), Q2=B(양식별 conditional), Q3=B(자동이메일+팩스/SMS), Q4=B(DB 가벼운 메타).
+- **Backend**:
+  - `models.Statement` 신규 (가벼운 메타 — business_id/item_code/mgt_key/total/status/receipt_num/email_sent_at)
+  - `services/statement_service.py`: Provider 추상화 + FORM_CODES 6종 메타 + StatementDraft.property_bag → SDK Statement 객체 dynamic attribute 매핑
+  - `routers/statement.py`: 8 엔드포인트 (status/issuer/form-codes/issue/search/info/send-fax/send-sms/popbill-url) + 테넌트 격리
+  - `main.py`: statement 라우터 include
+- **Frontend**:
+  - `pages/Statement.jsx` (~580줄): 양식 셀렉트, conditional 필드 동적 렌더, 자동 계산, 이력 테이블, 발행 결과 모달, 팩스/SMS 추가 발송
+  - `App.jsx`: `/finance/statement` 라우트
+  - `Sidebar.jsx`: 재무·회계 그룹에 전자명세서 메뉴 (전자세금계산서 아래)
+- **라이브 검증** (TEST 환경): 6/6 엔드포인트 통과. 발견·수정 버그 2건:
+  1. registIssue 인자 시그니처 — item_code 는 statement 객체 안 itemCode 필드
+  2. mgt_key 길이 24자 초과 (-12001011) → 21자로 단축
+
+**2) Statement.jsx 라이트 테마 재디자인 (a1291076)**
+
+- **사용자 피드백**: "디자인이 너무하다" — 다크 사이드바와 동일 색조라 라벨/제목 가독성 0.
+- **원인**: `.impeccable.md` 명시 "라이트 모드 전용" 위배. 자동 진행 모드에서 디자인 시스템 미확인.
+- **수정**: 페이지 `bg-slate-50`, 카드 `bg-white shadow-sm border-slate-100`, 입력 `bg-slate-50 border-slate-200 focus:ring-blue-500`, 라벨 `text-xs font-semibold text-slate-500`, TaxInvoice.jsx 패턴 정렬.
+
+**3) togo 표준화 + UserID fallback 안전화 (6fdf2a9b)**
+
+- **증상**: 사용자가 팝빌 콘솔 진입 4개 버튼 모두 "아이디 오류"로 안 열림.
+- **진단**: SDK 호출은 모든 togo 통과(BOX/TBOX/SBOX/WRITE/CERT 다 URL 발급). 진짜 원인은 togo='BOX' 가 비표준 값 (팝빌 표준은 TBOX/SBOX/WRITE/CERT).
+- **추가 발견**: Orbitron 운영 환경에 `POPBILL_USER_ID` 가 미주입 → fallback 'sodam'(미등록 ID) 으로 호출 → 페이지 거절. 메모리 함정 패턴(env 자동 미주입) 재현.
+- **수정**: default togo `BOX` → `TBOX`, 4개 버튼 (TBOX/SBOX/WRITE/CERT). 잘못된 fallback 'sodam' 제거 → user_id 미설정 시 `RuntimeError` 명시 발생.
+
+**4) 양식별 샘플 데이터 + 6종 일괄 샘플 발행 (adcfe63d)**
+
+- **사용자 요청**: "양식별로 발급용 샘플데이터를 넣어서 테스트나 모니터링이 가능하게"
+- **Backend**: `FORM_CODES` 6종에 `sample_data` 필드 추가 (소담김밥 휴게음식점 업종 친화 — 어린이집 도시락/단체급식/케이터링/식자재 발주/유치원 입금표/현장 영수증). `POST /api/statement/issue-samples` 엔드포인트 신규.
+- **Frontend**: 발행 폼 헤더에 "샘플 채우기" 버튼 + 페이지 상단 amber gradient "6종 일괄 발행" 카드 (LIVE 환경 시 confirm 비용 안내).
+- **라이브 검증**: 6/6 통과 (총 발행액 4,186,000원).
+
+**5) 전자명세서 운영 기능 풀세트 (0c243c5a)**
+
+- **사용자 요청**: "잔여 비용 부족하다고 3개만 됐어. 발행된 서류 볼 수 있는 메뉴 없네"
+- **라이브 잔액 확인**: 0.0 P (사용자 보고와 일치)
+- **Backend Provider 확장**: `get_view_url`/`get_print_url`/`send_email`/`cancel`/`get_balance`/`get_charge_url`
+- **신규 라우터 6**: `/balance` `/charge-url` `/{key}/view-url` `/print-url` `/send-email` `/cancel` (테넌트 격리 검증)
+- **Frontend 재구성**: 페이지 상단 3분할 카드 (잔액 + 충전 / 6종 일괄 발행). 이력 카드 클릭 → DetailModal (메타 + 팝빌 getInfo + 미리보기·인쇄·이메일 재전송·취소).
+
+**6) 전자세금계산서(TaxInvoice) Statement 패턴 일괄 적용 (222fa67b)**
+
+- **사용자 요청**: "전자세금계산서도 샘플양식과 미리보기 등 필요한 모든 기능들 전부 추가해줘"
+- **신규 모델**: `models.TaxinvoiceRecord` (key_type/mgt_key/invoice_num/receipt_num/status/email_sent_at...)
+- **Provider 6 메서드 + SAMPLE_DATA**: 도시락 50인 + 음료 세트 660,000원 더미.
+- **잠재 버그 fix**: `registIssue(Memo=...)` → `registIssue(memo=...)`. SDK 1.64.1 케이스 차이. 운영전환 미신청 -99010016 차단으로 가려져있던 잠재 버그.
+- **신규 라우터 7**: `/balance` `/charge-url` `/sample` `/issue-sample` `/{key}/view-url` `/print-url` `/pdf-url` `/send-email` `/cancel`. `/issue` 도 DB INSERT/UPDATE 추가, `/search`·`/info` 는 DB+팝빌 병합.
+- **Frontend pages/TaxInvoice.jsx 재구성**: 잔액 카드 + 샘플 발행 카드 + 이력 카드 클릭 + DetailModal (3 버튼 미리보기/인쇄/PDF + 이메일 + 취소).
+- **라이브 검증**: balance/charge/sample/search 통과. issue-sample 은 `-10004000 등록된 인증서가 존재하지 않습니다` (TaxInvoice 는 TEST 에서도 인증서 필수, Statement 와 다른 점).
+
+**7) 카카오 알림톡 셋업 (사용자 외부 작업 — 검수 대기)**
+
+- 알림톡 발송 4단계 함정 분석:
+  - 카카오톡 채널 개설 → 비즈인증 → 발신번호 → 템플릿 검수 → 잔액 충전
+- **사용자 진행**:
+  - 카카오톡 채널 `@sodam2025` (소담김밥 건대본점) 개설 ✅
+  - 위저드 (공개·검색·카테고리 음식점/분식) ✅
+  - **비즈인증** 신청 (사업자등록증, 영업일 3~5일 검수)
+  - **팝빌 발신번호 등록** (010-4173-6570 임춘우 공동대표): LG U+ 가입사실확인서 + 사업자등록증 + 임춘우 재직증명서 (대표자여도 강제) → 영업일 1일 검수
+- **결정**: 자동화(팝빌) + 일회성 광고(카카오 비즈센터) 병행 (옵션 D)
+
+### 인프라 변경
+
+- **신규 백엔드 라우터**: `/api/statement/*` (8 endpoints + 6 신규 = 14)
+- **TaxInvoice 라우터 확장**: 기존 6 → 13 (잔액/충전/샘플/뷰어/인쇄/PDF/이메일/취소 추가)
+- **신규 DB 모델**: `Statement`, `TaxinvoiceRecord` 2개 (auto-create)
+- **신규 프론트엔드 페이지**: `pages/Statement.jsx` (~580줄)
+- **신규 사이드바 메뉴**: 재무·회계 그룹에 "전자명세서"
+- **신규 앱 라우트**: `/finance/statement`
+
+### 메모리 갱신
+
+- `project_popbill_modules.md` (SSOT)
+  - StatementService 행: "(라우터 미구현)" → "✅ 활성 + 라우터/UI 구현 완료 (4/29)"
+  - 운영전환 신청 절차 + TEST 완성 후 일괄 LIVE 전환 전략
+- `project_popbill_sender_number.md` 신규: 발신번호 등록 절차 + 핵심 함정 (대표자여도 재직증명서 강제) + 임춘우 공동대표 정보
+- `MEMORY.md` 인덱스 갱신
+
+### 외부 대기 (4/30 ~ 5/7 통과 예상)
+
+| 항목 | 검수 시간 |
+|---|---|
+| 팝빌 발신번호 (010-4173-6570) | 영업일 1일 |
+| 카카오 비즈인증 (소담김밥 채널) | 영업일 3~5일 |
+| 알림톡 템플릿 (등록 후) | 카카오 검수 영업일 1~3일 |
+
+### 다음 세션 인계
+
+- **발신번호 통과 시** (예상 4/30): SMS 라이브 발송 가능 (잔액 충전 후). 사장님 폰으로 테스트 1건.
+- **비즈인증 통과 시** (예상 5/5~5/7): 셈하나 → 알림톡 → [플러스친구 관리] → 채널 ID `@sodam2025` 입력 → 카카오 자동 승인.
+- **알림톡 템플릿 시안 미리 준비**: 거래처 청구 안내 / 직원 급여 안내 / 예약 확인 등 3~5종 — 비즈인증 통과 즉시 등록 가능하도록.
+- **TaxInvoice 인증서 등록**: 운영전환 신청 + 인증서(전자세금용 1년 20,000원) 발급 후 LIVE 발행 가능.
+- **미부여 3개 모듈 추가 1:1 문의**: ClosedownService(사업자등록상태) + BizInfoCheckService(기업정보) + 친구톡(FTS).
+
+---
