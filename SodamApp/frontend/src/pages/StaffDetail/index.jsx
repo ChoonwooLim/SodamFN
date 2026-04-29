@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap, ChevronLeft } from 'lucide-react';
+import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap, ChevronLeft, Lock } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import { useBusinessConfig, SCALE_FEATURES } from '../../hooks/useBusinessConfig';
@@ -13,6 +13,7 @@ import RetirementTab from './RetirementTab';
 import LeaveTab from './LeaveTab';
 import ChangeLogTab from './ChangeLogTab';
 import TrainingTab from './TrainingTab';
+import PrivateTab from './PrivateTab';
 
 const ALL_TABS = [
     { key: 'basic', label: '기본정보', icon: User },
@@ -24,29 +25,47 @@ const ALL_TABS = [
     { key: 'training', label: '교육/자격', icon: GraduationCap },
     { key: 'document', label: '서류관리', icon: Upload },
     { key: 'changelog', label: '변경이력', icon: History },
+    // 사업주 전용 — admin/superadmin 만 노출 (TABS 필터에서 권한 체크)
+    { key: 'private', label: '사업주 전용', icon: Lock, requireRole: ['admin', 'superadmin'] },
 ];
+
+// 토큰에서 사용자 role 추출 — 권한별 탭 노출/차단 게이트
+function getCurrentUserRole() {
+    try {
+        const t = localStorage.getItem('token');
+        if (!t) return null;
+        const payload = JSON.parse(atob(t.split('.')[1]));
+        return payload.role || null;
+    } catch {
+        return localStorage.getItem('user_role') || null;
+    }
+}
 
 export default function StaffDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('basic');
     const { employeeScale, isSimpleMode } = useBusinessConfig();
+    const userRole = useMemo(() => getCurrentUserRole(), []);
 
-    // 5인 미만/이상에 따라 보이는 탭 필터링
+    // 5인 미만/이상에 따라 보이는 탭 필터링 + 권한별 차단(예: 'private' 은 admin/superadmin 만)
     const TABS = useMemo(() => {
         return ALL_TABS.filter(tab => {
+            if (tab.requireRole && !tab.requireRole.includes(userRole)) return false;
             const feature = SCALE_FEATURES.tabs[tab.key];
             return feature ? feature[employeeScale] : true;
         });
-    }, [employeeScale]);
+    }, [employeeScale, userRole]);
 
-    // 방어: activeTab이 현재 규모에서 허용되지 않으면 'basic'으로 폴백
-    // (scale 변경 / 직접 setActiveTab / 향후 URL 기반 탭 진입 모두 차단)
+    // 방어: activeTab 이 현재 규모/권한에서 허용되지 않으면 'basic' 으로 폴백
+    // (scale 변경 / 직접 setActiveTab / URL 기반 탭 진입 / 권한 우회 모두 차단)
     const effectiveTab = useMemo(() => {
+        const tabDef = ALL_TABS.find(t => t.key === activeTab);
+        if (tabDef?.requireRole && !tabDef.requireRole.includes(userRole)) return 'basic';
         const feature = SCALE_FEATURES.tabs[activeTab];
         if (feature && !feature[employeeScale]) return 'basic';
         return activeTab;
-    }, [activeTab, employeeScale]);
+    }, [activeTab, employeeScale, userRole]);
 
     // 차단된 탭에 있었다면 상태도 정리
     useEffect(() => {
@@ -731,6 +750,10 @@ export default function StaffDetail() {
                         id={id}
                         formData={formData}
                     />
+                )}
+
+                {effectiveTab === 'private' && (userRole === 'admin' || userRole === 'superadmin') && (
+                    <PrivateTab staffId={id} />
                 )}
             </div>
         </div>

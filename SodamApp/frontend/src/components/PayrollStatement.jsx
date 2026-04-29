@@ -4,7 +4,7 @@ import { Printer, X } from 'lucide-react';
 import api from '../api';
 import { CompanySeal } from './CompanySeal';
 
-const PayrollPaper = ({ staff, payroll, business, scale = 1, isPrint = false }) => {
+const PayrollPaper = ({ staff, payroll, business, staffPrivate, scale = 1, isPrint = false }) => {
     const formatDate = (monthStr) => {
         if (!monthStr || typeof monthStr !== 'string') return '';
         const parts = monthStr.split('-');
@@ -263,10 +263,21 @@ const PayrollPaper = ({ staff, payroll, business, scale = 1, isPrint = false }) 
                             <tr className="h-9 text-[12px]">
                                 <td className="w-1/4 bg-slate-100 font-bold border-2 border-slate-800 text-center">급여 수령 계좌</td>
                                 <td colSpan="3" className="px-8 border-2 border-slate-800 text-base font-black text-slate-800 tracking-wider">
-                                    {staff.bank_name || staff.account_number
-                                        ? `${staff.bank_name || ''} ${staff.account_number || ''} ${staff.account_holder || ''}`.trim()
-                                        : (staff.bank_account || '기록 없음')
-                                    }
+                                    {(() => {
+                                        // 사업주 비공개 지급 정책 마스킹
+                                        // spec: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+                                        const method = staffPrivate?.private_payment_method || 'transfer';
+                                        if (method === 'cash') return '현금 지급';
+                                        if (method === 'other_account') {
+                                            const acc = (staffPrivate?.private_actual_payee_account || '').trim();
+                                            return acc || '현금 지급';
+                                        }
+                                        // transfer (기본) — 본인 계좌 그대로 표시
+                                        if (staff.bank_name || staff.account_number) {
+                                            return `${staff.bank_name || ''} ${staff.account_number || ''} ${staff.account_holder || ''}`.trim();
+                                        }
+                                        return staff.bank_account || '기록 없음';
+                                    })()}
                                 </td>
                             </tr>
                         </tbody>
@@ -317,6 +328,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.5);
     const [business, setBusiness] = useState(null);
+    const [staffPrivate, setStaffPrivate] = useState(null);
 
     // 명세서 발급자(회사) 정보 fetch — 직인·대표자명·사업장명 동적 렌더링용.
     // 인터셉터의 X-View-As-Business 헤더로 view-as 모드도 자동 처리.
@@ -332,6 +344,25 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
         })();
         return () => { cancelled = true; };
     }, []);
+
+    // 사업주 전용 비공개 지급 정보 fetch — 명세서 '급여 수령 계좌' 행 마스킹용.
+    // staff 본인 토큰으로는 403 (admin/superadmin 전용) → catch 해서 무시 (기본 transfer fallback).
+    useEffect(() => {
+        if (!staff?.id) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await api.get(`/hr/staff/${staff.id}/private`);
+                if (!cancelled && res.data?.status === 'success') {
+                    setStaffPrivate(res.data.data);
+                }
+            } catch {
+                // 권한 없음(403) — 기본 transfer 정책으로 fallback
+                if (!cancelled) setStaffPrivate(null);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [staff?.id]);
 
     useLayoutEffect(() => {
         const updateScale = () => {
@@ -396,7 +427,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                         ref={containerRef}
                         className="flex-1 bg-slate-100 flex items-start sm:items-center justify-center overflow-hidden p-1 sm:p-0"
                     >
-                        <PayrollPaper staff={staff} payroll={payroll} business={business} scale={scale} isPrint={false} />
+                        <PayrollPaper staff={staff} payroll={payroll} business={business} staffPrivate={staffPrivate} scale={scale} isPrint={false} />
                     </div>
                 </div>
             </div>
@@ -404,7 +435,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
             {/* Hidden Print Container - Rendered via Portal for Print Only */}
             {createPortal(
                 <div className="print-portal-container">
-                    <PayrollPaper staff={staff} payroll={payroll} business={business} scale={1} isPrint={true} />
+                    <PayrollPaper staff={staff} payroll={payroll} business={business} staffPrivate={staffPrivate} scale={1} isPrint={true} />
                 </div>,
                 document.body
             )}
