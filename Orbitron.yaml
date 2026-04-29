@@ -105,6 +105,24 @@ services:
         value: "true"
       - key: BANK_SYNC_PROVIDER
         value: ""  # 빈값 = 자동(LINK_ID/SECRET_KEY 있으면 popbill, 없으면 stub)
+      # ─────────────────────────────────────────────
+      # CODEF (마이데이터 통합) — 2026-04-29 데모버전 발급
+      # 환경 전환: CODEF_ENV + CODEF_API_HOST + CLIENT_ID/SECRET 동시 교체
+      #   - demo: https://development.codef.io (1개월 하루 100회)
+      #   - production: https://api.codef.io (정식버전, 별도 신청)
+      # CLIENT_ID/SECRET/PUBLIC_KEY는 Orbitron Secrets로 등록 — YAML 실제 값 금지
+      # 도큐먼트: C:/WORK/llm-wiki/40-Tools/CODEF.md SSOT
+      # ─────────────────────────────────────────────
+      - key: CODEF_ENV
+        value: "demo"
+      - key: CODEF_API_HOST
+        value: "https://development.codef.io"
+      - key: CODEF_CLIENT_ID
+        value: ""  # ⚠️ Orbitron Secrets에 설정
+      - key: CODEF_CLIENT_SECRET
+        value: ""  # ⚠️ Orbitron Secrets에 설정
+      - key: CODEF_PUBLIC_KEY
+        value: ""  # ⚠️ Orbitron Secrets에 설정 (계정 RSA 공개키, 환경 무관 공통)
     healthCheck:
       path: /api/health
       interval: 30
