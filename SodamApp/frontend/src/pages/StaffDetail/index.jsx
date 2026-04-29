@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap } from 'lucide-react';
+import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap, ChevronLeft } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import { useBusinessConfig, SCALE_FEATURES } from '../../hooks/useBusinessConfig';
@@ -560,6 +560,13 @@ export default function StaffDetail() {
                 {/* Header */}
                 <header className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => navigate(-1)}
+                            aria-label="이전 메뉴로 돌아가기"
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                             <User size={20} className="text-white" />
                         </div>
