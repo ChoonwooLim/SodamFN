@@ -90,21 +90,37 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
     return {"status": "success", "data": staffs}
 
 @router.post("/staff")
-def create_staff(staff: StaffCreate, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
-    staff_business_id = _admin.business_id if _admin.role != "superadmin" else None
+def create_staff(
+    staff: StaffCreate,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    # SuperAdmin + View-As 시 bid 가 view-as 사업장. 일반 admin 은 본인 business_id.
+    # bid 가 없으면 _admin.business_id fallback. 둘 다 없으면 orphan 방지를 위해 명시적 에러.
+    target_bid = bid or _admin.business_id
+    if not target_bid:
+        raise HTTPException(
+            status_code=400,
+            detail="사업장 정보가 없습니다. SuperAdmin 은 먼저 대상 사업장을 선택(View As)하세요.",
+        )
     new_staff = Staff(
         name=staff.name,
         role=staff.role,
         hourly_wage=staff.hourly_wage,
         bank_account=staff.bank_account,
+        email=staff.email,
         start_date=staff.start_date,
         nationality=staff.nationality,
         visa_type=staff.visa_type,
-        business_id=staff_business_id or _admin.business_id
+        dependents_count=staff.dependents_count,
+        children_count=staff.children_count,
+        business_id=target_bid,
     )
     session.add(new_staff)
     session.commit()
-    return {"status": "success", "message": "Staff created"}
+    session.refresh(new_staff)
+    return {"status": "success", "message": "Staff created", "id": new_staff.id}
 
 @router.get("/staff/{staff_id}")
 def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):
