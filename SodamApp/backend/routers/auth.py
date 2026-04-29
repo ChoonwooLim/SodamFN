@@ -10,6 +10,7 @@ import httpx
 from sqlmodel import select
 from models import User, StoreApplication
 from services.database_service import DatabaseService
+from tenant_filter import get_bid_from_token
 import config
 
 import os
@@ -411,11 +412,29 @@ def _parse_settings_json(raw):
         return {}
 
 @router.get("/business-info")
-def get_business_info(bid: int):
+def get_business_info(
+    bid: Optional[int] = None,
+    bid_from_ctx: Optional[int] = Depends(get_bid_from_token),
+):
+    """사업장 기본 정보 조회.
+
+    bid 결정 우선순위:
+      1) 쿼리 파라미터 bid (명시적 지정)
+      2) X-View-As-Business 헤더 또는 토큰 business_id (get_bid_from_token 처리)
+
+    프론트의 localStorage 동기화 누락(다른 탭 view-as 변경 등)으로 쿼리 bid 가
+    비어 호출되더라도 헤더/토큰만으로 정상 응답.
+    """
+    target_bid = bid or bid_from_ctx
+    if not target_bid:
+        raise HTTPException(
+            status_code=400,
+            detail="사업장을 결정할 수 없습니다. (bid 쿼리 또는 X-View-As-Business 헤더 필요)",
+        )
     from models import Business
     service = DatabaseService()
     try:
-        business = service.session.get(Business, bid)
+        business = service.session.get(Business, target_bid)
         if not business:
             raise HTTPException(status_code=404, detail="Business not found")
         settings = _parse_settings_json(getattr(business, 'settings_json', None))

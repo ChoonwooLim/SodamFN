@@ -143,21 +143,31 @@ export default function CompanyInfoSettings() {
     }, []);
 
     const getBid = () => {
+        // SuperAdmin View-As 모드 우선 — Sidebar 활성화 시 'view_as_business_id' 키에 저장.
+        const viewAs = localStorage.getItem('view_as_business_id');
+        if (viewAs) return viewAs;
         const token = localStorage.getItem('token');
-        if (!token) return null;
+        if (!token) {
+            const ls = localStorage.getItem('business_id');
+            return ls && ls !== '' ? ls : null;
+        }
         try {
             const payload = JSON.parse(atob(token.split('.')[1]));
-            return payload.business_id || localStorage.getItem('business_id');
+            const fromToken = payload.business_id;
+            if (fromToken) return fromToken;
         } catch {
-            return localStorage.getItem('business_id');
+            /* fall through */
         }
+        const ls = localStorage.getItem('business_id');
+        return ls && ls !== '' ? ls : null;
     };
 
     const loadBusinessInfo = async () => {
         try {
             const bid = getBid();
-            if (!bid) return;
-            const res = await api.get(`/auth/business-info?bid=${bid}`);
+            // bid 가 없어도 backend 가 X-View-As-Business 헤더로 결정 가능 — 호출 시도.
+            const url = bid ? `/auth/business-info?bid=${bid}` : `/auth/business-info`;
+            const res = await api.get(url);
             const d = res.data || {};
             setForm((prev) => ({
                 ...prev,
