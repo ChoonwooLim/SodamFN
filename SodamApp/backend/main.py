@@ -130,6 +130,9 @@ app.include_router(account_check.router, prefix="/api")
 from routers import taxinvoice
 app.include_router(taxinvoice.router, prefix="/api")
 
+from routers import statement
+app.include_router(statement.router, prefix="/api")
+
 from routers import bizinfo_check
 app.include_router(bizinfo_check.router, prefix="/api")
 

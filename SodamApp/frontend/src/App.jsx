@@ -57,6 +57,7 @@ const JobPosting = React.lazy(() => import('./pages/JobPosting'));
 const FaxTransmission = React.lazy(() => import('./pages/FaxTransmission'));
 const BankSync = React.lazy(() => import('./pages/BankSync'));
 const TaxInvoice = React.lazy(() => import('./pages/TaxInvoice'));
+const Statement = React.lazy(() => import('./pages/Statement'));
 const HomeTaxCollect = React.lazy(() => import('./pages/HomeTaxCollect'));
 const KakaoNotifications = React.lazy(() => import('./pages/KakaoNotifications'));
 const CashBill = React.lazy(() => import('./pages/CashBill'));
@@ -165,6 +166,7 @@ export default function App() {
               <Route path="/finance/delivery" element={<ProtectedRoute adminOnly><DeliveryAppDashboard /></ProtectedRoute>} />
               <Route path="/finance/bank-sync" element={<ProtectedRoute adminOnly><BankSync /></ProtectedRoute>} />
               <Route path="/finance/tax-invoice" element={<ProtectedRoute adminOnly><TaxInvoice /></ProtectedRoute>} />
+              <Route path="/finance/statement" element={<ProtectedRoute adminOnly><Statement /></ProtectedRoute>} />
               <Route path="/finance/hometax" element={<ProtectedRoute adminOnly><HomeTaxCollect /></ProtectedRoute>} />
               <Route path="/hr/notifications" element={<ProtectedRoute adminOnly><KakaoNotifications /></ProtectedRoute>} />
               <Route path="/finance/cashbill" element={<ProtectedRoute adminOnly><CashBill /></ProtectedRoute>} />

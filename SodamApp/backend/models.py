@@ -1076,3 +1076,27 @@ class SalesGuideProgress(SQLModel, table=True):
 
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_by: Optional[int] = Field(default=None, foreign_key="user.id")
+
+
+class Statement(SQLModel, table=True):
+    """전자명세서 발행 메타 (팝빌 StatementService 6종 양식).
+
+    item_code: 121=거래명세서 122=청구서 123=견적서 124=발주서 125=입금표 126=영수증
+    또는 사업장 등록 양식코드.
+    품목 detail 은 저장 안 함 (필요 시 팝빌 getInfo 로 조회).
+    """
+    __tablename__ = "statement"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    item_code: str = Field(index=True, max_length=10)
+    mgt_key: str = Field(index=True, max_length=64)
+    write_date: str = Field(max_length=8)            # YYYYMMDD
+    total_amount: str = Field(default="0", max_length=20)
+    receiver_corp_num: str = Field(default="", max_length=20)
+    receiver_corp_name: str = Field(default="", max_length=200)
+    status: str = Field(default="issued", max_length=20)  # issued / cancelled / failed / pending
+    receipt_num: Optional[str] = Field(default=None, max_length=64)
+    error_message: Optional[str] = Field(default=None)
+    email_sent_at: Optional[datetime.datetime] = Field(default=None)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)

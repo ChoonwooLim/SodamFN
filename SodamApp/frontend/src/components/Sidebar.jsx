@@ -27,7 +27,7 @@ export default function Sidebar() {
         if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
         const hrPaths = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
-        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/hometax', '/finance/cashbill'];
+        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
         const productPaths = ['/products/'];
         if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
@@ -142,6 +142,7 @@ export default function Sidebar() {
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
         { icon: Landmark, label: '은행계좌 연동', path: '/finance/bank-sync', color: 'text-indigo-400' },
         { icon: FileText, label: '전자세금계산서', path: '/finance/tax-invoice', color: 'text-rose-400' },
+        { icon: FileText, label: '전자명세서', path: '/finance/statement', color: 'text-amber-400' },
         { icon: Wallet, label: '현금영수증', path: '/finance/cashbill', color: 'text-emerald-400' },
         { icon: BookOpen, label: '홈택스 수집', path: '/finance/hometax', color: 'text-violet-400' },
     ];
@@ -225,7 +226,7 @@ export default function Sidebar() {
 
     const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
-    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/hometax', '/finance/cashbill'].some(p => location.pathname.startsWith(p));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill'].some(p => location.pathname.startsWith(p));
     const isProductActive = productSubItems.some(item => location.pathname === item.path);
     const isSalesGuideActive = location.pathname.startsWith('/sales-guide');
 
