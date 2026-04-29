@@ -7,11 +7,12 @@
 라우터가 SMS 코드 입력 폼을 띄움.
 """
 import datetime
+import re
 from typing import Optional
 
 from sqlmodel import Session, select
 
-from models import CodefConnection
+from models import CodefConnection, Business
 from .codef_client import CodefClient
 from .organization_catalog import get_organization, AuthPolicy
 
@@ -28,12 +29,16 @@ class CodefConnectionService:
         """auth_payload 형식:
         - ID/PW:    {"id": "...", "password": "..."}
         - 간편인증: {"identity": "...", "loginType": "kakao", "birthDate": "...", ...}
+
+        사업자 카드 인증은 사업자등록번호(businessRegNo)도 페이로드에 포함 —
+        Business 모델에서 자동 추출.
         """
         org = get_organization(card_corp_code)
         if not org or org.type != "card":
             raise ValueError(f"알 수 없는 카드사: {card_corp_code}")
 
-        sdk_payload, auth_method = self._build_account_payload(org, auth_payload)
+        biz_reg_no = self._get_business_reg_no(business_id)
+        sdk_payload, auth_method = self._build_account_payload(org, auth_payload, biz_reg_no)
         result = self._client.create_account(sdk_payload)
         return self._upsert_connection(
             business_id=business_id,
@@ -41,6 +46,14 @@ class CodefConnectionService:
             connected_id=result.connected_id,
             auth_method=auth_method,
         )
+
+    def _get_business_reg_no(self, business_id: int) -> str:
+        """Business.business_number 에서 하이픈 제거한 10자리 추출."""
+        with Session(self.engine) as s:
+            biz = s.get(Business, business_id)
+            if not biz or not biz.business_number:
+                return ""
+            return re.sub(r"[^0-9]", "", biz.business_number)
 
     def reverify(self, connection_id: int, auth_payload: dict) -> CodefConnection:
         with Session(self.engine) as s:
@@ -50,8 +63,10 @@ class CodefConnectionService:
             org = get_organization(conn.organization_code)
             if not org:
                 raise ValueError(f"알 수 없는 organization_code: {conn.organization_code}")
+            target_business_id = conn.business_id
 
-        sdk_payload, auth_method = self._build_account_payload(org, auth_payload)
+        biz_reg_no = self._get_business_reg_no(target_business_id)
+        sdk_payload, auth_method = self._build_account_payload(org, auth_payload, biz_reg_no)
         result = self._client.create_account(sdk_payload)
 
         with Session(self.engine) as s:
@@ -120,43 +135,56 @@ class CodefConnectionService:
 
     # ─── 내부 헬퍼 ──────────────────────────────────
 
-    def _build_account_payload(self, org, auth_payload: dict) -> tuple[dict, str]:
+    def _build_account_payload(self, org, auth_payload: dict,
+                                biz_reg_no: str = "") -> tuple[dict, str]:
         """SDK create_account 페이로드 빌드 + auth_method 결정.
 
         ID/PW: password 키 존재 → "id_pw"
         간편인증: loginType in {kakao,naver,pass,toss,payco,samsung}
+
+        clientType:
+          - "P" (개인) — 사장님 본인 명의 카드 (현재 PoC 시나리오)
+          - "B" (사업자) — 사업자 카드. auth_payload 에 client_type='B' 명시 시.
+
+        biz_reg_no: 사업자(clientType=B)일 때만 사용.
         """
+        client_type = auth_payload.get("client_type", "P").upper()
+        if client_type not in {"P", "B"}:
+            client_type = "P"
+
         if "password" in auth_payload:
             encrypted = self._client.encrypt_password(auth_payload["password"])
-            payload = {
-                "accountList": [{
-                    "countryCode": "KR",
-                    "businessType": "CD",  # 카드
-                    "clientType": "B",  # 기업
-                    "organization": org.code,
-                    "loginType": "1",  # ID/PW
-                    "id": auth_payload["id"],
-                    "password": encrypted,
-                }]
+            account = {
+                "countryCode": "KR",
+                "businessType": "CD",  # 카드
+                "clientType": client_type,
+                "organization": org.code,
+                "loginType": "1",  # ID/PW
+                "id": auth_payload["id"],
+                "password": encrypted,
             }
-            return payload, "id_pw"
+            if client_type == "B" and biz_reg_no:
+                account["businessRegNo"] = biz_reg_no
+            return {"accountList": [account]}, "id_pw"
 
         login_type = auth_payload.get("loginType", "")
         if login_type in {"kakao", "naver", "pass", "toss", "payco", "samsung"}:
-            payload_inner = {
+            account = {
                 "countryCode": "KR",
                 "businessType": "CD",
-                "clientType": "B",
+                "clientType": client_type,
                 "organization": org.code,
                 "loginType": "5",  # 간편인증
                 "loginTypeLevel": "1",
             }
-            payload_inner.update({
+            account.update({
                 k: v for k, v in auth_payload.items()
-                if k not in {"loginType"}
+                if k not in {"loginType", "client_type"}
             })
-            payload_inner["loginType"] = "5"
-            return {"accountList": [payload_inner]}, "simple_auth"
+            account["loginType"] = "5"
+            if client_type == "B" and biz_reg_no:
+                account["businessRegNo"] = biz_reg_no
+            return {"accountList": [account]}, "simple_auth"
 
         raise ValueError("auth_payload 가 ID/PW 또는 간편인증 형식이 아님")
 

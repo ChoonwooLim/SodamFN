@@ -33,9 +33,10 @@ from .exceptions import (
 )
 
 
-APPROVAL_URL = "/v1/kr/card/common/b/approval"
-BILLING_URL = "/v1/kr/card/common/b/billing"
-MEMBER_STORE_URL = "/v1/kr/card/common/b/member-store"
+# 개인 카드 (clientType=P) — 현재 PoC 시나리오. 사업자 카드는 후속 옵션.
+APPROVAL_URL = "/v1/kr/card/common/p/approval"
+BILLING_URL = "/v1/kr/card/common/p/billing"
+MEMBER_STORE_URL = "/v1/kr/card/common/p/member-store"
 
 DEFAULT_SYNC_MODES = frozenset({"approval", "billing", "member_store"})
 
