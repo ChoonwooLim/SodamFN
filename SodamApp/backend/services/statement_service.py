@@ -297,6 +297,24 @@ class BaseStatementProvider:
                         user_id: Optional[str] = None) -> str:
         raise NotImplementedError
 
+    def get_view_url(self, item_code: str, mgt_key: str) -> str:
+        raise NotImplementedError
+
+    def get_print_url(self, item_code: str, mgt_key: str) -> str:
+        raise NotImplementedError
+
+    def send_email(self, item_code: str, mgt_key: str, receiver_email: str) -> dict:
+        raise NotImplementedError
+
+    def cancel(self, item_code: str, mgt_key: str, memo: str = "") -> dict:
+        raise NotImplementedError
+
+    def get_balance(self) -> Optional[float]:
+        raise NotImplementedError
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
+        raise NotImplementedError
+
 
 class DevStubProvider(BaseStatementProvider):
     name = "stub"
@@ -328,6 +346,24 @@ class DevStubProvider(BaseStatementProvider):
 
     def get_popbill_url(self, togo: str = "BOX",
                         user_id: Optional[str] = None) -> str:
+        return "https://www.popbill.com/"
+
+    def get_view_url(self, item_code: str, mgt_key: str) -> str:
+        return f"https://www.popbill.com/stub-view/{item_code}/{mgt_key}"
+
+    def get_print_url(self, item_code: str, mgt_key: str) -> str:
+        return f"https://www.popbill.com/stub-print/{item_code}/{mgt_key}"
+
+    def send_email(self, item_code: str, mgt_key: str, receiver_email: str) -> dict:
+        return {"ok": True, "note": "STUB", "receiver": receiver_email}
+
+    def cancel(self, item_code: str, mgt_key: str, memo: str = "") -> dict:
+        return {"ok": True, "note": "STUB"}
+
+    def get_balance(self) -> Optional[float]:
+        return None
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
         return "https://www.popbill.com/"
 
 
@@ -552,6 +588,56 @@ class PopbillStatementProvider(BaseStatementProvider):
         if not uid:
             raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다. (.env / Orbitron.yaml 확인)")
         return svc.getPopbillURL(self.corp_num, uid, togo)
+
+    def get_view_url(self, item_code: str, mgt_key: str) -> str:
+        svc = self._get_svc()
+        return svc.getPopUpURL(self.corp_num, item_code, mgt_key, self.user_id)
+
+    def get_print_url(self, item_code: str, mgt_key: str) -> str:
+        svc = self._get_svc()
+        return svc.getPrintURL(self.corp_num, item_code, mgt_key, self.user_id)
+
+    def send_email(self, item_code: str, mgt_key: str, receiver_email: str) -> dict:
+        try:
+            from popbill import PopbillException  # type: ignore
+        except ImportError:
+            PopbillException = Exception  # type: ignore
+        try:
+            svc = self._get_svc()
+            r = svc.sendEmail(self.corp_num, item_code, mgt_key, receiver_email, self.user_id)
+            return {"ok": True, "receiver": receiver_email, "raw": str(r) if r else None}
+        except PopbillException as pe:
+            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"이메일 발송 오류: {e}"}
+
+    def cancel(self, item_code: str, mgt_key: str, memo: str = "") -> dict:
+        try:
+            from popbill import PopbillException  # type: ignore
+        except ImportError:
+            PopbillException = Exception  # type: ignore
+        try:
+            svc = self._get_svc()
+            r = svc.cancel(self.corp_num, item_code, mgt_key, memo, self.user_id)
+            return {"ok": True, "raw": str(r) if r else None}
+        except PopbillException as pe:
+            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"취소 오류: {e}"}
+
+    def get_balance(self) -> Optional[float]:
+        try:
+            svc = self._get_svc()
+            return float(svc.getBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
+        svc = self._get_svc()
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다.")
+        return svc.getChargeURL(self.corp_num, uid)
 
 
 def _info_to_dict(obj) -> dict:

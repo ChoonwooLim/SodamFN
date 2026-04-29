@@ -123,6 +123,16 @@ class SendSmsIn(BaseModel):
     content: str
 
 
+class SendEmailIn(BaseModel):
+    item_code: str
+    receiver_email: str
+
+
+class CancelIn(BaseModel):
+    item_code: str
+    memo: Optional[str] = ""
+
+
 # ─── endpoints ────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -466,6 +476,126 @@ def popbill_url(
         return {"ok": True, "url": url, "togo": togo}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/balance")
+def get_balance(_admin: User = Depends(get_admin_user)):
+    """현재 팝빌 포인트 잔액 (전자명세서 발행 50원/건 차감 기준)."""
+    provider = get_provider()
+    bal = provider.get_balance()
+    is_test_mode = (os.getenv("POPBILL_IS_TEST", "true").strip().lower() in ("1", "true", "yes"))
+    return {
+        "ok": True,
+        "balance": bal,
+        "is_test": is_test_mode,
+        "unit_cost": 50,
+        "note": (
+            "TEST 환경 잔액 (test.popbill.com 충전)" if is_test_mode
+            else "LIVE 환경 잔액 (popbill.com 충전)"
+        ),
+    }
+
+
+@router.get("/charge-url")
+def get_charge_url(_admin: User = Depends(get_admin_user)):
+    """팝빌 포인트 충전 페이지 URL."""
+    provider = get_provider()
+    try:
+        url = provider.get_charge_url()
+        return {"ok": True, "url": url}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{mgt_key}/view-url")
+def get_view_url(
+    mgt_key: str,
+    item_code: str = Query(..., description="발행 시 사용한 양식 코드"),
+    _admin: User = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """발행된 명세서 미리보기 (팝빌 viewer popup) URL."""
+    _verify_tenant_owns_statement(session, bid, item_code, mgt_key)
+    provider = get_provider()
+    try:
+        url = provider.get_view_url(item_code, mgt_key)
+        return {"ok": True, "url": url}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{mgt_key}/print-url")
+def get_print_url(
+    mgt_key: str,
+    item_code: str = Query(..., description="발행 시 사용한 양식 코드"),
+    _admin: User = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """발행된 명세서 인쇄용 URL."""
+    _verify_tenant_owns_statement(session, bid, item_code, mgt_key)
+    provider = get_provider()
+    try:
+        url = provider.get_print_url(item_code, mgt_key)
+        return {"ok": True, "url": url}
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{mgt_key}/send-email")
+def send_email(
+    mgt_key: str,
+    body: SendEmailIn,
+    _admin: User = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """이메일 재전송."""
+    _verify_tenant_owns_statement(session, bid, body.item_code, mgt_key)
+    provider = get_provider()
+    result = provider.send_email(body.item_code, mgt_key, body.receiver_email)
+    if result.get("ok"):
+        # DB 의 email_sent_at 갱신
+        row = session.exec(
+            select(Statement).where(
+                Statement.business_id == bid,
+                Statement.item_code == body.item_code,
+                Statement.mgt_key == mgt_key,
+            )
+        ).first()
+        if row:
+            row.email_sent_at = datetime.now()
+            session.add(row)
+            session.commit()
+    return result
+
+
+@router.post("/{mgt_key}/cancel")
+def cancel_statement(
+    mgt_key: str,
+    body: CancelIn,
+    _admin: User = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """명세서 취소 (팝빌 cancel)."""
+    _verify_tenant_owns_statement(session, bid, body.item_code, mgt_key)
+    provider = get_provider()
+    result = provider.cancel(body.item_code, mgt_key, body.memo or "")
+    if result.get("ok"):
+        row = session.exec(
+            select(Statement).where(
+                Statement.business_id == bid,
+                Statement.item_code == body.item_code,
+                Statement.mgt_key == mgt_key,
+            )
+        ).first()
+        if row:
+            row.status = "cancelled"
+            session.add(row)
+            session.commit()
+    return result
 
 
 @router.post("/issue-samples")

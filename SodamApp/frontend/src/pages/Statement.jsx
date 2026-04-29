@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
     FileText, ExternalLink, ShieldCheck, Loader2, Plus, Trash2,
     RefreshCw, AlertCircle, CheckCircle2, Send, X, Mail, FileCheck,
-    Sparkles, Layers,
+    Sparkles, Layers, Eye, Printer, CreditCard, Ban, Wallet,
 } from 'lucide-react';
 import api from '../api';
 
@@ -61,12 +61,35 @@ export default function Statement() {
     const [details, setDetails] = useState([emptyDetail()]);
     const [batchRunning, setBatchRunning] = useState(false);
     const [batchResult, setBatchResult] = useState(null);
+    const [balance, setBalance] = useState(null);
+    const [selected, setSelected] = useState(null); // 상세 모달 대상
 
     useEffect(() => {
         loadStatus();
         loadIssuer();
         loadFormCodes();
+        loadBalance();
     }, []);
+
+    const loadBalance = async () => {
+        try {
+            const res = await api.get('/statement/balance');
+            setBalance(res.data);
+        } catch { /* noop */ }
+    };
+
+    const openChargeURL = async () => {
+        try {
+            const res = await api.get('/statement/charge-url');
+            if (res.data?.ok && res.data.url) {
+                window.open(res.data.url, '_blank', 'noopener');
+            } else {
+                alert('충전 URL 발급 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || '충전 URL 발급 실패');
+        }
+    };
 
     useEffect(() => {
         loadHistory(historyFilter);
@@ -336,32 +359,69 @@ export default function Statement() {
                     </div>
                 )}
 
-                {/* 모니터링 카드: 6종 일괄 샘플 발행 */}
-                <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl shadow-sm border border-amber-200 mb-4">
-                    <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div className="flex items-start gap-3">
-                            <div className="p-2 bg-amber-200 text-amber-700 rounded-xl shrink-0">
-                                <Layers size={20} />
+                {/* 잔액 + 모니터링 카드 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    {/* 잔액 카드 */}
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="flex items-start gap-2 mb-2">
+                            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg">
+                                <Wallet size={16} />
                             </div>
-                            <div>
-                                <div className="font-bold text-slate-900 text-sm">6종 일괄 샘플 발행 (모니터링)</div>
-                                <div className="text-xs text-slate-600 mt-0.5">
-                                    각 양식의 미리 정의된 샘플 데이터로 한 번에 6건 발행 → 결과 표 + 이력 자동 등록.
-                                    {status && !status.is_stub && (
-                                        <span className="ml-1 font-medium">{status.note?.includes('IsTest=true') ? 'TEST 환경 (무료)' : 'LIVE 환경 (50원/건)'}</span>
+                            <div className="flex-1">
+                                <div className="text-xs font-semibold text-slate-500">팝빌 잔액 ({balance?.is_test ? 'TEST' : 'LIVE'})</div>
+                                <div className="text-xl font-bold text-slate-900 tabular-nums">
+                                    {balance?.balance != null
+                                        ? `${Number(balance.balance).toLocaleString()}P`
+                                        : '—'}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                    발행 {balance?.unit_cost || 50}원/건
+                                    {balance?.balance != null && (
+                                        <span className="ml-1 text-emerald-700">
+                                            (≈ {Math.floor((balance.balance || 0) / (balance.unit_cost || 50))}건)
+                                        </span>
                                     )}
                                 </div>
                             </div>
                         </div>
                         <button
                             type="button"
-                            onClick={runBatch}
-                            disabled={batchRunning}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
+                            onClick={openChargeURL}
+                            className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors"
                         >
-                            {batchRunning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                            {batchRunning ? '발행 중...' : '6종 일괄 발행'}
+                            <CreditCard size={12} /> 잔액 충전
                         </button>
+                    </div>
+
+                    {/* 6종 일괄 샘플 발행 카드 */}
+                    <div className="md:col-span-2 bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl shadow-sm border border-amber-200">
+                        <div className="flex items-start justify-between gap-3 flex-wrap h-full">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-amber-200 text-amber-700 rounded-xl shrink-0">
+                                    <Layers size={20} />
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 text-sm">6종 일괄 샘플 발행</div>
+                                    <div className="text-xs text-slate-600 mt-0.5">
+                                        각 양식 샘플 데이터 1건씩 → 결과 표 + 이력 자동 등록.
+                                        {status && !status.is_stub && (
+                                            <span className="ml-1 font-medium">
+                                                {balance?.is_test ? 'TEST 환경' : 'LIVE 환경 (300원 차감)'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={runBatch}
+                                disabled={batchRunning}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
+                            >
+                                {batchRunning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                {batchRunning ? '발행 중...' : '6종 일괄 발행'}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -680,7 +740,12 @@ export default function Statement() {
                         {history.db?.length > 0 && (
                             <div className="space-y-2">
                                 {history.db.map((r) => (
-                                    <div key={r.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-sm">
+                                    <button
+                                        key={r.id}
+                                        type="button"
+                                        onClick={() => setSelected(r)}
+                                        className="w-full text-left p-3 bg-slate-50 rounded-xl border border-slate-100 hover:bg-amber-50 hover:border-amber-200 transition-colors text-sm cursor-pointer"
+                                    >
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="font-semibold text-slate-800">{r.receiver_corp_name || '-'}</span>
                                             <StatusBadge status={r.status} />
@@ -695,15 +760,27 @@ export default function Statement() {
                                             </div>
                                         )}
                                         {r.error_message && (
-                                            <div className="mt-1 text-xs text-red-600">{r.error_message}</div>
+                                            <div className="mt-1 text-xs text-red-600 line-clamp-2">{r.error_message}</div>
                                         )}
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         )}
                     </div>
                 </div>
             </div>
+
+            {/* 발행 상세 모달 */}
+            {selected && (
+                <DetailModal
+                    row={selected}
+                    onClose={() => setSelected(null)}
+                    onChanged={() => {
+                        loadHistory(historyFilter);
+                        loadBalance();
+                    }}
+                />
+            )}
 
             {/* 6종 일괄 샘플 발행 결과 모달 */}
             {batchResult && (
@@ -825,6 +902,261 @@ export default function Statement() {
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+function DetailModal({ row, onClose, onChanged }) {
+    const [info, setInfo] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [emailValue, setEmailValue] = useState('');
+    const [emailSending, setEmailSending] = useState(false);
+    const [emailResp, setEmailResp] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelMemo, setCancelMemo] = useState('');
+    const [showCancel, setShowCancel] = useState(false);
+
+    useEffect(() => {
+        loadInfo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [row?.id]);
+
+    const loadInfo = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/statement/info/${row.mgt_key}`, {
+                params: { item_code: row.item_code },
+            });
+            setInfo(res.data);
+        } catch (e) {
+            setInfo({ error: e?.response?.data?.detail || '상세 조회 실패' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openUrl = async (kind) => {
+        try {
+            const res = await api.get(`/statement/${row.mgt_key}/${kind}`, {
+                params: { item_code: row.item_code },
+            });
+            if (res.data?.ok && res.data.url) {
+                window.open(res.data.url, '_blank', 'noopener');
+            } else {
+                alert('URL 발급 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || 'URL 발급 실패');
+        }
+    };
+
+    const sendEmail = async () => {
+        if (!emailValue) {
+            alert('받는 이메일을 입력하세요.');
+            return;
+        }
+        setEmailSending(true);
+        try {
+            const res = await api.post(`/statement/${row.mgt_key}/send-email`, {
+                item_code: row.item_code,
+                receiver_email: emailValue,
+            });
+            setEmailResp(res.data);
+            if (res.data?.ok) onChanged?.();
+        } catch (e) {
+            setEmailResp({ ok: false, error: e?.response?.data?.detail || '이메일 발송 실패' });
+        } finally {
+            setEmailSending(false);
+        }
+    };
+
+    const cancelStatement = async () => {
+        if (!window.confirm('이 명세서를 취소하시겠습니까? 이 동작은 되돌릴 수 없습니다.')) return;
+        setCancelling(true);
+        try {
+            const res = await api.post(`/statement/${row.mgt_key}/cancel`, {
+                item_code: row.item_code,
+                memo: cancelMemo,
+            });
+            if (res.data?.ok) {
+                alert('취소 완료');
+                onChanged?.();
+                onClose();
+            } else {
+                alert(res.data?.error || '취소 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || '취소 실패');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const isCancelled = row.status === 'cancelled' || info?.popbill?.info?.stateCode === '7';
+    const isFailed = row.status === 'failed';
+
+    return (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
+                            <FileText size={20} />
+                        </div>
+                        <div>
+                            <div className="text-lg font-bold text-slate-900">발행 상세</div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                                {row.item_code} · {row.write_date} · {row.receiver_corp_name || '-'}
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* 메타 정보 */}
+                <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1 mb-4">
+                    <div className="flex justify-between"><span className="text-slate-500">관리번호</span><span className="font-mono text-xs text-slate-800">{row.mgt_key}</span></div>
+                    {row.receipt_num && (
+                        <div className="flex justify-between"><span className="text-slate-500">접수번호</span><span className="text-slate-800">{row.receipt_num}</span></div>
+                    )}
+                    <div className="flex justify-between"><span className="text-slate-500">총액</span><span className="font-bold text-slate-900 tabular-nums">{Number(row.total_amount).toLocaleString()}원</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">상태</span><StatusBadge status={row.status} /></div>
+                    {row.email_sent_at && (
+                        <div className="flex justify-between text-emerald-700">
+                            <span>이메일 발송</span>
+                            <span className="text-xs">{new Date(row.email_sent_at).toLocaleString('ko-KR')}</span>
+                        </div>
+                    )}
+                    {row.error_message && (
+                        <div className="mt-2 p-2 bg-red-50 text-red-700 text-xs rounded">{row.error_message}</div>
+                    )}
+                </div>
+
+                {/* 팝빌 상세 정보 */}
+                {loading && (
+                    <div className="text-sm text-slate-500 flex items-center gap-2 mb-3">
+                        <Loader2 size={14} className="animate-spin" /> 팝빌 상세 조회 중...
+                    </div>
+                )}
+                {info?.popbill?.ok && info.popbill.info && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm space-y-1 mb-4">
+                        <div className="text-xs font-semibold text-blue-800 mb-1">팝빌 시스템 정보</div>
+                        {info.popbill.info.issueDT && (
+                            <div className="flex justify-between"><span className="text-slate-500">발행 시각</span><span className="text-slate-700 tabular-nums">{info.popbill.info.issueDT}</span></div>
+                        )}
+                        {info.popbill.info.stateMemo && (
+                            <div className="flex justify-between"><span className="text-slate-500">상태 메모</span><span className="text-slate-700">{info.popbill.info.stateMemo}</span></div>
+                        )}
+                        {info.popbill.info.stateDT && (
+                            <div className="flex justify-between"><span className="text-slate-500">상태 변경</span><span className="text-slate-700 tabular-nums">{info.popbill.info.stateDT}</span></div>
+                        )}
+                    </div>
+                )}
+                {info?.popbill?.error && !isFailed && (
+                    <div className="bg-amber-50 text-amber-800 text-xs rounded p-2 mb-3">{info.popbill.error}</div>
+                )}
+
+                {/* 액션 버튼들 (실패/취소 아닐 때만) */}
+                {!isFailed && !isCancelled && (
+                    <>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            <button
+                                type="button"
+                                onClick={() => openUrl('view-url')}
+                                className="flex items-center justify-center gap-1.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors"
+                            >
+                                <Eye size={14} /> 미리보기
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => openUrl('print-url')}
+                                className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-sm font-medium transition-colors"
+                            >
+                                <Printer size={14} /> 인쇄
+                            </button>
+                        </div>
+
+                        {/* 이메일 재전송 */}
+                        <div className="bg-slate-50 rounded-xl p-3 mb-3">
+                            <div className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+                                <Mail size={12} /> 이메일 재전송
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    placeholder="받는 이메일 주소"
+                                    value={emailValue}
+                                    onChange={(e) => setEmailValue(e.target.value)}
+                                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={sendEmail}
+                                    disabled={emailSending}
+                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-1"
+                                >
+                                    {emailSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    발송
+                                </button>
+                            </div>
+                            {emailResp && (
+                                <div className={`text-xs p-2 rounded mt-2 ${emailResp.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                    {emailResp.ok ? '이메일 발송 완료' : emailResp.error}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 취소 */}
+                        {!showCancel ? (
+                            <button
+                                type="button"
+                                onClick={() => setShowCancel(true)}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-500 hover:text-red-600 transition-colors"
+                            >
+                                <Ban size={12} /> 명세서 취소
+                            </button>
+                        ) : (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <div className="text-xs font-semibold text-red-800 mb-2 flex items-center gap-1">
+                                    <Ban size={12} /> 명세서 취소
+                                </div>
+                                <input
+                                    type="text"
+                                    placeholder="취소 사유 (선택)"
+                                    value={cancelMemo}
+                                    onChange={(e) => setCancelMemo(e.target.value)}
+                                    className="w-full px-3 py-2 bg-white border border-red-200 rounded-lg text-sm mb-2 focus:ring-2 focus:ring-red-400 outline-none"
+                                />
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCancel(false)}
+                                        className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm"
+                                    >
+                                        뒤로
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={cancelStatement}
+                                        disabled={cancelling}
+                                        className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+                                    >
+                                        {cancelling ? '취소 중...' : '취소 확정'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {isCancelled && (
+                    <div className="bg-slate-100 text-slate-600 text-sm rounded-xl p-3 text-center">
+                        취소된 명세서입니다.
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
