@@ -31,7 +31,8 @@ def _normalize_corp_num(raw: str) -> str:
     return re.sub(r"\D", "", str(raw or ""))
 
 
-# 양식 메타 — frontend conditional 필드 동적 렌더링용
+# 양식 메타 — frontend conditional 필드 동적 렌더링 + 샘플 데이터
+# sample_data: 양식별 미리 정의된 더미 (소담김밥 휴게음식점 업종 친화적)
 FORM_CODES: List[dict] = [
     {
         "code": "121",
@@ -39,6 +40,22 @@ FORM_CODES: List[dict] = [
         "default_tax_type": "과세",
         "default_purpose_type": "영수",
         "extra_fields": [],
+        "sample_data": {
+            "receiver_corp_name": "○○어린이집 (테스트)",
+            "receiver_corp_num": "",
+            "receiver_addr": "서울특별시 광진구 자양동 123-45",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 월말 정산용 거래명세서",
+            "details": [
+                {"itemName": "도시락 정식", "qty": "30", "unitCost": "6000",
+                 "supplyCost": "180000", "tax": "18000", "spec": "", "remark": ""},
+                {"itemName": "김밥 단체주문", "qty": "20", "unitCost": "3500",
+                 "supplyCost": "70000", "tax": "7000", "spec": "", "remark": ""},
+            ],
+            "property_bag": {},
+            "email_subject": "",
+        },
     },
     {
         "code": "122",
@@ -49,6 +66,23 @@ FORM_CODES: List[dict] = [
             {"key": "deadline_date", "label": "납기일", "type": "date"},
             {"key": "deposit_account", "label": "입금계좌", "type": "text"},
         ],
+        "sample_data": {
+            "receiver_corp_name": "(주)테스트 구내식당",
+            "receiver_corp_num": "",
+            "receiver_addr": "서울특별시 강남구 테헤란로 100",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 단체급식 월별 청구",
+            "details": [
+                {"itemName": "단체급식 (이번달)", "qty": "1", "unitCost": "1500000",
+                 "supplyCost": "1500000", "tax": "150000", "spec": "", "remark": ""},
+            ],
+            "property_bag": {
+                "deadline_date": "",
+                "deposit_account": "신한은행 110-357-7***** (소담김밥)",
+            },
+            "email_subject": "[소담김밥] 월별 단체급식 청구서",
+        },
     },
     {
         "code": "123",
@@ -58,6 +92,22 @@ FORM_CODES: List[dict] = [
         "extra_fields": [
             {"key": "validity_date", "label": "견적유효기간", "type": "date"},
         ],
+        "sample_data": {
+            "receiver_corp_name": "테스트 행사기획팀",
+            "receiver_corp_num": "",
+            "receiver_addr": "서울특별시 종로구 1번지",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 신년 행사 케이터링 견적",
+            "details": [
+                {"itemName": "행사 도시락 (50인)", "qty": "50", "unitCost": "12000",
+                 "supplyCost": "600000", "tax": "60000", "spec": "", "remark": ""},
+                {"itemName": "음료 세트", "qty": "50", "unitCost": "2000",
+                 "supplyCost": "100000", "tax": "10000", "spec": "", "remark": ""},
+            ],
+            "property_bag": {"validity_date": ""},
+            "email_subject": "",
+        },
     },
     {
         "code": "124",
@@ -68,6 +118,25 @@ FORM_CODES: List[dict] = [
             {"key": "delivery_date", "label": "납기일", "type": "date"},
             {"key": "delivery_place", "label": "납품장소", "type": "text"},
         ],
+        "sample_data": {
+            "receiver_corp_name": "○○식자재유통 (테스트)",
+            "receiver_corp_num": "",
+            "receiver_addr": "경기도 성남시 분당구",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 주간 식자재 발주",
+            "details": [
+                {"itemName": "쌀 20kg", "qty": "10", "unitCost": "55000",
+                 "supplyCost": "550000", "tax": "55000", "spec": "", "remark": ""},
+                {"itemName": "참치캔 (1박스)", "qty": "5", "unitCost": "32000",
+                 "supplyCost": "160000", "tax": "16000", "spec": "", "remark": ""},
+            ],
+            "property_bag": {
+                "delivery_date": "",
+                "delivery_place": "소담김밥 본점 (서울 광진구 능동로 110)",
+            },
+            "email_subject": "",
+        },
     },
     {
         "code": "125",
@@ -78,6 +147,23 @@ FORM_CODES: List[dict] = [
             {"key": "deposit_date", "label": "입금일", "type": "date"},
             {"key": "depositor", "label": "입금자", "type": "text"},
         ],
+        "sample_data": {
+            "receiver_corp_name": "○○유치원 (테스트)",
+            "receiver_corp_num": "",
+            "receiver_addr": "서울특별시 광진구",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 도시락 매출 입금 확인",
+            "details": [
+                {"itemName": "월말 도시락 정산", "qty": "1", "unitCost": "850000",
+                 "supplyCost": "850000", "tax": "0", "spec": "", "remark": ""},
+            ],
+            "property_bag": {
+                "deposit_date": "",
+                "depositor": "○○유치원 행정실",
+            },
+            "email_subject": "",
+        },
     },
     {
         "code": "126",
@@ -87,6 +173,20 @@ FORM_CODES: List[dict] = [
         "extra_fields": [
             {"key": "receiver_name", "label": "영수자", "type": "text"},
         ],
+        "sample_data": {
+            "receiver_corp_name": "현장 거래처 (테스트)",
+            "receiver_corp_num": "",
+            "receiver_addr": "",
+            "receiver_email": "",
+            "receiver_tel": "",
+            "remark1": "[샘플] 현금 매출 영수증",
+            "details": [
+                {"itemName": "김밥 / 라면 / 음료", "qty": "1", "unitCost": "35000",
+                 "supplyCost": "35000", "tax": "0", "spec": "", "remark": ""},
+            ],
+            "property_bag": {"receiver_name": "고객"},
+            "email_subject": "",
+        },
     },
 ]
 

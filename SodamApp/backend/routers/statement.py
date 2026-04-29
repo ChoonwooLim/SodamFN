@@ -466,3 +466,159 @@ def popbill_url(
         return {"ok": True, "url": url, "togo": togo}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/issue-samples")
+def issue_samples(
+    only_codes: Optional[str] = Query(
+        None,
+        description="쉼표 구분 양식 코드 필터 (예: '121,126'). 미지정 시 6종 전부 발행",
+    ),
+    _admin: User = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """6종(또는 필터 지정) 양식별 샘플 데이터로 일괄 발행 + 결과 표.
+
+    각 양식의 FORM_CODES[*].sample_data 로 발행. 모니터링/회귀 검증용.
+    LIVE 환경에서는 양식별 50원/건 비용 발생 — 프론트에서 confirm 권장.
+    """
+    if not bid:
+        raise HTTPException(status_code=400, detail="사업장 정보가 없습니다.")
+    business = session.get(Business, bid)
+    if not business:
+        raise HTTPException(status_code=404, detail="사업장을 찾을 수 없습니다.")
+    issuer = _build_issuer_from_business(business)
+    if not issuer["corp_num"] or len(issuer["corp_num"]) != 10:
+        raise HTTPException(
+            status_code=400,
+            detail="사업자등록번호가 설정되지 않았습니다. (환경설정 > 회사정보 관리)",
+        )
+
+    filter_set: Optional[set[str]] = None
+    if only_codes:
+        filter_set = {c.strip() for c in only_codes.split(",") if c.strip()}
+
+    write_date = date.today().strftime("%Y%m%d")
+    provider = get_provider()
+    results: List[dict] = []
+
+    for form in FORM_CODES:
+        item_code = form["code"]
+        if filter_set and item_code not in filter_set:
+            continue
+
+        sample = form.get("sample_data") or {}
+        if not sample:
+            results.append({
+                "item_code": item_code, "name": form["name"],
+                "ok": False, "error": "샘플 데이터 미정의",
+            })
+            continue
+
+        # 양식별 sample_data 의 property_bag 의 빈 날짜는 기본값 채움
+        property_bag = dict(sample.get("property_bag") or {})
+        for k, v in list(property_bag.items()):
+            if v == "" and k.endswith("_date"):
+                # 청구서 납기/견적 유효기간은 7~14일 후
+                offset = 14 if "validity" in k else 7
+                property_bag[k] = (date.today() + timedelta(days=offset)).strftime("%Y%m%d")
+
+        import uuid as _uuid
+        mgt_key = f"SDM{datetime.now().strftime('%Y%m%d%H%M%S')}{_uuid.uuid4().hex[:4]}"
+
+        details = [
+            StatementDetail(
+                serialNum=i + 1,
+                purchaseDT=write_date,
+                itemName=d["itemName"],
+                qty=d.get("qty", "1"),
+                unitCost=d.get("unitCost", "0"),
+                supplyCost=d.get("supplyCost", "0"),
+                tax=d.get("tax", "0"),
+                spec=d.get("spec", ""),
+                remark=d.get("remark", ""),
+            )
+            for i, d in enumerate(sample.get("details") or [])
+        ]
+        supply = sum(int(d.supplyCost or 0) for d in details)
+        tax = sum(int(d.tax or 0) for d in details)
+        total = supply + tax
+
+        draft = StatementDraft(
+            item_code=item_code,
+            mgt_key=mgt_key,
+            write_date=write_date,
+            tax_type=form.get("default_tax_type", "과세"),
+            purpose_type=form.get("default_purpose_type", "영수"),
+            sender_corp_num=issuer["corp_num"],
+            sender_corp_name=issuer["corp_name"],
+            sender_ceo_name=issuer["ceo_name"],
+            sender_addr=issuer["addr"],
+            sender_biz_class=issuer["biz_class"],
+            sender_biz_type=issuer["biz_type"],
+            sender_contact_name=issuer["contact_name"],
+            sender_email=issuer["email"],
+            sender_tel=issuer["tel"],
+            receiver_corp_name=sample.get("receiver_corp_name", ""),
+            receiver_corp_num=sample.get("receiver_corp_num", ""),
+            receiver_addr=sample.get("receiver_addr", ""),
+            receiver_email=sample.get("receiver_email", ""),
+            receiver_tel=sample.get("receiver_tel", ""),
+            supply_cost_total=str(supply),
+            tax_total=str(tax),
+            total_amount=str(total),
+            remark1=sample.get("remark1", ""),
+            property_bag=property_bag,
+            detail_list=details,
+            email_subject=sample.get("email_subject", ""),
+        )
+
+        # DB INSERT
+        row = Statement(
+            business_id=bid,
+            item_code=item_code,
+            mgt_key=mgt_key,
+            write_date=write_date,
+            total_amount=str(total),
+            receiver_corp_num=sample.get("receiver_corp_num", ""),
+            receiver_corp_name=sample.get("receiver_corp_name", ""),
+            status="pending",
+        )
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+
+        # 팝빌 호출
+        result = provider.issue(draft)
+        if result.ok:
+            row.status = "issued"
+            row.receipt_num = result.receipt_num
+            if draft.email_subject:
+                row.email_sent_at = datetime.now()
+        else:
+            row.status = "failed"
+            row.error_message = result.error
+        session.add(row)
+        session.commit()
+
+        results.append({
+            "item_code": item_code,
+            "name": form["name"],
+            "ok": result.ok,
+            "id": row.id,
+            "mgt_key": mgt_key,
+            "total_amount": total,
+            "receipt_num": result.receipt_num,
+            "error": result.error,
+            "email_sent": bool(draft.email_subject) if result.ok else False,
+        })
+
+    success_count = sum(1 for r in results if r["ok"])
+    return {
+        "ok": True,
+        "total": len(results),
+        "success": success_count,
+        "failed": len(results) - success_count,
+        "results": results,
+    }

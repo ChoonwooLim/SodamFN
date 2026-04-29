@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
     FileText, ExternalLink, ShieldCheck, Loader2, Plus, Trash2,
     RefreshCw, AlertCircle, CheckCircle2, Send, X, Mail, FileCheck,
+    Sparkles, Layers,
 } from 'lucide-react';
 import api from '../api';
 
@@ -58,6 +59,8 @@ export default function Statement() {
     });
     const [propertyBag, setPropertyBag] = useState({});
     const [details, setDetails] = useState([emptyDetail()]);
+    const [batchRunning, setBatchRunning] = useState(false);
+    const [batchResult, setBatchResult] = useState(null);
 
     useEffect(() => {
         loadStatus();
@@ -179,6 +182,67 @@ export default function Statement() {
         [formCodes, form.item_code],
     );
 
+    const fillSample = () => {
+        const meta = currentFormMeta;
+        if (!meta?.sample_data) {
+            alert('이 양식의 샘플 데이터가 없습니다.');
+            return;
+        }
+        const s = meta.sample_data;
+        const filledBag = { ...(s.property_bag || {}) };
+        for (const k of Object.keys(filledBag)) {
+            if (filledBag[k] === '' && k.endsWith('_date')) {
+                const offset = k.includes('validity') ? 14 : 7;
+                const d = new Date();
+                d.setDate(d.getDate() + offset);
+                filledBag[k] = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+            }
+        }
+        setForm((prev) => ({
+            ...prev,
+            receiver_corp_num: s.receiver_corp_num || '',
+            receiver_corp_name: s.receiver_corp_name || '',
+            receiver_ceo_name: s.receiver_ceo_name || '',
+            receiver_addr: s.receiver_addr || '',
+            receiver_email: s.receiver_email || '',
+            receiver_tel: s.receiver_tel || '',
+            tax_type: meta.default_tax_type || prev.tax_type,
+            purpose_type: meta.default_purpose_type || prev.purpose_type,
+            remark1: s.remark1 || '',
+            email_subject: s.email_subject || '',
+        }));
+        setPropertyBag(filledBag);
+        setDetails((s.details || [emptyDetail()]).map((d) => ({
+            itemName: d.itemName || '',
+            qty: d.qty || '1',
+            unitCost: d.unitCost || '',
+            supplyCost: d.supplyCost || '',
+            tax: d.tax || '0',
+            spec: d.spec || '',
+            remark: d.remark || '',
+        })));
+    };
+
+    const runBatch = async () => {
+        const isLive = status && status.is_stub === false && status.note?.includes('IsTest=false');
+        const confirmMsg = isLive
+            ? '⚠️ LIVE 환경입니다.\n6종 양식 × 50원/건 = 약 300원 비용이 발생합니다.\n계속할까요?'
+            : 'TEST 환경에서 6종 양식 일괄 샘플 발행을 진행합니다.\n각 양식의 샘플 데이터로 1건씩 발행됩니다.\n계속할까요?';
+        if (!window.confirm(confirmMsg)) return;
+
+        setBatchRunning(true);
+        setBatchResult(null);
+        try {
+            const res = await api.post('/statement/issue-samples');
+            setBatchResult(res.data);
+            loadHistory(historyFilter);
+        } catch (e) {
+            setBatchResult({ ok: false, error: e?.response?.data?.detail || '일괄 발행 실패' });
+        } finally {
+            setBatchRunning(false);
+        }
+    };
+
     const submit = async () => {
         if (!form.receiver_corp_name) {
             alert('공급받는자 상호를 입력하세요.');
@@ -272,6 +336,35 @@ export default function Statement() {
                     </div>
                 )}
 
+                {/* 모니터링 카드: 6종 일괄 샘플 발행 */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl shadow-sm border border-amber-200 mb-4">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="flex items-start gap-3">
+                            <div className="p-2 bg-amber-200 text-amber-700 rounded-xl shrink-0">
+                                <Layers size={20} />
+                            </div>
+                            <div>
+                                <div className="font-bold text-slate-900 text-sm">6종 일괄 샘플 발행 (모니터링)</div>
+                                <div className="text-xs text-slate-600 mt-0.5">
+                                    각 양식의 미리 정의된 샘플 데이터로 한 번에 6건 발행 → 결과 표 + 이력 자동 등록.
+                                    {status && !status.is_stub && (
+                                        <span className="ml-1 font-medium">{status.note?.includes('IsTest=true') ? 'TEST 환경 (무료)' : 'LIVE 환경 (50원/건)'}</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={runBatch}
+                            disabled={batchRunning}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors shrink-0"
+                        >
+                            {batchRunning ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                            {batchRunning ? '발행 중...' : '6종 일괄 발행'}
+                        </button>
+                    </div>
+                </div>
+
                 {/* 팝빌 바로가기 */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
                     <div className="flex items-center gap-2 mb-3">
@@ -305,6 +398,13 @@ export default function Statement() {
                             <h2 className="font-bold text-slate-800 flex items-center gap-2">
                                 <FileCheck size={18} className="text-amber-600" /> {formName} 발행
                             </h2>
+                            <button
+                                type="button"
+                                onClick={fillSample}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg transition-colors"
+                            >
+                                <Sparkles size={12} /> 샘플 채우기
+                            </button>
                         </div>
 
                         {/* 공급자 */}
@@ -604,6 +704,65 @@ export default function Statement() {
                     </div>
                 </div>
             </div>
+
+            {/* 6종 일괄 샘플 발행 결과 모달 */}
+            {batchResult && (
+                <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
+                                    <Layers size={20} />
+                                </div>
+                                <div>
+                                    <div className="text-lg font-bold text-slate-900">일괄 발행 결과</div>
+                                    {batchResult.ok && (
+                                        <div className="text-xs text-slate-500 mt-0.5">
+                                            성공 <span className="text-emerald-600 font-bold">{batchResult.success}</span> / 실패 <span className="text-red-600 font-bold">{batchResult.failed}</span> / 총 {batchResult.total}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <button onClick={() => setBatchResult(null)} className="text-slate-400 hover:text-slate-700 p-1">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {batchResult.error ? (
+                            <div className="p-3 bg-red-50 text-red-700 rounded-xl text-sm whitespace-pre-wrap">
+                                {batchResult.error}
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {(batchResult.results || []).map((r) => (
+                                    <div
+                                        key={r.item_code}
+                                        className={`p-3 rounded-xl border text-sm ${
+                                            r.ok ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <div className="font-bold text-slate-900 flex items-center gap-2">
+                                                {r.ok
+                                                    ? <CheckCircle2 size={14} className="text-emerald-600" />
+                                                    : <AlertCircle size={14} className="text-red-600" />}
+                                                {r.item_code} {r.name}
+                                            </div>
+                                            <span className="text-xs text-slate-700 tabular-nums font-medium">{Number(r.total_amount).toLocaleString()}원</span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 ml-6 space-y-0.5">
+                                            <div>관리번호: <span className="font-mono">{r.mgt_key}</span></div>
+                                            {r.ok && r.receipt_num && <div>접수번호: {r.receipt_num}</div>}
+                                            {r.ok && r.email_sent && <div className="text-emerald-700"><Mail size={10} className="inline mr-1" />이메일 발송</div>}
+                                            {!r.ok && <div className="text-red-700">{r.error}</div>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* 발행 결과 모달 */}
             {result && (
