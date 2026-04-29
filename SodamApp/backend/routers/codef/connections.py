@@ -1,12 +1,13 @@
 """CODEF 연결 CRUD + organization 카탈로그 라우터."""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from database import engine
 from models import User, CodefConnection
 from routers.auth import get_admin_user
+from ._helpers import resolve_bid
 from services.codef.connection_service import CodefConnectionService
 from services.codef.organization_catalog import (
     get_organizations,
@@ -79,25 +80,30 @@ def get_catalog(type: Optional[str] = None,
 # ─── 연결 CRUD ────────────────────────────────────
 
 @router.get("/connections")
-def list_connections(type: Optional[str] = None,
-                     admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def list_connections(
+    type: Optional[str] = None,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     svc = CodefConnectionService(engine=engine)
-    conns = svc.list_all(business_id=admin.business_id, organization_type=type)
+    conns = svc.list_all(business_id=bid, organization_type=type)
     return {"connections": [_connection_dto(c) for c in conns]}
 
 
 @router.post("/connections/register")
-def register(body: RegisterRequest, admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def register(
+    body: RegisterRequest,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     if body.organization_type != "card":
         raise HTTPException(400, f"Phase 1 은 'card' 만 지원 (got {body.organization_type})")
     svc = CodefConnectionService(engine=engine)
     try:
         conn = svc.register_card(
-            business_id=admin.business_id,
+            business_id=bid,
             card_corp_code=body.organization_code,
             auth_payload=body.auth,
         )
@@ -116,14 +122,18 @@ def register(body: RegisterRequest, admin: User = Depends(get_admin_user)):
 
 
 @router.post("/connections/{cid}/verify")
-def verify(cid: int, body: VerifyRequest, admin: User = Depends(get_admin_user)):
+def verify(
+    cid: int,
+    body: VerifyRequest,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
     """SMS 코드/캡차 등 추가본인확인 응답 처리.
 
     구현 노트: easycodefpy 의 추가본인확인 흐름은 SDK 응답 형식에 따라 달라짐.
     PoC 첫 실호출(Phase 1F Task 29)에서 SDK 응답 패턴 확인 후 본 메서드 보강.
     """
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+    resolve_bid(admin, x_view_as_business)
     raise HTTPException(
         501,
         "추가본인확인 verify 는 PoC 검증 후 구현 예정 (Phase 1G Task 33)"
@@ -131,9 +141,13 @@ def verify(cid: int, body: VerifyRequest, admin: User = Depends(get_admin_user))
 
 
 @router.post("/connections/{cid}/reverify")
-def reverify(cid: int, body: ReverifyRequest, admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def reverify(
+    cid: int,
+    body: ReverifyRequest,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    resolve_bid(admin, x_view_as_business)
     svc = CodefConnectionService(engine=engine)
     try:
         conn = svc.reverify(connection_id=cid, auth_payload=body.auth)
@@ -149,9 +163,12 @@ def reverify(cid: int, body: ReverifyRequest, admin: User = Depends(get_admin_us
 
 
 @router.delete("/connections/{cid}")
-def deactivate(cid: int, admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def deactivate(
+    cid: int,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    resolve_bid(admin, x_view_as_business)
     svc = CodefConnectionService(engine=engine)
     try:
         svc.deactivate(connection_id=cid)

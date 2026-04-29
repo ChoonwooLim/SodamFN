@@ -6,6 +6,7 @@ GET  /api/codef/sync-cards/history — 최근 N일 호출 이력
 """
 import datetime
 import os
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlmodel import Session, select, desc
@@ -13,6 +14,7 @@ from sqlmodel import Session, select, desc
 from database import engine
 from models import User, CodefCallLog
 from routers.auth import get_admin_user
+from ._helpers import resolve_bid
 from tasks.codef_card_sync_task import (
     run_card_sync_for_all_businesses,
     sync_business_cards,
@@ -47,11 +49,13 @@ def cron_run(_: bool = Depends(_check_cron_secret)):
 
 
 @router.post("/manual")
-def manual_run(admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def manual_run(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     report = sync_business_cards(
-        business_id=admin.business_id,
+        business_id=bid,
         triggered_by="user_button",
         triggered_user_id=admin.id,
     )
@@ -79,16 +83,19 @@ def manual_run(admin: User = Depends(get_admin_user)):
 
 
 @router.get("/history")
-def history(days: int = 30, admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def history(
+    days: int = 30,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     days = max(1, min(days, 90))
     cutoff = datetime.date.today() - datetime.timedelta(days=days)
     with Session(engine) as s:
         stmt = (
             select(CodefCallLog)
             .where(
-                CodefCallLog.business_id == admin.business_id,
+                CodefCallLog.business_id == bid,
                 CodefCallLog.called_date >= cutoff,
             )
             .order_by(desc(CodefCallLog.called_at))

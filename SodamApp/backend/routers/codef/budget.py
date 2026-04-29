@@ -4,14 +4,16 @@ GET /api/codef/budget/current   — 이달 호출 수/비용 + settings
 PUT /api/codef/budget/settings  — 월 예산/임계값 저장
 """
 import datetime
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from database import engine
 from models import User, CodefBudgetSetting
 from routers.auth import get_admin_user
+from ._helpers import resolve_bid
 from services.codef.quota_service import CodefQuotaService
 
 
@@ -25,16 +27,18 @@ class BudgetSettings(BaseModel):
 
 
 @router.get("/current")
-def current(admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def current(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     quota = CodefQuotaService(engine=engine)
-    summary = quota.current_month_summary(business_id=admin.business_id)
+    summary = quota.current_month_summary(business_id=bid)
 
     with Session(engine) as s:
         setting = s.exec(
             select(CodefBudgetSetting).where(
-                CodefBudgetSetting.business_id == admin.business_id
+                CodefBudgetSetting.business_id == bid
             )
         ).first()
 
@@ -49,17 +53,20 @@ def current(admin: User = Depends(get_admin_user)):
 
 
 @router.put("/settings")
-def update_settings(body: BudgetSettings, admin: User = Depends(get_admin_user)):
-    if not admin.business_id:
-        raise HTTPException(400, "사업장 정보가 없습니다.")
+def update_settings(
+    body: BudgetSettings,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    bid = resolve_bid(admin, x_view_as_business)
     with Session(engine) as s:
         setting = s.exec(
             select(CodefBudgetSetting).where(
-                CodefBudgetSetting.business_id == admin.business_id
+                CodefBudgetSetting.business_id == bid
             )
         ).first()
         if not setting:
-            setting = CodefBudgetSetting(business_id=admin.business_id)
+            setting = CodefBudgetSetting(business_id=bid)
         setting.monthly_budget_krw = body.monthly_budget_krw
         setting.warning_threshold_pct = body.warning_threshold_pct
         setting.hard_limit_pct = body.hard_limit_pct
