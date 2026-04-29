@@ -67,6 +67,14 @@ def _run_migrations():
         ("inventorycheck", "items_json", "TEXT"),
         # 2026-04-27: bank-sync 자동 분류 → 매출관리/매입관리(DailyExpense) 연동
         ("banktransaction", "linked_daily_id", "INTEGER"),
+        # 2026-04-30: 사업주 전용 비공개 지급 정보
+        # spec: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+        ("staff", "private_payment_method", "VARCHAR DEFAULT 'transfer'"),
+        ("staff", "private_actual_payee_name", "VARCHAR"),
+        ("staff", "private_actual_payee_relation", "VARCHAR"),
+        ("staff", "private_actual_payee_account", "VARCHAR"),
+        ("staff", "private_tax_unreported", "BOOLEAN DEFAULT FALSE"),
+        ("staff", "private_owner_note", "TEXT"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")

@@ -44,6 +44,7 @@ else:
     )
 
 def create_db_and_tables():
+    """수동 스크립트 전용 (scripts/maintenance/migrate_*). 운영 startup 은 init_db.init_db() 사용."""
     SQLModel.metadata.create_all(engine)
     _run_codef_phase1_migrations(engine)
     _run_private_payment_migrations(engine)
