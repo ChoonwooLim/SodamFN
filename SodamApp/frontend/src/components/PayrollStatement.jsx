@@ -1,8 +1,10 @@
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
+import api from '../api';
+import { CompanySeal } from './CompanySeal';
 
-const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
+const PayrollPaper = ({ staff, payroll, business, scale = 1, isPrint = false }) => {
     const formatDate = (monthStr) => {
         if (!monthStr || typeof monthStr !== 'string') return '';
         const parts = monthStr.split('-');
@@ -277,14 +279,34 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                 <p className="text-xl font-bold text-slate-800 mb-2 tracking-tight">위와 같이 급여를 지급합니다.</p>
                 <p className="text-sm text-slate-500 mb-4 font-medium italic">{(new Date()).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
-                <div className="flex justify-center items-center gap-10">
-                    <span className="text-[18px] font-black tracking-[0.4em] text-slate-800">소담김밥 대표</span>
-                    <div className="relative">
-                        <span className="text-[22px] font-black text-slate-900 tracking-widest">HONG JI YEON</span>
-                        <div className="absolute -top-4 -right-12 w-10 h-10 border-[3px] border-red-500 rounded-full flex items-center justify-center text-red-600 font-black text-[12px] rotate-12 bg-white/10 backdrop-blur-[1px] shadow-sm">
+                <div className="flex justify-center items-center gap-6">
+                    <span className="text-[18px] font-black tracking-[0.4em] text-slate-800">
+                        {business?.business_name || '소담김밥'} {business?.owner_title || '대표'}
+                    </span>
+                    <span className="text-[22px] font-black text-slate-900 tracking-widest">
+                        {business?.representative_eng || business?.owner_name || 'HONG JI YEON'}
+                    </span>
+                    {/* 직인 — seal_image_url 우선, 없으면 SVG 직인, 둘 다 없으면 (인) fallback */}
+                    {business?.seal_image_url ? (
+                        <img
+                            src={business.seal_image_url}
+                            alt="직인"
+                            style={{ width: 64, height: 64, objectFit: 'contain' }}
+                            className="rotate-6"
+                        />
+                    ) : business?.seal_style ? (
+                        <div className="rotate-6">
+                            <CompanySeal
+                                style={business.seal_style}
+                                text={business.seal_text || business.business_name || '회사명'}
+                                size={64}
+                            />
+                        </div>
+                    ) : (
+                        <div className="w-12 h-12 border-[3px] border-red-500 rounded-full flex items-center justify-center text-red-600 font-black text-[12px] rotate-12 bg-white/10 backdrop-blur-[1px] shadow-sm">
                             (인)
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -294,6 +316,22 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
 export default function PayrollStatement({ staff, payroll, onClose }) {
     const containerRef = useRef(null);
     const [scale, setScale] = useState(0.5);
+    const [business, setBusiness] = useState(null);
+
+    // 명세서 발급자(회사) 정보 fetch — 직인·대표자명·사업장명 동적 렌더링용.
+    // 인터셉터의 X-View-As-Business 헤더로 view-as 모드도 자동 처리.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await api.get('/auth/business-info');
+                if (!cancelled) setBusiness(res.data || null);
+            } catch (err) {
+                console.error('PayrollStatement: business-info load failed', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     useLayoutEffect(() => {
         const updateScale = () => {
@@ -358,7 +396,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                         ref={containerRef}
                         className="flex-1 bg-slate-100 flex items-start sm:items-center justify-center overflow-hidden p-1 sm:p-0"
                     >
-                        <PayrollPaper staff={staff} payroll={payroll} scale={scale} isPrint={false} />
+                        <PayrollPaper staff={staff} payroll={payroll} business={business} scale={scale} isPrint={false} />
                     </div>
                 </div>
             </div>
@@ -366,7 +404,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
             {/* Hidden Print Container - Rendered via Portal for Print Only */}
             {createPortal(
                 <div className="print-portal-container">
-                    <PayrollPaper staff={staff} payroll={payroll} scale={1} isPrint={true} />
+                    <PayrollPaper staff={staff} payroll={payroll} business={business} scale={1} isPrint={true} />
                 </div>,
                 document.body
             )}

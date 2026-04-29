@@ -492,7 +492,13 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
             if req.overrides.get('ei') is not None: d_ei = int(req.overrides['ei'])
             if req.overrides.get('it') is not None: d_it = int(req.overrides['it'])
             if req.overrides.get('lit') is not None: d_lit = int(req.overrides['lit'])
-        
+
+        # ── 4-B. 세금신고 제외 직원(사업주 정책) — 모든 공제 강제 0 ──
+        # spec: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+        # override 보다 우선 적용 — 토글 ON 직원은 무조건 공제 0, 실수령 = 지급총액.
+        if getattr(staff, "private_tax_unreported", False):
+            d_np = d_hi = d_lti = d_ei = d_it = d_lit = 0
+
         # 5. 최종 금액 산출
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
