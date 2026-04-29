@@ -73,10 +73,22 @@ class CodefClient:
         """connectedId 발급. 추가본인확인이면 CodefAdditionalAuth."""
         raw_response = self._sdk.create_account(self.service_type, account_payload)
         data = self._parse(raw_response)
+        # PoC 디버깅 — DEMO 환경 한정 raw response 로그
+        if self.env in {"demo", "sandbox"}:
+            import logging
+            logging.getLogger("codef.client").info(
+                "create_account response: env=%s payload_keys=%s response=%s",
+                self.env,
+                list((account_payload.get("accountList") or [{}])[0].keys()),
+                str(data)[:1500],
+            )
         self._maybe_raise(data)
         connected_id = data.get("data", {}).get("connectedId", "")
         if not connected_id:
-            raise CodefAPIError(code="missing-connected-id", message="connectedId 없음")
+            raise CodefAPIError(
+                code="missing-connected-id",
+                message=f"connectedId 없음 — raw: {str(data)[:500]}"
+            )
         return CreateAccountResult(connected_id=connected_id, raw=data)
 
     def request_product(self, url: str, params: dict) -> RequestProductResult:
@@ -118,4 +130,4 @@ class CodefClient:
             raise CodefRateLimited(message)
         # 기타 — 메시지에 extraMessage 합쳐 사용자에게 의미있는 정보 노출
         full_msg = f"{message} {extra_message}".strip()
-        raise CodefAPIError(code=code, message=full_msg)
+        raise CodefAPIError(code=code, message=full_msg, raw=data)

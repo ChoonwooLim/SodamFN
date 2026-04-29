@@ -116,13 +116,13 @@ def register(
     except CodefAuthExpired as e:
         raise HTTPException(400, f"인증 만료: {str(e)}")
     except CodefAPIError as e:
-        # CF-04000 (페이로드 거부) 등 CODEF 측 에러 — 사용자에게 명확한 진단 + 우회 안내
-        hint = ""
-        if "CF-04000" in str(e):
-            hint = " (간편인증 페이로드 형식 문제 가능 — DEMO 환경에서는 ID/PW 모드를 권장합니다.)"
-        elif "CF-12" in str(e):
-            hint = " (카드사 비밀번호/계정 문제 가능 — 카드사 사이트에서 로그인 가능한지 확인하세요.)"
-        raise HTTPException(400, f"{str(e)}{hint}")
+        # CODEF 측 에러 — raw 응답을 detail 에 포함해 진단 가능
+        detail = {
+            "message": str(e),
+            "code": e.code,
+            "raw": e.raw,
+        }
+        raise HTTPException(400, detail)
     except ValueError as e:
         raise HTTPException(400, str(e))
 

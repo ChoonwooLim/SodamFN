@@ -32,9 +32,10 @@ class CodefRateLimited(Exception):
 class CodefAPIError(Exception):
     """기타 CODEF API 에러."""
 
-    def __init__(self, code: str = "", message: str = ""):
+    def __init__(self, code: str = "", message: str = "", raw: Optional[dict] = None):
         self.code = code
         self.message = message
+        self.raw = raw or {}
         super().__init__(f"[{code}] {message}")
 
 
