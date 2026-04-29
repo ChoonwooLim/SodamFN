@@ -690,3 +690,80 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 - **미부여 3개 모듈 추가 1:1 문의**: ClosedownService(사업자등록상태) + BizInfoCheckService(기업정보) + 친구톡(FTS).
 
 ---
+
+## 2026-04-29 (저녁 — CODEF Phase 1 풀 구현 + 매출 채널 재평가)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| infra | CODEF DEMO 환경변수 5개 (.env / Orbitron.yaml / .env.example) | 완료 |
+| docs | CODEF Phase 1 design spec(902줄) + implementation plan(3,485줄, 33 task) | 완료 |
+| feat | CODEF 백엔드 풀 구현 (모델 4 + 마이그레이션 + 서비스 5개 + 라우터 3 + cron + 알림톡 통합) | 완료 |
+| feat | CODEF 프론트엔드 — 외부연동 hub + 카드 모듈 디테일 + 등록 모달 + 8 컴포넌트 | 완료 |
+| fix | SuperAdmin View-As 헤더 처리 누락 → resolve_bid 헬퍼 적용 (3 라우터 11 endpoint) | 완료 |
+| fix | SDK set_demo_client_info 누락 + 성공 코드 범위 너무 광범위 (`CF-000` → `CF-00000`) | 완료 |
+| fix | 사업자 → 개인 카드 모드 전환 (`clientType=P`, URL `/b/*` → `/p/*`) | 완료 |
+| design | 매출/매입 채널 분리 + 이지포스(KICC) VAN사 가입 사실 발견 → 매출은 CODEF 부적합 | 발견 |
+
+### 세부 내용
+
+#### CODEF Phase 1 백엔드 (commits 0cacf4ca → eba136fd → 9f5acb54 머지)
+- **DB 모델 4 신규**: CodefConnection (Phase 2-5 공유) / CardMerchant / CodefCallLog / CodefBudgetSetting
+- **기존 모델 컬럼 추가**: CardSalesApproval / CardPayment 에 source / source_meta / connection_id / synced_at (auto-migration 가드)
+- **services/codef/**: exceptions(5종 표준 예외) + organization_catalog(14 카드사) + codef_client(SDK 래퍼/RSA/result code 매핑) + connection_service(라이프사이클) + quota_service(한도/쿨다운/예산) + card_provider(approval/billing/member-store)
+- **routers/codef/** + tasks/: connections(6) + card_sync(3, X-Cron-Secret 인증) + budget(2) + Orbitron cron 핸들러
+- **알림톡 통합**: NotificationService 재사용, codef_connection_expired 템플릿 (graceful degradation)
+- **테스트 105/105 PASS**, 회귀 0건
+
+#### CODEF Phase 1E 프론트엔드 (commit 52cd4e69)
+- **신규 페이지 2개**: `/external-integration` Hub + `/external-integration/cards` Detail
+- **신규 컴포넌트 8개** (`components/codef/`): SourceBadge / BudgetSummaryCard / ModuleGrid (Phase 2-5 placeholder) / CardModule / CardConnectionList / CardConnectionRegisterModal (자동 분기 — 간편인증/ID·PW) / AdditionalAuthStep / BudgetSettingsModal / SyncHistoryDrawer
+- **수정 3개**: App.jsx 라우팅 + Sidebar 외부연동 메뉴 + CardSales.jsx 헤더에 빠른 동기화 버튼
+- **빌드 14.72s 통과**
+
+#### 환경변수 등록 + prod 배포
+- Orbitron 대시보드 secrets/env 9개 등록 (CODEF_CLIENT_ID/SECRET/PUBLIC_KEY + CRON_SHARED_SECRET + CODEF_ENV/API_HOST/PRICE_TABLE/DEMO_DAILY_LIMIT + NOTIFICATION_TEMPLATE_*)
+- main 머지 + 자동 배포 — 1.5분만에 prod 반영, CODEF 11 endpoint 노출 + cron 엔드포인트 200 OK 검증
+
+#### 4 디버깅 사이클 (3ac51417 → 0be1e3b9 → 29130c6a → 67a4f9e1)
+- 사용자 PoC 시도 시 4개 버그 순차 발견·수정. 매번 prod 재배포 검증 후 진행.
+- 최종 발견: CF-04000의 진짜 원인은 `clientType="B"` 사업자 하드코딩 vs 사용자가 입력한 개인 카드 ID 불일치.
+
+#### 매출 채널 재평가 (이번 세션 핵심 발견)
+- 사용자 정보 공유: **이지포스(EasyPos / KICC)** VAN사 가입 사실
+- 즉, 소담김밥 카드 매출 통합 = 이지포스 API 가 정답 (CODEF 카드사 직접 가맹점 채널 부적합)
+- 셈하나에 `docs/EasyPOS_API_연동_가이드.md` 이미 존재 — KICC 1600-1234 전화 + API 키 발급 절차
+- **새 채널 매트릭스**:
+  - 매출(가맹점 입금) → 이지포스 API → CardSalesApproval/CardPayment
+  - 매입(사장님 개인 카드 지출) → CODEF P 모드 (방금 만든 코드 활용) → DailyExpense
+  - 계좌 거래 → CODEF 또는 팝빌 EasyFinBank (기존)
+- **재구조화 필요**: CODEF 카드 어댑터(card_provider.py)의 적재 모델을 CardSalesApproval → DailyExpense 로 변경. 카드 사업자(B 모드) 코드는 셈하나에 무용 (이지포스가 14개 카드사 통합 매출 처리).
+
+### 메모리 갱신
+
+- `feedback_proceed_with_recommendation.md` 신규: 작업 진행 중 매 결정마다 묻지 말고 추천 명시 후 실행, 결과만 보고. brainstorming/위험 작업은 예외.
+- `project_codef_evaluation.md` 갱신: 데모 키 발급 + .env/Orbitron.yaml 연결 완료 + Popbill vs CODEF 어댑터 차이표 추가.
+- `MEMORY.md` 인덱스 갱신.
+
+### 다음 세션 인계 (중요)
+
+1. **사용자 액션 — KICC 1600-1234 전화** (이지포스 API 키 발급, 영업일 1-2일)
+2. **재구조화 결정 필요** (다음 세션 첫 작업):
+   - 옵션 A 추천: 매입 어댑터 재매핑(P 모드 → DailyExpense) + 이지포스 어댑터 신규 = 두 채널 동시 구축
+   - 옵션 B: CODEF 카드 모듈 deprecated, 이지포스만 (매입 자동화는 후속)
+   - 옵션 C: 보류 + KICC API 키 도착 후 한 번에
+3. **PoC 미완**: CODEF connectedId 발급 자체는 아직 성공 못 함 (clientType=P 변경 후 재테스트 미실시). 옵션 A 결정 시 매핑 변경하면서 함께 재시도.
+4. **Phase 1G**: 추가본인확인 verify endpoint 501 보강 (PoC 결과 후)
+5. **알림톡 템플릿**: codef_connection_expired 검수 미신청 (이지포스 채널 결정 후 함께 진행)
+
+### 외부 대기 (4/30 ~)
+
+| 항목 | 검수 시간 |
+|---|---|
+| KICC 이지포스 API 키 | 영업일 1-2일 (전화 후) |
+| 팝빌 발신번호 (010-4173-6570) | 영업일 1일 (4/29 신청) |
+| 카카오 비즈인증 | 영업일 3-5일 (4/29 신청) |
+| 알림톡 템플릿 (등록 후) | 영업일 1-3일 |
+
+---

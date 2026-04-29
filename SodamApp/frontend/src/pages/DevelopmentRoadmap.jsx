@@ -269,6 +269,11 @@ const phases = [
                     { text: '팝빌 기업정보 자동채움 (BizInfoCheckService) — 거래처 prefill', done: true },
                     { text: '팝빌 EasyFinBank 계좌조회 — TEST 환경 검증 완료(411건 적재) + 자동분류·매출/매입관리 연동 + 21분 자동 갱신. LIVE 활성화 대기', done: true },
                     { text: '영업관리 V1 — 휴게음식점 38항목 6카테고리 + 진행률 트래킹 + 빨간 배지', done: true },
+                    { text: '팝빌 전자명세서 6종(거래/청구/견적/발주/입금표/영수증) 발행 + 잔액/샘플/미리보기/이메일/취소 운영 풀세트', done: true },
+                    { text: '팝빌 전자세금계산서 Statement 패턴 일괄 적용 (TaxinvoiceRecord + 9 endpoints + DetailModal)', done: true },
+                    { text: 'CODEF Phase 1 — 마이데이터 통합 백엔드(11 endpoints + 신규 모델 4 + cron) + 외부연동 hub UI (Phase 2-5 공유 인프라)', done: true },
+                    { text: 'CODEF 카드 매출 PoC — 매입 채널 재구조화 결정 후 본격 가동 (현재 PoC 디버깅 사이클 진행)', done: false },
+                    { text: '이지포스(KICC) VAN사 API — 카드 매출 자동수집 (KICC 1600-1234 API 키 발급 대기)', done: false },
                 ],
             },
             {
