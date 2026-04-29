@@ -250,8 +250,14 @@ class CardSalesApproval(SQLModel, table=True):
     amount: int # 승인금액
     installment: Optional[str] = None # 할부개월
     status: str = Field(default="승인") # 승인 / 취소
-    
+
     shop_name: Optional[str] = None # 가맹점명 (from Excel)
+
+    # CODEF Phase 1 — 출처 추적
+    source: str = Field(default="excel", index=True)  # 'codef' | 'excel' | 'manual' | 'excel_overridden'
+    source_meta: Optional[str] = None  # CODEF 응답 원본 JSON (요약)
+    connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
+    synced_at: Optional[datetime.datetime] = None
 
 class CardPayment(SQLModel, table=True):
     __table_args__ = (
@@ -266,6 +272,12 @@ class CardPayment(SQLModel, table=True):
     vat_on_fees: int = 0 # 수수료 부가세 (if applicable separately, often included in fees for stats)
     net_deposit: int = 0 # 입금예정액/실입금액
     bank: Optional[str] = None # 입금은행
+
+    # CODEF Phase 1 — 출처 추적 (CardSalesApproval 과 동일)
+    source: str = Field(default="excel", index=True)
+    source_meta: Optional[str] = None
+    connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
+    synced_at: Optional[datetime.datetime] = None
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

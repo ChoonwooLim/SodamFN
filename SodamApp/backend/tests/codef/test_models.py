@@ -1,6 +1,6 @@
 import datetime
 import pytest
-from sqlmodel import SQLModel, Session, create_engine, select
+from sqlmodel import SQLModel, Session, create_engine
 from models import CodefConnection, CardMerchant, CodefCallLog, CodefBudgetSetting, Business
 
 
@@ -89,3 +89,56 @@ def test_codef_budget_setting_unique_per_business(engine, biz):
         s.add(b2)
         with pytest.raises(Exception):
             s.commit()
+
+
+def test_card_sales_approval_default_source(engine, biz):
+    """기존 row 호환 — source default = 'excel'"""
+    from models import CardSalesApproval
+    with Session(engine) as s:
+        row = CardSalesApproval(
+            business_id=biz,
+            approval_date=datetime.date(2026, 4, 29),
+            card_corp="신한카드",
+            amount=15000,
+        )
+        s.add(row); s.commit(); s.refresh(row)
+        assert row.source == "excel"
+        assert row.connection_id is None
+        assert row.synced_at is None
+        assert row.source_meta is None
+
+
+def test_card_sales_approval_codef_source(engine, biz):
+    """신규 CODEF 행 — source='codef' + connection_id FK"""
+    from models import CardSalesApproval
+    with Session(engine) as s:
+        c = CodefConnection(business_id=biz, organization_type="card",
+                            organization_code="0306", organization_label="신한카드",
+                            connected_id="x", auth_method="simple_auth")
+        s.add(c); s.commit(); s.refresh(c)
+
+        row = CardSalesApproval(
+            business_id=biz,
+            approval_date=datetime.date(2026, 4, 29),
+            card_corp="신한카드",
+            amount=15000,
+            source="codef",
+            connection_id=c.id,
+            synced_at=datetime.datetime.utcnow(),
+        )
+        s.add(row); s.commit(); s.refresh(row)
+        assert row.source == "codef"
+        assert row.connection_id == c.id
+        assert row.synced_at is not None
+
+
+def test_card_payment_source_columns(engine, biz):
+    """CardPayment 도 동일한 4컬럼"""
+    from models import CardPayment
+    with Session(engine) as s:
+        row = CardPayment(business_id=biz, payment_date=datetime.date(2026, 4, 29),
+                          card_corp="삼성카드", net_deposit=120000)
+        s.add(row); s.commit(); s.refresh(row)
+        assert row.source == "excel"
+        assert row.connection_id is None
+        assert row.synced_at is None
