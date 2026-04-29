@@ -131,8 +131,15 @@ const PayrollPaper = ({ staff, payroll, scale = 1, isPrint = false }) => {
                                     </tr>
                                 )}
 
-                                {/* Weekly Holiday Detail */}
-                                {payroll.bonus_holiday > 0 && (
+                                {/* Weekly Holiday Detail
+                                    합계가 0 이라도 holiday_details 에 익월정산/자격미달 정보가 있으면 표시
+                                    — 월말 입사(예: 4/27~30) 케이스에서 '익월정산' 안내가 안 보이던 회귀 보정. */}
+                                {(() => {
+                                    const hasHolidayInfo = details.holiday_details && Object.entries(details.holiday_details).some(
+                                        ([key, val]) => key !== 'info' && typeof val === 'string' && val.length > 0
+                                    );
+                                    return payroll.bonus_holiday > 0 || hasHolidayInfo;
+                                })() && (
                                     <>
                                         <tr className="bg-indigo-50/30 border-b border-slate-800 h-7">
                                             <td colSpan="2" className="px-3 font-black text-[10px] text-indigo-900 border-b border-slate-800 bg-indigo-50/50">주휴수당 (Holiday Pay)</td>
