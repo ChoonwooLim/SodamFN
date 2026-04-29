@@ -250,8 +250,14 @@ class CardSalesApproval(SQLModel, table=True):
     amount: int # 승인금액
     installment: Optional[str] = None # 할부개월
     status: str = Field(default="승인") # 승인 / 취소
-    
+
     shop_name: Optional[str] = None # 가맹점명 (from Excel)
+
+    # CODEF Phase 1 — 출처 추적
+    source: str = Field(default="excel", index=True)  # 'codef' | 'excel' | 'manual' | 'excel_overridden'
+    source_meta: Optional[str] = None  # CODEF 응답 원본 JSON (요약)
+    connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
+    synced_at: Optional[datetime.datetime] = None
 
 class CardPayment(SQLModel, table=True):
     __table_args__ = (
@@ -266,6 +272,12 @@ class CardPayment(SQLModel, table=True):
     vat_on_fees: int = 0 # 수수료 부가세 (if applicable separately, often included in fees for stats)
     net_deposit: int = 0 # 입금예정액/실입금액
     bank: Optional[str] = None # 입금은행
+
+    # CODEF Phase 1 — 출처 추적 (CardSalesApproval 과 동일)
+    source: str = Field(default="excel", index=True)
+    source_meta: Optional[str] = None
+    connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
+    synced_at: Optional[datetime.datetime] = None
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -1125,3 +1137,80 @@ class TaxinvoiceRecord(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None)
     email_sent_at: Optional[datetime.datetime] = Field(default=None)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+# ─────────────────────────────────────────────────────────
+# CODEF Phase 1 — 마이데이터 통합 인프라 (Phase 2~5 공유)
+# spec: docs/superpowers/specs/2026-04-29-codef-card-sales-phase1-design.md § 5
+# ─────────────────────────────────────────────────────────
+
+
+class CodefConnection(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_codef_conn_business_org", "business_id", "organization_code"),
+        UniqueConstraint("business_id", "organization_code", "organization_type"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    organization_type: str = Field(index=True)
+    organization_code: str = Field(index=True)
+    organization_label: str
+    connected_id: str
+    auth_method: str
+    status: str = Field(default="active", index=True)
+    last_verified_at: Optional[datetime.datetime] = None
+    last_failed_at: Optional[datetime.datetime] = None
+    last_error_code: Optional[str] = None
+    last_error_message: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    deactivated_at: Optional[datetime.datetime] = None
+
+
+class CardMerchant(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("business_id", "card_corp", "merchant_id"),
+        Index("ix_card_merchant_business_corp", "business_id", "card_corp"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    card_corp: str = Field(index=True)
+    merchant_id: str
+    merchant_name: Optional[str] = None
+    fee_rate: Optional[float] = None
+    fee_rate_updated_at: Optional[datetime.datetime] = None
+    registered_at: Optional[datetime.date] = None
+    status: str = Field(default="active")
+    source: str = Field(default="codef")
+    last_synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class CodefCallLog(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_codef_log_business_date", "business_id", "called_date"),
+        Index("ix_codef_log_path_date", "api_path", "called_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
+    api_path: str = Field(index=True)
+    organization_code: Optional[str] = None
+    called_date: datetime.date = Field(index=True, default_factory=datetime.date.today)
+    called_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    status: str
+    result_code: Optional[str] = None
+    rows_returned: Optional[int] = None
+    estimated_cost_krw: Optional[int] = None
+    triggered_by: str
+    triggered_user_id: Optional[int] = None
+
+
+class CodefBudgetSetting(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", unique=True, index=True)
+    monthly_budget_krw: int = Field(default=0)
+    warning_threshold_pct: int = Field(default=80)
+    hard_limit_pct: int = Field(default=100)
+    last_warning_sent_at: Optional[datetime.datetime] = None
+    last_hardlimit_sent_at: Optional[datetime.datetime] = None
+    current_month_first_day: Optional[datetime.date] = None
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)

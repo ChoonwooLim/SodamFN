@@ -123,6 +123,17 @@ services:
         value: ""  # ⚠️ Orbitron Secrets에 설정
       - key: CODEF_PUBLIC_KEY
         value: ""  # ⚠️ Orbitron Secrets에 설정 (계정 RSA 공개키, 환경 무관 공통)
+      # ─────────────────────────────────────────────
+      # CODEF Phase 1 — 운영 (cron + 한도 + 알림톡)
+      # ─────────────────────────────────────────────
+      - key: CRON_SHARED_SECRET
+        value: ""  # ⚠️ Orbitron Secrets에 32자 random (cron 엔드포인트 인증)
+      - key: CODEF_PRICE_TABLE
+        value: "{}"  # API별 단가 JSON, DEMO=빈, PRODUCT 견적 후 갱신
+      - key: CODEF_DEMO_DAILY_LIMIT
+        value: "100"
+      - key: NOTIFICATION_TEMPLATE_CODEF_EXPIRED
+        value: ""  # ⚠️ 팝빌 알림톡 검수 후 templateCode 등록
     healthCheck:
       path: /api/health
       interval: 30

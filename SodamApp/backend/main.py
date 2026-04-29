@@ -154,6 +154,14 @@ app.include_router(staff_yearend.router, prefix="/api/staff")
 from routers import sales_guide
 app.include_router(sales_guide.router, prefix="/api")
 
+# CODEF Phase 1 — 마이데이터 통합 (카드 매출 + 향후 계좌·4대보험·등)
+from routers.codef import connections as codef_connections
+from routers.codef import card_sync as codef_card_sync
+from routers.codef import budget as codef_budget
+app.include_router(codef_connections.router)
+app.include_router(codef_card_sync.router)
+app.include_router(codef_budget.router)
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""

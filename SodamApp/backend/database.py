@@ -45,7 +45,43 @@ else:
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    _run_codef_phase1_migrations(engine)
 
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+# ─────────────────────────────────────────────────────────
+# CODEF Phase 1 — auto-migration 가드 함수
+# spec: docs/superpowers/specs/2026-04-29-codef-card-sales-phase1-design.md § 5.3
+# ─────────────────────────────────────────────────────────
+from sqlalchemy import text, inspect
+
+
+def _column_exists(engine_, table: str, column: str) -> bool:
+    inspector = inspect(engine_)
+    cols = [c["name"] for c in inspector.get_columns(table)]
+    return column in cols
+
+
+def _ensure_column(engine_, table: str, column: str, ddl: str):
+    if _column_exists(engine_, table, column):
+        return
+    with engine_.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+
+
+def _run_codef_phase1_migrations(engine_):
+    """CODEF Phase 1 마이그레이션 — idempotent.
+
+    cardsalesapproval / cardpayment 에 source / source_meta / connection_id /
+    synced_at 컬럼을 안전하게 추가하고, source NULL 행을 'excel'로 백필.
+    """
+    for table in ("cardsalesapproval", "cardpayment"):
+        _ensure_column(engine_, table, "source", "VARCHAR DEFAULT 'excel'")
+        _ensure_column(engine_, table, "source_meta", "TEXT")
+        _ensure_column(engine_, table, "connection_id", "INTEGER")
+        _ensure_column(engine_, table, "synced_at", "TIMESTAMP")
+        with engine_.begin() as conn:
+            conn.execute(text(f"UPDATE {table} SET source = 'excel' WHERE source IS NULL"))
