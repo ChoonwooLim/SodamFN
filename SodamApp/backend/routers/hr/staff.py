@@ -74,6 +74,41 @@ class StaffUpdate(BaseModel):
     tax_support_enabled: Optional[bool] = None
     birth_date: Optional[date] = None
 
+
+class StaffPrivateUpdate(BaseModel):
+    """사업주 전용 비공개 지급 정보 PUT 페이로드."""
+    private_payment_method: Optional[str] = None  # 'transfer' / 'cash' / 'other_account'
+    private_actual_payee_name: Optional[str] = None
+    private_actual_payee_relation: Optional[str] = None
+    private_actual_payee_account: Optional[str] = None
+    private_tax_unreported: Optional[bool] = None
+    private_owner_note: Optional[str] = None
+
+
+# 외부 노출 금지 — Staff 응답 직렬화 시 제거할 키 목록
+_PRIVATE_KEYS = {
+    "private_payment_method",
+    "private_actual_payee_name",
+    "private_actual_payee_relation",
+    "private_actual_payee_account",
+    "private_tax_unreported",
+    "private_owner_note",
+}
+
+
+def _strip_private(staff_obj):
+    """Staff 객체를 dict 로 변환하면서 private_* 필드 제거."""
+    if hasattr(staff_obj, "model_dump"):
+        data = staff_obj.model_dump()
+    elif hasattr(staff_obj, "dict"):
+        data = staff_obj.dict()
+    else:
+        data = dict(staff_obj)
+    for k in _PRIVATE_KEYS:
+        data.pop(k, None)
+    return data
+
+
 @router.get("/staff")
 def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     stmt = apply_bid_filter(select(Staff), Staff, bid)
@@ -87,7 +122,7 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
         stmt = stmt.where(col(Staff.name).contains(q))
         
     staffs = session.exec(stmt).all()
-    return {"status": "success", "data": staffs}
+    return {"status": "success", "data": [_strip_private(s) for s in staffs]}
 
 @router.post("/staff")
 def create_staff(
@@ -143,13 +178,79 @@ def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), 
     payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
 
     return {
-        "status": "success", 
-        "data": staff, 
-        "documents": documents, 
-        "payrolls": payrolls, 
+        "status": "success",
+        "data": _strip_private(staff),
+        "documents": documents,
+        "payrolls": payrolls,
         "contracts": contracts,
         "user": user_info
     }
+
+
+@router.get("/staff/{staff_id}/private")
+def get_staff_private(
+    staff_id: int,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """사업주 전용 비공개 지급 정보 조회 — admin/superadmin 만 접근.
+
+    spec: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+    """
+    if _admin.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    stmt = apply_bid_filter(select(Staff).where(Staff.id == staff_id), Staff, bid)
+    staff = session.exec(stmt).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+    return {
+        "status": "success",
+        "data": {
+            "private_payment_method": staff.private_payment_method or "transfer",
+            "private_actual_payee_name": staff.private_actual_payee_name or "",
+            "private_actual_payee_relation": staff.private_actual_payee_relation or "",
+            "private_actual_payee_account": staff.private_actual_payee_account or "",
+            "private_tax_unreported": bool(staff.private_tax_unreported),
+            "private_owner_note": staff.private_owner_note or "",
+        },
+    }
+
+
+@router.put("/staff/{staff_id}/private")
+def update_staff_private(
+    staff_id: int,
+    update_data: StaffPrivateUpdate,
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """사업주 전용 비공개 지급 정보 수정 — admin/superadmin 만 접근."""
+    if _admin.role not in ("admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="권한이 없습니다.")
+    stmt = apply_bid_filter(select(Staff).where(Staff.id == staff_id), Staff, bid)
+    staff = session.exec(stmt).first()
+    if not staff:
+        raise HTTPException(status_code=404, detail="직원을 찾을 수 없습니다.")
+    if update_data.private_payment_method is not None:
+        if update_data.private_payment_method not in ("transfer", "cash", "other_account"):
+            raise HTTPException(status_code=400, detail="payment_method 값이 올바르지 않습니다.")
+        staff.private_payment_method = update_data.private_payment_method
+    for field in (
+        "private_actual_payee_name",
+        "private_actual_payee_relation",
+        "private_actual_payee_account",
+        "private_owner_note",
+    ):
+        v = getattr(update_data, field)
+        if v is not None:
+            setattr(staff, field, v.strip()[:255] if isinstance(v, str) else v)
+    if update_data.private_tax_unreported is not None:
+        staff.private_tax_unreported = bool(update_data.private_tax_unreported)
+    session.add(staff)
+    session.commit()
+    return {"status": "success", "message": "비공개 지급 정보가 저장되었습니다."}
+
 
 FIELD_LABELS = {
     'hourly_wage': '시급',
