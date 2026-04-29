@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import {
     Receipt, ExternalLink, ShieldCheck, Loader2, Plus, Trash2,
     RefreshCw, AlertCircle, CheckCircle2, Info, FileCheck,
+    Wallet, CreditCard, Sparkles, Eye, Printer, FileDown,
+    Mail, Ban, Send, X, FileText,
 } from 'lucide-react';
 import api from '../api';
 
@@ -36,6 +38,9 @@ export default function TaxInvoice() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [history, setHistory] = useState({ total: 0, list: [] });
     const [openingUrl, setOpeningUrl] = useState(null);
+    const [balance, setBalance] = useState(null);
+    const [selected, setSelected] = useState(null);
+    const [sampleLoading, setSampleLoading] = useState(false);
 
     // 폼 상태
     const [form, setForm] = useState({
@@ -57,6 +62,7 @@ export default function TaxInvoice() {
         loadStatus();
         loadIssuer();
         loadHistory();
+        loadBalance();
     }, []);
 
     const loadStatus = async () => {
@@ -79,15 +85,117 @@ export default function TaxInvoice() {
         setHistoryLoading(true);
         try {
             const res = await api.get('/taxinvoice/search', { params: { per_page: 50 } });
-            if (res.data.ok) {
-                setHistory({ total: res.data.total || 0, list: res.data.list || [] });
+            if (res.data?.ok) {
+                // db + 팝빌 search 병합 (db 우선)
+                const dbList = (res.data.db || []).map((r) => ({
+                    source: 'db',
+                    id: r.id,
+                    key_type: r.key_type,
+                    mgt_key: r.mgt_key,
+                    name: r.invoicee_corp_name || '-',
+                    corp_num: r.invoicee_corp_num,
+                    date: r.write_date,
+                    amount: r.total_amount,
+                    status: r.status,
+                    receipt_num: r.receipt_num,
+                    invoice_num: r.invoice_num,
+                    error_message: r.error_message,
+                    email_sent_at: r.email_sent_at,
+                }));
+                const popbillList = (res.data?.popbill?.list || []).map((it) => ({
+                    source: 'popbill',
+                    key_type: 'SELL',
+                    mgt_key: it.invoicerMgtKey || it.mgtKey,
+                    name: it.invoiceeCorpName || '-',
+                    corp_num: it.invoiceeCorpNum,
+                    date: it.writeDate,
+                    amount: it.totalAmount,
+                    status: it.stateMemo,
+                    receipt_num: it.ntsconfirmNum,
+                    invoice_num: it.ntsconfirmNum,
+                }));
+                setHistory({
+                    total: dbList.length + popbillList.length,
+                    list: [...dbList, ...popbillList],
+                    db_count: dbList.length,
+                });
             } else {
-                setHistory({ total: 0, list: [], error: res.data.error });
+                setHistory({ total: 0, list: [], error: res.data?.error });
             }
         } catch (e) {
             setHistory({ total: 0, list: [], error: e?.response?.data?.detail || '이력 조회 실패' });
         } finally {
             setHistoryLoading(false);
+        }
+    };
+
+    const loadBalance = async () => {
+        try {
+            const res = await api.get('/taxinvoice/balance');
+            setBalance(res.data);
+        } catch { /* noop */ }
+    };
+
+    const openChargeURL = async () => {
+        try {
+            const res = await api.get('/taxinvoice/charge-url');
+            if (res.data?.ok && res.data.url) {
+                window.open(res.data.url, '_blank', 'noopener');
+            } else {
+                alert('충전 URL 발급 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || '충전 URL 발급 실패');
+        }
+    };
+
+    const fillSample = async () => {
+        try {
+            const res = await api.get('/taxinvoice/sample');
+            const s = res.data || {};
+            setForm((prev) => ({
+                ...prev,
+                invoicee_corp_num: s.invoicee_corp_num || '',
+                invoicee_corp_name: s.invoicee_corp_name || '',
+                invoicee_ceo_name: s.invoicee_ceo_name || '',
+                invoicee_addr: s.invoicee_addr || '',
+                invoicee_email1: s.invoicee_email1 || '',
+                invoicee_tel: s.invoicee_tel || '',
+                invoicee_type: s.invoicee_type || '사업자',
+                tax_type: s.tax_type || '과세',
+                purpose_type: s.purpose_type || '영수',
+                remark1: s.remark1 || '',
+            }));
+            setDetails((s.details || [emptyDetail()]).map((d) => ({
+                itemName: d.itemName || '',
+                qty: d.qty || '1',
+                unitCost: d.unitCost || '',
+                supplyCost: d.supplyCost || '',
+                tax: d.tax || '',
+                spec: d.spec || '',
+                remark: d.remark || '',
+            })));
+        } catch (e) {
+            alert(e?.response?.data?.detail || '샘플 데이터 로드 실패');
+        }
+    };
+
+    const runIssueSample = async () => {
+        const isLive = balance && balance.is_test === false;
+        const msg = isLive
+            ? '⚠️ LIVE 환경입니다. 100원 + 인증서 보유 필요.\n샘플 1건 발행을 진행할까요?'
+            : 'TEST 환경에서 샘플 데이터로 1건 발행합니다 (인증서 등록 필요).\n계속할까요?';
+        if (!window.confirm(msg)) return;
+        setSampleLoading(true);
+        try {
+            const res = await api.post('/taxinvoice/issue-sample');
+            setResult(res.data);
+            loadHistory();
+            loadBalance();
+        } catch (e) {
+            setResult({ ok: false, error: e?.response?.data?.detail || '샘플 발행 실패' });
+        } finally {
+            setSampleLoading(false);
         }
     };
 
@@ -203,6 +311,63 @@ export default function TaxInvoice() {
                         <span>{status.note}</span>
                     </div>
                 )}
+
+                {/* 잔액 + 샘플 일괄 발행 카드 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="flex items-start gap-2 mb-2">
+                            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg">
+                                <Wallet size={16} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-xs font-semibold text-slate-500">팝빌 잔액 ({balance?.is_test ? 'TEST' : 'LIVE'})</div>
+                                <div className="text-xl font-bold text-slate-900 tabular-nums">
+                                    {balance?.balance != null ? `${Number(balance.balance).toLocaleString()}P` : '—'}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                    발행 {balance?.unit_cost || 100}원/건
+                                    {balance?.balance != null && (
+                                        <span className="ml-1 text-emerald-700">
+                                            (≈ {Math.floor((balance.balance || 0) / (balance.unit_cost || 100))}건)
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" onClick={openChargeURL}
+                            className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors">
+                            <CreditCard size={12} /> 잔액 충전
+                        </button>
+                    </div>
+
+                    <div className="md:col-span-2 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 rounded-2xl shadow-sm border border-indigo-200">
+                        <div className="flex items-start justify-between gap-3 flex-wrap h-full">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-indigo-200 text-indigo-700 rounded-xl shrink-0">
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <div className="font-bold text-slate-900 text-sm">샘플 발행 (테스트·모니터링)</div>
+                                    <div className="text-xs text-slate-600 mt-0.5">
+                                        샘플 데이터로 즉시 1건 발행 → 결과 + 이력 자동 등록.
+                                        <span className="ml-1 text-amber-700 font-medium">※ 발행 전 인증서 등록 필수 (재무·회계 → 팝빌 인증서 등록)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                                <button type="button" onClick={fillSample}
+                                    className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-indigo-700 border border-indigo-200 text-sm font-medium rounded-xl transition-colors">
+                                    <Sparkles size={14} /> 폼 채우기
+                                </button>
+                                <button type="button" onClick={runIssueSample} disabled={sampleLoading}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors">
+                                    {sampleLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                    {sampleLoading ? '발행 중...' : '즉시 발행'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {/* 팝빌 바로가기 */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
@@ -466,29 +631,297 @@ export default function TaxInvoice() {
 
                         <div className="space-y-2 max-h-[700px] overflow-y-auto">
                             {history.list.map((it, idx) => (
-                                <div key={idx} className="p-3 bg-slate-50 rounded-xl text-sm">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-semibold text-slate-800 truncate">
-                                            {it.invoiceeCorpName || it.invoicerCorpName || '-'}
-                                        </span>
-                                        <span className="text-xs text-slate-500">{it.writeDate}</span>
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => it.source === 'db' && setSelected(it)}
+                                    disabled={it.source !== 'db'}
+                                    className={`w-full text-left p-3 bg-slate-50 rounded-xl text-sm border border-transparent transition-colors ${
+                                        it.source === 'db'
+                                            ? 'hover:bg-indigo-50 hover:border-indigo-200 cursor-pointer'
+                                            : 'opacity-90 cursor-default'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between mb-1 gap-2">
+                                        <span className="font-semibold text-slate-800 truncate">{it.name}</span>
+                                        <span className="text-xs text-slate-500 shrink-0">{it.date}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-xs">
-                                        <span className="text-slate-500">{it.stateMemo || it.purposeType || ''}</span>
-                                        <span className="font-bold text-indigo-700">
-                                            {Number(it.totalAmount || 0).toLocaleString('ko-KR')}원
+                                    <div className="flex items-center justify-between text-xs gap-2">
+                                        <span className="text-slate-500 truncate">
+                                            {it.source === 'db' ? <StatusBadge status={it.status} /> : (it.status || '')}
+                                        </span>
+                                        <span className="font-bold text-indigo-700 tabular-nums shrink-0">
+                                            {Number(it.amount || 0).toLocaleString('ko-KR')}원
                                         </span>
                                     </div>
-                                    {it.ntsconfirmNum && (
-                                        <div className="text-[10px] text-slate-400 mt-1 truncate">
-                                            승인: {it.ntsconfirmNum}
+                                    {it.email_sent_at && (
+                                        <div className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                                            <Mail size={10} /> 이메일 발송됨
                                         </div>
                                     )}
-                                </div>
+                                    {it.invoice_num && (
+                                        <div className="text-[10px] text-slate-400 mt-1 truncate">
+                                            승인: {it.invoice_num}
+                                        </div>
+                                    )}
+                                    {it.error_message && (
+                                        <div className="text-[10px] text-red-600 mt-1 line-clamp-2">{it.error_message}</div>
+                                    )}
+                                </button>
                             ))}
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* 발행 상세 모달 */}
+            {selected && (
+                <DetailModal
+                    row={selected}
+                    onClose={() => setSelected(null)}
+                    onChanged={() => { loadHistory(); loadBalance(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+const inputClsModal = "w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none";
+
+function StatusBadge({ status }) {
+    const styles = {
+        issued: 'bg-emerald-100 text-emerald-700',
+        failed: 'bg-red-100 text-red-700',
+        pending: 'bg-amber-100 text-amber-700',
+        cancelled: 'bg-slate-200 text-slate-600',
+    };
+    const cls = styles[status] || 'bg-slate-100 text-slate-600';
+    return <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${cls}`}>{status}</span>;
+}
+
+function DetailModal({ row, onClose, onChanged }) {
+    const [info, setInfo] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [emailValue, setEmailValue] = useState('');
+    const [emailSending, setEmailSending] = useState(false);
+    const [emailResp, setEmailResp] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
+    const [cancelMemo, setCancelMemo] = useState('');
+    const [showCancel, setShowCancel] = useState(false);
+
+    useEffect(() => {
+        loadInfo();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [row?.id]);
+
+    const loadInfo = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get(`/taxinvoice/info/${row.mgt_key}`, {
+                params: { key_type: row.key_type || 'SELL' },
+            });
+            setInfo(res.data);
+        } catch (e) {
+            setInfo({ error: e?.response?.data?.detail || '상세 조회 실패' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const openUrl = async (kind) => {
+        try {
+            const res = await api.get(`/taxinvoice/${row.mgt_key}/${kind}`, {
+                params: { key_type: row.key_type || 'SELL' },
+            });
+            if (res.data?.ok && res.data.url) {
+                window.open(res.data.url, '_blank', 'noopener');
+            } else {
+                alert('URL 발급 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || 'URL 발급 실패');
+        }
+    };
+
+    const sendEmail = async () => {
+        if (!emailValue) { alert('받는 이메일을 입력하세요.'); return; }
+        setEmailSending(true);
+        try {
+            const res = await api.post(`/taxinvoice/${row.mgt_key}/send-email`, {
+                key_type: row.key_type || 'SELL',
+                receiver_email: emailValue,
+            });
+            setEmailResp(res.data);
+            if (res.data?.ok) onChanged?.();
+        } catch (e) {
+            setEmailResp({ ok: false, error: e?.response?.data?.detail || '이메일 발송 실패' });
+        } finally {
+            setEmailSending(false);
+        }
+    };
+
+    const cancelInvoice = async () => {
+        if (!window.confirm('이 세금계산서를 취소하시겠습니까? (국세청 신고 전에만 취소 가능)')) return;
+        setCancelling(true);
+        try {
+            const res = await api.post(`/taxinvoice/${row.mgt_key}/cancel`, {
+                key_type: row.key_type || 'SELL',
+                memo: cancelMemo,
+            });
+            if (res.data?.ok) {
+                alert('취소 완료');
+                onChanged?.();
+                onClose();
+            } else {
+                alert(res.data?.error || '취소 실패');
+            }
+        } catch (e) {
+            alert(e?.response?.data?.detail || '취소 실패');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const isCancelled = row.status === 'cancelled';
+    const isFailed = row.status === 'failed';
+
+    return (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
+                            <FileText size={20} />
+                        </div>
+                        <div>
+                            <div className="text-lg font-bold text-slate-900">발행 상세</div>
+                            <div className="text-xs text-slate-500 mt-0.5">
+                                {row.key_type || 'SELL'} · {row.date} · {row.name}
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1 mb-4">
+                    <div className="flex justify-between"><span className="text-slate-500">관리번호</span><span className="font-mono text-xs text-slate-800">{row.mgt_key}</span></div>
+                    {row.invoice_num && (
+                        <div className="flex justify-between"><span className="text-slate-500">국세청 승인번호</span><span className="text-slate-800 font-mono text-xs">{row.invoice_num}</span></div>
+                    )}
+                    {row.receipt_num && (
+                        <div className="flex justify-between"><span className="text-slate-500">접수번호</span><span className="text-slate-800">{row.receipt_num}</span></div>
+                    )}
+                    <div className="flex justify-between"><span className="text-slate-500">총액</span><span className="font-bold text-slate-900 tabular-nums">{Number(row.amount).toLocaleString()}원</span></div>
+                    <div className="flex justify-between items-center"><span className="text-slate-500">상태</span><StatusBadge status={row.status} /></div>
+                    {row.email_sent_at && (
+                        <div className="flex justify-between text-emerald-700">
+                            <span>이메일 발송</span>
+                            <span className="text-xs">{new Date(row.email_sent_at).toLocaleString('ko-KR')}</span>
+                        </div>
+                    )}
+                    {row.error_message && (
+                        <div className="mt-2 p-2 bg-red-50 text-red-700 text-xs rounded">{row.error_message}</div>
+                    )}
+                </div>
+
+                {loading && (
+                    <div className="text-sm text-slate-500 flex items-center gap-2 mb-3">
+                        <Loader2 size={14} className="animate-spin" /> 팝빌 상세 조회 중...
+                    </div>
+                )}
+                {info?.popbill?.ok && info.popbill.info && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm space-y-1 mb-4">
+                        <div className="text-xs font-semibold text-blue-800 mb-1">팝빌 시스템 정보</div>
+                        {info.popbill.info.issueDT && (
+                            <div className="flex justify-between"><span className="text-slate-500">발행 시각</span><span className="text-slate-700 tabular-nums">{info.popbill.info.issueDT}</span></div>
+                        )}
+                        {info.popbill.info.stateMemo && (
+                            <div className="flex justify-between"><span className="text-slate-500">상태 메모</span><span className="text-slate-700">{info.popbill.info.stateMemo}</span></div>
+                        )}
+                        {info.popbill.info.ntsResult && (
+                            <div className="flex justify-between"><span className="text-slate-500">국세청 결과</span><span className="text-slate-700">{info.popbill.info.ntsResult}</span></div>
+                        )}
+                    </div>
+                )}
+                {info?.popbill?.error && !isFailed && (
+                    <div className="bg-amber-50 text-amber-800 text-xs rounded p-2 mb-3">{info.popbill.error}</div>
+                )}
+
+                {!isFailed && !isCancelled && (
+                    <>
+                        <div className="grid grid-cols-3 gap-2 mb-3">
+                            <button type="button" onClick={() => openUrl('view-url')}
+                                className="flex items-center justify-center gap-1.5 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-sm font-medium transition-colors">
+                                <Eye size={14} /> 미리보기
+                            </button>
+                            <button type="button" onClick={() => openUrl('print-url')}
+                                className="flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-medium transition-colors">
+                                <Printer size={14} /> 인쇄
+                            </button>
+                            <button type="button" onClick={() => openUrl('pdf-url')}
+                                className="flex items-center justify-center gap-1.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-sm font-medium transition-colors">
+                                <FileDown size={14} /> PDF
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-xl p-3 mb-3">
+                            <div className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+                                <Mail size={12} /> 이메일 재전송
+                            </div>
+                            <div className="flex gap-2">
+                                <input type="email" placeholder="받는 이메일 주소"
+                                    value={emailValue}
+                                    onChange={(e) => setEmailValue(e.target.value)}
+                                    className={`${inputClsModal} flex-1`}
+                                />
+                                <button type="button" onClick={sendEmail} disabled={emailSending}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-1">
+                                    {emailSending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    발송
+                                </button>
+                            </div>
+                            {emailResp && (
+                                <div className={`text-xs p-2 rounded mt-2 ${emailResp.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                    {emailResp.ok ? '이메일 발송 완료' : emailResp.error}
+                                </div>
+                            )}
+                        </div>
+
+                        {!showCancel ? (
+                            <button type="button" onClick={() => setShowCancel(true)}
+                                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-500 hover:text-red-600 transition-colors">
+                                <Ban size={12} /> 발행 취소 (국세청 신고 전)
+                            </button>
+                        ) : (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                <div className="text-xs font-semibold text-red-800 mb-2 flex items-center gap-1">
+                                    <Ban size={12} /> 발행 취소
+                                </div>
+                                <input type="text" placeholder="취소 사유 (선택)"
+                                    value={cancelMemo}
+                                    onChange={(e) => setCancelMemo(e.target.value)}
+                                    className={`${inputClsModal} mb-2`}
+                                />
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setShowCancel(false)}
+                                        className="flex-1 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-sm">
+                                        뒤로
+                                    </button>
+                                    <button type="button" onClick={cancelInvoice} disabled={cancelling}
+                                        className="flex-1 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium">
+                                        {cancelling ? '취소 중...' : '취소 확정'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {isCancelled && (
+                    <div className="bg-slate-100 text-slate-600 text-sm rounded-xl p-3 text-center">취소된 세금계산서입니다.</div>
+                )}
             </div>
         </div>
     );

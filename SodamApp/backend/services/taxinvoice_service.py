@@ -117,6 +117,27 @@ class BaseTaxinvoiceProvider:
     def get_popbill_url(self, togo: str = "TBOX", user_id: Optional[str] = None) -> str:
         raise NotImplementedError
 
+    def get_view_url(self, key_type: str, mgt_key: str) -> str:
+        raise NotImplementedError
+
+    def get_print_url(self, key_type: str, mgt_key: str) -> str:
+        raise NotImplementedError
+
+    def get_pdf_url(self, key_type: str, mgt_key: str) -> str:
+        raise NotImplementedError
+
+    def send_email(self, key_type: str, mgt_key: str, receiver_email: str) -> dict:
+        raise NotImplementedError
+
+    def cancel_issue(self, key_type: str, mgt_key: str, memo: str = "") -> dict:
+        raise NotImplementedError
+
+    def get_balance(self) -> Optional[float]:
+        raise NotImplementedError
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
+        raise NotImplementedError
+
 
 class DevStubProvider(BaseTaxinvoiceProvider):
     name = "stub"
@@ -138,6 +159,27 @@ class DevStubProvider(BaseTaxinvoiceProvider):
         return {"ok": True, "total": 0, "list": [], "note": "STUB 모드: 빈 이력 반환"}
 
     def get_popbill_url(self, togo: str = "TBOX", user_id: Optional[str] = None) -> str:
+        return "https://www.popbill.com/"
+
+    def get_view_url(self, key_type: str, mgt_key: str) -> str:
+        return f"https://www.popbill.com/stub-view/{key_type}/{mgt_key}"
+
+    def get_print_url(self, key_type: str, mgt_key: str) -> str:
+        return f"https://www.popbill.com/stub-print/{key_type}/{mgt_key}"
+
+    def get_pdf_url(self, key_type: str, mgt_key: str) -> str:
+        return f"https://www.popbill.com/stub-pdf/{key_type}/{mgt_key}"
+
+    def send_email(self, key_type: str, mgt_key: str, receiver_email: str) -> dict:
+        return {"ok": True, "note": "STUB", "receiver": receiver_email}
+
+    def cancel_issue(self, key_type: str, mgt_key: str, memo: str = "") -> dict:
+        return {"ok": True, "note": "STUB"}
+
+    def get_balance(self) -> Optional[float]:
+        return None
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
         return "https://www.popbill.com/"
 
 
@@ -226,7 +268,7 @@ class PopbillTaxinvoiceProvider(BaseTaxinvoiceProvider):
         try:
             svc = self._get_svc()
             tax = self._build_tax(draft)
-            r = svc.registIssue(self.corp_num, tax, Memo=draft.remark1 or "셈하나 발행", UserID=self.user_id)
+            r = svc.registIssue(self.corp_num, tax, memo=draft.remark1 or "셈하나 발행", UserID=self.user_id)
             # Response: {code, message, receiptNum, ntsconfirmNum, ntsSendDT, issueDT}
             ok = getattr(r, "code", None) in (1, "1") or getattr(r, "receiptNum", None)
             return TaxinvoiceResult(
@@ -285,7 +327,64 @@ class PopbillTaxinvoiceProvider(BaseTaxinvoiceProvider):
 
     def get_popbill_url(self, togo: str = "TBOX", user_id: Optional[str] = None) -> str:
         svc = self._get_svc()
-        return svc.getPopbillURL(self.corp_num, user_id or self.user_id or "sodam", togo)
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다. (.env / Orbitron.yaml 확인)")
+        return svc.getPopbillURL(self.corp_num, uid, togo)
+
+    def get_view_url(self, key_type: str, mgt_key: str) -> str:
+        svc = self._get_svc()
+        return svc.getPopUpURL(self.corp_num, key_type, mgt_key, self.user_id)
+
+    def get_print_url(self, key_type: str, mgt_key: str) -> str:
+        svc = self._get_svc()
+        return svc.getPrintURL(self.corp_num, key_type, mgt_key, self.user_id)
+
+    def get_pdf_url(self, key_type: str, mgt_key: str) -> str:
+        svc = self._get_svc()
+        return svc.getPDFURL(self.corp_num, key_type, mgt_key, self.user_id)
+
+    def send_email(self, key_type: str, mgt_key: str, receiver_email: str) -> dict:
+        try:
+            from popbill import PopbillException  # type: ignore
+        except ImportError:
+            PopbillException = Exception  # type: ignore
+        try:
+            svc = self._get_svc()
+            r = svc.sendEmail(self.corp_num, key_type, mgt_key, receiver_email, self.user_id)
+            return {"ok": True, "receiver": receiver_email, "raw": str(r) if r else None}
+        except PopbillException as pe:
+            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"이메일 발송 오류: {e}"}
+
+    def cancel_issue(self, key_type: str, mgt_key: str, memo: str = "") -> dict:
+        try:
+            from popbill import PopbillException  # type: ignore
+        except ImportError:
+            PopbillException = Exception  # type: ignore
+        try:
+            svc = self._get_svc()
+            r = svc.cancelIssue(self.corp_num, key_type, mgt_key, memo, self.user_id)
+            return {"ok": True, "raw": str(r) if r else None}
+        except PopbillException as pe:
+            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"취소 오류: {e}"}
+
+    def get_balance(self) -> Optional[float]:
+        try:
+            svc = self._get_svc()
+            return float(svc.getBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            return None
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
+        svc = self._get_svc()
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다.")
+        return svc.getChargeURL(self.corp_num, uid)
 
 
 def _info_to_dict(obj) -> dict:
@@ -306,6 +405,26 @@ def _info_to_dict(obj) -> dict:
         if v is not None:
             out[k] = str(v) if not isinstance(v, (int, float, bool, list)) else v
     return out
+
+
+SAMPLE_DATA = {
+    "invoicee_corp_num": "",  # 빈 값 — 자기 사업자번호로 자동 채움 안 함, 사용자가 검토
+    "invoicee_corp_name": "(주)테스트 거래처",
+    "invoicee_ceo_name": "홍길동",
+    "invoicee_addr": "서울특별시 강남구 테헤란로 123",
+    "invoicee_email1": "",
+    "invoicee_tel": "02-1234-5678",
+    "invoicee_type": "사업자",
+    "tax_type": "과세",
+    "purpose_type": "영수",
+    "remark1": "[샘플] 도시락 납품 매출",
+    "details": [
+        {"itemName": "도시락 정식 (50인)", "qty": "50", "unitCost": "10000",
+         "supplyCost": "500000", "tax": "50000", "spec": "", "remark": ""},
+        {"itemName": "음료 세트", "qty": "50", "unitCost": "2000",
+         "supplyCost": "100000", "tax": "10000", "spec": "", "remark": ""},
+    ],
+}
 
 
 _PROVIDERS = {

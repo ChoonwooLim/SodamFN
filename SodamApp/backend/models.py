@@ -1100,3 +1100,28 @@ class Statement(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None)
     email_sent_at: Optional[datetime.datetime] = Field(default=None)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class TaxinvoiceRecord(SQLModel, table=True):
+    """전자세금계산서 발행 메타 (팝빌 TaxinvoiceService).
+
+    key_type: SELL=매출 / BUY=매입 / TRUSTEE=수탁
+    Statement 와 동일 패턴 — 가벼운 메타만 (품목·세부는 팝빌 getInfo 로 조회).
+    """
+    __tablename__ = "taxinvoicerecord"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    key_type: str = Field(default="SELL", index=True, max_length=10)
+    mgt_key: str = Field(index=True, max_length=64)
+    write_date: str = Field(max_length=8)            # YYYYMMDD
+    tax_type: str = Field(default="과세", max_length=10)
+    total_amount: str = Field(default="0", max_length=20)
+    invoicee_corp_num: str = Field(default="", max_length=20)
+    invoicee_corp_name: str = Field(default="", max_length=200)
+    status: str = Field(default="issued", max_length=20)  # issued / cancelled / failed / pending
+    receipt_num: Optional[str] = Field(default=None, max_length=64)
+    invoice_num: Optional[str] = Field(default=None, max_length=64)  # 국세청 승인번호
+    error_message: Optional[str] = Field(default=None)
+    email_sent_at: Optional[datetime.datetime] = Field(default=None)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
