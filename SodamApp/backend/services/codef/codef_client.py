@@ -41,7 +41,7 @@ class RequestProductResult:
 _AUTH_EXPIRED_CODES = {"CF-12100", "CF-12101", "CF-12102", "CF-12410"}
 _ADDITIONAL_AUTH_CODES = {"CF-03002", "CF-03012", "CF-03013"}
 _RATE_LIMITED_CODES = {"CF-00100", "CF-09001"}
-_SUCCESS_PREFIX = "CF-000"  # CF-00000 ~ CF-00099 = 성공 또는 부분 성공
+_SUCCESS_CODES = {"CF-00000"}  # 정확히 성공만
 
 
 class CodefClient:
@@ -51,7 +51,11 @@ class CodefClient:
         self.public_key = os.getenv("CODEF_PUBLIC_KEY", "")
         self.env = os.getenv("CODEF_ENV", "demo")
         self._sdk = Codef()
+        # SDK 는 PRODUCT/DEMO/SANDBOX 환경별로 클라이언트 정보를 따로 보관.
+        # DEMO 환경에서도 set_demo_client_info 호출이 필요 — 같은 키 사용.
         self._sdk.set_client_info(self.client_id, self.client_secret)
+        self._sdk.set_demo_client_info(self.client_id, self.client_secret)
+        self._sdk.public_key = self.public_key
 
     @property
     def service_type(self) -> ServiceType:
@@ -100,8 +104,9 @@ class CodefClient:
         result = data.get("result", {})
         code = result.get("code", "")
         message = result.get("message", "")
+        extra_message = result.get("extraMessage", "")
 
-        if code == "" or code.startswith(_SUCCESS_PREFIX):
+        if code == "" or code in _SUCCESS_CODES:
             return
         if code in _AUTH_EXPIRED_CODES:
             raise CodefAuthExpired(code=code, message=message)
@@ -111,4 +116,6 @@ class CodefClient:
             raise CodefAdditionalAuth(method=method, extra_info=extra)
         if code in _RATE_LIMITED_CODES:
             raise CodefRateLimited(message)
-        raise CodefAPIError(code=code, message=message)
+        # 기타 — 메시지에 extraMessage 합쳐 사용자에게 의미있는 정보 노출
+        full_msg = f"{message} {extra_message}".strip()
+        raise CodefAPIError(code=code, message=full_msg)
