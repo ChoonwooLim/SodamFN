@@ -47,6 +47,9 @@ python-dotenv
 # Popbill SDK (팩스·문자·세금계산서·계좌조회 등 팝빌 연동)
 popbill>=1.64.0
 
+# CODEF SDK (마이데이터 통합 — 카드 매출/계좌/4대보험 자동수집)
+easycodefpy>=0.5.0
+
 # HTML → PDF 렌더링 (증명서 팩스 전송용)
 weasyprint>=60.0
 
