@@ -42,7 +42,7 @@ export function getStandardContractTemplate() {
    - 연차유급휴가는 근로기준법에서 정하는 바에 따라 부여함
 
 8. 사회보험 적용여부(해당란에 체크)
-   ☐ 고용보험   ☐ 산재보험   ☐ 국민연금   ☐ 건강보험
+   {insurance_check_ei} 고용보험   {insurance_check_wi} 산재보험   {insurance_check_np} 국민연금   {insurance_check_hi} 건강보험
 
 9. 근로계약서 교부
    - 사업주는 근로계약을 체결함과 동시에 본 계약서를 사본하여 근로자의 교부요구와
@@ -71,7 +71,7 @@ export function getStandardContractTemplate() {
  * 직원 + 사업주 + 오늘 날짜 데이터를 변수 매핑 dict 로 빌드.
  *
  * @param {Object} staff   직원 폼/객체 (Staff 모델 필드)
- * @param {Object} business 사업주 정보 (GET /api/business-info 응답)
+ * @param {Object} business 사업주 정보 (GET /api/auth/business-info 응답)
  * @returns {Record<string, string>}
  */
 export function buildContractVariables(staff = {}, business = {}) {
@@ -94,6 +94,18 @@ export function buildContractVariables(staff = {}, business = {}) {
     const yyyy = today.getFullYear();
     const mm = today.getMonth() + 1;
     const dd = today.getDate();
+
+    // 사회보험 체크박스 자동 표시
+    // - insurance_4major=True 이면 NP/HI 가입 (단 np_exempt=True 면 NP 제외)
+    // - 일용직/정규직 무관 EI/WI(산재) 는 사업장 단위 의무가입이라 여기서는 staff 별 체크는 하지 않고
+    //   insurance_4major 또는 contract_type='정규직' 이면 표시
+    const checkedBox = '☑';
+    const uncheckedBox = '☐';
+    const isInsured = !!staff.insurance_4major || staff.contract_type === '정규직';
+    const npApplied = isInsured && !staff.np_exempt;
+    const hiApplied = isInsured;
+    const eiApplied = isInsured || staff.contract_type === '일용직' || staff.contract_type === '아르바이트';
+    const wiApplied = true;  // 산재보험은 모든 근로자 의무 적용
 
     return {
         // ── 직원 정보 ──
@@ -151,6 +163,12 @@ export function buildContractVariables(staff = {}, business = {}) {
             || (business.business_name && business.address
                 ? `${business.business_name} (${business.address})`
                 : (business.business_name || business.address || '')),
+
+        // ── 사회보험 적용여부 자동 체크박스 ──
+        '{insurance_check_np}': npApplied ? checkedBox : uncheckedBox,
+        '{insurance_check_hi}': hiApplied ? checkedBox : uncheckedBox,
+        '{insurance_check_ei}': eiApplied ? checkedBox : uncheckedBox,
+        '{insurance_check_wi}': wiApplied ? checkedBox : uncheckedBox,
 
         // ── 오늘 날짜 ──
         '{today}': `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`,

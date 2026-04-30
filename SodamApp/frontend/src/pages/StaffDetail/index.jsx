@@ -581,7 +581,7 @@ export default function StaffDetail() {
         try {
             const [templateRes, businessRes, storesRes] = await Promise.all([
                 api.get('/settings/contract_template').catch(() => null),
-                api.get('/business-info').catch(() => null),
+                api.get('/auth/business-info').catch(() => null),
                 api.get('/stores').catch(() => null),
             ]);
             if (templateRes?.data?.value) template = templateRes.data.value;

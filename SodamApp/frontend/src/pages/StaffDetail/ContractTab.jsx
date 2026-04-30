@@ -498,23 +498,35 @@ export default function ContractTab({
                                 <h3 className="text-xl font-bold text-slate-900">전자계약서 작성</h3>
                                 <button
                                     onClick={async () => {
-                                        // 항상 최신 사업주 정보 fetch — props 가 빈 상태이거나 stale 일 수 있음
+                                        // 항상 최신 양식 + 사업주 정보 + 매장 fetch — stale state 회피
+                                        let template = contractForm.content || "";
                                         let biz = businessInfo;
+                                        let storeName = '';
                                         try {
-                                            const res = await api.get('/business-info');
-                                            if (res?.data) biz = res.data;
+                                            const [tplRes, bizRes, storesRes] = await Promise.all([
+                                                api.get('/settings/contract_template').catch(() => null),
+                                                api.get('/auth/business-info').catch(() => null),
+                                                api.get('/stores').catch(() => null),
+                                            ]);
+                                            if (tplRes?.data?.value) template = tplRes.data.value;
+                                            if (bizRes?.data) biz = bizRes.data;
+                                            if (storesRes?.data?.data) {
+                                                const list = storesRes.data.data.filter(s => s.is_active);
+                                                const sel = list.find(s => s.id === selectedStoreId)
+                                                    || list.find(s => s.is_default)
+                                                    || list[0];
+                                                if (sel) storeName = sel.name;
+                                            }
                                         } catch (err) {
-                                            console.warn('business-info fetch 실패, 기존 props 사용:', err);
+                                            console.warn('변수 치환 fetch 일부 실패:', err);
                                         }
                                         const variables = buildContractVariables(formData, biz);
-                                        // 선택된 매장으로 work_location 치환
-                                        const selectedStore = stores.find(s => s.id === selectedStoreId);
-                                        if (selectedStore) variables['{work_location}'] = selectedStore.name;
-                                        const newContent = applyContractVariables(contractForm.content || "", variables);
+                                        if (storeName) variables['{work_location}'] = storeName;
+                                        const newContent = applyContractVariables(template, variables);
                                         setContractForm(prev => ({ ...prev, content: newContent }));
                                     }}
                                     className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"
-                                    title="직원/사업주/오늘날짜 정보를 본문에 자동 채움"
+                                    title="직원/사업주/매장/오늘날짜 정보를 본문에 자동 채움 (양식도 최신으로 갱신)"
                                 >
                                     변수 치환
                                 </button>
