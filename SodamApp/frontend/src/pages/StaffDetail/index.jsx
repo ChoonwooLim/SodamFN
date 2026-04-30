@@ -571,7 +571,8 @@ export default function StaffDetail() {
 
     const handleOpenContractModal = async () => {
         setEditingContractId(null);
-        let template = contractForm.content;
+        // 항상 DB 의 최신 양식으로 시작. 이전 모달 세션의 stale state 가 본문에 남지 않도록.
+        let template = '';
         let businessInfo = {};
         let storesList = [];
         let defaultStoreName = '';
