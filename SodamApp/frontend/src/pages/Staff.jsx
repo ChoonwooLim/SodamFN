@@ -11,7 +11,7 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("재직"); // '재직', '퇴사', 'all'
-    const [sortBy, setBySort] = useState("id"); // 'id', 'name', 'start_date', 'wage'
+    const [sortBy, setBySort] = useState("username"); // 'username', 'name', 'start_date', 'wage'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     useEffect(() => {
@@ -87,8 +87,14 @@ export default function StaffPage() {
 
     const getSortedStaffs = () => {
         return [...staffs].sort((a, b) => {
-            if (sortBy === 'id') {
-                return (a.id || 0) - (b.id || 0);
+            if (sortBy === 'username') {
+                // 로그인 아이디 순 (없는 직원은 맨 뒤)
+                const ua = a.username || '';
+                const ub = b.username || '';
+                if (!ua && !ub) return 0;
+                if (!ua) return 1;
+                if (!ub) return -1;
+                return ua.localeCompare(ub);
             } else if (sortBy === 'name') {
                 return a.name.localeCompare(b.name, 'ko');
             } else if (sortBy === 'start_date') {
@@ -155,7 +161,7 @@ export default function StaffPage() {
                                 onChange={(e) => setBySort(e.target.value)}
                                 className="text-sm font-medium text-slate-600 outline-none bg-transparent"
                             >
-                                <option value="id">ID 순</option>
+                                <option value="username">아이디순</option>
                                 <option value="name">이름순</option>
                                 <option value="start_date">입사일순</option>
                                 <option value="wage">시급 높은순</option>
@@ -195,7 +201,11 @@ export default function StaffPage() {
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <div className="font-bold text-lg text-slate-900 group-hover:text-blue-600 transition-colors">{staff.name}</div>
-                                        <span className="text-xs font-mono text-slate-400 tabular-nums">#{staff.id}</span>
+                                        {staff.username ? (
+                                            <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{staff.username}</span>
+                                        ) : (
+                                            <span className="text-xs font-mono text-slate-300 italic">계정없음</span>
+                                        )}
                                         {staff.status === '퇴사' ? (
                                             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold">퇴사</span>
                                         ) : (

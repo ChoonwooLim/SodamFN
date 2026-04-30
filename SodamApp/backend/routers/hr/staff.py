@@ -134,7 +134,22 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
         
     staffs = session.exec(stmt).all()
     include_summary = _admin.role in ("admin", "superadmin")
-    return {"status": "success", "data": [_strip_private(s, include_summary) for s in staffs]}
+
+    # 로그인 계정 username 한 번에 매핑 (목록 화면에서 ID 표시용)
+    from models import User
+    staff_ids = [s.id for s in staffs if s.id is not None]
+    if staff_ids:
+        users = session.exec(select(User).where(col(User.staff_id).in_(staff_ids))).all()
+        username_map = {u.staff_id: u.username for u in users}
+    else:
+        username_map = {}
+
+    data = []
+    for s in staffs:
+        item = _strip_private(s, include_summary)
+        item["username"] = username_map.get(s.id)
+        data.append(item)
+    return {"status": "success", "data": data}
 
 @router.post("/staff")
 def create_staff(
