@@ -252,6 +252,44 @@ def _watermark_block(business) -> str:
     return f'<div class="cert-watermark"><img src="{data_uri}" alt="" /></div>'
 
 
+def _is_foreign(staff) -> bool:
+    """외국인 직원 판단: 국적이 South Korea 외이거나, 비자 종류가 명시된 경우."""
+    if not staff:
+        return False
+    nat = (getattr(staff, "nationality", "") or "").strip()
+    if nat and nat.lower() not in ("south korea", "대한민국", "한국", "korea"):
+        return True
+    if getattr(staff, "visa_type", None):
+        return True
+    return False
+
+
+def _staff_display_name(staff) -> str:
+    """증명서/계약서 표기용 직원명.
+
+    외국인이고 name_eng 가 등록되어 있으면 'NAME ENG (한글이름)' 형태,
+    한국인 또는 영문명 미등록 시는 한글 이름만.
+    """
+    if not staff:
+        return "-"
+    base = staff.name or "-"
+    name_eng = (getattr(staff, "name_eng", "") or "").strip()
+    if _is_foreign(staff) and name_eng:
+        return f"{name_eng} ({base})"
+    return base
+
+
+def _staff_signature_block(staff) -> str:
+    """본인 서명란 (외국인이면 영문명 라벨 함께 표기)."""
+    display = _staff_display_name(staff)
+    return f"""
+    <div class="cert-staff-sign">
+        <span>본 &nbsp;&nbsp; 인 &nbsp;&nbsp;{display}</span>
+        <span class="sign-mark">(서명)</span>
+    </div>
+    """
+
+
 def _issuer_block(business) -> str:
     """발급자 블록 — 좌측 사업장 정보 + 우측 대표자/직인.
 
@@ -402,6 +440,23 @@ def _base_css() -> str:
             letter-spacing: 4px;
             color: #1a1a1a;
         }
+        .cert-staff-sign {
+            margin: 28px 20mm 16px 20mm;
+            padding: 10px 0 10px 0;
+            border-top: 1px dashed #cbd5e1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14.5px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            letter-spacing: 1px;
+        }
+        .cert-staff-sign .sign-mark {
+            color: #475569;
+            font-size: 13px;
+            letter-spacing: 2px;
+        }
         .cert-issuer {
             font-size: 14.5px;
             line-height: 1.85;
@@ -517,7 +572,7 @@ def generate_employment_certificate(
             <tr><th colspan="4" class="cert-section-header">인 적 사 항</th></tr>
             <tr>
                 <th>성 명</th>
-                <td>{staff.name}</td>
+                <td>{_staff_display_name(staff)}</td>
                 <th>생년월일</th>
                 <td>{_fmt_date(staff.birth_date) if staff.birth_date else "-"}</td>
             </tr>
@@ -565,6 +620,7 @@ def generate_employment_certificate(
 
     <div class="cert-date">{_fmt_date(today)}</div>
 
+    {_staff_signature_block(staff)}
     {_issuer_block(business)}
     """
 
@@ -626,7 +682,7 @@ def generate_career_certificate(
             </tr>
             <tr>
                 <th>성 명</th>
-                <td>{staff.name}</td>
+                <td>{_staff_display_name(staff)}</td>
                 <th>생년월일</th>
                 <td>{_fmt_date(staff.birth_date) if staff.birth_date else "-"}</td>
             </tr>
@@ -680,6 +736,7 @@ def generate_career_certificate(
 
     <div class="cert-date">{_fmt_date(today)}</div>
 
+    {_staff_signature_block(staff)}
     {_issuer_block(business)}
     """
 
@@ -759,7 +816,7 @@ def generate_salary_certificate(
             </tr>
             <tr>
                 <th>성 명</th>
-                <td>{staff.name}</td>
+                <td>{_staff_display_name(staff)}</td>
                 <th>생년월일</th>
                 <td>{_fmt_date(staff.birth_date) if staff.birth_date else "-"}</td>
             </tr>
@@ -813,6 +870,7 @@ def generate_salary_certificate(
 
     <div class="cert-date">{_fmt_date(today)}</div>
 
+    {_staff_signature_block(staff)}
     {_issuer_block(business)}
     """
 
@@ -919,7 +977,7 @@ def generate_retirement_certificate(
             </tr>
             <tr>
                 <th>성 명</th>
-                <td>{staff.name}</td>
+                <td>{_staff_display_name(staff)}</td>
                 <th>생년월일</th>
                 <td>{_fmt_date(staff.birth_date) if staff.birth_date else "-"}</td>
             </tr>
@@ -977,6 +1035,7 @@ def generate_retirement_certificate(
 
     <div class="cert-date">{_fmt_date(today)}</div>
 
+    {_staff_signature_block(staff)}
     {_issuer_block(business)}
     """
 

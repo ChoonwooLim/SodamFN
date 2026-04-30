@@ -34,6 +34,7 @@ class StaffCreate(BaseModel):
 
 class StaffUpdate(BaseModel):
     name: Optional[str] = None
+    name_eng: Optional[str] = None  # 영문 이름 (외국인 직원)
     role: Optional[str] = None
     hourly_wage: Optional[int] = None
     bank_account: Optional[str] = None

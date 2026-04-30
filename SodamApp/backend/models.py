@@ -202,6 +202,7 @@ class Staff(SQLModel, table=True):
     # HR Details
     nationality: str = Field(default="South Korea") # 국적
     visa_type: Optional[str] = None # 비자 종류 (e.g. H-2, E-9, F-4...)
+    name_eng: Optional[str] = None # 영문 이름 (외국인 직원의 증명서/계약서용. 예: "DAO KIM HONG NGOC")
     phone: Optional[str] = None
     email: Optional[str] = None # 이메일 주소
     address: Optional[str] = None # Added for contract

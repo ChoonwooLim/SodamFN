@@ -80,6 +80,8 @@ def _run_migrations():
         ("staff", "private_owner_note", "TEXT"),
         # 2026-04-30: 팩스 다중 파일 묶음 발송 시 첨부 파일 list 보존
         ("faxtransmission", "attachment_files", "TEXT"),
+        # 2026-04-30: 외국인 직원 영문 이름 (증명서/계약서용)
+        ("staff", "name_eng", "VARCHAR"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")

@@ -75,6 +75,10 @@ export default function BasicInfoTab({
                                     <input type="text" name="role" value={formData.role || ''} onChange={handleChange} className={inputClass} placeholder="대표이사, 주방장, Staff..." />
                                 </div>
                             </div>
+                            <div>
+                                <label className={labelClass}>영문 이름 (외국인 직원만 — 증명서/계약서에 자동 표시)</label>
+                                <input type="text" name="name_eng" value={formData.name_eng || ''} onChange={handleChange} className={inputClass} placeholder="예: DAO KIM HONG NGOC" />
+                            </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className={labelClass}>휴대폰</label>
