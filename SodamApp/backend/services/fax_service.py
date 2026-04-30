@@ -256,6 +256,74 @@ class PopbillProvider(BaseFaxProvider):
                 except Exception:
                     pass
 
+    def send_multi(
+        self,
+        *,
+        target_number: str,
+        files,  # List[Tuple[bytes, str]] — (content, original_filename)
+        caller_id: Optional[str] = None,
+        subject: Optional[str] = None,
+    ) -> FaxResult:
+        """여러 파일을 한 통의 팩스로 묶어 발송 (팝빌 sendFAX_multi).
+
+        files = [(file_bytes, filename), ...]
+        SDK 가 파일들을 PDF 변환 + 한 통으로 합산해 발송. 페이지 수 = 합산.
+        """
+        if not self.corp_num or len(self.corp_num) != 10:
+            return FaxResult(ok=False, error="POPBILL_CORP_NUM (사업자번호 10자리) 미설정.")
+        sender = re.sub(r"\D", "", caller_id or "") or self.sender_num
+        if not sender:
+            return FaxResult(ok=False, error="발신번호(POPBILL_SENDER_NUMBER) 미설정.")
+        receiver = re.sub(r"\D", "", target_number)
+        if not receiver:
+            return FaxResult(ok=False, error="수신번호가 비어있습니다.")
+        if not files:
+            return FaxResult(ok=False, error="파일이 1개 이상 필요합니다.")
+
+        import tempfile
+        tmp_paths = []
+        try:
+            # 모든 파일을 임시 파일로 저장 (팝빌 SDK 는 파일 경로 list 요구)
+            for content, filename in files:
+                suffix = os.path.splitext(filename or "fax.pdf")[1] or ".pdf"
+                fd, tmp = tempfile.mkstemp(prefix="popbill_fax_multi_", suffix=suffix)
+                with os.fdopen(fd, "wb") as f:
+                    f.write(content)
+                tmp_paths.append(tmp)
+
+            svc = self._get_service()
+            try:
+                from popbill import PopbillException  # type: ignore
+            except ImportError:
+                PopbillException = Exception  # type: ignore
+
+            try:
+                receipt_num = svc.sendFAX_multi(
+                    self.corp_num,
+                    sender,
+                    receiver,
+                    "",  # ReceiverName
+                    tmp_paths,
+                    None,  # ReserveDT
+                    self.user_id,
+                    None,  # SenderName
+                    False,  # adsYN
+                    (subject or "")[:60] if subject else None,
+                )
+                return FaxResult(ok=True, provider_tx_id=str(receipt_num))
+            except PopbillException as pe:
+                code = getattr(pe, "code", None)
+                msg = getattr(pe, "message", str(pe))
+                return FaxResult(ok=False, error=f"Popbill[{code}] {msg}")
+            except Exception as e:
+                return FaxResult(ok=False, error=f"Popbill 다중 전송 오류: {e}")
+        finally:
+            for tp in tmp_paths:
+                try:
+                    os.remove(tp)
+                except Exception:
+                    pass
+
     def get_balance(self) -> Optional[float]:
         """현재 팝빌 포인트 잔액. 디버깅/어드민 화면용."""
         try:

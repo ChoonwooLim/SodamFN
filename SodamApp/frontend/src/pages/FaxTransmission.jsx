@@ -45,7 +45,7 @@ export default function FaxTransmission() {
     const [selectedCertType, setSelectedCertType] = useState('employment');
     const [staffList, setStaffList] = useState([]);
     const [selectedStaffId, setSelectedStaffId] = useState('');
-    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadFiles, setUploadFiles] = useState([]); // 다중 파일 — 한 통의 팩스로 묶어 발송
     const [bizDocs, setBizDocs] = useState([]);
     const [selectedBizDocId, setSelectedBizDocId] = useState('');
 
@@ -139,8 +139,9 @@ export default function FaxTransmission() {
             return await buildCertificatePdf();
         }
         if (source === 'upload') {
-            if (!uploadFile) throw new Error('파일을 선택하세요.');
-            return { blob: uploadFile, filename: uploadFile.name, sourceRef: null };
+            if (!uploadFiles || uploadFiles.length === 0) throw new Error('파일을 선택하세요.');
+            // 단일/다중 공통: 첫 파일을 대표값으로 반환 (handleSend 에서 다중 분기)
+            return { blob: uploadFiles[0], filename: uploadFiles[0].name, sourceRef: null };
         }
         if (source === 'business_doc') {
             const doc = bizDocs.find((d) => String(d.id) === String(selectedBizDocId));
@@ -162,16 +163,27 @@ export default function FaxTransmission() {
         }
         setSending(true);
         try {
-            const { blob, filename, sourceRef } = await getFileFromSource();
+            // 직접 업로드 + 2개 이상 → 한 통으로 묶어 /fax/send-multi 호출
+            const isMultiUpload = source === 'upload' && uploadFiles && uploadFiles.length > 1;
+
             const fd = new FormData();
-            fd.append('file', blob, filename);
             fd.append('target_number', targetNumber);
             if (targetName) fd.append('target_name', targetName);
             if (subject) fd.append('subject', subject);
             fd.append('source_type', source);
-            if (sourceRef) fd.append('source_ref', sourceRef);
 
-            const res = await api.post('/fax/send', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            let endpoint;
+            if (isMultiUpload) {
+                endpoint = '/fax/send-multi';
+                uploadFiles.forEach((f) => fd.append('files', f, f.name));
+            } else {
+                endpoint = '/fax/send';
+                const { blob, filename, sourceRef } = await getFileFromSource();
+                fd.append('file', blob, filename);
+                if (sourceRef) fd.append('source_ref', sourceRef);
+            }
+
+            const res = await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
             const status = res.data?.status;
             if (status === 'success') {
                 setMsg({ type: 'success', text: `전송 완료 (Tx: ${res.data.provider_tx_id || '-'})` });
@@ -376,22 +388,58 @@ export default function FaxTransmission() {
                             )}
 
                             {source === 'upload' && (
-                                <div className="p-5 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-center">
-                                    <label className="cursor-pointer inline-flex flex-col items-center gap-2">
+                                <div className="p-5 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                    <label className="cursor-pointer flex flex-col items-center gap-2 text-center">
                                         <Upload size={24} className="text-slate-400" />
                                         <span className="text-xs font-semibold text-slate-600">
-                                            {uploadFile ? uploadFile.name : 'PDF / 이미지 파일 선택 (최대 10MB)'}
+                                            {uploadFiles.length === 0
+                                                ? 'PDF / 이미지 파일 선택 (여러 파일 선택 시 한 통의 팩스로 묶여 발송, 합계 최대 10MB)'
+                                                : `선택된 파일 ${uploadFiles.length}개${uploadFiles.length > 1 ? ' — 한 통으로 묶어 발송' : ''}`}
                                         </span>
                                         <input
                                             type="file"
+                                            multiple
                                             className="hidden"
                                             accept=".pdf,image/*"
-                                            onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                            onChange={(e) => {
+                                                const newFiles = Array.from(e.target.files || []);
+                                                setUploadFiles((prev) => [...prev, ...newFiles]);
+                                                e.target.value = ''; // 같은 파일 재선택 가능
+                                            }}
                                         />
                                         <span className="mt-1 px-3 py-1 bg-white border border-slate-200 rounded-lg text-xs text-slate-600 hover:bg-slate-50">
-                                            파일 선택
+                                            파일 추가
                                         </span>
                                     </label>
+
+                                    {uploadFiles.length > 0 && (
+                                        <ul className="mt-4 space-y-1.5 text-left">
+                                            {uploadFiles.map((f, idx) => (
+                                                <li
+                                                    key={`${f.name}-${idx}-${f.lastModified}`}
+                                                    className="flex items-center justify-between gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
+                                                >
+                                                    <span className="flex-1 truncate text-slate-700">
+                                                        {idx + 1}. {f.name}
+                                                        <span className="text-slate-400 ml-2">
+                                                            {(f.size / 1024).toFixed(0)} KB
+                                                        </span>
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setUploadFiles((prev) =>
+                                                                prev.filter((_, i) => i !== idx)
+                                                            )
+                                                        }
+                                                        className="px-2 py-0.5 text-red-500 hover:bg-red-50 rounded"
+                                                    >
+                                                        제거
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             )}
 
