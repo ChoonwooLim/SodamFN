@@ -11,7 +11,7 @@ export default function StaffPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("재직"); // '재직', '퇴사', 'all'
-    const [sortBy, setBySort] = useState("name"); // 'name', 'start_date', 'wage'
+    const [sortBy, setBySort] = useState("id"); // 'id', 'name', 'start_date', 'wage'
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     useEffect(() => {
@@ -87,7 +87,9 @@ export default function StaffPage() {
 
     const getSortedStaffs = () => {
         return [...staffs].sort((a, b) => {
-            if (sortBy === 'name') {
+            if (sortBy === 'id') {
+                return (a.id || 0) - (b.id || 0);
+            } else if (sortBy === 'name') {
                 return a.name.localeCompare(b.name, 'ko');
             } else if (sortBy === 'start_date') {
                 return new Date(b.start_date) - new Date(a.start_date); // Newest first
@@ -153,6 +155,7 @@ export default function StaffPage() {
                                 onChange={(e) => setBySort(e.target.value)}
                                 className="text-sm font-medium text-slate-600 outline-none bg-transparent"
                             >
+                                <option value="id">ID 순</option>
                                 <option value="name">이름순</option>
                                 <option value="start_date">입사일순</option>
                                 <option value="wage">시급 높은순</option>
@@ -192,6 +195,7 @@ export default function StaffPage() {
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <div className="font-bold text-lg text-slate-900 group-hover:text-blue-600 transition-colors">{staff.name}</div>
+                                        <span className="text-xs font-mono text-slate-400 tabular-nums">#{staff.id}</span>
                                         {staff.status === '퇴사' ? (
                                             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold">퇴사</span>
                                         ) : (
