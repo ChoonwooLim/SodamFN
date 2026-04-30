@@ -298,11 +298,13 @@ class PopbillProvider(BaseFaxProvider):
                 PopbillException = Exception  # type: ignore
 
             try:
+                # 시그니처: sendFax_multi(CorpNum, SenderNum, Receiver, FilePath,
+                #                          ReserveDT, UserID, SenderName, adsYN, title, RequestNum)
+                # 단일(sendFax) 와 달리 ReceiverName 인자 없음 + FilePath 가 list 위치(4번째).
                 receipt_num = svc.sendFax_multi(
                     self.corp_num,
                     sender,
                     receiver,
-                    "",  # ReceiverName
                     tmp_paths,
                     None,  # ReserveDT
                     self.user_id,
