@@ -343,7 +343,7 @@ def _base_css() -> str:
     return """
         @page {
             size: A4;
-            margin: 15mm 15mm 15mm 15mm;
+            margin: 10mm 12mm 10mm 12mm;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -358,11 +358,11 @@ def _base_css() -> str:
             margin: 0 auto;
             background: #fff;
             position: relative;
-            padding: 14mm 12mm;
+            padding: 10mm 10mm;
             border: 2px solid #1a1a1a;
             outline: 1px solid #1a1a1a;
             outline-offset: 4px;
-            min-height: calc(297mm - 32mm);
+            min-height: calc(297mm - 24mm);
             overflow: hidden;
         }
         .cert-watermark {
@@ -439,76 +439,76 @@ def _base_css() -> str:
         }
         .cert-purpose {
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
-            margin: 22px 0 8px;
-            line-height: 1.6;
+            margin: 14px 0 6px;
+            line-height: 1.5;
             letter-spacing: 2px;
         }
         .cert-purpose .purpose-sub {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 400;
-            margin-top: 6px;
+            margin-top: 4px;
             color: #333;
             letter-spacing: 1px;
         }
         .cert-date {
             text-align: center;
             font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 700;
-            margin: 18px 0 24px;
+            margin: 10px 0 14px;
             letter-spacing: 4px;
             color: #1a1a1a;
         }
         .cert-staff-sign {
-            margin: 28px 20mm 16px 20mm;
-            padding: 10px 0 10px 0;
+            margin: 14px 20mm 8px 20mm;
+            padding: 6px 0 4px 0;
             border-top: 1px dashed #cbd5e1;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 14.5px;
+            font-size: 14px;
             page-break-inside: avoid;
             break-inside: avoid;
             letter-spacing: 1px;
         }
         .cert-staff-sign .sign-mark {
             color: #475569;
-            font-size: 13px;
+            font-size: 12.5px;
             letter-spacing: 2px;
         }
         .cert-issuer {
-            font-size: 14.5px;
-            line-height: 1.85;
+            font-size: 14px;
+            line-height: 1.7;
             page-break-inside: avoid;
             break-inside: avoid;
-            margin-top: 6px;
+            margin-top: 0;
         }
         .cert-issuer-info {
             text-align: left;
             padding-left: 20mm;
         }
         .cert-issuer-info p {
-            margin: 3px 0;
+            margin: 2px 0;
             letter-spacing: 0.5px;
         }
         .cert-issuer-info .biz-name {
             font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 700;
             letter-spacing: 3px;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
         .cert-issuer-owner {
             display: flex;
             justify-content: flex-end;
             align-items: center;
-            gap: 14px;
-            margin-top: 14px;
+            gap: 12px;
+            margin-top: 8px;
             padding-right: 18mm;
             font-family: 'Nanum Myeongjo', 'Noto Serif KR', serif;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 700;
             letter-spacing: 3px;
         }
@@ -518,8 +518,8 @@ def _base_css() -> str:
         }
         .cert-seal-img {
             display: inline-block;
-            width: 78px;
-            height: 78px;
+            width: 62px;
+            height: 62px;
             vertical-align: middle;
             transform: rotate(-5deg);
         }
