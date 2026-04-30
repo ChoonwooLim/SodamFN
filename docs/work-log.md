@@ -858,3 +858,134 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 4. **이지포스 KICC API 키** (4/29 전화 후 영업일 1-2일) — 도착 시 매출 채널 통합 + CODEF 매입 어댑터 재매핑 결정
 
 ---
+
+## 2026-04-30 (저녁 세션 — 직원관리 자동화 + 다중매장 + 전자계약서 표준양식 + 외국인 증명서)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | payroll calculate 의 override 입력 시 NameError 회귀 + details_json 에 overrides 누락 수정 | 완료 |
+| feat | 직원관리 페이지 로그인 계정 username 표시 + 아이디순 정렬 (기본값) | 완료 |
+| feat | 신규 직원 등록 시 로그인 ID 자동 순차 부여 (사업장별 prefix 감지) + 계정 동시 생성 | 완료 |
+| feat | 인사기록카드 로그인 계정 — 아이디 수정/비밀번호 재설정/계정 삭제 + 표시 토글 | 완료 |
+| infra | npm run dev 자동화 — OS 무관 백엔드 명령 + venv backslash 경로 + requirements 자동 동기화 prereq | 완료 |
+| feat | 전자계약서 변수 자동 치환 확장 (30+ 변수) + 고용노동부 표준 양식 + 변수 카탈로그 도움말 | 완료 |
+| feat | 근무장소 자동 입력 — settings.work_location 단일 필드 (단일매장) | 완료 |
+| feat | 다중매장 보유 업체 지원 — BusinessStore 모델 + 매장 관리 UI + 계약서 매장 선택 드롭다운 | 완료 |
+| fix | 전자계약서 모달 stale state 회피 + /business-info → /auth/business-info 경로 정정 (404 원인) | 완료 |
+| feat | 사회보험 체크박스 자동 표시 변수 4개 (NP/HI/EI/WI) — 직원 분류·NP면제 기반 ☑/☐ 자동 결정 | 완료 |
+| feat | 외국인 직원 영문명 표기 + 본인 서명란 — Staff.name_eng 필드 + 자동 fallback (account_holder 영문) | 완료 |
+| style | 본인 서명란 추가로 인한 2페이지 분리 해소 + 직인 80% 축소 + 외곽선 인쇄 안전 영역 확보 | 완료 |
+| chore | 데이터 정정 — 정명주/김순복/정수현 contract_type 정규직→아르바이트, 김금순/김다은 영문명 등록 | 완료 |
+
+### 세부 내용
+
+#### payroll override 회귀 fix
+- `routers/payroll.py:508` `details['overrides'] = req.overrides` — `details` 변수가 calculate 함수 안에 정의된 적 없어 NameError 500
+- 사장님이 6개 공제 필드 입력하면 산출 자체가 실패 (기능이 없어진 것처럼 보임)
+- details_json 직렬화 시 overrides 도 누락되어 다음 진입 시 자동 복원 실패
+- `details_payload` 통합 dict 로 정정. req.overrides=None 케이스도 정상 직렬화 보장
+
+#### 직원관리 자동화
+- 직원 카드 이름 옆 로그인 ID 배지 (slate-100 bg, mono font-bold)
+- 정렬 옵션 첫 번째 "아이디순" + 기본값
+- 신규 직원 추가 모달:
+  - 사업장 username 패턴 분석 → 다음 추천값 미리 채움 (예: sodam008 → sodam009)
+  - 충돌 회피 +1 반복
+  - "로그인 계정 함께 생성" 토글 + 비밀번호/등급 입력 (기본 ON)
+  - POST /staff 가 auto_create_account=True 시 Staff + User 한 번에 생성
+- 인사기록카드 로그인 계정 섹션:
+  - 아이디 옆 연필 → 인라인 수정 (Enter 저장 / Esc 취소)
+  - 비밀번호 재설정 모달 (눈 아이콘 표시 토글, 평문 미리보기)
+  - 계정 삭제 빨간 버튼 (이중 confirm)
+- 백엔드 신규 endpoint 4개:
+  - GET /staff/next-username
+  - PUT /staff/{id}/account/username
+  - PUT /staff/{id}/account/password
+  - DELETE /staff/{id}/account
+
+#### npm run dev 자동화 (DevOps)
+- `dev:backend` 명령이 cmd 전용 구문(for/findstr/^|/taskkill) → bash/PowerShell 에서 실패
+- OS 무관 형태로 교체: `.venv\Scripts\python.exe -m uvicorn main:app --reload`
+- 첫 시도 시 forward slash 가 cmd.exe 에서 명령으로 인식 → backslash 로 정정
+- `setup:backend` prereq 추가: `pip install -q -r requirements.txt` 자동 실행 → ModuleNotFoundError 재발 방지
+
+#### 전자계약서 표준양식 + 30+ 변수 자동 치환
+- 신규 utils/contractVars.js:
+  - `getStandardContractTemplate()` — 고용노동부 표준 양식 11개 조항
+  - `buildContractVariables(staff, business)` — 30+ 변수 매핑
+  - `applyContractVariables(template, vars)` — split-join 안전 치환
+  - `CONTRACT_VARIABLE_CATALOG` — UI 도움말용
+- ContractSettings: 표준 양식 함수 호출 + 변수 클릭하면 클립보드 복사
+- StaffDetail handleOpenContractModal: 템플릿 + business + stores 병렬 fetch + 일괄 치환
+- ContractTab "변수 치환" 버튼: 항상 최신 fetch 후 치환
+
+#### 다중매장 BusinessStore 시스템 (대형)
+- 신규 모델 BusinessStore (business_id FK + name + address + phone + is_default + is_active)
+- 신규 라우터 routers/store.py: GET/POST/PUT/DELETE /stores + PUT /stores/{id}/set-default
+- 신규 컴포넌트 components/StoreManager.jsx: 목록 + 추가/인라인 수정/삭제/기본 설정
+- CompanyInfoSettings 임베드 (회사 정보 저장 다음)
+- 계약서 모달에 매장 선택 드롭다운 (amber 배경, default 자동 선택)
+- _seed_default_stores() — 기존 사업장에 default store 1개 자동 생성 (idempotent)
+  - 3개 사업장 시드: 소담김밥/소담김밥 강동점/장인김밥
+- {work_location} 변수가 선택된 store.name 으로 자동 치환
+
+#### 사회보험 체크박스 자동 표시
+- 변수 4개 신규: {insurance_check_np/hi/ei/wi}
+- ☑/☐ 자동 결정:
+  - 산재(WI): 항상 ☑ (모든 근로자 의무)
+  - 고용(EI): insurance_4major OR 일용직/아르바이트
+  - 국민연금(NP): insurance_4major AND !np_exempt
+  - 건강(HI): insurance_4major
+- 표준 양식 8번 자리에 변수 4개 박힘
+- DB 양식 즉시 갱신 (사장님이 양식 다시 초기화 안 해도 다음 변수치환 시 적용)
+
+#### 외국인 직원 증명서 강화
+- Staff.name_eng 신규 필드 (Optional VARCHAR + auto-migration)
+- StaffUpdate Pydantic + BasicInfoTab 입력 칸 추가
+- _is_foreign(staff): nationality 비한국 OR visa_type 명시
+- _resolve_name_eng(staff): name_eng > account_holder(영문) > '' 우선순위
+- _staff_display_name: 외국인 + 영문명 결정 가능 시 'NAME ENG (한글이름)' 자동 표기
+- _staff_signature_block: 본인 서명란 (점선 구분선 + 'XXX (서명)')
+- 4개 증명서(재직/경력/급여/퇴직) 모두 적용
+- 김다은(D-2 베트남) 'DAO KIM HONG NGOC' 등록
+- 김금순(F-4 재외동포) 'JIN JINSHUN' account_holder 에서 자동 fallback 등록
+
+#### 인쇄 스타일 미세 조정
+- 본인 서명란 추가로 콘텐츠 늘어 2페이지 분리 → margin/padding 일괄 축소로 1페이지 수렴
+- 직인 78px → 62px (사장님 요청 80% 적용)
+- @page margin 하단 14mm + min-height calc(297-40)mm — 외곽선 인쇄 안전 영역 안
+
+#### 데이터 정정 (DB 직접)
+- 정명주(id=3)/김순복(id=8)/정수현(id=9): contract_type 정규직 → 아르바이트
+  - 김금순(id=2)만 진짜 정규직(월급 3,400,000) 유지
+- 김다은(id=14): name_eng='DAO KIM HONG NGOC', nationality='Vietnam' 등록
+- 김금순(id=2): name_eng='JIN JINSHUN' 자동 등록 (account_holder 에서 복사)
+- 소담김밥 settings.work_location='소담김밥 건대본점 매장'
+- 3개 사업장 default BusinessStore 자동 시드
+
+### 메모리 갱신
+
+- `feedback_korean_encoding.md` 신규 — Windows cp949 콘솔 한글 깨짐 + DELETE 시 staff_id 명시 강제 (이전 등록)
+- `project_payroll_apr_2026.md` 갱신 — 4월 정합성 진행 상태 + 자동화 95% Phase 2-4 로드맵 + contract_type 정정 메모
+- `MEMORY.md` 인덱스 갱신
+
+### 외부 진행 상태 (4/30 종료 시점)
+
+| 항목 | 상태 |
+|---|---|
+| 알림톡 템플릿 (급여명세서 발송 안내) | ⏳ 사장님 검수 신청 진행 중 |
+| 린 일용직 세무사 PDF | ⏳ 사장님 별도 요청 (선택) |
+| Prod 동기화 — 정명주/김순복/정수현 contract_type | ⏳ admin UI 에서 변경 필요 |
+| Prod 동기화 — 외국인 영문명 입력 (또는 자동 fallback) | ⏳ 자동 fallback 동작 시 추가 작업 불필요 |
+
+### 다음 세션 인계
+
+1. **알림톡 템플릿 검수 결과 확인** + 백엔드 발송 코드 (PopbillProvider.sendKakaoAlimtalk 연결, 급여 확정 트리거)
+2. **자동화 Phase 2-4** (1.5시간): insurance_base_salary_hi + ei_exempt + 두루누리 정책 재검토 → 9/10명 자동
+3. **1월 데이터 CLAUDE.md 모순 점검**: 1월 김금순 세금대납 데이터 재조정
+4. **이지포스 KICC API 키** 도착 후 매출 채널 통합 결정
+5. **다중매장 후속** (별도): Staff.store_id FK 추가 → 직원별 소속 매장 자동 매핑 (2번째 매장 오픈 시점)
+
+---

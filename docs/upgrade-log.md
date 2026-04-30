@@ -83,3 +83,11 @@
 | 2026-04-30 | 직원앱 급여명세서 페이지 ?month= 쿼리스트링 지원 (알림톡 #{지급월코드} 변수와 연결) | feat | staff-app/src/pages/Payslip.jsx |
 | 2026-04-30 | 2026-04 급여 세무사 기준 정합성 조정 — 10명 전원 항목별 분해 완료. 분류: 4대보험+세금대납(김금순) / 4대보험(정명주/정수현/김순복) / 일용직 EI만(김다은/린) / 3.3% 사업소득(정수미/반정옥/황윤선/고아라) | feat | scripts/maintenance/adjust_apr_to_accountant.py |
 | 2026-04-30 | 4월 자동 계산 vs 세무사 PDF 검증 도구 — 매월 차이 항목별 자동 비교 (DRY-RUN). 사업소득자 4명 + 일용직 1명 = 5명 100% 자동 검증, 4대보험 가입자 5명은 HI 보수월액 분리 필드 필요 (Phase 2 로드맵) | feat | scripts/maintenance/verify_apr_auto_calc.py |
+| 2026-04-30 | 직원관리 페이지 로그인 계정 username 표시 + 아이디순 정렬 (기본값) | feat | pages/Staff.jsx, routers/hr/staff.py |
+| 2026-04-30 | 신규 직원 등록 시 로그인 ID 자동 순차 부여 (사업장 prefix 패턴 분석) + Staff/User 동시 생성 | feat | routers/hr/staff.py, components/StaffAddModal.jsx |
+| 2026-04-30 | 인사기록카드 로그인 계정 — 아이디 수정/비밀번호 재설정/계정 삭제 + 비밀번호 표시 토글 | feat | routers/hr/staff.py, pages/StaffDetail/index.jsx, BasicInfoTab.jsx |
+| 2026-04-30 | npm run dev 자동화 — OS 무관 백엔드 기동 + venv 경로 + requirements.txt 자동 동기화 prereq | infra | SodamApp/frontend/package.json |
+| 2026-04-30 | 전자계약서 변수 자동 치환 30+ 변수 + 고용노동부 표준 양식 + 변수 카탈로그 도움말 | feat | utils/contractVars.js, pages/ContractSettings.jsx, pages/StaffDetail/index.jsx, ContractTab.jsx |
+| 2026-04-30 | 다중매장 보유 업체 지원 — BusinessStore 모델 + 매장 관리 UI + 계약서 매장 선택 드롭다운 | feat | models.py, init_db.py, routers/store.py, components/StoreManager.jsx, pages/CompanyInfoSettings.jsx, ContractTab.jsx |
+| 2026-04-30 | 사회보험 적용여부 체크박스 자동 표시 변수 4개 (NP/HI/EI/WI) — insurance_4major/np_exempt/contract_type 기반 ☑/☐ 자동 결정 | feat | utils/contractVars.js |
+| 2026-04-30 | 외국인 직원 영문 이름 표기 + 본인 서명란 — Staff.name_eng 신규 + account_holder 영문값 자동 fallback + 4개 증명서 일괄 적용 | feat | models.py, init_db.py, routers/hr/staff.py, routers/hr/certificate.py, BasicInfoTab.jsx |
