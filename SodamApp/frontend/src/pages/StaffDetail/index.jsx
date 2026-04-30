@@ -14,6 +14,7 @@ import LeaveTab from './LeaveTab';
 import ChangeLogTab from './ChangeLogTab';
 import TrainingTab from './TrainingTab';
 import PrivateTab from './PrivateTab';
+import StaffPrivateBadges from '../../components/StaffPrivateBadges';
 
 const ALL_TABS = [
     { key: 'basic', label: '기본정보', icon: User },
@@ -590,7 +591,11 @@ export default function StaffDetail() {
                             <User size={20} className="text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{formData.name} 인사기록카드</h1>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{formData.name} 인사기록카드</h1>
+                                {/* 사업주 전용 정책 배지 — formData 가 admin 응답이면 private_* 요약 필드 포함 */}
+                                <StaffPrivateBadges staff={formData} size="sm" />
+                            </div>
                             {/* Auto-save status */}
                             <div className="h-4 mt-0.5">
                                 {saveStatus === 'pending' && (

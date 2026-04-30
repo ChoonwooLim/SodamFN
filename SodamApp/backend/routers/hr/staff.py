@@ -85,7 +85,7 @@ class StaffPrivateUpdate(BaseModel):
     private_owner_note: Optional[str] = None
 
 
-# 외부 노출 금지 — Staff 응답 직렬화 시 제거할 키 목록
+# 외부 노출 금지 — Staff 응답 직렬화 시 제거할 키 목록 (전체 비공개 필드)
 _PRIVATE_KEYS = {
     "private_payment_method",
     "private_actual_payee_name",
@@ -95,9 +95,18 @@ _PRIVATE_KEYS = {
     "private_owner_note",
 }
 
+# admin/superadmin 에게만 기본 응답에 포함하는 요약 필드 — 직원 목록·헤더 배지 표시용.
+# 민감한 본문(타인계좌·메모)은 여전히 GET /staff/{id}/private 엔드포인트 전용.
+_PRIVATE_SUMMARY_KEYS = {"private_payment_method", "private_tax_unreported"}
 
-def _strip_private(staff_obj):
-    """Staff 객체를 dict 로 변환하면서 private_* 필드 제거."""
+
+def _strip_private(staff_obj, include_admin_summary=False):
+    """Staff 객체를 dict 로 변환하면서 private_* 필드 처리.
+
+    include_admin_summary=True 면 요약 필드(_PRIVATE_SUMMARY_KEYS)는 남김 — 사업주가
+    직원 목록/헤더에서 운영 상태(현금지급/세금미신고 등)를 한눈에 볼 수 있도록.
+    민감 본문(타인계좌 정보·메모)은 어떤 경우에도 기본 응답에 포함 안 함.
+    """
     if hasattr(staff_obj, "model_dump"):
         data = staff_obj.model_dump()
     elif hasattr(staff_obj, "dict"):
@@ -105,6 +114,8 @@ def _strip_private(staff_obj):
     else:
         data = dict(staff_obj)
     for k in _PRIVATE_KEYS:
+        if include_admin_summary and k in _PRIVATE_SUMMARY_KEYS:
+            continue
         data.pop(k, None)
     return data
 
@@ -122,7 +133,8 @@ def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin:
         stmt = stmt.where(col(Staff.name).contains(q))
         
     staffs = session.exec(stmt).all()
-    return {"status": "success", "data": [_strip_private(s) for s in staffs]}
+    include_summary = _admin.role in ("admin", "superadmin")
+    return {"status": "success", "data": [_strip_private(s, include_summary) for s in staffs]}
 
 @router.post("/staff")
 def create_staff(
@@ -177,9 +189,10 @@ def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), 
 
     payrolls = session.exec(select(Payroll).where(Payroll.staff_id == staff_id)).all()
 
+    include_summary = _admin.role in ("admin", "superadmin")
     return {
         "status": "success",
-        "data": _strip_private(staff),
+        "data": _strip_private(staff, include_summary),
         "documents": documents,
         "payrolls": payrolls,
         "contracts": contracts,

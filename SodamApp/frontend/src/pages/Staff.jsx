@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, UserPlus, ChevronRight, UserMinus, UserCheck, SortAsc, Filter, Trash2, Users } from 'lucide-react';
 import api from '../api';
 import StaffAddModal from '../components/StaffAddModal';
+import StaffPrivateBadges from '../components/StaffPrivateBadges';
 
 export default function StaffPage() {
     const navigate = useNavigate();
@@ -189,13 +190,15 @@ export default function StaffPage() {
                                 className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center cursor-pointer hover:shadow-md transition-shadow group card-animate"
                             >
                                 <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <div className="font-bold text-lg text-slate-900 group-hover:text-blue-600 transition-colors">{staff.name}</div>
                                         {staff.status === '퇴사' ? (
                                             <span className="bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full font-bold">퇴사</span>
                                         ) : (
                                             <span className="bg-emerald-100 text-emerald-600 text-xs px-2 py-0.5 rounded-full font-bold">재직</span>
                                         )}
+                                        {/* 사업주 전용 정책 배지 — admin/superadmin 토큰 응답에만 필드 포함 */}
+                                        <StaffPrivateBadges staff={staff} size="sm" />
                                     </div>
                                     <div className="text-sm text-slate-500 mt-1">{staff.role} | 시급 {staff.hourly_wage.toLocaleString()}원</div>
                                 </div>
