@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { User, Save, FileText, CreditCard, Calendar, Upload, Calculator, Check, Loader2, Palmtree, History, GraduationCap, ChevronLeft, Lock } from 'lucide-react';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
+import { buildContractVariables, applyContractVariables } from '../../utils/contractVars';
 import { useBusinessConfig, SCALE_FEATURES } from '../../hooks/useBusinessConfig';
 import BasicInfoTab from './BasicInfoTab';
 import AttendanceTab from './AttendanceTab';
@@ -123,6 +124,7 @@ export default function StaffDetail() {
     const [payrolls, setPayrolls] = useState([]); // List of payroll history
     const [contracts, setContracts] = useState([]); // List of electronic contracts
     const [user, setUser] = useState(null); // Linked user account
+    const [businessInfo, setBusinessInfo] = useState({}); // 사업주 정보 (계약서 변수 치환용)
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
     const [selectedPayroll, setSelectedPayroll] = useState(null); // Selected payroll for statement modal
@@ -568,49 +570,26 @@ export default function StaffDetail() {
     const handleOpenContractModal = async () => {
         setEditingContractId(null);
         let template = contractForm.content;
+        let businessInfo = {};
 
+        // 템플릿 + 사업주 정보 병렬 fetch
         try {
-            const res = await api.get('/settings/contract_template');
-            if (res.data && res.data.value) {
-                template = res.data.value;
+            const [templateRes, businessRes] = await Promise.all([
+                api.get('/settings/contract_template').catch(() => null),
+                api.get('/business-info').catch(() => null),
+            ]);
+            if (templateRes?.data?.value) template = templateRes.data.value;
+            if (businessRes?.data) {
+                businessInfo = businessRes.data;
+                setBusinessInfo(businessRes.data);
             }
         } catch (error) {
-            console.error("Failed to fetch contract template", error);
+            console.error("Failed to fetch contract context", error);
         }
 
-        // --- Auto-Fill Logic ---
-        const wage = formData.contract_type === '정규직'
-            ? formData.monthly_salary
-            : formData.hourly_wage;
-        const formattedWage = wage ? formatNumber(wage) : '';
-
-        const bonusInfo = formData.bonus_enabled
-            ? `있음 (${formData.bonus_amount || ''})`
-            : '없음';
-
-        const replacements = {
-            '{name}': formData.name || '',
-            '{phone}': formData.phone || '',
-            '{address}': formData.address || '____________________',
-            '{contract_start_date}': formData.contract_start_date || '____년 __월 __일',
-            '{contract_end_date}': formData.contract_end_date || '____년 __월 __일',
-            '{work_start_time}': formData.work_start_time || '__:__',
-            '{work_end_time}': formData.work_end_time || '__:__',
-            '{rest_start_time}': formData.rest_start_time || '__:__',
-            '{rest_end_time}': formData.rest_end_time || '__:__',
-            '{working_days}': formData.working_days || '______',
-            '{weekly_holiday}': formData.weekly_holiday || '______',
-            '{job_description}': formData.job_description || '______',
-            '{wage}': formattedWage,
-            '{bonus_info}': bonusInfo,
-            '{salary_payment_date}': formData.salary_payment_date || '매월 말일',
-            '{salary_payment_method}': formData.salary_payment_method || '근로자 계좌 입금'
-        };
-
-        let filledContent = template;
-        for (const [key, value] of Object.entries(replacements)) {
-            filledContent = filledContent.replace(new RegExp(key, 'g'), value);
-        }
+        // 공통 변수 매핑 → 치환
+        const variables = buildContractVariables(formData, businessInfo);
+        const filledContent = applyContractVariables(template, variables);
 
         setContractForm(prev => ({ ...prev, content: filledContent }));
         setIsContractModalOpen(true);
@@ -773,6 +752,7 @@ export default function StaffDetail() {
                         contracts={contracts}
                         contractForm={contractForm}
                         setContractForm={setContractForm}
+                        businessInfo={businessInfo}
                         isContractModalOpen={isContractModalOpen}
                         setIsContractModalOpen={setIsContractModalOpen}
                         handleOpenContractModal={handleOpenContractModal}

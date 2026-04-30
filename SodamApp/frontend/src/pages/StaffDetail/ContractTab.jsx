@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, MessageSquare, Trash2, CreditCard, ShieldCheck, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { formatNumber } from '../../utils/format';
+import { buildContractVariables, applyContractVariables } from '../../utils/contractVars';
 import api from '../../api';
 
 const POPBILL_BANKS = [
@@ -34,6 +35,7 @@ export default function ContractTab({
     handleDeleteContract,
     handleEditContract,
     editingContractId,
+    businessInfo = {},
 }) {
     // 예금주 자동확인 (Popbill AccountCheckService)
     const [acctChecking, setAcctChecking] = useState(false);
@@ -493,15 +495,12 @@ export default function ContractTab({
                                 <h3 className="text-xl font-bold text-slate-900">전자계약서 작성</h3>
                                 <button
                                     onClick={() => {
-                                        let newContent = contractForm.content || "";
-                                        newContent = newContent.replace(/{name}/g, formData.name || "");
-                                        newContent = newContent.replace(/{start_date}/g, formData.start_date || "");
-                                        newContent = newContent.replace(/{phone}/g, formData.phone || "");
-                                        const wage = formData.contract_type === '정규직' ? formData.monthly_salary : formData.hourly_wage;
-                                        newContent = newContent.replace(/{wage}/g, wage ? formatNumber(wage) : "");
+                                        const variables = buildContractVariables(formData, businessInfo);
+                                        const newContent = applyContractVariables(contractForm.content || "", variables);
                                         setContractForm(prev => ({ ...prev, content: newContent }));
                                     }}
                                     className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100"
+                                    title="직원/사업주/오늘날짜 정보를 본문에 자동 채움"
                                 >
                                     변수 치환
                                 </button>
