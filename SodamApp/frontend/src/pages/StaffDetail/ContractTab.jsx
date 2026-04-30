@@ -494,8 +494,16 @@ export default function ContractTab({
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-bold text-slate-900">전자계약서 작성</h3>
                                 <button
-                                    onClick={() => {
-                                        const variables = buildContractVariables(formData, businessInfo);
+                                    onClick={async () => {
+                                        // 항상 최신 사업주 정보 fetch — props 가 빈 상태이거나 stale 일 수 있음
+                                        let biz = businessInfo;
+                                        try {
+                                            const res = await api.get('/business-info');
+                                            if (res?.data) biz = res.data;
+                                        } catch (err) {
+                                            console.warn('business-info fetch 실패, 기존 props 사용:', err);
+                                        }
+                                        const variables = buildContractVariables(formData, biz);
                                         const newContent = applyContractVariables(contractForm.content || "", variables);
                                         setContractForm(prev => ({ ...prev, content: newContent }));
                                     }}

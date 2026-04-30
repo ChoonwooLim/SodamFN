@@ -75,9 +75,15 @@ export function getStandardContractTemplate() {
  * @returns {Record<string, string>}
  */
 export function buildContractVariables(staff = {}, business = {}) {
-    const wageNum = staff.contract_type === '정규직'
-        ? staff.monthly_salary
-        : staff.hourly_wage;
+    // 임금 우선순위:
+    //   정규직: monthly_salary > 0 이면 월급, 아니면 시급(hourly_wage)으로 fallback
+    //   그 외(아르바이트/일용직): hourly_wage 시급
+    let wageNum;
+    if (staff.contract_type === '정규직' && staff.monthly_salary && staff.monthly_salary > 0) {
+        wageNum = staff.monthly_salary;
+    } else {
+        wageNum = staff.hourly_wage;
+    }
     const formattedWage = wageNum ? formatNumber(wageNum) : '';
 
     const bonusInfo = staff.bonus_enabled
