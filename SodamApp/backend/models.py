@@ -48,6 +48,28 @@ class Business(SQLModel, table=True):
     users: List["User"] = Relationship(back_populates="business")
     staff_members: List["Staff"] = Relationship(back_populates="business")
     vendors: List["Vendor"] = Relationship(back_populates="business")
+    stores: List["BusinessStore"] = Relationship(back_populates="business")
+
+
+class BusinessStore(SQLModel, table=True):
+    """사업장 산하 매장 (다중매장 보유 업체 지원).
+
+    예) 소담김밥(business) → 건대본점/강남점/신촌점(stores).
+    단일매장 업체도 default store 1개를 보유하도록 마이그레이션에서 자동 생성.
+    계약서 {work_location} 변수가 선택된 store.name 으로 치환됨.
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    name: str  # 매장명 (예: "소담김밥 건대본점 매장")
+    address: Optional[str] = None  # 매장 주소 (사업장 주소와 다를 수 있음)
+    phone: Optional[str] = None
+    is_default: bool = Field(default=False)  # 신규 직원 등록 시 기본 매장
+    is_active: bool = Field(default=True)
+    sort_order: int = Field(default=0)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+    business: Optional[Business] = Relationship(back_populates="stores")
+
 
 # --- Financials ---
 

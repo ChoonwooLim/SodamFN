@@ -125,6 +125,8 @@ export default function StaffDetail() {
     const [contracts, setContracts] = useState([]); // List of electronic contracts
     const [user, setUser] = useState(null); // Linked user account
     const [businessInfo, setBusinessInfo] = useState({}); // 사업주 정보 (계약서 변수 치환용)
+    const [stores, setStores] = useState([]); // 매장 목록 (계약서 모달에서 선택)
+    const [selectedStoreId, setSelectedStoreId] = useState(null); // 선택된 매장 id
     const [loading, setLoading] = useState(true);
     const [msg, setMsg] = useState("");
     const [selectedPayroll, setSelectedPayroll] = useState(null); // Selected payroll for statement modal
@@ -571,24 +573,37 @@ export default function StaffDetail() {
         setEditingContractId(null);
         let template = contractForm.content;
         let businessInfo = {};
+        let storesList = [];
+        let defaultStoreName = '';
 
-        // 템플릿 + 사업주 정보 병렬 fetch
+        // 템플릿 + 사업주 정보 + 매장 목록 병렬 fetch
         try {
-            const [templateRes, businessRes] = await Promise.all([
+            const [templateRes, businessRes, storesRes] = await Promise.all([
                 api.get('/settings/contract_template').catch(() => null),
                 api.get('/business-info').catch(() => null),
+                api.get('/stores').catch(() => null),
             ]);
             if (templateRes?.data?.value) template = templateRes.data.value;
             if (businessRes?.data) {
                 businessInfo = businessRes.data;
                 setBusinessInfo(businessRes.data);
             }
+            if (storesRes?.data?.data) {
+                storesList = storesRes.data.data.filter(s => s.is_active);
+                setStores(storesList);
+                const defaultStore = storesList.find(s => s.is_default) || storesList[0];
+                if (defaultStore) {
+                    setSelectedStoreId(defaultStore.id);
+                    defaultStoreName = defaultStore.name;
+                }
+            }
         } catch (error) {
             console.error("Failed to fetch contract context", error);
         }
 
-        // 공통 변수 매핑 → 치환
+        // 공통 변수 매핑 → 치환 (매장 선택값 우선)
         const variables = buildContractVariables(formData, businessInfo);
+        if (defaultStoreName) variables['{work_location}'] = defaultStoreName;
         const filledContent = applyContractVariables(template, variables);
 
         setContractForm(prev => ({ ...prev, content: filledContent }));
@@ -753,6 +768,9 @@ export default function StaffDetail() {
                         contractForm={contractForm}
                         setContractForm={setContractForm}
                         businessInfo={businessInfo}
+                        stores={stores}
+                        selectedStoreId={selectedStoreId}
+                        setSelectedStoreId={setSelectedStoreId}
                         isContractModalOpen={isContractModalOpen}
                         setIsContractModalOpen={setIsContractModalOpen}
                         handleOpenContractModal={handleOpenContractModal}

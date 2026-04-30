@@ -4,6 +4,7 @@ import {
     File as FileIcon, ChevronLeft, ChevronRight, Stamp,
 } from 'lucide-react';
 import api from '../api';
+import StoreManager from '../components/StoreManager';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -330,17 +331,9 @@ export default function CompanyInfoSettings() {
                         placeholder="예: 서울시 광진구 능동로 110 스타시티 영촌빌딩 B208호"
                         className="md:col-span-2"
                     />
-                    <Field
-                        label="근무장소 (계약서 자동입력)"
-                        value={form.work_location}
-                        onChange={(v) => setForm({ ...form, work_location: v })}
-                        placeholder="예: 소담김밥 건대본점 매장"
-                        className="md:col-span-2"
-                    />
                 </div>
                 <p className="mt-2 text-[11px] text-slate-400">
-                    근무장소는 전자계약서의 <code className="bg-slate-100 px-1 rounded">{'{work_location}'}</code> 변수에 자동 치환됩니다.
-                    다중 매장 보유 시는 추후 매장별 선택 기능이 추가될 예정입니다.
+                    근무장소는 아래 <strong>매장 관리</strong> 섹션에서 관리합니다. 다중 매장 보유 시 매장별로 등록 후 계약서 작성 시 선택할 수 있습니다.
                 </p>
 
                 {infoMsg && (
@@ -362,6 +355,9 @@ export default function CompanyInfoSettings() {
                     {savingInfo ? '저장 중...' : '회사 정보 저장'}
                 </button>
             </div>
+
+            {/* 매장 관리 */}
+            <StoreManager />
 
             {/* Seal Image Upload */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 card-animate">

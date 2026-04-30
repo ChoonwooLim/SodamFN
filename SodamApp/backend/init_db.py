@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, select
 from database import engine
-from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck  # noqa: F401 - import all models so create_all creates their tables
+from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck, BusinessStore  # noqa: F401 - import all models so create_all creates their tables
 from services.database_service import DatabaseService
 from routers.auth import get_password_hash
 from sqlalchemy import text
@@ -11,6 +11,9 @@ def init_db():
 
     # --- Auto-migration: add missing columns ---
     _run_migrations()
+
+    # --- Seed default BusinessStore for existing businesses (idempotent) ---
+    _seed_default_stores()
     
     service = DatabaseService()
     try:
@@ -105,6 +108,58 @@ def _run_migrations():
                     print(f"  [OK] {table}.{column} already exists")
             except Exception as e:
                 print(f"  [SKIP] Migration {table}.{column}: {e}")
+
+def _seed_default_stores():
+    """기존 사업장에 default BusinessStore 1개를 자동 생성 (idempotent).
+
+    - 이미 store 가 있는 사업장은 건너뜀.
+    - settings_json.work_location 값이 있으면 그 이름으로, 없으면 business.name + ' 매장' 으로 생성.
+    - is_default=True 로 설정해 신규 직원 자동 매핑 + 단일매장 사용처 폴백.
+    """
+    import json
+    from models import Business, BusinessStore
+    service = DatabaseService()
+    try:
+        businesses = service.session.exec(select(Business)).all()
+        created = 0
+        skipped = 0
+        for biz in businesses:
+            existing = service.session.exec(
+                select(BusinessStore).where(BusinessStore.business_id == biz.id)
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+            # settings.work_location 우선
+            settings = {}
+            if biz.settings_json:
+                try:
+                    settings = json.loads(biz.settings_json)
+                except Exception:
+                    settings = {}
+            store_name = (settings.get("work_location") or "").strip() \
+                or (f"{biz.name} 매장" if biz.name else "기본 매장")
+            store = BusinessStore(
+                business_id=biz.id,
+                name=store_name,
+                address=biz.address or "",
+                phone=biz.phone or "",
+                is_default=True,
+                is_active=True,
+                sort_order=0,
+            )
+            service.session.add(store)
+            created += 1
+        if created:
+            service.session.commit()
+            print(f"  Seeded {created} default BusinessStore(s) (skipped {skipped} existing).")
+        else:
+            print(f"  BusinessStore seed: all {skipped} business(es) already have stores.")
+    except Exception as e:
+        print(f"  [SKIP] _seed_default_stores: {e}")
+    finally:
+        service.close()
+
 
 if __name__ == "__main__":
     init_db()

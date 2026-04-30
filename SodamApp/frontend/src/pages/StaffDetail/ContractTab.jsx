@@ -36,6 +36,9 @@ export default function ContractTab({
     handleEditContract,
     editingContractId,
     businessInfo = {},
+    stores = [],
+    selectedStoreId,
+    setSelectedStoreId,
 }) {
     // 예금주 자동확인 (Popbill AccountCheckService)
     const [acctChecking, setAcctChecking] = useState(false);
@@ -504,6 +507,9 @@ export default function ContractTab({
                                             console.warn('business-info fetch 실패, 기존 props 사용:', err);
                                         }
                                         const variables = buildContractVariables(formData, biz);
+                                        // 선택된 매장으로 work_location 치환
+                                        const selectedStore = stores.find(s => s.id === selectedStoreId);
+                                        if (selectedStore) variables['{work_location}'] = selectedStore.name;
                                         const newContent = applyContractVariables(contractForm.content || "", variables);
                                         setContractForm(prev => ({ ...prev, content: newContent }));
                                     }}
@@ -521,6 +527,38 @@ export default function ContractTab({
                                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500 font-bold"
                                     placeholder="계약서 제목 (예: [소담] 근로계약서_홍길동)"
                                 />
+
+                                {/* 매장 선택 (다중매장 지원) */}
+                                {stores && stores.length > 0 && (
+                                    <div className="flex items-center gap-3 bg-amber-50/60 border border-amber-200 rounded-xl px-3 py-2.5">
+                                        <span className="text-xs font-bold text-amber-700 whitespace-nowrap">근무 매장</span>
+                                        <select
+                                            value={selectedStoreId || ''}
+                                            onChange={(e) => {
+                                                const newId = parseInt(e.target.value);
+                                                setSelectedStoreId(newId);
+                                                // 즉시 본문의 work_location 변수 재치환
+                                                const store = stores.find(s => s.id === newId);
+                                                if (store && contractForm.content) {
+                                                    const variables = buildContractVariables(formData, businessInfo);
+                                                    variables['{work_location}'] = store.name;
+                                                    const newContent = applyContractVariables(contractForm.content, variables);
+                                                    setContractForm(prev => ({ ...prev, content: newContent }));
+                                                }
+                                            }}
+                                            className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-1.5 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-amber-300"
+                                        >
+                                            {stores.map(s => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}{s.is_default ? ' (기본)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <span className="text-[10px] text-amber-600 whitespace-nowrap hidden sm:inline">
+                                            {`{work_location}`} 변수에 적용
+                                        </span>
+                                    </div>
+                                )}
                                 <textarea
                                     value={contractForm.content}
                                     onChange={(e) => setContractForm({ ...contractForm, content: e.target.value })}

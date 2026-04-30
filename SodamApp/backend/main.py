@@ -124,6 +124,9 @@ app.include_router(notifications.router, prefix="/api")
 from routers import biz_check
 app.include_router(biz_check.router, prefix="/api")
 
+from routers import store as store_router
+app.include_router(store_router.router, prefix="/api")
+
 from routers import account_check
 app.include_router(account_check.router, prefix="/api")
 
