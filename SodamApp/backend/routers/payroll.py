@@ -503,10 +503,6 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         total_deductions = d_np + d_hi + d_ei + d_lti + d_it + d_lit
         net_pay = gross_pay - total_deductions
         
-        # Save overrides if any
-        if req.overrides:
-            details['overrides'] = req.overrides
-        
         # Tax Support (제세공과금 지원금) - 사업주 세금 대납
         tax_support = 0
         if getattr(staff, 'tax_support_enabled', False):
@@ -514,10 +510,13 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
             tax_support = total_deductions
 
         # 4. Save to Payroll Table
-        details_json = json.dumps({
+        details_payload = {
             "work_breakdown": work_breakdown,
-            "holiday_details": holiday_details
-        }, ensure_ascii=False)
+            "holiday_details": holiday_details,
+        }
+        if req.overrides:
+            details_payload["overrides"] = req.overrides
+        details_json = json.dumps(details_payload, ensure_ascii=False)
         
         existing = service.session.exec(apply_bid_filter(select(Payroll), Payroll, bid).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
         # bid filter applied via select stmt above
