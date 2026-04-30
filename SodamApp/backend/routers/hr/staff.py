@@ -26,6 +26,11 @@ class StaffCreate(BaseModel):
     visa_type: Optional[str] = None
     dependents_count: int = 1
     children_count: int = 0
+    # 로그인 계정 동시 생성 (선택)
+    auto_create_account: bool = False
+    account_username: Optional[str] = None  # 미입력 시 자동 추천값 사용
+    account_password: Optional[str] = None
+    account_grade: str = "정직원"
 
 class StaffUpdate(BaseModel):
     name: Optional[str] = None
@@ -120,6 +125,65 @@ def _strip_private(staff_obj, include_admin_summary=False):
     return data
 
 
+def _suggest_next_username(session: Session, target_bid: int) -> dict:
+    """현재 사업장의 username 패턴을 분석해 다음 순차 ID 추천.
+
+    - 같은 business_id 직원에 매핑된 User 들의 username 수집
+    - prefix(영문)+number(숫자) 패턴만 추출 → 가장 많이 쓰인 prefix 선택
+    - 그 prefix 의 max 숫자 +1, 패딩 자릿수 유지
+    - 전역 username unique 제약을 만족할 때까지 +1 반복
+
+    패턴 없는 신규 사업장은 'sodam001' 디폴트 (이후 사장님이 직접 변경 가능).
+    """
+    import re
+    from collections import Counter
+    from models import User
+
+    stmt = (
+        select(User.username)
+        .join(Staff, User.staff_id == Staff.id)
+        .where(Staff.business_id == target_bid)
+        .where(col(User.username).is_not(None))
+    )
+    usernames = session.exec(stmt).all()
+    pat = re.compile(r"^([a-z]+)(\d+)$")
+    pattern_data = []  # [(prefix, num, padding_len), ...]
+    for u in usernames:
+        m = pat.match(u or "")
+        if m:
+            pattern_data.append((m.group(1), int(m.group(2)), len(m.group(2))))
+
+    if not pattern_data:
+        prefix, next_num, padding = "sodam", 1, 3
+    else:
+        prefix = Counter(p for p, _, _ in pattern_data).most_common(1)[0][0]
+        same_prefix = [(n, pad) for p, n, pad in pattern_data if p == prefix]
+        max_num = max(n for n, _ in same_prefix)
+        padding = max(len(str(max_num + 1)), max(pad for _, pad in same_prefix))
+        next_num = max_num + 1
+
+    while True:
+        suggested = f"{prefix}{str(next_num).zfill(padding)}"
+        if not session.exec(select(User).where(User.username == suggested)).first():
+            break
+        next_num += 1
+
+    return {"username": suggested, "prefix": prefix, "next_num": next_num, "padding": padding}
+
+
+@router.get("/staff/next-username")
+def suggest_next_username(
+    _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
+    session: Session = Depends(get_session),
+):
+    """사업장의 username 순차 패턴에 맞는 다음 추천 ID 반환."""
+    target_bid = bid or _admin.business_id
+    if not target_bid:
+        raise HTTPException(status_code=400, detail="사업장 정보가 없습니다.")
+    return {"status": "success", "data": _suggest_next_username(session, target_bid)}
+
+
 @router.get("/staff")
 def get_all_staff(q: Optional[str] = None, status: Optional[str] = None, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     stmt = apply_bid_filter(select(Staff), Staff, bid)
@@ -182,7 +246,37 @@ def create_staff(
     session.add(new_staff)
     session.commit()
     session.refresh(new_staff)
-    return {"status": "success", "message": "Staff created", "id": new_staff.id}
+
+    # 로그인 계정 동시 생성 (auto_create_account=True 일 때)
+    account_info = None
+    if staff.auto_create_account and staff.account_password:
+        from models import User
+        # username 미지정이면 자동 추천 사용
+        username = (staff.account_username or "").strip()
+        if not username:
+            username = _suggest_next_username(session, target_bid)["username"]
+        # 충돌 방지: 이미 존재하면 자동 추천으로 폴백
+        if session.exec(select(User).where(User.username == username)).first():
+            username = _suggest_next_username(session, target_bid)["username"]
+        new_user = User(
+            username=username,
+            hashed_password=get_password_hash(staff.account_password),
+            role="staff",
+            grade=staff.account_grade or "정직원",
+            staff_id=new_staff.id,
+            real_name=new_staff.name,
+            business_id=target_bid,
+        )
+        session.add(new_user)
+        session.commit()
+        account_info = {"username": username, "grade": new_user.grade}
+
+    return {
+        "status": "success",
+        "message": "Staff created",
+        "id": new_staff.id,
+        "account": account_info,
+    }
 
 @router.get("/staff/{staff_id}")
 def get_staff_detail(staff_id: int, _admin: AuthUser = Depends(get_admin_user), session: Session = Depends(get_session)):

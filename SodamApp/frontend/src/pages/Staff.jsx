@@ -202,7 +202,7 @@ export default function StaffPage() {
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <div className="font-bold text-lg text-slate-900 group-hover:text-blue-600 transition-colors">{staff.name}</div>
                                         {staff.username ? (
-                                            <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{staff.username}</span>
+                                            <span className="text-sm font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">{staff.username}</span>
                                         ) : (
                                             <span className="text-xs font-mono text-slate-300 italic">계정없음</span>
                                         )}
