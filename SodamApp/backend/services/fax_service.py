@@ -326,6 +326,54 @@ class PopbillProvider(BaseFaxProvider):
                 except Exception:
                     pass
 
+    # 팝빌 result 코드 → 사람 읽기 좋은 메시지
+    # https://docs.popbill.com 의 sendFax response 결과 코드 표
+    _RESULT_LABELS = {
+        200: "전송 성공",
+        401: "회선 통화중",
+        402: "회선 이상/응답 없음",
+        404: "회선 이상/응답 없음",
+        405: "회선 이상/응답 없음",
+        411: "팩스기 아님",
+        412: "통화중",
+        413: "수신측 거부",
+        419: "통화중",
+        422: "시간 초과",
+        432: "응답 없음",
+        477: "회선 이상",
+        499: "송신 실패 (사전 등록되지 않은 발신번호 또는 운영 미전환 가능성)",
+    }
+
+    def map_result_to_status(self, popbill_result: dict):
+        """팝빌 getFaxResult 응답 → (status, error_message) 변환.
+
+        sendState: 1=대기, 2=전송중, 3=전송완료, 4=전송실패, 5=취소, 6=실패
+        convState: 0=대기, 1=중, 2=실패, 3=완료
+        result: 200=성공, 4xx=각종 회선 실패
+        """
+        if not popbill_result:
+            return (None, None)
+        send_state = popbill_result.get("sendState")
+        conv_state = popbill_result.get("convState")
+        result = popbill_result.get("result")
+        label = self._RESULT_LABELS.get(result, f"코드 {result}") if result is not None else None
+
+        if conv_state == 2:
+            return ("failed", "PDF 변환 실패")
+        if send_state == 1:
+            return ("pending", "전송 대기")
+        if send_state == 2:
+            return ("sending", "전송 중")
+        if send_state == 3:
+            if result is not None and 200 <= result < 300:
+                return ("success", None)
+            return ("failed", f"전송 실패: {label}" if label else "전송 실패")
+        if send_state == 4 or send_state == 6:
+            return ("failed", f"전송 실패: {label}" if label else "전송 실패")
+        if send_state == 5:
+            return ("failed", "취소됨")
+        return (None, None)
+
     def get_balance(self) -> Optional[float]:
         """현재 팝빌 포인트 잔액. 디버깅/어드민 화면용."""
         try:

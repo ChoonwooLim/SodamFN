@@ -54,6 +54,7 @@ export default function FaxTransmission() {
 
     const [history, setHistory] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [attachmentModalTx, setAttachmentModalTx] = useState(null); // 다중 첨부 미리보기 모달용
 
     const [providerInfo, setProviderInfo] = useState(null);
 
@@ -210,6 +211,15 @@ export default function FaxTransmission() {
         }
     };
 
+    const handleRefresh = async (id) => {
+        try {
+            await api.post(`/fax/${id}/refresh`);
+            await loadHistory();
+        } catch (err) {
+            alert(err?.response?.data?.detail || '상태 확인 실패');
+        }
+    };
+
     const handleDelete = async (id) => {
         if (!window.confirm('이 전송 이력을 삭제할까요?')) return;
         try {
@@ -253,12 +263,18 @@ export default function FaxTransmission() {
                     <div className={`mb-6 p-4 rounded-xl text-sm ${
                         providerInfo.is_stub
                             ? 'bg-amber-50 border border-amber-200 text-amber-800'
-                            : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                            : providerInfo.is_popbill_test
+                                ? 'bg-red-50 border-2 border-red-300 text-red-800'
+                                : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                     }`}>
                         <div className="flex items-start gap-2">
                             <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
                             <div>
-                                <strong>프로바이더: {providerInfo.active}</strong>
+                                <strong>
+                                    {providerInfo.is_popbill_test
+                                        ? '⚠️ 팝빌 TEST 모드 — 실제 팩스 미발송'
+                                        : `프로바이더: ${providerInfo.active}`}
+                                </strong>
                                 <div className="text-xs mt-1 leading-relaxed">{providerInfo.note}</div>
                             </div>
                         </div>
@@ -543,7 +559,18 @@ export default function FaxTransmission() {
                                                     )}
                                                 </div>
                                                 <div className="flex flex-col gap-1 flex-shrink-0">
-                                                    {tx.file_path && (
+                                                    {tx.attachment_files && tx.attachment_files.length > 1 ? (
+                                                        <button
+                                                            onClick={() => setAttachmentModalTx(tx)}
+                                                            className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 relative"
+                                                            title={`첨부 ${tx.attachment_files.length}건 보기`}
+                                                        >
+                                                            <FileText size={13} />
+                                                            <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center leading-none">
+                                                                {tx.attachment_files.length}
+                                                            </span>
+                                                        </button>
+                                                    ) : tx.file_path && (
                                                         <a
                                                             href={buildFileUrl(tx.file_path)}
                                                             target="_blank"
@@ -559,6 +586,15 @@ export default function FaxTransmission() {
                                                             onClick={() => handleRetry(tx.id)}
                                                             className="p-1.5 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100"
                                                             title="재전송"
+                                                        >
+                                                            <RefreshCw size={13} />
+                                                        </button>
+                                                    )}
+                                                    {(tx.status === 'success' || tx.status === 'sending') && tx.provider_tx_id && (
+                                                        <button
+                                                            onClick={() => handleRefresh(tx.id)}
+                                                            className="p-1.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-slate-100"
+                                                            title="실제 수신 상태 확인"
                                                         >
                                                             <RefreshCw size={13} />
                                                         </button>
@@ -580,6 +616,61 @@ export default function FaxTransmission() {
                     </div>
                 </div>
             </div>
+
+            {/* 다중 첨부 미리보기 모달 — 한 통의 팩스에 묶여 발송된 N개 파일 개별 보기/다운로드 */}
+            {attachmentModalTx && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                    onClick={() => setAttachmentModalTx(null)}
+                >
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">첨부 파일 ({attachmentModalTx.attachment_files?.length || 0}건)</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {attachmentModalTx.target_number} {attachmentModalTx.target_name && `(${attachmentModalTx.target_name})`} — 한 통의 팩스로 묶여 발송
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setAttachmentModalTx(null)}
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-5 space-y-2">
+                            {(attachmentModalTx.attachment_files || []).map((f, idx) => (
+                                <div
+                                    key={`${f.url}-${idx}`}
+                                    className="flex items-center justify-between gap-2 p-3 border border-slate-200 rounded-lg hover:bg-slate-50"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-sm font-semibold text-slate-700 truncate">
+                                            {idx + 1}. {f.name}
+                                        </div>
+                                        {f.size && (
+                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                {(f.size / 1024).toFixed(0)} KB
+                                            </div>
+                                        )}
+                                    </div>
+                                    <a
+                                        href={buildFileUrl(f.url)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 flex-shrink-0"
+                                    >
+                                        미리보기
+                                    </a>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

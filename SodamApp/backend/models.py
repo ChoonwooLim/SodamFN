@@ -379,6 +379,9 @@ class FaxTransmission(SQLModel, table=True):
     file_path: str
     original_filename: str
     page_count: Optional[int] = None
+    # 다중 파일 묶음 발송 시 모든 파일을 보존 — JSON 직렬화된 list of {url, name, size}.
+    # 단일 발송 시 NULL. 미리보기 모달에서 개별 파일 보기/다운로드 가능하게.
+    attachment_files: Optional[str] = None
 
     status: str = Field(default="pending", index=True)
     provider: Optional[str] = None           # 'stub' / 'phaxio' / ...

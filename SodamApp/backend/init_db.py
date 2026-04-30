@@ -75,6 +75,8 @@ def _run_migrations():
         ("staff", "private_actual_payee_account", "VARCHAR"),
         ("staff", "private_tax_unreported", "BOOLEAN DEFAULT FALSE"),
         ("staff", "private_owner_note", "TEXT"),
+        # 2026-04-30: 팩스 다중 파일 묶음 발송 시 첨부 파일 list 보존
+        ("faxtransmission", "attachment_files", "TEXT"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")
