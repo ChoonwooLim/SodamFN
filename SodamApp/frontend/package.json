@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"VITE,FASTAPI,STAFF\" -c \"blue,green,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:staff\"",
+    "dev": "npm run setup:backend && concurrently -n \"VITE,FASTAPI,STAFF\" -c \"blue,green,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:staff\"",
+    "setup:backend": "cd ../backend && .venv\\Scripts\\python.exe -m pip install -q -r requirements.txt",
     "dev:frontend": "vite",
     "dev:backend": "cd ../backend && .venv\\Scripts\\python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000",
     "dev:staff": "cd ../staff-app && npx vite",
