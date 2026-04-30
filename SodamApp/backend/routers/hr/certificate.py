@@ -264,18 +264,39 @@ def _is_foreign(staff) -> bool:
     return False
 
 
+def _resolve_name_eng(staff) -> str:
+    """직원의 영문명 결정.
+
+    우선순위:
+      1) staff.name_eng (사용자가 직접 입력)
+      2) staff.account_holder 가 ASCII 영문이면 그 값 (통장 영문명 — 외국인은 통상 영문 통장)
+      3) 빈 문자열
+    """
+    if not staff:
+        return ""
+    direct = (getattr(staff, "name_eng", "") or "").strip()
+    if direct:
+        return direct
+    import re
+    ah = (getattr(staff, "account_holder", "") or "").strip()
+    if ah and re.fullmatch(r"[A-Za-z\s]+", ah):
+        return ah
+    return ""
+
+
 def _staff_display_name(staff) -> str:
     """증명서/계약서 표기용 직원명.
 
-    외국인이고 name_eng 가 등록되어 있으면 'NAME ENG (한글이름)' 형태,
-    한국인 또는 영문명 미등록 시는 한글 이름만.
+    외국인(visa_type 또는 비한국 국적)이고 영문명이 결정 가능하면 'NAME ENG (한글이름)' 형태,
+    한국인 또는 영문명 결정 불가 시는 한글 이름만.
     """
     if not staff:
         return "-"
     base = staff.name or "-"
-    name_eng = (getattr(staff, "name_eng", "") or "").strip()
-    if _is_foreign(staff) and name_eng:
-        return f"{name_eng} ({base})"
+    if _is_foreign(staff):
+        name_eng = _resolve_name_eng(staff)
+        if name_eng:
+            return f"{name_eng} ({base})"
     return base
 
 
