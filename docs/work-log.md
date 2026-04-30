@@ -767,3 +767,94 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 | 알림톡 템플릿 (등록 후) | 영업일 1-3일 |
 
 ---
+
+## 2026-04-30 (HR/Payroll 버그픽스 + 사업주 비공개 지급 정보 시스템 + 팝빌 팩스 다중 발송 + 4월 급여 세무사 정합성)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | HR/payroll Staff.end_date 잘못된 참조 수정 (산출 500 오류 해결) | 완료 |
+| fix | SuperAdmin View-As 모드 — 신규 직원 생성 business_id=NULL 버그, 회사기본정보·직인 화면 회귀 수정 | 완료 |
+| feat | hr-certificate 영문 대표자명 표기 지원 (영문 주소·인적사항 주소 변경 시도는 롤백) | 완료 |
+| feat | staff/staff-detail 페이지 상단 돌아가기 버튼 추가 | 완료 |
+| docs | 사업주 전용 비공개 지급 정보 spec(설계) + plan(9 task 구현 계획) | 완료 |
+| feat | private_* 비공개 지급 정보 시스템 — 모델 6 필드 + 마이그레이션 + 직렬화 필터 + GET/PUT /private 엔드포인트 + 사업주 전용 PrivateTab UI + 명세서 마스킹 + 정책 배지 | 완료 |
+| feat | payroll private_tax_unreported 분기 — 공제 강제 0 + 명세서 직인·발급자 동적 렌더 | 완료 |
+| fix | startup auto-migration 에 private_* 6 컬럼 추가 (prod 배포 안전성) | 완료 |
+| feat | 팝빌 팩스 다중 파일 한 통 묶음 발송 (직접 업로드 모드) + 결과 폴링 + 테스트모드 배너 + 시간대 fix | 완료 |
+| fix | sendFax_multi 메소드명 오타 + 인자 순서(ReceiverName 인자 없음) 교정 | 완료 |
+| feat | 직원앱 급여명세서 페이지 ?month= 쿼리스트링 지원 (알림톡 링크에서 정확한 월 자동 표시) | 완료 |
+| feat | 2026-04 급여 세무사 기준 정합성 조정 스크립트 — 10명 전원 세무사 PDF와 정확히 일치 | 완료 |
+| fix | 4월 잘못 삭제된 6명 Payroll 긴급 복구 (cp949 콘솔 한글 깨짐으로 인한 분류 오류) | 완료 |
+| feat | 4월 자동 계산 vs 세무사 PDF 검증 도구 — 매월 차이 항목별 자동 비교 가능 | 완료 |
+| fix | 급여명세서 익월정산/자격미달 안내가 주휴수당 합계 0원 케이스에서 안 보이던 회귀 수정 | 완료 |
+
+### 세부 내용
+
+#### 사업주 전용 비공개 지급 정보 시스템 (대형 기능 신규 도입)
+- **spec**: docs/superpowers/specs/2026-04-30-private-payment-info-design.md
+- **plan**: 9 task 구현 계획
+- **모델**: Staff 에 `private_*` prefix 일관 사용 6 필드 추가 (private_tax_unreported, private_seal_image_url, private_issuer_name, private_signed_off_by, private_payment_memo, private_extra_amount 등)
+- **직렬화 필터**: `private_` prefix 단일 패턴 차단 (외부 출력에서 일괄 차단)
+- **엔드포인트 신규 2개**: GET/PUT `/staff/{id}/private` (사업주만 접근)
+- **payroll 분기**: `private_tax_unreported=True` 직원은 공제 강제 0, 실수령=지급총액. override 보다 우선 적용
+- **명세서**: 직인/발급자/메모 모두 직원별 private_* 값으로 동적 렌더 (사업주 정책 반영)
+- **UI**: 인사기록카드 권한별 탭 분리, 사업주 시야에 PrivateTab + 정책 배지
+- **auto-migration**: prod 배포 안전 — startup 시 6 컬럼 idempotent 추가
+
+#### 4월 급여 세무사 정합성 작업 (이번 세션 대형 작업)
+- **세무사 PDF 4명**: 김금순(세금대납)/정명주/정수현/김순복 공제 항목 세무사 수치로 덮어쓰기
+- **6명 직원 분해 추가**: 김다은(일용직 PDF) + 린(일용직 추정) + 정수미/반정옥/황윤선/고아라(3.3% 사업소득)
+- **CLAUDE.md 규칙 준수**: 김금순 세금대납 처리 시 total_pay = gross + bonus_tax_support (총 보상액)
+- **사고 + 복구**: cp949 한글 깨짐으로 6명 잘못 삭제 → 즉시 복구 (1명 항목별 분해 영구 분실)
+- **검증 도구**: scripts/maintenance/verify_apr_auto_calc.py — 매월 자동 비교 가능
+- **자동화 현황**: 사업소득자 4명 + 일용직 1명 = 5명 100% 자동 / 4대보험 가입자 5명은 HI 보수월액 분리 필드 필요(Phase 2)
+- **P/L 4월 인건비**: labor_cost = 14,584,460
+- **린/김다은 contract_type 정정**: '아르바이트' → '일용직' (DB 직접 변경, prod 배포 시 동일 변경 필요)
+
+#### 직원앱 급여명세서 ?month= 쿼리스트링
+- 알림톡 본문의 #{지급월코드}(`2026-04` 형태)를 받아 자동 표시
+- 지연 클릭에도 정확한 월 명세서 표시 보장 — 알림톡 1개 템플릿이 모든 월 커버
+
+#### 팝빌 팩스 다중 파일 묶음 발송
+- 기존 단일 파일 발송 → 다중 첨부 한 통 묶음 발송 모드 추가
+- sendFax_multi 메소드명 오타 + 인자 순서 교정 (ReceiverName 인자 없음)
+- 결과 폴링 + 테스트모드 배너 + 시간대 fix (KST 일관)
+
+#### HR/Payroll 버그 픽스
+- Staff.end_date 미존재 필드 참조 → 산출 500 오류 (페이로드 검증 누락) → 정정
+- View-As 모드에서 신규 직원 추가 시 business_id=NULL 으로 생성되던 버그 → resolve_bid 헬퍼 적용
+- 회사기본정보·직인 화면 빈칸 회귀 → 동일 헬퍼 적용
+- 신규 staff_id 13/14 contract_type 정정 (아르바이트 → 일용직)
+
+#### HR Certificate 영문 표기
+- 대표자명 영문 표기 지원 (외국인 직원 서류 발급용)
+- 주소 영문 표기 시도는 한글 도로명이 더 정확해서 롤백
+- 인적사항 주소를 회사 주소로 변경하는 시도도 롤백 (직원 거주지가 정답)
+
+### 메모리 갱신
+
+- `feedback_korean_encoding.md` 신규 — Windows cp949 콘솔 한글 깨짐 함정 + DELETE 시 staff_id 명시 강제
+- `project_payroll_apr_2026.md` 신규 — 4월 정합성 진행 상태 + 자동화 95% Phase 2-4 로드맵
+- `project_popbill_sender_number.md` 갱신 — 카카오 비즈인증 + 발신번호 + 채널 연동 4/30 모두 승인 완료
+- `MEMORY.md` 인덱스 갱신
+
+### 외부 진행 상태 (4/30 종료 시점)
+
+| 항목 | 상태 |
+|---|---|
+| 카카오 비즈니스 채널 sodam2025 | ✅ 승인 (4/30, 1영업일) |
+| 팝빌 발신번호 010-4173-6570 | ✅ 사용 (4/30) |
+| 팝빌 ↔ 카카오 채널 연동 | ✅ 완료 (4/30 12:31) |
+| 알림톡 템플릿 (급여명세서 발송 안내) | ⏳ 사장님 검수 신청 진행 중 |
+| 린 일용직 세무사 PDF | ⏳ 사장님 별도 요청 (선택) |
+
+### 다음 세션 인계
+
+1. **알림톡 템플릿 검수 결과 확인 + 백엔드 발송 코드** (PopbillProvider.sendKakaoAlimtalk 연결, 급여 확정 트리거)
+2. **자동화 Phase 2-4** (1.5시간): insurance_base_salary_hi 필드 분리 + ei_exempt 필드 + 두루누리 정책 재검토 → 9/10명 자동
+3. **1월 데이터 CLAUDE.md 모순 점검**: scripts/adjust_jan_to_accountant.py 가 세금대납 직원 total_pay = gross - total_ded 로 저장 (실수령액). CLAUDE.md 규칙은 gross + bonus_tax_support (총 보상액). 4월과 동일 패턴으로 재조정 필요할 수 있음
+4. **이지포스 KICC API 키** (4/29 전화 후 영업일 1-2일) — 도착 시 매출 채널 통합 + CODEF 매입 어댑터 재매핑 결정
+
+---
