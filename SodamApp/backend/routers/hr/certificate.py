@@ -343,7 +343,7 @@ def _base_css() -> str:
     return """
         @page {
             size: A4;
-            margin: 10mm 12mm 10mm 12mm;
+            margin: 10mm 12mm 14mm 12mm;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -362,7 +362,7 @@ def _base_css() -> str:
             border: 2px solid #1a1a1a;
             outline: 1px solid #1a1a1a;
             outline-offset: 4px;
-            min-height: calc(297mm - 24mm);
+            min-height: calc(297mm - 40mm);
             overflow: hidden;
         }
         .cert-watermark {
