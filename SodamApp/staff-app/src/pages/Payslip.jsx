@@ -15,6 +15,8 @@ export default function Payslip() {
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const [month, setMonth] = useState(() => {
+        const fromUrl = new URLSearchParams(window.location.search).get('month');
+        if (fromUrl && /^\d{4}-\d{2}$/.test(fromUrl)) return fromUrl;
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
