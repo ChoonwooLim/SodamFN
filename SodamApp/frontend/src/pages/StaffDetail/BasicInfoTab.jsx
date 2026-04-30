@@ -1,4 +1,5 @@
-import { User, Calendar, CheckCircle, Shield, Globe, X, Phone, Building2, AlertTriangle, Clock, FileCheck, Info } from 'lucide-react';
+import { useState } from 'react';
+import { User, Calendar, CheckCircle, Shield, Globe, X, Phone, Building2, AlertTriangle, Clock, FileCheck, Info, Edit2, KeyRound, Trash2, Eye, EyeOff, Save } from 'lucide-react';
 
 export default function BasicInfoTab({
     formData,
@@ -10,9 +11,44 @@ export default function BasicInfoTab({
     setAccountForm,
     handleCreateAccount,
     handleGradeUpdate,
+    handleUsernameUpdate,
+    handlePasswordUpdate,
+    handleDeleteAccount,
     isVisaGuideOpen,
     setIsVisaGuideOpen,
 }) {
+    // 로그인 계정 편집 상태
+    const [isEditingUsername, setIsEditingUsername] = useState(false);
+    const [usernameDraft, setUsernameDraft] = useState('');
+    const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+    const [passwordDraft, setPasswordDraft] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+
+    const startEditUsername = () => {
+        setUsernameDraft(user?.username || '');
+        setIsEditingUsername(true);
+    };
+    const submitUsername = async () => {
+        const ok = await handleUsernameUpdate?.(usernameDraft.trim());
+        if (ok !== false) setIsEditingUsername(false);
+    };
+    const openPasswordModal = () => {
+        setPasswordDraft('');
+        setShowPassword(false);
+        setIsPasswordModalOpen(true);
+    };
+    const submitPassword = async () => {
+        if (!passwordDraft || passwordDraft.length < 4) {
+            alert('비밀번호는 최소 4자 이상이어야 합니다.');
+            return;
+        }
+        const ok = await handlePasswordUpdate?.(passwordDraft);
+        if (ok !== false) {
+            alert(`비밀번호가 재설정되었습니다.\n새 비밀번호: ${passwordDraft}\n직원에게 알려주세요.`);
+            setIsPasswordModalOpen(false);
+            setPasswordDraft('');
+        }
+    };
     const inputClass = "w-full p-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-sm text-slate-800 focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition-all placeholder:text-slate-300";
     const labelClass = "block text-xs font-semibold text-slate-500 mb-1.5 tracking-wide";
 
@@ -90,10 +126,61 @@ export default function BasicInfoTab({
                         </div>
                         {user ? (
                             <div className="space-y-2.5">
-                                <div className="flex justify-between items-center text-sm bg-slate-50 px-3 py-2.5 rounded-xl">
-                                    <span className="text-slate-500 text-xs font-medium">아이디</span>
-                                    <span className="font-bold text-slate-800">{user.username}</span>
+                                {/* 아이디 (인라인 수정) */}
+                                <div className="flex justify-between items-center gap-2 text-sm bg-slate-50 px-3 py-2.5 rounded-xl">
+                                    <span className="text-slate-500 text-xs font-medium flex-shrink-0">아이디</span>
+                                    {isEditingUsername ? (
+                                        <div className="flex items-center gap-1.5 flex-1 justify-end">
+                                            <input
+                                                type="text"
+                                                value={usernameDraft}
+                                                onChange={(e) => setUsernameDraft(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') submitUsername(); if (e.key === 'Escape') setIsEditingUsername(false); }}
+                                                autoFocus
+                                                className="bg-white border border-indigo-300 rounded-lg px-2 py-1 text-sm font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-400 text-right w-32"
+                                            />
+                                            <button
+                                                onClick={submitUsername}
+                                                className="p-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                                                title="저장"
+                                            >
+                                                <Save size={12} />
+                                            </button>
+                                            <button
+                                                onClick={() => setIsEditingUsername(false)}
+                                                className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 rounded-lg transition-colors"
+                                                title="취소"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="font-mono font-bold text-slate-800 text-sm">{user.username}</span>
+                                            <button
+                                                onClick={startEditUsername}
+                                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded transition-colors"
+                                                title="아이디 수정"
+                                            >
+                                                <Edit2 size={12} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* 비밀번호 재설정 */}
+                                <div className="flex justify-between items-center text-sm bg-slate-50 px-3 py-2.5 rounded-xl">
+                                    <span className="text-slate-500 text-xs font-medium">비밀번호</span>
+                                    <button
+                                        onClick={openPasswordModal}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-lg text-xs font-bold transition-colors"
+                                        title="비밀번호 재설정"
+                                    >
+                                        <KeyRound size={12} /> 재설정
+                                    </button>
+                                </div>
+
+                                {/* 등급 */}
                                 <div className="flex justify-between items-center text-sm bg-slate-50 px-3 py-2.5 rounded-xl">
                                     <span className="text-slate-500 text-xs font-medium">등급</span>
                                     <select
@@ -106,6 +193,14 @@ export default function BasicInfoTab({
                                         <option value="admin">관리자</option>
                                     </select>
                                 </div>
+
+                                {/* 계정 삭제 */}
+                                <button
+                                    onClick={handleDeleteAccount}
+                                    className="w-full flex items-center justify-center gap-1.5 mt-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold border border-red-100 transition-colors"
+                                >
+                                    <Trash2 size={12} /> 로그인 계정 삭제
+                                </button>
                             </div>
                         ) : (
                             <div className="text-center py-4 text-xs text-slate-400">연동된 계정이 없습니다.</div>
@@ -209,6 +304,70 @@ export default function BasicInfoTab({
                         <div className="p-4 bg-slate-50 flex gap-2 border-t border-slate-100">
                             <button onClick={() => setIsAccountModalOpen(false)} className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors">취소</button>
                             <button onClick={handleCreateAccount} className="flex-1 p-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md transition-colors">생성</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ═══ Password Reset Modal ═══ */}
+            {isPasswordModalOpen && user && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+                        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md">
+                                    <KeyRound size={16} className="text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900">비밀번호 재설정</h3>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">{user.username}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800 leading-relaxed flex items-start gap-1.5">
+                                <Info size={12} className="flex-shrink-0 mt-0.5" />
+                                <span>현재 비밀번호는 보안 정책상 표시할 수 없습니다 (단방향 암호화).<br />새 비밀번호를 설정한 뒤 직원에게 전달해 주세요.</span>
+                            </div>
+                            <div>
+                                <label className={labelClass}>새 비밀번호</label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? "text" : "password"}
+                                        value={passwordDraft}
+                                        onChange={(e) => setPasswordDraft(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') submitPassword(); }}
+                                        autoFocus
+                                        className={inputClass + " pr-10"}
+                                        placeholder="최소 4자 이상"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                        title={showPassword ? "숨기기" : "표시"}
+                                    >
+                                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                    </button>
+                                </div>
+                                {showPassword && passwordDraft && (
+                                    <p className="mt-1.5 text-[11px] text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg font-mono">{passwordDraft}</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 flex gap-2 border-t border-slate-100">
+                            <button
+                                onClick={() => setIsPasswordModalOpen(false)}
+                                className="flex-1 p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={submitPassword}
+                                className="flex-1 p-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md transition-colors"
+                            >
+                                재설정
+                            </button>
                         </div>
                     </div>
                 </div>

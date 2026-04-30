@@ -383,6 +383,50 @@ export default function StaffDetail() {
         }
     };
 
+    const handleUsernameUpdate = async (newUsername) => {
+        if (!user) return;
+        try {
+            await api.put(`/hr/staff/${id}/account/username`, { username: newUsername });
+            setMsg("아이디가 변경되었습니다.");
+            setTimeout(() => setMsg(""), 3000);
+            fetchStaffDetail();
+            return true;
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "아이디 변경 실패");
+            return false;
+        }
+    };
+
+    const handlePasswordUpdate = async (newPassword) => {
+        if (!user) return;
+        try {
+            await api.put(`/hr/staff/${id}/account/password`, { password: newPassword });
+            setMsg("비밀번호가 재설정되었습니다.");
+            setTimeout(() => setMsg(""), 3000);
+            return true;
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "비밀번호 재설정 실패");
+            return false;
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!user) return;
+        if (!window.confirm(`로그인 계정 '${user.username}' 을(를) 삭제하시겠습니까?\n직원의 로그인은 즉시 차단되지만 인사 기록은 그대로 보존됩니다.`)) return;
+        if (!window.confirm("정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.")) return;
+        try {
+            await api.delete(`/hr/staff/${id}/account`);
+            setMsg("계정이 삭제되었습니다.");
+            setTimeout(() => setMsg(""), 3000);
+            fetchStaffDetail();
+        } catch (error) {
+            console.error(error);
+            alert(error.response?.data?.detail || "계정 삭제 실패");
+        }
+    };
+
     const handleCreateContract = async () => {
         if (!typeof contractForm.content === 'string' || contractForm.content.trim().length === 0) {
             alert("계약서 내용이 비어있습니다.");
@@ -674,6 +718,9 @@ export default function StaffDetail() {
                         setAccountForm={setAccountForm}
                         handleCreateAccount={handleCreateAccount}
                         handleGradeUpdate={handleGradeUpdate}
+                        handleUsernameUpdate={handleUsernameUpdate}
+                        handlePasswordUpdate={handlePasswordUpdate}
+                        handleDeleteAccount={handleDeleteAccount}
                         isVisaGuideOpen={isVisaGuideOpen}
                         setIsVisaGuideOpen={setIsVisaGuideOpen}
                     />

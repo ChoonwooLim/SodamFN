@@ -508,11 +508,80 @@ def update_staff_account_grade(
     user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
     if not user_account:
         raise HTTPException(status_code=404, detail="User account not found for this staff")
-        
+
     user_account.grade = grade
     session.add(user_account)
     session.commit()
     return {"status": "success", "message": "Grade updated successfully"}
+
+
+@router.put("/staff/{staff_id}/account/username")
+def update_staff_account_username(
+    staff_id: int,
+    username: str = Body(..., embed=True),
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session),
+):
+    """직원 로그인 계정의 username 변경. 전역 unique 제약 검증."""
+    from models import User
+    user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+    if not user_account:
+        raise HTTPException(status_code=404, detail="연동된 계정이 없습니다.")
+
+    new_username = (username or "").strip()
+    if not new_username:
+        raise HTTPException(status_code=400, detail="아이디를 입력해 주세요.")
+    if new_username == user_account.username:
+        return {"status": "success", "message": "변경 사항 없음"}
+
+    conflict = session.exec(select(User).where(User.username == new_username)).first()
+    if conflict and conflict.id != user_account.id:
+        raise HTTPException(status_code=400, detail="이미 사용 중인 아이디입니다.")
+
+    user_account.username = new_username
+    session.add(user_account)
+    session.commit()
+    return {"status": "success", "message": "아이디가 변경되었습니다.", "username": new_username}
+
+
+@router.put("/staff/{staff_id}/account/password")
+def update_staff_account_password(
+    staff_id: int,
+    password: str = Body(..., embed=True),
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session),
+):
+    """직원 비밀번호 재설정 (사업주가 새 값으로 덮어쓰기). 평문은 저장하지 않음 — 단방향 해시."""
+    from models import User
+    user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+    if not user_account:
+        raise HTTPException(status_code=404, detail="연동된 계정이 없습니다.")
+
+    new_password = (password or "").strip()
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="비밀번호는 최소 4자 이상이어야 합니다.")
+
+    user_account.hashed_password = get_password_hash(new_password)
+    session.add(user_account)
+    session.commit()
+    return {"status": "success", "message": "비밀번호가 재설정되었습니다."}
+
+
+@router.delete("/staff/{staff_id}/account")
+def delete_staff_account(
+    staff_id: int,
+    _admin: AuthUser = Depends(get_admin_user),
+    session: Session = Depends(get_session),
+):
+    """직원 로그인 계정만 삭제 (Staff 레코드 자체는 보존)."""
+    from models import User
+    user_account = session.exec(select(User).where(User.staff_id == staff_id)).first()
+    if not user_account:
+        raise HTTPException(status_code=404, detail="연동된 계정이 없습니다.")
+
+    session.delete(user_account)
+    session.commit()
+    return {"status": "success", "message": "계정이 삭제되었습니다."}
 
 @router.get("/staff/{staff_id}/documents")
 def get_staff_documents(staff_id: int, _user: AuthUser = Depends(get_current_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
