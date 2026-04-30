@@ -298,7 +298,7 @@ class PopbillProvider(BaseFaxProvider):
                 PopbillException = Exception  # type: ignore
 
             try:
-                receipt_num = svc.sendFAX_multi(
+                receipt_num = svc.sendFax_multi(
                     self.corp_num,
                     sender,
                     receiver,
