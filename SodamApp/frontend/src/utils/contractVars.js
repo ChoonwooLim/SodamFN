@@ -22,7 +22,7 @@ export function getStandardContractTemplate() {
 1. 근로개시일 : {start_date}부터 {contract_end_date}까지
    ※ 근로계약기간을 정하지 않는 경우에는 "근로개시일"만 기재
 
-2. 근 무 장 소 : {business_name} ({business_address})
+2. 근 무 장 소 : {work_location}
 
 3. 업무의 내용 : {job_description}
 
@@ -146,6 +146,11 @@ export function buildContractVariables(staff = {}, business = {}) {
         '{business_fax}': business.fax || '',
         '{representative_eng}': business.representative_eng || '',
         '{tax_office}': business.tax_office || '',
+        // 근무장소 — settings.work_location 우선, 없으면 사업장명+주소 fallback
+        '{work_location}': business.work_location
+            || (business.business_name && business.address
+                ? `${business.business_name} (${business.address})`
+                : (business.business_name || business.address || '')),
 
         // ── 오늘 날짜 ──
         '{today}': `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`,
@@ -219,6 +224,7 @@ export const CONTRACT_VARIABLE_CATALOG = [
             { key: '{business_phone}', label: '사업장 전화' },
             { key: '{business_owner}', label: '대표자명' },
             { key: '{business_number}', label: '사업자등록번호' },
+            { key: '{work_location}', label: '근무장소 (예: ○○ 건대본점)' },
         ],
     },
     {

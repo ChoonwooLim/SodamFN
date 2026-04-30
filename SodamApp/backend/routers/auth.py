@@ -460,6 +460,8 @@ def get_business_info(
             "representative_eng": settings.get("representative_eng", ""),
             "tax_office": settings.get("tax_office", ""),
             "industry_code": settings.get("industry_code", ""),
+            # 근무장소 (계약서 자동 채움) — 단일매장 기본값. 다중매장은 차후 BusinessStore 모델로 확장.
+            "work_location": settings.get("work_location", ""),
         }
     finally:
         service.close()
@@ -526,6 +528,7 @@ def update_business_settings(
             "representative_eng": 64,
             "tax_office": 64,
             "industry_code": 32,
+            "work_location": 128,    # 근무장소 (단일매장. 예: "소담김밥 건대본점 매장")
         }
         for field, maxlen in SETTINGS_STR_FIELDS.items():
             if field in data and isinstance(data[field], str):

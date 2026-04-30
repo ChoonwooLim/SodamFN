@@ -125,6 +125,7 @@ export default function CompanyInfoSettings() {
         phone: '', address: '', region: '', email: '', fax: '', website: '',
         opening_date: '', owner_title: '대표', representative_eng: '',
         tax_office: '', industry_code: '',
+        work_location: '',  // 근무장소 (계약서 자동채움. 단일매장 기준)
     });
     const [savingInfo, setSavingInfo] = useState(false);
     const [infoMsg, setInfoMsg] = useState(null);
@@ -186,6 +187,7 @@ export default function CompanyInfoSettings() {
                 representative_eng: d.representative_eng || '',
                 tax_office: d.tax_office || '',
                 industry_code: d.industry_code || '',
+                work_location: d.work_location || '',
             }));
             if (d.seal_image_url) setSealImageUrl(d.seal_image_url);
         } catch (e) {
@@ -328,7 +330,18 @@ export default function CompanyInfoSettings() {
                         placeholder="예: 서울시 광진구 능동로 110 스타시티 영촌빌딩 B208호"
                         className="md:col-span-2"
                     />
+                    <Field
+                        label="근무장소 (계약서 자동입력)"
+                        value={form.work_location}
+                        onChange={(v) => setForm({ ...form, work_location: v })}
+                        placeholder="예: 소담김밥 건대본점 매장"
+                        className="md:col-span-2"
+                    />
                 </div>
+                <p className="mt-2 text-[11px] text-slate-400">
+                    근무장소는 전자계약서의 <code className="bg-slate-100 px-1 rounded">{'{work_location}'}</code> 변수에 자동 치환됩니다.
+                    다중 매장 보유 시는 추후 매장별 선택 기능이 추가될 예정입니다.
+                </p>
 
                 {infoMsg && (
                     <div className={`mt-4 text-sm font-medium p-4 rounded-xl ${
