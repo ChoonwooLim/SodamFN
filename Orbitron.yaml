@@ -53,14 +53,23 @@ services:
         value: "sodam-uploads"
       - key: R2_PUBLIC_URL
         value: ""  # Set after R2 bucket creation
-      - key: REPLICATE_API_TOKEN
-        value: ""  # Set via Orbitron secrets (Replicate.com API token for AI image generation)
-      - key: OPENAI_API_KEY
-        value: ""  # Set via Orbitron secrets (OpenAI DALL-E 3 final fallback)
-      # Shared AI compute server: twinverse-ai @ 192.168.219.117 (RTX 3090 24GB)
-      # See C:\WORK\infra-docs\ai-shared-registry.md for full policy
+      # ─────────────────────────────────────────────
+      # AI 이미지 파이프라인 (2026-05-01 — 외부 API 전면 제거 → OpenClaw + 자체 Flux)
+      # 프롬프트 엔지니어링: OpenClaw GPT-5.5 (ChatGPT Plus/Pro OAuth)
+      # 이미지 생성: 작업PC RTX 3090 — FLUX.1-schnell + Real-ESRGAN + rembg + LaMa
+      # ─────────────────────────────────────────────
+      - key: AI_FLUX_BASE_URL
+        value: "http://192.168.219.100:8100"  # 작업PC GPU 서버 (D:\SodamAI\image-service)
       - key: AI_GPU_SERVER_URL
-        value: "http://192.168.219.117:8100"  # Flux.1-schnell + Real-ESRGAN + rembg + LaMa
+        value: "http://192.168.219.100:8100"  # 레거시 호환 (promotions.py 등)
+      - key: OPENCLAW_GATEWAY_URL
+        value: "http://192.168.219.117:18790"  # twinverse-ai socat 프록시 → 127.0.0.1:18789
+      - key: OPENCLAW_GATEWAY_TOKEN
+        value: ""  # ⚠️ Orbitron Secrets에 설정 (gateway.auth.token from openclaw.json)
+      - key: OPENCLAW_MODEL
+        value: "openclaw/codex-pro"  # GPT-5.5 agent
+      # Shared AI compute server: twinverse-ai @ 192.168.219.117
+      # See C:\WORK\infra-docs\ai-shared-registry.md for full policy
       - key: OLLAMA_URL
         value: "http://192.168.219.117:11434"  # Ollama LLM (qwen2.5/mistral/llava)
       - key: TTS_SERVER_URL

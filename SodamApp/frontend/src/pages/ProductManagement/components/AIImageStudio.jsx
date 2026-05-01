@@ -5,7 +5,7 @@ import {
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
   Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search, Eraser,
-  Paintbrush, Palette, CircleDot, MousePointer2
+  Paintbrush, Palette, CircleDot
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -284,7 +284,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
   const [bgColor, setBgColor] = useState('#ffffff');
   const [bgImage, setBgImage] = useState(null);
   const [replacingBg, setReplacingBg] = useState(false);
-  const [segmenting, setSegmenting] = useState(false);
   const [fillPrompt, setFillPrompt] = useState(''); // 오브젝트 추가용 프롬프트
   const [filling, setFilling] = useState(false);
   const maskCanvasRef = useRef(null);
@@ -370,7 +369,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
           width: 512,
           height: 512,
           steps: 2,
-          skip_translation: useCustomEnglish && translatedPrompt.trim() ? true : false,
+          skip_refinement: useCustomEnglish && translatedPrompt.trim() ? true : false,
         };
         if (seed) payload.seed = parseInt(seed, 10);
         if (negativePrompt.trim() && !(useCustomEnglish && translatedPrompt.trim())) payload.negative_prompt = negativePrompt;
@@ -648,67 +647,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
       ctx.putImageData(dstData, 0, 0);
       maskCanvas.toBlob(resolve, 'image/png');
     });
-  };
-
-  // ── 스마트 선택 (AI 세그멘테이션 → 마스크 캔버스에 적용) ──
-  const handleSmartSelect = async (mode) => {
-    if (!editImage) return;
-    setSegmenting(true);
-    try {
-      const res = await fetch(editImage);
-      const blob = await res.blob();
-      const formData = new FormData();
-      formData.append('file', blob, 'image.png');
-      formData.append('mode', mode); // foreground | background
-
-      const response = await axios.post(`${API_URL}/api/delivery-images/segment`, formData, {
-        headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
-        responseType: 'blob',
-        timeout: 120000,
-      });
-
-      // 마스크 결과를 캔버스에 그리기
-      const maskUrl = URL.createObjectURL(response.data);
-      const maskImg = new window.Image();
-      await new Promise((resolve, reject) => {
-        maskImg.onload = resolve;
-        maskImg.onerror = reject;
-        maskImg.src = maskUrl;
-      });
-
-      const canvas = maskCanvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // 마스크를 캔버스에 색상으로 표시
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(maskImg, 0, 0, canvas.width, canvas.height);
-        const maskData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-
-        const color = mode === 'foreground'
-          ? [255, 0, 0] // 빨강 = 제거 대상
-          : [0, 200, 0]; // 초록 = 보존 대상
-        for (let i = 0; i < maskData.data.length; i += 4) {
-          if (maskData.data[i] > 128) { // 흰색 영역
-            maskData.data[i] = color[0];
-            maskData.data[i+1] = color[1];
-            maskData.data[i+2] = color[2];
-            maskData.data[i+3] = 128; // 반투명
-          } else {
-            maskData.data[i+3] = 0; // 투명
-          }
-        }
-        ctx.putImageData(maskData, 0, 0);
-      }
-      URL.revokeObjectURL(maskUrl);
-    } catch (err) {
-      alert('스마트 선택 실패: ' + (err.response?.data?.detail || err.message));
-    }
-    setSegmenting(false);
   };
 
   // ── 오브젝트 추가 (마스크 영역에 프롬프트로 생성) ──
@@ -1628,24 +1566,6 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
                               <span className="text-xs text-slate-400">{brushSize}px</span>
                             </div>
                             <input type="range" min="5" max="100" value={brushSize} onChange={e => setBrushSize(Number(e.target.value))} className="w-full h-1.5 rounded-full appearance-none bg-slate-200 accent-violet-500" />
-                          </div>
-
-                          {/* 스마트 선택 (AI) */}
-                          <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 block">AI 스마트 선택</label>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <button onClick={() => handleSmartSelect('foreground')} disabled={segmenting}
-                                className="py-2 rounded-lg text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
-                                {segmenting ? <Loader2 className="w-3 h-3 animate-spin" /> : <MousePointer2 className="w-3 h-3" />}
-                                피사체 선택
-                              </button>
-                              <button onClick={() => handleSmartSelect('background')} disabled={segmenting}
-                                className="py-2 rounded-lg text-[11px] font-bold bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 transition-all flex items-center justify-center gap-1 disabled:opacity-50">
-                                {segmenting ? <Loader2 className="w-3 h-3 animate-spin" /> : <MousePointer2 className="w-3 h-3" />}
-                                배경 선택
-                              </button>
-                            </div>
-                            <p className="text-[9px] text-slate-400 mt-1">AI가 자동으로 피사체/배경 경계를 인식합니다</p>
                           </div>
 
                           <button onClick={clearMask} className="w-full py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-1">

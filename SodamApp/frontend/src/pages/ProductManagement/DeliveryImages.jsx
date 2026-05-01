@@ -313,7 +313,7 @@ export default function DeliveryImages() {
           <button
             onClick={() => {
               if (!aiEnabled) {
-                alert('AI API 키가 설정되지 않았습니다.\n백엔드 .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요.');
+                alert('AI 서비스에 연결할 수 없습니다.\nOpenClaw 게이트웨이(twinverse-ai:18789) 또는 Flux 이미지 서버(192.168.219.100:8100) 상태를 확인해주세요.');
                 return;
               }
               setShowAIStudio(true);

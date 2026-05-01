@@ -1,20 +1,26 @@
 """
 배달앱 이미지 관리 API
-- CRUD: 이미지 목록, 업로드, 삭제
-- AI: 셀프호스팅 GPU (Flux.1-schnell) > Replicate > OpenAI 폴백
+- CRUD: 이미지 목록 / 업로드 / 삭제
+- AI 파이프라인: OpenClaw(GPT-5.5) 프롬프트 정제 → Flux.1-schnell 이미지 생성
+  · 외부 API(Replicate / OpenAI) 의존성 제거 — OpenClaw + 자체 GPU만 사용
 """
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi.responses import Response
 from routers.auth import get_admin_user
-from models import User as AuthUser, DeliveryImage, FoodTranslation
+from models import User as AuthUser, DeliveryImage
 from sqlmodel import Session, select
 from database import get_session
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-from tenant_filter import get_bid_from_token, apply_bid_filter
-from services.storage_service import get_storage
+from io import BytesIO
 import os
 import logging
+
+from tenant_filter import get_bid_from_token, apply_bid_filter
+from services.storage_service import get_storage
+from services.openclaw_client import get_openclaw, OpenClawError
+from services.flux_image_client import get_flux, FluxImageError
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +39,6 @@ def list_images(
     stmt = apply_bid_filter(stmt, DeliveryImage, bid)
     if category:
         stmt = stmt.where(DeliveryImage.category == category)
-
     images = session.exec(stmt).all()
     return {
         "status": "success",
@@ -102,17 +107,14 @@ def delete_image(
     image_id: int,
     session: Session = Depends(get_session),
     _admin: AuthUser = Depends(get_admin_user),
-    bid=Depends(get_bid_from_token),
+    _bid=Depends(get_bid_from_token),
 ):
     img = session.get(DeliveryImage, image_id)
     if not img:
         raise HTTPException(status_code=404, detail="이미지를 찾을 수 없습니다.")
-
-    # 스토리지에서 파일 삭제
     if img.storage_key:
         storage = get_storage()
         storage.delete_file(img.storage_key)
-
     session.delete(img)
     session.commit()
     return {"status": "success"}
@@ -122,17 +124,16 @@ def delete_image(
 class BulkDeleteRequest(BaseModel):
     ids: List[int]
 
+
 @router.post("/bulk-delete")
 def bulk_delete(
     req: BulkDeleteRequest,
     session: Session = Depends(get_session),
     _admin: AuthUser = Depends(get_admin_user),
-    bid=Depends(get_bid_from_token),
+    _bid=Depends(get_bid_from_token),
 ):
     storage = get_storage()
-    images = session.exec(
-        select(DeliveryImage).where(DeliveryImage.id.in_(req.ids))
-    ).all()
+    images = session.exec(select(DeliveryImage).where(DeliveryImage.id.in_(req.ids))).all()
     for img in images:
         if img.storage_key:
             storage.delete_file(img.storage_key)
@@ -141,255 +142,72 @@ def bulk_delete(
     return {"status": "success", "deleted": len(images)}
 
 
-# ── AI 이미지 생성 ──
+# ══════════════════════════════════════════════════
+# AI 이미지 생성 (OpenClaw → Flux 파이프라인)
+# ══════════════════════════════════════════════════
 class AIGenerateRequest(BaseModel):
     prompt: str
     name: str = "AI 생성 이미지"
     category: str = "김밥류"
-    style: str = "natural"  # natural, studio, minimal
-    provider: str = "replicate"  # replicate, openai
-    upscale: int = 4           # 1, 2, 4
-    width: int = 512
-    height: int = 512
+    style: str = "natural"
+    width: int = 1024
+    height: int = 1024
     steps: int = 4
     seed: Optional[int] = None
+    upscale: int = 1                    # 1=SD, 2=HD, 4=4K (Real-ESRGAN 후처리)
     negative_prompt: Optional[str] = None
-    reference_description: Optional[str] = None  # Text description of reference image
-    skip_translation: bool = False  # True if prompt is already in English
-
-STYLE_SUFFIXES = {
-    "natural": "shot on Canon EOS R5, 50mm f/1.8, natural window light, warm color temperature, real food texture with visible grain and gloss, white ceramic plate on light wood table, soft shadows, editorial food photography",
-    "studio": "shot on Sony A7R IV, 85mm f/2.8, Profoto studio strobe with softbox, dark moody background, rim light highlighting steam and texture, shallow depth of field, Michelin-star plating, commercial food photography",
-    "minimal": "shot on Fujifilm X-T5, 35mm f/2, bright diffused daylight, pure white seamless background, flat lay overhead composition, clean negative space, real food texture, catalog product photography",
-    "overhead": "shot on Canon EOS R5, 24mm f/4, directly overhead bird-eye view, natural daylight, wooden table surface, multiple dishes arranged, real food texture, editorial spread layout",
-    "angle45": "shot on Sony A7 III, 50mm f/1.4, 45-degree angle, natural side light from window, bokeh background, real food texture with oil sheen and moisture, lifestyle food photography",
-    "closeup": "shot on Canon EOS R5, 100mm macro f/2.8, extreme close-up showing food texture detail, visible steam, oil droplets, sauce gloss, grain of rice, shallow depth of field, hyper-detailed food photography",
-    "steam": "shot on Sony A7R IV, 85mm f/2, backlit steam rising from hot food, warm tungsten lighting, dark cozy background, condensation on bowl, freshly cooked moment captured, atmospheric food photography",
-    "delivery": "clean product shot for delivery app menu, shot on iPhone 15 Pro, bright even lighting, white or light gray background, no shadows, centered composition, clear and appetizing, mobile-optimized food photography",
-    "casual": "shot on Fujifilm X100V, natural ambient light, casual dining table setting with chopsticks and side dishes, lived-in warm atmosphere, slightly messy authentic Korean meal scene, lifestyle photography",
-    "premium": "shot on Phase One IQ4, 80mm f/2.8, luxury restaurant plating on black slate plate, gold accent garnish, professional food styling with tweezers, dramatic chiaroscuro lighting, fine dining editorial photography",
-}
-
-# ── 한국어 음식명 → 영어 사전 (DB 기반, 캐시 사용) ──
-_translation_cache: dict = {}
-_cache_ts: float = 0
-
-def _load_translations() -> dict:
-    """DB에서 번역 사전 로드 (60초 캐시)"""
-    global _translation_cache, _cache_ts
-    import time
-    now = time.time()
-    if _translation_cache and (now - _cache_ts) < 60:
-        return _translation_cache
-    try:
-        from database import engine
-        with Session(engine) as session:
-            rows = session.exec(
-                select(FoodTranslation).where(FoodTranslation.is_active == True)
-            ).all()
-            _translation_cache = {r.korean: r.english for r in rows}
-            _cache_ts = now
-    except Exception as e:
-        logger.warning(f"번역 사전 로드 실패, 캐시 사용: {e}")
-    return _translation_cache
+    reference_description: Optional[str] = None
+    skip_refinement: bool = False       # True면 OpenClaw 우회 (영문 프롬프트 직접 입력)
 
 
-def _translate_prompt(korean_prompt: str) -> str:
-    """한국어 프롬프트를 영어로 변환하여 Flux 모델 정확도 향상"""
-    translations = _load_translations()
-    prompt = korean_prompt.strip()
-
-    # 1. Exact match
-    if prompt in translations:
-        return translations[prompt]
-
-    # 2. Partial match (longest-first)
-    translated_parts = []
-    remaining = prompt
-    for kr_name, en_desc in sorted(translations.items(), key=lambda x: len(x[0]), reverse=True):
-        if kr_name in remaining:
-            translated_parts.append(en_desc)
-            remaining = remaining.replace(kr_name, "", 1)
-
-    if translated_parts:
-        result = ", ".join(translated_parts)
-        remaining = remaining.strip().strip(",").strip()
-        if remaining:
-            result += f", ({remaining})"
-        return result
-
-    # 3. No match
-    return f"Korean food dish: {prompt}, appetizing Korean cuisine"
-
-
-def _build_prompt(translated: str, style: str, reference_description: str = None, negative_prompt: str = None) -> str:
-    """최종 프롬프트 조합 - 음식 설명 우선, 스타일은 간결하게"""
-    style_suffix = STYLE_SUFFIXES.get(style, STYLE_SUFFIXES["natural"])
-    # 핵심: 음식 묘사가 최우선, 스타일은 짧게 뒤에
-    parts = [translated, style_suffix]
-    if reference_description:
-        parts.insert(1, f"style reference: {reference_description}")
-    prompt = ", ".join(parts)
-    if negative_prompt:
-        prompt += f". Avoid: {negative_prompt}"
-    return prompt
-
-
-# ── GPU 서버 도달 가능성 체크 (30초 캐시) ──
-_gpu_reachable_cache: dict = {"url": None, "ok": False, "ts": 0.0}
-
-def _is_gpu_server_reachable(url: str, timeout: float = 1.5) -> bool:
-    """GPU 서버 TCP 연결 가능 여부 확인 (30초 캐시). 환경변수만 세팅하고 서버가 꺼져있을 때 self-hosted로 잘못 라우팅되는 것을 방지."""
-    import time
-    import socket
-    from urllib.parse import urlparse
-
-    now = time.time()
-    if _gpu_reachable_cache["url"] == url and (now - _gpu_reachable_cache["ts"]) < 30:
-        return _gpu_reachable_cache["ok"]
-
-    ok = False
-    try:
-        parsed = urlparse(url)
-        host = parsed.hostname
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        if host:
-            with socket.create_connection((host, port), timeout=timeout):
-                ok = True
-    except (OSError, ValueError) as e:
-        logger.info(f"GPU 서버 도달 불가 ({url}): {e}")
-
-    _gpu_reachable_cache["url"] = url
-    _gpu_reachable_cache["ok"] = ok
-    _gpu_reachable_cache["ts"] = now
-    return ok
-
-
-def _get_ai_provider():
-    """사용 가능한 AI 이미지 생성 프로바이더 확인 (우선순위: self-hosted > replicate > openai).
-    self-hosted는 TCP 도달 가능할 때만 선택되며, 불가 시 자동으로 다음 프로바이더로 폴백한다."""
-    gpu_server_url = os.getenv("AI_GPU_SERVER_URL")
-    if gpu_server_url and _is_gpu_server_reachable(gpu_server_url):
-        return "self-hosted", gpu_server_url
-    replicate_token = os.getenv("REPLICATE_API_TOKEN")
-    openai_key = os.getenv("OPENAI_API_KEY")
-    if replicate_token:
-        return "replicate", replicate_token
-    if openai_key:
-        return "openai", openai_key
-    return None, None
-
-
-async def _generate_with_selfhosted(full_prompt: str, server_url: str, style: str = "natural", upscale: int = 4, width: int = 512, height: int = 512, steps: int = 4, seed: Optional[int] = None) -> bytes:
-    """셀프호스팅 GPU 서버로 이미지 생성 (Flux.1-schnell + Real-ESRGAN 업스케일, 무료)"""
-    import httpx
-
-    payload = {
-        "prompt": full_prompt,
-        "style": style,
-        "width": width,
-        "height": height,
-        "steps": steps,
-        "upscale": upscale,
-    }
-    if seed is not None:
-        payload["seed"] = seed
-
-    async with httpx.AsyncClient(timeout=180.0) as client:
-        response = await client.post(
-            f"{server_url}/generate",
-            json=payload,
+async def _refine_prompt(req: AIGenerateRequest) -> str:
+    """OpenClaw GPT-5.5로 한국어 → 정제된 영문 Flux 프롬프트 생성."""
+    if req.skip_refinement:
+        return req.prompt.strip()
+    oc = get_openclaw()
+    if not oc.configured:
+        raise HTTPException(
+            status_code=503,
+            detail="OpenClaw 게이트웨이가 설정되지 않았습니다. 환경변수 OPENCLAW_GATEWAY_URL/TOKEN 확인.",
         )
-        if response.status_code != 200:
-            raise Exception(f"GPU 서버 오류: {response.status_code} {response.text[:200]}")
-        return response.content  # PNG bytes
-
-
-async def _generate_with_replicate(full_prompt: str, api_token: str) -> str:
-    """Replicate API로 SDXL 이미지 생성 (비용: ~$0.005/장, 속도: 3~10초)"""
-    import httpx
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        # Replicate prediction 생성
-        response = await client.post(
-            "https://api.replicate.com/v1/predictions",
-            headers={
-                "Authorization": f"Bearer {api_token}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "version": "39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b",
-                "input": {
-                    "prompt": full_prompt,
-                    "width": 1024,
-                    "height": 1024,
-                    "num_inference_steps": 4,
-                    "guidance_scale": 0.0,
-                    "num_outputs": 1,
-                },
-            },
+    try:
+        return await oc.refine_image_prompt(
+            korean_prompt=req.prompt,
+            style=req.style,
+            reference_description=req.reference_description,
+            negative_prompt=req.negative_prompt,
         )
-        if response.status_code != 201:
-            raise Exception(f"Replicate API 오류: {response.status_code} {response.text}")
-
-        prediction = response.json()
-        prediction_url = prediction.get("urls", {}).get("get")
-
-        if not prediction_url:
-            raise Exception("Replicate prediction URL을 받지 못했습니다")
-
-        # 폴링: 결과 대기 (최대 120초)
-        for _ in range(60):
-            poll = await client.get(
-                prediction_url,
-                headers={"Authorization": f"Bearer {api_token}"},
-            )
-            result = poll.json()
-            status = result.get("status")
-
-            if status == "succeeded":
-                output = result.get("output")
-                if isinstance(output, list) and output:
-                    return output[0]
-                raise Exception("Replicate 출력이 비어 있습니다")
-            elif status == "failed":
-                raise Exception(f"Replicate 생성 실패: {result.get('error', '알 수 없는 오류')}")
-
-            import asyncio
-            await asyncio.sleep(2)
-
-        raise Exception("Replicate 생성 타임아웃 (120초 초과)")
+    except OpenClawError as e:
+        raise HTTPException(status_code=502, detail=f"프롬프트 정제 실패: {e}")
 
 
-async def _generate_with_openai(full_prompt: str, api_key: str) -> str:
-    """OpenAI DALL-E 3로 이미지 생성 (비용: $0.04/장) — 비동기"""
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=api_key)
-    response = await client.images.generate(
-        model="dall-e-3",
-        prompt=full_prompt,
-        size="1024x1024",
-        quality="standard",
-        n=1,
-    )
-    return response.data[0].url
-
-
-# ── 프롬프트 번역 (한국어 → 영어) ──
+# ── 프롬프트 정제 (미리보기용 - 이미지 생성 없이) ──
 class TranslateRequest(BaseModel):
     prompt: str
     style: str = "natural"
     reference_description: Optional[str] = None
     negative_prompt: Optional[str] = None
 
+
 @router.post("/translate-prompt")
-def translate_prompt(req: TranslateRequest, _admin: AuthUser = Depends(get_admin_user)):
-    translated = _translate_prompt(req.prompt)
-    full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
-    return {"translated": translated, "full_prompt": full_prompt}
+async def translate_prompt(req: TranslateRequest, _admin: AuthUser = Depends(get_admin_user)):
+    """한국어 음식 설명을 OpenClaw GPT-5.5로 정제된 영문 프롬프트로 변환."""
+    oc = get_openclaw()
+    if not oc.configured:
+        raise HTTPException(status_code=503, detail="OpenClaw 게이트웨이가 설정되지 않았습니다.")
+    try:
+        refined = await oc.refine_image_prompt(
+            korean_prompt=req.prompt,
+            style=req.style,
+            reference_description=req.reference_description,
+            negative_prompt=req.negative_prompt,
+        )
+        return {"translated": refined, "full_prompt": refined}
+    except OpenClawError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
 
+# ── AI 이미지 생성 (DB 저장 포함) ──
 @router.post("/ai-generate")
 async def ai_generate_image(
     req: AIGenerateRequest,
@@ -397,170 +215,86 @@ async def ai_generate_image(
     _admin: AuthUser = Depends(get_admin_user),
     bid=Depends(get_bid_from_token),
 ):
-    provider, api_key = _get_ai_provider()
-    if not provider:
-        gpu_url = os.getenv("AI_GPU_SERVER_URL")
-        if gpu_url:
-            detail = f"GPU 서버({gpu_url})에 연결할 수 없고 폴백 API 키도 없습니다. GPU 서버를 시작하거나 .env에 REPLICATE_API_TOKEN / OPENAI_API_KEY를 추가해주세요."
-        else:
-            detail = "AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요."
-        raise HTTPException(status_code=503, detail=detail)
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다 (AI_FLUX_BASE_URL).")
 
-    if req.skip_translation:
-        full_prompt = req.prompt
-    else:
-        translated = _translate_prompt(req.prompt)
-        full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
+    full_prompt = await _refine_prompt(req)
 
     try:
-        from io import BytesIO
-
-        # 프로바이더별 이미지 생성
-        if provider == "self-hosted":
-            # GPU 서버에서 직접 PNG 바이너리 수신
-            image_bytes = await _generate_with_selfhosted(
-                full_prompt, api_key, req.style,
-                upscale=req.upscale, width=req.width, height=req.height,
-                steps=req.steps, seed=req.seed
-            )
-            storage = get_storage()
-            timestamp = int(datetime.now().timestamp() * 1000)
-            storage_key = f"delivery_images/ai_{timestamp}.png"
-            file_data = BytesIO(image_bytes)
-            stored_url = storage.upload_file(file_data, storage_key, "image/png")
-        else:
-            if provider == "replicate":
-                ai_image_url = await _generate_with_replicate(full_prompt, api_key)
-            else:
-                ai_image_url = await _generate_with_openai(full_prompt, api_key)
-
-            # 생성된 이미지를 스토리지에 저장
-            import httpx
-
-            async with httpx.AsyncClient(timeout=60.0) as http_client:
-                img_response = await http_client.get(ai_image_url)
-                if img_response.status_code != 200:
-                    raise Exception("AI 이미지 다운로드 실패")
-
-            storage = get_storage()
-            timestamp = int(datetime.now().timestamp() * 1000)
-            ext = "webp" if provider == "replicate" else "png"
-            storage_key = f"delivery_images/ai_{timestamp}.{ext}"
-            file_data = BytesIO(img_response.content)
-            stored_url = storage.upload_file(file_data, storage_key, f"image/{ext}")
-
-        # DB에 저장
-        img = DeliveryImage(
-            business_id=bid,
-            name=req.name,
-            category=req.category,
-            image_url=stored_url,
-            storage_key=storage_key,
-            source="ai_generated",
+        image_bytes = await flux.generate(
+            prompt=full_prompt,
+            width=req.width, height=req.height,
+            steps=req.steps, seed=req.seed,
+            upscale=req.upscale,
         )
-        session.add(img)
-        session.commit()
-        session.refresh(img)
+    except FluxImageError as e:
+        logger.error(f"Flux generate error: {e}")
+        raise HTTPException(status_code=502, detail=f"이미지 생성 실패: {e}")
 
-        return {
-            "status": "success",
-            "data": {
-                "id": img.id,
-                "name": img.name,
-                "category": img.category,
-                "image_url": img.image_url,
-                "source": img.source,
-                "provider": provider,
-            },
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"AI image generation error ({provider}): {e}")
-        raise HTTPException(status_code=500, detail=f"AI 이미지 생성 실패: {str(e)}")
+    storage = get_storage()
+    timestamp = int(datetime.now().timestamp() * 1000)
+    storage_key = f"delivery_images/ai_{timestamp}.png"
+    stored_url = storage.upload_file(BytesIO(image_bytes), storage_key, "image/png")
+
+    img = DeliveryImage(
+        business_id=bid,
+        name=req.name,
+        category=req.category,
+        image_url=stored_url,
+        storage_key=storage_key,
+        source="ai_generated",
+    )
+    session.add(img)
+    session.commit()
+    session.refresh(img)
+
+    return {
+        "status": "success",
+        "data": {
+            "id": img.id,
+            "name": img.name,
+            "category": img.category,
+            "image_url": img.image_url,
+            "source": img.source,
+            "provider": "openclaw+flux",
+            "refined_prompt": full_prompt,
+        },
+    }
 
 
-# ── AI 이미지 미리보기 (DB 저장 없이) ──
+# ── AI 이미지 미리보기 (DB 저장 없이 PNG 반환) ──
 @router.post("/ai-preview")
 async def ai_preview_image(
     req: AIGenerateRequest,
     _admin: AuthUser = Depends(get_admin_user),
 ):
-    """AI 이미지 미리보기 (DB 저장 없이 이미지만 반환)"""
-    provider, api_key = _get_ai_provider()
-    if not provider:
-        gpu_url = os.getenv("AI_GPU_SERVER_URL")
-        if gpu_url:
-            detail = f"GPU 서버({gpu_url})에 연결할 수 없고 폴백 API 키도 없습니다. GPU 서버를 시작하거나 .env에 REPLICATE_API_TOKEN / OPENAI_API_KEY를 추가해주세요."
-        else:
-            detail = "AI API 키가 설정되지 않았습니다. .env 파일에 REPLICATE_API_TOKEN 또는 OPENAI_API_KEY를 추가해주세요."
-        raise HTTPException(status_code=503, detail=detail)
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
 
-    if req.skip_translation:
-        full_prompt = req.prompt
-    else:
-        translated = _translate_prompt(req.prompt)
-        full_prompt = _build_prompt(translated, req.style, req.reference_description, req.negative_prompt)
+    full_prompt = await _refine_prompt(req)
 
     try:
-        if provider == "self-hosted":
-            image_bytes = await _generate_with_selfhosted(
-                full_prompt, api_key, req.style,
-                upscale=req.upscale, width=req.width, height=req.height,
-                steps=req.steps, seed=req.seed
-            )
-            from fastapi.responses import Response
-            return Response(content=image_bytes, media_type="image/png")
-        else:
-            # For cloud providers, generate and return the URL
-            if provider == "replicate":
-                url = await _generate_with_replicate(full_prompt, api_key)
-            else:
-                url = await _generate_with_openai(full_prompt, api_key)
-            return {"status": "success", "image_url": url, "provider": provider}
-    except Exception as e:
-        logger.error(f"AI preview error ({provider}): {e}")
-        raise HTTPException(status_code=500, detail=f"AI 이미지 생성 실패: {str(e)}")
-
-
-# ── 이미지 업스케일 (GPU 서버 프록시) ──
-@router.post("/upscale")
-async def upscale_image(
-    file: UploadFile = File(...),
-    scale: int = Form(4),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    """이미지 업스케일 (GPU 서버 프록시)"""
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    if not gpu_url:
-        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
-
-    import httpx
-    file_bytes = await file.read()
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{gpu_url}/upscale",
-            files={"file": (file.filename or "image.png", file_bytes, file.content_type or "image/png")},
-            data={"scale": min(max(scale, 2), 4)},
+        image_bytes = await flux.generate(
+            prompt=full_prompt,
+            width=req.width, height=req.height,
+            steps=req.steps, seed=req.seed,
+            upscale=req.upscale,
         )
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"업스케일 실패: {response.text[:200]}")
+    except FluxImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
-    from fastapi.responses import Response
     return Response(
-        content=response.content,
+        content=image_bytes,
         media_type="image/png",
-        headers={
-            "X-Original-Size": response.headers.get("X-Original-Size", ""),
-            "X-Output-Size": response.headers.get("X-Output-Size", ""),
-            "X-Scale": response.headers.get("X-Scale", ""),
-            "X-Upscale-Time": response.headers.get("X-Upscale-Time", ""),
-        }
+        headers={"X-Refined-Prompt": full_prompt[:512]},
     )
 
 
-# ── Image-to-Image 생성 (GPU 서버 프록시) ──
+# ══════════════════════════════════════════════════
+# Flux GPU 프록시 — 이미지 편집 6종
+# ══════════════════════════════════════════════════
 @router.post("/img2img")
 async def img2img_generate(
     file: UploadFile = File(...),
@@ -568,165 +302,156 @@ async def img2img_generate(
     strength: float = Form(0.75),
     steps: int = Form(4),
     seed: Optional[int] = Form(None),
-    style: str = Form(""),
+    upscale: int = Form(1),
+    refine: bool = Form(True),
+    style: str = Form("natural"),
     _admin: AuthUser = Depends(get_admin_user),
 ):
-    """이미지 + 프롬프트로 새 이미지 생성 (Image-to-Image)"""
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    if not gpu_url:
-        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+    """이미지 + 프롬프트로 새 이미지 생성. refine=True면 OpenClaw로 프롬프트 정제."""
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
 
-    import httpx
+    final_prompt = prompt
+    if refine:
+        oc = get_openclaw()
+        if oc.configured:
+            try:
+                final_prompt = await oc.refine_image_prompt(prompt, style=style)
+            except OpenClawError as e:
+                logger.warning(f"img2img 프롬프트 정제 실패, 원본 사용: {e}")
+
     file_bytes = await file.read()
-
-    form_data = {
-        "prompt": prompt,
-        "strength": str(min(max(strength, 0.1), 1.0)),
-        "steps": str(steps),
-        "style": style,
-        "upscale": "1",
-    }
-    if seed is not None:
-        form_data["seed"] = str(seed)
-
-    async with httpx.AsyncClient(timeout=180.0) as client:
-        response = await client.post(
-            f"{gpu_url}/img2img",
-            files={"file": (file.filename or "image.png", file_bytes, file.content_type or "image/png")},
-            data=form_data,
+    try:
+        image_bytes, headers = await flux.img2img(
+            prompt=final_prompt,
+            image_bytes=file_bytes,
+            filename=file.filename or "image.png",
+            content_type=file.content_type or "image/png",
+            strength=strength, steps=steps, seed=seed, upscale=upscale,
         )
-        if response.status_code == 429:
-            raise HTTPException(status_code=429, detail="GPU 서버가 다른 작업 중입니다. 잠시 후 다시 시도해주세요.")
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Img2Img 생성 실패: {response.text[:200]}")
+    except FluxImageError as e:
+        if "다른 작업 중" in str(e):
+            raise HTTPException(status_code=429, detail=str(e))
+        raise HTTPException(status_code=502, detail=str(e))
 
-    from fastapi.responses import Response
     return Response(
-        content=response.content,
+        content=image_bytes,
         media_type="image/png",
         headers={
-            "X-Generation-Time": response.headers.get("X-Generation-Time", ""),
-            "X-Seed": response.headers.get("X-Seed", ""),
-            "X-Strength": response.headers.get("X-Strength", ""),
+            "X-Generation-Time": headers.get("x-generation-time", ""),
+            "X-Seed": headers.get("x-seed", ""),
+            "X-Strength": headers.get("x-strength", ""),
+            "X-Refined-Prompt": final_prompt[:512],
         },
     )
 
 
-# ── 배경 제거 (GPU 서버 프록시) ──
+@router.post("/upscale")
+async def upscale_image(
+    file: UploadFile = File(...),
+    scale: int = Form(4),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """이미지 업스케일 (Real-ESRGAN 4x) — SD→HD/4K 업그레이드 버튼용."""
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
+
+    file_bytes = await file.read()
+    try:
+        image_bytes, headers = await flux.upscale(
+            image_bytes=file_bytes,
+            filename=file.filename or "image.png",
+            content_type=file.content_type or "image/png",
+            scale=scale,
+        )
+    except FluxImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    return Response(
+        content=image_bytes,
+        media_type="image/png",
+        headers={
+            "X-Original-Size": headers.get("x-original-size", ""),
+            "X-Output-Size": headers.get("x-output-size", ""),
+            "X-Scale": headers.get("x-scale", ""),
+            "X-Upscale-Time": headers.get("x-upscale-time", ""),
+        },
+    )
+
+
 @router.post("/remove-bg")
 async def remove_background(
     file: UploadFile = File(...),
     _admin: AuthUser = Depends(get_admin_user),
 ):
-    """이미지 배경 제거 (GPU 서버 rembg 프록시)"""
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    if not gpu_url:
-        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
 
-    import httpx
     file_bytes = await file.read()
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{gpu_url}/remove-bg",
-            files={"file": (file.filename or "image.png", file_bytes, file.content_type or "image/png")},
+    try:
+        image_bytes, headers = await flux.remove_bg(
+            image_bytes=file_bytes,
+            filename=file.filename or "image.png",
+            content_type=file.content_type or "image/png",
         )
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"배경 제거 실패: {response.text[:200]}")
+    except FluxImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
-    from fastapi.responses import Response
     return Response(
-        content=response.content,
+        content=image_bytes,
         media_type="image/png",
-        headers={
-            "X-Processing-Time": response.headers.get("X-Processing-Time", ""),
-        },
+        headers={"X-Processing-Time": headers.get("x-processing-time", "")},
     )
 
 
-# ── AI 세그멘테이션 (스마트 선택, GPU 서버 프록시) ──
-@router.post("/segment")
-async def segment_image(
-    file: UploadFile = File(...),
-    mode: str = Form("foreground"),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    """AI로 피사체/배경 마스크 추출 (스마트 선택)"""
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    if not gpu_url:
-        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
-
-    import httpx
-    file_bytes = await file.read()
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{gpu_url}/segment",
-            files={"file": (file.filename or "image.png", file_bytes, "image/png")},
-            data={"mode": mode},
-        )
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"세그멘테이션 실패: {response.text[:200]}")
-
-    from fastapi.responses import Response
-    return Response(
-        content=response.content,
-        media_type="image/png",
-        headers={"X-Processing-Time": response.headers.get("X-Processing-Time", "")},
-    )
-
-
-# ── AI 인페인팅 (오브젝트 제거, GPU 서버 프록시) ──
 @router.post("/inpaint")
 async def inpaint_image(
     file: UploadFile = File(...),
     mask: UploadFile = File(...),
     _admin: AuthUser = Depends(get_admin_user),
 ):
-    """마스크 영역을 AI로 자연스럽게 제거 (LaMa inpainting)"""
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    if not gpu_url:
-        raise HTTPException(status_code=503, detail="GPU 서버가 설정되지 않았습니다.")
+    """마스크 영역을 LaMa로 자연스럽게 제거."""
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
 
-    import httpx
     file_bytes = await file.read()
     mask_bytes = await mask.read()
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            f"{gpu_url}/inpaint",
-            files={
-                "file": (file.filename or "image.png", file_bytes, "image/png"),
-                "mask": ("mask.png", mask_bytes, "image/png"),
-            },
+    try:
+        image_bytes, headers = await flux.inpaint(
+            image_bytes=file_bytes,
+            image_filename=file.filename or "image.png",
+            image_ct=file.content_type or "image/png",
+            mask_bytes=mask_bytes,
         )
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"인페인팅 실패: {response.text[:200]}")
+    except FluxImageError as e:
+        raise HTTPException(status_code=502, detail=str(e))
 
-    from fastapi.responses import Response
     return Response(
-        content=response.content,
+        content=image_bytes,
         media_type="image/png",
-        headers={
-            "X-Processing-Time": response.headers.get("X-Processing-Time", ""),
-        },
+        headers={"X-Processing-Time": headers.get("x-processing-time", "")},
     )
 
 
-# ── AI 설정 상태 확인 ──
+# ── AI 상태 확인 ──
 @router.get("/ai-status")
-def ai_status(_admin: AuthUser = Depends(get_admin_user)):
-    provider, _ = _get_ai_provider()
-    gpu_url = os.getenv("AI_GPU_SERVER_URL")
-    gpu_configured = bool(gpu_url)
-    gpu_reachable = bool(gpu_url and _is_gpu_server_reachable(gpu_url))
+async def ai_status(_admin: AuthUser = Depends(get_admin_user)):
+    oc = get_openclaw()
+    flux = get_flux()
+    oc_health = await oc.health()
+    flux_health = await flux.health()
+    enabled = bool(oc_health.get("reachable") and flux_health.get("reachable"))
     return {
         "status": "success",
-        "ai_enabled": provider is not None,
-        "provider": provider,
-        "provider_name": {"self-hosted": "셀프호스팅 GPU (Flux.1-schnell)", "replicate": "Replicate (SDXL Turbo)", "openai": "OpenAI (DALL-E 3)"}.get(provider, "없음"),
-        "gpu_configured": gpu_configured,
-        "gpu_reachable": gpu_reachable,
+        "ai_enabled": enabled,
+        "provider": "openclaw+flux" if enabled else None,
+        "provider_name": "OpenClaw GPT-5.5 + Flux.1-schnell" if enabled else "사용 불가",
+        "openclaw": oc_health,
+        "flux": flux_health,
     }
 
 
@@ -744,7 +469,6 @@ async def proxy_image(url: str, _admin: AuthUser = Depends(get_admin_user)):
             content_type = resp.headers.get("content-type", "")
             if not content_type.startswith("image/"):
                 raise HTTPException(status_code=400, detail="이미지가 아닙니다")
-            from fastapi.responses import Response
             return Response(
                 content=resp.content,
                 media_type=content_type,
@@ -752,102 +476,3 @@ async def proxy_image(url: str, _admin: AuthUser = Depends(get_admin_user)):
             )
     except httpx.HTTPError:
         raise HTTPException(status_code=400, detail="이미지를 불러올 수 없습니다")
-
-
-# ══════════════════════════════════════════
-# 음식 번역 사전 관리 CRUD
-# ══════════════════════════════════════════
-
-class FoodTranslationCreate(BaseModel):
-    korean: str
-    english: str
-    category: str = "기타"
-
-class FoodTranslationUpdate(BaseModel):
-    korean: Optional[str] = None
-    english: Optional[str] = None
-    category: Optional[str] = None
-    is_active: Optional[bool] = None
-
-@router.get("/translations")
-def list_translations(
-    session: Session = Depends(get_session),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    rows = session.exec(
-        select(FoodTranslation).order_by(FoodTranslation.category, FoodTranslation.korean)
-    ).all()
-    return [
-        {
-            "id": r.id, "korean": r.korean, "english": r.english,
-            "category": r.category, "is_active": r.is_active,
-            "created_at": r.created_at.isoformat(), "updated_at": r.updated_at.isoformat(),
-        }
-        for r in rows
-    ]
-
-@router.post("/translations")
-def create_translation(
-    body: FoodTranslationCreate,
-    session: Session = Depends(get_session),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    existing = session.exec(
-        select(FoodTranslation).where(FoodTranslation.korean == body.korean.strip())
-    ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"'{body.korean}' 항목이 이미 존재합니다")
-    entry = FoodTranslation(
-        korean=body.korean.strip(),
-        english=body.english.strip(),
-        category=body.category,
-    )
-    session.add(entry)
-    session.commit()
-    session.refresh(entry)
-    _invalidate_translation_cache()
-    return {"id": entry.id, "korean": entry.korean, "english": entry.english, "category": entry.category}
-
-@router.put("/translations/{tid}")
-def update_translation(
-    tid: int,
-    body: FoodTranslationUpdate,
-    session: Session = Depends(get_session),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    entry = session.get(FoodTranslation, tid)
-    if not entry:
-        raise HTTPException(status_code=404, detail="항목을 찾을 수 없습니다")
-    if body.korean is not None:
-        entry.korean = body.korean.strip()
-    if body.english is not None:
-        entry.english = body.english.strip()
-    if body.category is not None:
-        entry.category = body.category
-    if body.is_active is not None:
-        entry.is_active = body.is_active
-    entry.updated_at = datetime.now()
-    session.add(entry)
-    session.commit()
-    session.refresh(entry)
-    _invalidate_translation_cache()
-    return {"id": entry.id, "korean": entry.korean, "english": entry.english, "category": entry.category, "is_active": entry.is_active}
-
-@router.delete("/translations/{tid}")
-def delete_translation(
-    tid: int,
-    session: Session = Depends(get_session),
-    _admin: AuthUser = Depends(get_admin_user),
-):
-    entry = session.get(FoodTranslation, tid)
-    if not entry:
-        raise HTTPException(status_code=404, detail="항목을 찾을 수 없습니다")
-    session.delete(entry)
-    session.commit()
-    _invalidate_translation_cache()
-    return {"status": "deleted", "id": tid}
-
-def _invalidate_translation_cache():
-    global _translation_cache, _cache_ts
-    _translation_cache = {}
-    _cache_ts = 0
