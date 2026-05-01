@@ -20,8 +20,9 @@ function getAuthHeaders() {
  * Props:
  *  - onGenerate(prompt: string): 사용자가 [이 프롬프트로 생성] 클릭 시 호출
  *  - onClose(): 모드 종료
+ *  - onSaved(): img2img+refs 경로에서 DB 저장이 완료되면 호출 (갤러리 새로고침용)
  */
-export default function AIChatPromptBuilder({ onGenerate, onClose }) {
+export default function AIChatPromptBuilder({ onGenerate, onClose, onSaved }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
@@ -33,6 +34,7 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
   ]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [generating, setGenerating] = useState(false);  // img2img+refs 경로 생성 중
 
   // 참고 이미지 N장: 각 항목 = { id, file, preview, description, analyzing, error }
   const [refImages, setRefImages] = useState([]);
@@ -196,6 +198,66 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
     }
   };
 
+  // [이 프롬프트로 이미지 생성] 클릭 분기:
+  //  - 참고 이미지 0장: 부모 onGenerate(prompt) → 빠른 생성 탭에서 ai-generate
+  //  - 참고 이미지 1장+: 직접 ai-generate-with-refs 호출 (콜라주 → img2img)
+  //    이 경로는 LLaVA 텍스트 묘사 대신 실제 이미지를 init_image 로 사용해
+  //    한국 음식 인식 약점을 우회한다.
+  const handleGenerateClick = useCallback(async (englishPrompt) => {
+    const ready = refImages.filter((r) => !r.analyzing && !r.error && r.file);
+    if (ready.length === 0) {
+      onGenerate?.(englishPrompt);
+      return;
+    }
+
+    setGenerating(true);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: `🎨 참고 이미지 ${ready.length}장을 합성한 콜라주를 baseline 으로 새 이미지를 생성하고 있어요... (40초~2분)`,
+      },
+    ]);
+    try {
+      const formData = new FormData();
+      formData.append('prompt', englishPrompt);
+      formData.append('name', `AI 채팅 - ${new Date().toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}`);
+      formData.append('category', '김밥류');
+      formData.append('strength', '0.65');
+      formData.append('steps', '4');
+      ready.forEach((r) => formData.append('files', r.file, r.file.name || 'ref.png'));
+
+      const res = await axios.post(
+        `${API_URL}/api/delivery-images/ai-generate-with-refs`,
+        formData,
+        {
+          headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
+          timeout: 240000,
+        }
+      );
+      const url = res.data?.data?.image_url;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: `✅ 이미지 생성 완료! 갤러리에 저장됐어요. 마음에 안 들면 "조금 더 어둡게" 같이 수정 요청해서 새 프롬프트를 받아보세요.`,
+          generated_image_url: url,
+        },
+      ]);
+      onSaved?.();
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '⚠️ 이미지 생성 실패: ' + (err.response?.data?.detail || err.message),
+          error: true,
+        },
+      ]);
+    }
+    setGenerating(false);
+  }, [refImages, onGenerate, onSaved]);
+
   // 마크다운 ```prompt``` 블록을 자연스럽게 렌더링하기 위한 분할
   const renderContent = (content) => {
     const parts = content.split(/(```(?:prompt)?\n[\s\S]+?\n```)/gi);
@@ -350,13 +412,21 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
               >
                 {renderContent(msg.content)}
               </div>
-              {msg.role === 'assistant' && msg.final_prompt && (
+              {msg.role === 'assistant' && msg.final_prompt && !generating && (
                 <button
-                  onClick={() => onGenerate(msg.final_prompt)}
+                  onClick={() => handleGenerateClick(msg.final_prompt)}
                   className="mt-2 ml-1 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-600 text-white shadow-lg shadow-violet-500/20 hover:shadow-xl transition-all"
                 >
-                  <Wand2 className="w-3.5 h-3.5" />이 프롬프트로 이미지 생성
+                  <Wand2 className="w-3.5 h-3.5" />
+                  {refImages.filter((r) => !r.analyzing && !r.error).length > 0
+                    ? `참고 이미지 ${refImages.filter((r) => !r.analyzing && !r.error).length}장 + 프롬프트로 생성`
+                    : '이 프롬프트로 이미지 생성'}
                 </button>
+              )}
+              {msg.generated_image_url && (
+                <div className="mt-2 ml-1 rounded-xl overflow-hidden border border-violet-200 max-w-xs">
+                  <img src={msg.generated_image_url} alt="생성 결과" className="w-full h-auto" />
+                </div>
               )}
             </div>
           </div>

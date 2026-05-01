@@ -510,6 +510,141 @@ async def analyze_reference_image(
     return {"description": description, "model": vision.model}
 
 
+# ══════════════════════════════════════════════════
+# 참고 이미지 + img2img 콜라주 합성 (한국 음식 인식 약점 우회)
+# ══════════════════════════════════════════════════
+def _compose_reference_collage(images_bytes: List[bytes], target_size: tuple = (1024, 1024)) -> bytes:
+    """N장의 참고 이미지를 1장의 콜라주로 합성.
+    Flux img2img init_image 로 사용 → LLaVA 묘사 부정확 / Flux 한국 음식 인식 약점을
+    실제 이미지 픽셀로 우회. 단순한 균등 분할:
+      n=1 → resize 만; n=2 → 좌우; n=3 → 가로 3분할; n=4 → 2x2; n≥5 → ⌈√n⌉ × ⌈n/cols⌉ 그리드."""
+    import math
+    from PIL import Image as PILImage
+    pil_images = [PILImage.open(BytesIO(b)).convert("RGB") for b in images_bytes]
+    n = len(pil_images)
+
+    if n == 1:
+        out = pil_images[0].resize(target_size, PILImage.LANCZOS)
+    elif n == 2:
+        w, h = target_size[0] // 2, target_size[1]
+        out = PILImage.new("RGB", target_size, (255, 255, 255))
+        for i, img in enumerate(pil_images):
+            out.paste(img.resize((w, h), PILImage.LANCZOS), (i * w, 0))
+    elif n == 3:
+        w, h = target_size[0] // 3, target_size[1]
+        out = PILImage.new("RGB", target_size, (255, 255, 255))
+        for i, img in enumerate(pil_images):
+            out.paste(img.resize((w, h), PILImage.LANCZOS), (i * w, 0))
+    elif n == 4:
+        w, h = target_size[0] // 2, target_size[1] // 2
+        out = PILImage.new("RGB", target_size, (255, 255, 255))
+        for i, img in enumerate(pil_images):
+            row, col = i // 2, i % 2
+            out.paste(img.resize((w, h), PILImage.LANCZOS), (col * w, row * h))
+    else:
+        cols = math.ceil(math.sqrt(n))
+        rows = math.ceil(n / cols)
+        w, h = target_size[0] // cols, target_size[1] // rows
+        out = PILImage.new("RGB", target_size, (255, 255, 255))
+        for i, img in enumerate(pil_images):
+            row, col = i // cols, i % cols
+            out.paste(img.resize((w, h), PILImage.LANCZOS), (col * w, row * h))
+
+    buf = BytesIO()
+    out.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()
+
+
+@router.post("/ai-generate-with-refs")
+async def ai_generate_with_refs(
+    prompt: str = Form(...),
+    name: str = Form("AI 생성 이미지"),
+    category: str = Form("김밥류"),
+    strength: float = Form(0.6),
+    steps: int = Form(4),
+    files: List[UploadFile] = File(...),
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+):
+    """N장 참고 이미지를 콜라주로 합성 → Flux img2img init_image → 새 이미지 생성.
+    LLaVA 텍스트 묘사 대신 실제 이미지 픽셀을 baseline 으로 써서 한국 음식 등
+    텍스트 인식이 약한 케이스에서 의도와 일치하는 결과를 얻기 위함."""
+    if not files:
+        raise HTTPException(status_code=400, detail="참고 이미지가 1장 이상 필요합니다.")
+    if len(files) > 6:
+        raise HTTPException(status_code=400, detail="참고 이미지는 최대 6장까지 가능합니다.")
+
+    flux = get_flux()
+    if not flux.configured:
+        raise HTTPException(status_code=503, detail="Flux 이미지 서버가 설정되지 않았습니다.")
+
+    # 1) 모든 참고 이미지 읽기
+    images_bytes: list[bytes] = []
+    for f in files:
+        b = await f.read()
+        if len(b) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"{f.filename}: 이미지 크기는 10MB 이하만 가능합니다.")
+        images_bytes.append(b)
+
+    # 2) 콜라주 합성
+    try:
+        init_bytes = _compose_reference_collage(images_bytes)
+    except Exception as e:
+        logger.error(f"collage compose error: {e}")
+        raise HTTPException(status_code=500, detail=f"참고 이미지 합성 실패: {e}")
+
+    # 3) Flux img2img 호출 (영문 프롬프트는 채팅에서 이미 정제됨)
+    try:
+        image_bytes, headers = await flux.img2img(
+            prompt=prompt,
+            image_bytes=init_bytes,
+            filename="reference_collage.png",
+            content_type="image/png",
+            strength=min(max(strength, 0.3), 0.85),
+            steps=steps,
+        )
+    except FluxImageError as e:
+        if "다른 작업 중" in str(e):
+            raise HTTPException(status_code=429, detail=str(e))
+        logger.error(f"Flux img2img with refs error: {e}")
+        raise HTTPException(status_code=502, detail=f"이미지 생성 실패: {e}")
+
+    # 4) storage 업로드
+    storage = get_storage()
+    timestamp = int(datetime.now().timestamp() * 1000)
+    storage_key = f"delivery_images/ai_refs_{timestamp}.png"
+    stored_url = storage.upload_file(BytesIO(image_bytes), storage_key, "image/png")
+
+    # 5) DB
+    img = DeliveryImage(
+        business_id=bid,
+        name=name,
+        category=category,
+        image_url=stored_url,
+        storage_key=storage_key,
+        source="ai_generated",
+    )
+    session.add(img)
+    session.commit()
+    session.refresh(img)
+
+    return {
+        "status": "success",
+        "data": {
+            "id": img.id,
+            "name": img.name,
+            "category": img.category,
+            "image_url": img.image_url,
+            "source": img.source,
+            "provider": "openclaw+flux+refs",
+            "ref_count": len(images_bytes),
+            "strength": strength,
+            "generation_time": headers.get("x-generation-time", ""),
+        },
+    }
+
+
 # ── AI 상태 확인 ──
 @router.get("/ai-status")
 async def ai_status(_admin: AuthUser = Depends(get_admin_user)):

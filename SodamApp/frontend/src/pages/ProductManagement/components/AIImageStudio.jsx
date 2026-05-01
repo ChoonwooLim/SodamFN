@@ -969,6 +969,7 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
               <AIChatPromptBuilder
                 onGenerate={handleChatPromptConfirmed}
                 onClose={() => setActiveTab('generate')}
+                onSaved={() => onSave?.()}
               />
             </div>
           )}
