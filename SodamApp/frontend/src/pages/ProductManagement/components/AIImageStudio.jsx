@@ -5,9 +5,10 @@ import {
   Pencil, Image as ImageIcon, ChevronRight, RefreshCw,
   Trash2, Copy, Check, Sliders, Maximize2, Undo2,
   Link, Clipboard, Languages, Eye, EyeOff, BookOpen, Plus, Search, Eraser,
-  Paintbrush, Palette, CircleDot
+  Paintbrush, Palette, CircleDot, MessageSquare
 } from 'lucide-react';
 import axios from 'axios';
+import AIChatPromptBuilder from './AIChatPromptBuilder';
 
 /* ══════════════════════════════════════════
    ImageDropZone - 다목적 이미지 입력 컴포넌트
@@ -903,11 +904,20 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
   );
 
   const tabs = [
-    { id: 'generate', label: 'AI 생성', icon: Wand2 },
+    { id: 'chat', label: 'AI와 대화', icon: MessageSquare },
+    { id: 'generate', label: '빠른 생성', icon: Wand2 },
     { id: 'upscale', label: '업스케일', icon: ArrowUpCircle },
     { id: 'edit', label: '편집', icon: Pencil },
     { id: 'dictionary', label: '번역 사전', icon: BookOpen },
   ];
+
+  // 채팅 모드에서 확정한 영문 프롬프트를 받아 빠른 생성 탭에 자동 입력
+  const handleChatPromptConfirmed = useCallback((englishPrompt) => {
+    setUseCustomEnglish(true);
+    setTranslatedPrompt(englishPrompt);
+    setPrompt(englishPrompt.slice(0, 50));  // 한국어 슬롯에도 미리보기 차원에서 일부 채움
+    setActiveTab('generate');
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center">
@@ -950,6 +960,18 @@ export default function AIImageStudio({ onClose, onSave, aiProvider, initialImag
 
         {/* ── 메인 컨텐츠 ── */}
         <div className="flex-1 overflow-hidden flex">
+
+          {/* ═══════════════════════════════
+              AI와 대화 탭 (프롬프트 엔지니어링)
+              ═══════════════════════════════ */}
+          {activeTab === 'chat' && (
+            <div className="flex-1 overflow-hidden p-5 bg-slate-50">
+              <AIChatPromptBuilder
+                onGenerate={handleChatPromptConfirmed}
+                onClose={() => setActiveTab('generate')}
+              />
+            </div>
+          )}
 
           {/* ═══════════════════════════════
               생성 탭

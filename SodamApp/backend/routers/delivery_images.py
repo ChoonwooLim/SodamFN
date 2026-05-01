@@ -21,6 +21,7 @@ from tenant_filter import get_bid_from_token, apply_bid_filter
 from services.storage_service import get_storage
 from services.openclaw_client import get_openclaw, OpenClawError
 from services.flux_image_client import get_flux, FluxImageError
+from services.ollama_vision_client import get_vision, OllamaVisionError
 
 logger = logging.getLogger(__name__)
 
@@ -435,6 +436,78 @@ async def inpaint_image(
         media_type="image/png",
         headers={"X-Processing-Time": headers.get("x-processing-time", "")},
     )
+
+
+# ══════════════════════════════════════════════════
+# 대화형 프롬프트 엔지니어링 (OpenClaw GPT-5.5 + LLaVA 참고이미지 분석)
+# ══════════════════════════════════════════════════
+class ChatMessage(BaseModel):
+    role: str  # "user" | "assistant"
+    content: str
+
+
+class AIChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    reference_image_description: Optional[str] = None  # 클라이언트가 한 번 분석 후 캐시 가능
+
+
+class AIChatResponse(BaseModel):
+    reply: str
+    final_prompt: Optional[str] = None  # ```prompt 코드블록에서 추출
+
+
+def _extract_prompt_block(text: str) -> Optional[str]:
+    """AI 응답에서 ```prompt ... ``` 블록 안 영문 프롬프트 추출."""
+    import re
+    m = re.search(r"```(?:prompt)?\s*\n(.+?)\n```", text, re.DOTALL | re.IGNORECASE)
+    if not m:
+        return None
+    body = m.group(1).strip()
+    # 너무 짧으면 무효 (아직 정제 미완)
+    return body if len(body) >= 20 else None
+
+
+@router.post("/ai-chat", response_model=AIChatResponse)
+async def ai_chat(req: AIChatRequest, _admin: AuthUser = Depends(get_admin_user)):
+    """대화형 프롬프트 엔지니어링. 사용자 ↔ GPT-5.5 멀티턴 대화로 요구사항 정제 후
+    ```prompt 코드블록으로 최종 영문 프롬프트 제안. 사용자 확인 후 ai-generate 호출."""
+    oc = get_openclaw()
+    if not oc.configured:
+        raise HTTPException(status_code=503, detail="OpenClaw 게이트웨이가 설정되지 않았습니다.")
+
+    try:
+        reply = await oc.chat_with_history(
+            messages=[m.model_dump() for m in req.messages],
+            reference_image_description=req.reference_image_description,
+        )
+    except OpenClawError as e:
+        raise HTTPException(status_code=502, detail=f"대화 실패: {e}")
+
+    final_prompt = _extract_prompt_block(reply)
+    return AIChatResponse(reply=reply, final_prompt=final_prompt)
+
+
+@router.post("/analyze-reference")
+async def analyze_reference_image(
+    file: UploadFile = File(...),
+    _admin: AuthUser = Depends(get_admin_user),
+):
+    """참고 이미지 → ollama LLaVA → 영문 묘사. 채팅 진입 전 한 번만 호출."""
+    vision = get_vision()
+    if not vision.configured:
+        raise HTTPException(status_code=503, detail="Ollama LLaVA 서버가 설정되지 않았습니다.")
+
+    image_bytes = await file.read()
+    if len(image_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="이미지 크기는 10MB 이하만 가능합니다.")
+
+    try:
+        description = await vision.describe_image(image_bytes)
+    except OllamaVisionError as e:
+        logger.error(f"LLaVA describe error: {e}")
+        raise HTTPException(status_code=502, detail=f"이미지 분석 실패: {e}")
+
+    return {"description": description, "model": vision.model}
 
 
 # ── AI 상태 확인 ──

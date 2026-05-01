@@ -34,6 +34,21 @@ SYSTEM_PROMPT = (
 )
 
 
+CHAT_SYSTEM_PROMPT = (
+    "당신은 식품 사진 전문 프롬프트 엔지니어입니다. FLUX.1-schnell 이미지 생성 모델을 위해 "
+    "사용자와 한국어로 자연스럽게 대화하며 다음 정보를 충분히 파악합니다:\n"
+    "1) 어떤 음식 / 핵심 재료 / 플레이팅\n"
+    "2) 분위기 / 조명 (자연광·스튜디오·역광 등) / 색감\n"
+    "3) 카메라 스타일 / 앵글 / 심도\n"
+    "4) 참고 이미지가 있으면 그 묘사를 분석에 활용\n\n"
+    "정보가 충분하다고 판단되면 영문 50~100단어의 최종 프롬프트를 ```prompt 코드블록으로 감싸 제안하고 "
+    "사용자 확인을 요청합니다. 사용자가 'OK', '확정', '좋아요', '진행' 등으로 동의하면 "
+    "동일한 ```prompt 블록을 다시 출력해 최종 확정합니다 (이때는 추가 질문 없이 블록만 출력).\n\n"
+    "대화는 한국어로 하되, ```prompt 코드블록 안의 최종 프롬프트는 반드시 영문으로 작성하세요. "
+    "사용자가 수정 요청을 하면 프롬프트를 갱신해서 다시 ```prompt 블록으로 제안하세요."
+)
+
+
 class OpenClawError(Exception):
     pass
 
@@ -76,6 +91,22 @@ class OpenClawClient:
                 return data["choices"][0]["message"]["content"].strip()
             except (KeyError, IndexError) as e:
                 raise OpenClawError(f"OpenClaw 응답 형식 오류: {e}, payload={str(data)[:200]}")
+
+    async def chat_with_history(
+        self,
+        messages: list[dict],
+        reference_image_description: Optional[str] = None,
+    ) -> str:
+        """다중 턴 대화. 참고 이미지가 있으면 ollama LLaVA로 분석한 묘사를
+        시스템 프롬프트 뒤에 첨부. messages 는 클라이언트가 매번 전체 히스토리 송신."""
+        system_content = CHAT_SYSTEM_PROMPT
+        if reference_image_description:
+            system_content += (
+                f"\n\n[참고 이미지 분석]\n{reference_image_description}\n"
+                "이 묘사를 바탕으로 사용자가 비슷한 스타일·구도를 원하는지 자연스럽게 확인하세요."
+            )
+        full_messages = [{"role": "system", "content": system_content}, *messages]
+        return await self.chat(messages=full_messages)
 
     async def refine_image_prompt(
         self,
