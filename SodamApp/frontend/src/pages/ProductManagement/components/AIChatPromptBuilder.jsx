@@ -34,10 +34,9 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
 
-  const [refFile, setRefFile] = useState(null);
-  const [refPreview, setRefPreview] = useState(null);
-  const [refDescription, setRefDescription] = useState('');
-  const [analyzing, setAnalyzing] = useState(false);
+  // 참고 이미지 N장: 각 항목 = { id, file, preview, description, analyzing, error }
+  const [refImages, setRefImages] = useState([]);
+  const MAX_REF_IMAGES = 6;
 
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -47,45 +46,102 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, thinking]);
 
-  // 참고 이미지 분석
-  const handleReferenceUpload = async (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    setRefFile(file);
-    setRefPreview(URL.createObjectURL(file));
-    setAnalyzing(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await axios.post(
-        `${API_URL}/api/delivery-images/analyze-reference`,
-        formData,
-        { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }, timeout: 180000 }
-      );
-      setRefDescription(res.data?.description || '');
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            '참고 이미지를 분석했어요. 이걸 참고로 진행할게요.\n\n' +
-            `_${(res.data?.description || '').slice(0, 200)}${
-              (res.data?.description || '').length > 200 ? '...' : ''
-            }_\n\n` +
-            '추가로 어떤 느낌으로 만들고 싶으신지 알려주세요. (예: 한국 김밥으로, 매콤한 김치 보이게, 자연광)',
-        },
-      ]);
-    } catch (err) {
-      alert('이미지 분석 실패: ' + (err.response?.data?.detail || err.message));
-      setRefFile(null);
-      setRefPreview(null);
+  // unmount 시 ObjectURL 정리
+  useEffect(() => {
+    return () => {
+      refImages.forEach((r) => r.preview && URL.revokeObjectURL(r.preview));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 참고 이미지 다중 업로드 + 순차 분석
+  const handleReferenceUpload = async (files) => {
+    const list = Array.from(files || []).filter((f) => f && f.type.startsWith('image/'));
+    if (!list.length) return;
+
+    // 한도 확인
+    const room = MAX_REF_IMAGES - refImages.length;
+    if (room <= 0) {
+      alert(`참고 이미지는 최대 ${MAX_REF_IMAGES}장까지 업로드 가능합니다.`);
+      return;
     }
-    setAnalyzing(false);
+    const accepted = list.slice(0, room);
+
+    // 즉시 썸네일 등록 (analyzing=true)
+    const newItems = accepted.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      file,
+      preview: URL.createObjectURL(file),
+      description: '',
+      analyzing: true,
+      error: false,
+    }));
+    setRefImages((prev) => [...prev, ...newItems]);
+
+    // 순차 분석 (병렬 시 LLaVA GPU 충돌 방지)
+    for (const item of newItems) {
+      try {
+        const formData = new FormData();
+        formData.append('file', item.file);
+        const res = await axios.post(
+          `${API_URL}/api/delivery-images/analyze-reference`,
+          formData,
+          { headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' }, timeout: 180000 }
+        );
+        const desc = res.data?.description || '';
+        setRefImages((prev) =>
+          prev.map((r) => (r.id === item.id ? { ...r, description: desc, analyzing: false } : r))
+        );
+      } catch (err) {
+        const msg = err.response?.data?.detail || err.message;
+        setRefImages((prev) =>
+          prev.map((r) => (r.id === item.id ? { ...r, error: true, analyzing: false, description: `(분석 실패: ${msg})` } : r))
+        );
+      }
+    }
+
+    // 분석 결과를 채팅에 합산 메시지로 한 번 출력
+    const analyzedCount = accepted.length;
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'assistant',
+        content:
+          `참고 이미지 ${analyzedCount}장을 분석에 반영했어요. ` +
+          `종합적으로 봐서 어떤 느낌이 마음에 드시는지 알려주시면, 공통 요소를 우선 반영해 프롬프트를 만들어드릴게요.\n\n` +
+          `(예: "1번 사진의 조명 + 2번 사진의 플레이팅 + 매콤한 느낌")`,
+      },
+    ]);
   };
+
+  // 개별 참고이미지 삭제
+  const removeRefImage = (id) => {
+    setRefImages((prev) => {
+      const target = prev.find((r) => r.id === id);
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return prev.filter((r) => r.id !== id);
+    });
+  };
+
+  // GPT-5.5 에 보낼 통합 묘사 문자열 (이미지 N장 → 번호 매겨 join)
+  const composedReferenceDescription = useCallback(() => {
+    const ready = refImages.filter((r) => !r.analyzing && r.description && !r.error);
+    if (!ready.length) return undefined;
+    if (ready.length === 1) return ready[0].description;
+    return ready
+      .map((r, i) => `[참고 이미지 ${i + 1}]\n${r.description}`)
+      .join('\n\n');
+  }, [refImages]);
 
   // 사용자 메시지 전송
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || thinking) return;
+    // 분석 중인 이미지가 있으면 잠시 대기 안내
+    if (refImages.some((r) => r.analyzing)) {
+      alert('참고 이미지 분석이 끝난 후 메시지를 보내주세요.');
+      return;
+    }
     const newUserMsg = { role: 'user', content: text };
     const next = [...messages, newUserMsg];
     setMessages(next);
@@ -96,7 +152,7 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
         `${API_URL}/api/delivery-images/ai-chat`,
         {
           messages: next.map((m) => ({ role: m.role, content: m.content })),
-          reference_image_description: refDescription || undefined,
+          reference_image_description: composedReferenceDescription(),
         },
         { headers: getAuthHeaders(), timeout: 180000 }
       );
@@ -117,7 +173,7 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
       ]);
     }
     setThinking(false);
-  }, [input, thinking, messages, refDescription]);
+  }, [input, thinking, messages, refImages, composedReferenceDescription]);
 
   // 새로 시작
   const handleReset = () => {
@@ -129,10 +185,8 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
       },
     ]);
     setInput('');
-    setRefFile(null);
-    if (refPreview) URL.revokeObjectURL(refPreview);
-    setRefPreview(null);
-    setRefDescription('');
+    refImages.forEach((r) => r.preview && URL.revokeObjectURL(r.preview));
+    setRefImages([]);
   };
 
   const handleEnter = (e) => {
@@ -192,58 +246,81 @@ export default function AIChatPromptBuilder({ onGenerate, onClose }) {
         </button>
       </div>
 
-      {/* 참고 이미지 영역 */}
+      {/* 참고 이미지 갤러리 (최대 N장) */}
       <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
-        {refPreview ? (
-          <div className="flex items-center gap-3">
-            <img src={refPreview} alt="ref" className="w-14 h-14 rounded-lg object-cover border border-slate-200" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <Eye className="w-3 h-3 text-violet-500" />
-                <span className="text-[11px] font-bold text-slate-600">참고 이미지 분석됨</span>
-              </div>
-              <p className="text-[10px] text-slate-500 truncate">
-                {analyzing ? '분석 중...' : refDescription.slice(0, 100) + (refDescription.length > 100 ? '...' : '')}
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setRefFile(null);
-                if (refPreview) URL.revokeObjectURL(refPreview);
-                setRefPreview(null);
-                setRefDescription('');
-              }}
-              className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-200 transition-all"
+        <div className="flex items-center gap-1.5 mb-2">
+          <Eye className="w-3 h-3 text-violet-500" />
+          <span className="text-[11px] font-bold text-slate-600">
+            참고 이미지 {refImages.length > 0 ? `(${refImages.length}/${MAX_REF_IMAGES})` : '(선택)'}
+          </span>
+          {refImages.some((r) => r.analyzing) && (
+            <span className="flex items-center gap-1 text-[10px] text-violet-500 ml-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              분석 중
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {refImages.map((r, idx) => (
+            <div
+              key={r.id}
+              className="group relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 bg-white shrink-0"
+              title={r.description || (r.analyzing ? '분석 중...' : '')}
             >
-              <X className="w-3.5 h-3.5" />
+              <img src={r.preview} alt={`ref-${idx + 1}`} className="w-full h-full object-cover" />
+              {r.analyzing && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                </div>
+              )}
+              {r.error && (
+                <div className="absolute inset-0 bg-red-500/40 flex items-center justify-center">
+                  <X className="w-4 h-4 text-white" />
+                </div>
+              )}
+              {!r.analyzing && !r.error && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-1 py-0.5">
+                  <span className="text-[9px] font-bold text-white">#{idx + 1}</span>
+                </div>
+              )}
+              <button
+                onClick={() => removeRefImage(r.id)}
+                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-50"
+              >
+                <X className="w-2.5 h-2.5 text-slate-700" />
+              </button>
+            </div>
+          ))}
+
+          {refImages.length < MAX_REF_IMAGES && (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-200 hover:border-violet-300 hover:bg-violet-50/30 transition-all flex flex-col items-center justify-center gap-0.5 shrink-0"
+              title="참고 이미지 추가"
+            >
+              <Camera className="w-4 h-4 text-slate-400" />
+              <span className="text-[9px] font-bold text-slate-400">
+                {refImages.length === 0 ? '추가' : '+'}
+              </span>
             </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={analyzing}
-            className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-500 bg-white border-2 border-dashed border-slate-200 hover:border-violet-300 hover:bg-violet-50/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {analyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                참고 이미지 분석 중...
-              </>
-            ) : (
-              <>
-                <Camera className="w-4 h-4" />
-                참고 이미지 업로드 (선택사항)
-              </>
-            )}
-          </button>
+          )}
+        </div>
+
+        {refImages.length === 0 && (
+          <p className="text-[10px] text-slate-400 mt-2">
+            여러 장 업로드하면 종합적으로 분석해 더 정확한 프롬프트를 만들 수 있어요.
+          </p>
         )}
+
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(e) => {
-            handleReferenceUpload(e.target.files?.[0]);
+            handleReferenceUpload(e.target.files);
             e.target.value = '';
           }}
         />
