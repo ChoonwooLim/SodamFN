@@ -91,3 +91,9 @@
 | 2026-04-30 | 다중매장 보유 업체 지원 — BusinessStore 모델 + 매장 관리 UI + 계약서 매장 선택 드롭다운 | feat | models.py, init_db.py, routers/store.py, components/StoreManager.jsx, pages/CompanyInfoSettings.jsx, ContractTab.jsx |
 | 2026-04-30 | 사회보험 적용여부 체크박스 자동 표시 변수 4개 (NP/HI/EI/WI) — insurance_4major/np_exempt/contract_type 기반 ☑/☐ 자동 결정 | feat | utils/contractVars.js |
 | 2026-04-30 | 외국인 직원 영문 이름 표기 + 본인 서명란 — Staff.name_eng 신규 + account_holder 영문값 자동 fallback + 4개 증명서 일괄 적용 | feat | models.py, init_db.py, routers/hr/staff.py, routers/hr/certificate.py, BasicInfoTab.jsx |
+| 2026-05-01 | Impeccable 디자인 스킬 세트 33개 + .gitignore (scratch_*.py, *.mp4) 정리 | infra | .agents/skills/, .gitignore |
+| 2026-05-01 | 2026-04 직원급여 PDF 산출물 12종 (직원별 9건 + 급여명세서 + 사업소득대장 + 일용직대장) | docs | 2026소득분석/직원급여/4월/ |
+| 2026-05-01 | 셈하나 가치평가/IR 자료 + AGENTS·AI_WIKI 인덱스 (mp4 46MB 별도 보관) | docs | SEMHANA_Valuation_Report.md, docs/PT자료/, AGENTS.md, AI_WIKI.md |
+| 2026-05-01 | delivery-images 외부 API(Replicate/OpenAI) 전면 제거 → OpenClaw GPT-5.5 + 자체 Flux 단일 파이프라인 (678→232 라인, 신규 어댑터 2종) | refactor | services/openclaw_client.py, services/flux_image_client.py, routers/delivery_images.py, .env, Orbitron.yaml |
+| 2026-05-01 | 대화형 프롬프트 엔지니어링 — GPT-5.5 와 멀티턴 한국어 대화로 식품 사진 요구사항 정제 후 ```prompt``` 영문 블록 확정 → Flux 생성 | feat | services/openclaw_client.py(chat_with_history), services/ollama_vision_client.py, routers/delivery_images.py(/ai-chat,/analyze-reference), components/AIChatPromptBuilder.jsx |
+| 2026-05-01 | 다중 참고 이미지 (최대 6장) → PIL 콜라주 합성 → Flux img2img init_image 우회 경로 (한국 음식 인식 약점 대응) | feat | routers/delivery_images.py(_compose_reference_collage,/ai-generate-with-refs), components/AIChatPromptBuilder.jsx |

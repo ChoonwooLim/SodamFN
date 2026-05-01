@@ -989,3 +989,78 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 5. **다중매장 후속** (별도): Staff.store_id FK 추가 → 직원별 소속 매장 자동 매핑 (2번째 매장 오픈 시점)
 
 ---
+
+## 2026-05-01
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| infra | Impeccable 디자인 스킬 33개 + .gitignore (scratch_*, mp4) 정리 | 완료 |
+| docs | 2026-04 직원급여 PDF 12종 + 셈하나 가치평가 IR 자료 + AGENTS·AI_WIKI 인덱스 | 완료 |
+| refactor | delivery-images 외부 API(Replicate/OpenAI) 전면 제거 → OpenClaw + 자체 Flux 단일 파이프라인 | 완료 |
+| fix | .env 가 시스템 환경변수보다 우선되도록 load_dotenv(override=True) | 완료 |
+| feat | 대화형 프롬프트 엔지니어링 (GPT-5.5 + LLaVA 참고이미지 분석) | 완료 |
+| fix | CLIP 77 토큰 truncation 완화 — 30-50단어 + 음식 정체성 첫 위치 강제 | 완료 |
+| feat | 다중 참고 이미지 (최대 6장) + 콜라주 → img2img 우회 경로 | 완료 |
+| perf | 콜라주 1024→512 + strength 0.55 + axios timeout 10분 | 완료 |
+
+### 세부 내용
+
+#### 오전 — 파일 정리 (커밋 26e2caf8 ~ 562d6d41)
+
+세션 간 누적된 미커밋 54개 파일을 4 그룹으로 분류해 일괄 정리:
+
+- **`.agents/skills/` 33개**: Impeccable 디자인 스킬 정의 (adapt/animate/audit/critique/frontend-design 등 22개 + reference 11개). `.gitignore` 에 `scratch_*.py`, `*.mp4` 패턴 추가
+- **2026-04 직원급여 PDF 12종**: 직원별 급여대장 9건 + 급여명세서 + 사업소득대장 + 김다은 일용직대장
+- **셈하나 가치평가 IR 자료**: SEMHANA_Valuation_Report.md + PDF 2종. 영상(.mp4 46MB)은 `.gitignore` 처리하고 별도 보관
+- **AGENTS.md / AI_WIKI.md**: 에이전트·LLM 위키 포인터 인덱스
+
+#### 저녁 — AI 이미지 생성 시스템 풀 교체 (커밋 55812b5a ~ ceaf3d4f)
+
+배달앱 이미지 생성 흐름을 외부 API 의존성 제거 + OpenClaw GPT-5.5 + 자체 Flux GPU 자체 호스팅으로 풀 교체.
+
+**Phase A — 인프라 + 어댑터 (커밋 55812b5a, 2de641f3)**
+- `services/openclaw_client.py` 신규: OpenClaw `/v1/chat/completions` 래퍼. ChatGPT Plus/Pro OAuth 토큰을 통한 GPT-5.5 호출. 식품 사진 프롬프트 엔지니어링 전담
+- `services/flux_image_client.py` 신규: 작업PC `192.168.219.100:8100` 자체 호스팅 FLUX.1-schnell 호출 (generate / img2img / upscale / remove-bg / inpaint)
+- `routers/delivery_images.py`: Replicate/OpenAI 분기 + 한영 사전 + STYLE_SUFFIXES + `/segment` 라우터 전부 제거. 678→ 232 라인. 13 endpoint 검증
+- 인프라: openclaw.json `gateway.http.endpoints.chatCompletions.enabled=true` + `gateway.bind="custom" customBindHost="0.0.0.0"` (적용 안 됨) → systemd `openclaw-gateway-proxy.service` (socat 18790 → 127.0.0.1:18789) 영구 우회
+- ufw `192.168.219.0/24 → 18790/tcp` 허용
+- `.env` / `Orbitron.yaml`: `OPENCLAW_GATEWAY_URL/TOKEN/MODEL`, `AI_FLUX_BASE_URL` 추가, `REPLICATE_API_TOKEN` / `OPENAI_API_KEY` 삭제
+- `config.py` / `database.py`: `load_dotenv(override=True)` — 작업PC User scope 환경변수가 .env 무시하던 문제 해결
+
+**Phase B — 대화형 프롬프트 엔지니어링 (커밋 d2692655)**
+- `services/ollama_vision_client.py` 신규: ollama LLaVA 7B (`192.168.219.117:11434`) 로 참고 이미지 영문 묘사 추출 (OpenClaw image_url content parts 미지원 — issue #17685 우회)
+- `routers/delivery_images.py`: `POST /ai-chat` (멀티턴, stateless) + `POST /analyze-reference` (LLaVA) 추가
+- `components/AIChatPromptBuilder.jsx` 신규: 채팅 UI 전용 컴포넌트. ```prompt``` 코드블록 자동 감지 + [이 프롬프트로 이미지 생성] CTA
+- `components/AIImageStudio.jsx`: 탭 "AI와 대화" 추가, 영문 프롬프트 확정 시 빠른 생성 탭 자동 채움
+
+**Phase C — CLIP 77 토큰 + 다중 참고이미지 + 콜라주 (커밋 a8bdfc0d, fc565217, ceaf3d4f)**
+- 증상: 사용자 "참치김밥 매콤" 요청에 떡볶이/소시지/순대 같은 엉뚱한 이미지 생성. 떡볶이 사진 업로드 시 소시지 형태로 변형
+- 원인 1: GPT-5.5 가 50-100단어 정제 → CLIP 77 토큰 입력 시 끝부분 truncation → 음식 정체성 손실
+- 해결 1: SYSTEM_PROMPT + CHAT_SYSTEM_PROMPT 강화 — 30-50단어 MAX, 음식 정체성을 첫 6단어 안에 영문+로마자(예: "Korean tuna kimbap roll (chamchi gimbap)"), filler 어 금지
+- 원인 2: Flux + LLaVA 모두 한국 특화 음식(떡볶이/순대/꼬마김밥) 인식 약함
+- 해결 2: `POST /ai-generate-with-refs` 신규 — N장(최대 6) 참고 이미지를 PIL 콜라주로 합성(n=1 resize, n=2 좌우, n=3 가로 3분할, n=4 2x2, n≥5 그리드) → Flux img2img init_image 로 사용 → LLaVA 텍스트 우회 + Flux 인식 약점도 우회
+- 원인 3: 1024×1024 img2img step 당 127초 (model CPU offload + VAE encode/decode 매 step transfer 누적) → 6분+ → frontend 240초 timeout 초과
+- 해결 3: 콜라주 사이즈 1024 → 512, strength 0.65 → 0.55 (effective_steps 2-3), axios timeout 240→ 600초
+
+**프론트엔드**
+- AIChatPromptBuilder: 단일 → 다중 (최대 6장) 갤러리. 64×64 썸네일 + 인덱스 뱃지 + 호버 X 삭제, 순차 LLaVA 분석 (GPU 충돌 방지)
+- 채팅 [생성] 버튼 분기: 참고이미지 0장 → 부모 onGenerate(prompt) → 빠른 생성 탭. 1장 이상 → 직접 `/ai-generate-with-refs` POST + 결과 PNG 인라인 미리보기 + onSaved 콜백 (갤러리 새로고침)
+
+### 검증
+
+- ✅ OpenClaw `openclaw/codex-pro` agent (GPT-5.5) 한국어 → 영문 프롬프트 정제 동작
+- ✅ Flux `/generate` 1024 (참치김밥 PNG 400KB) 풀 파이프라인 동작
+- ✅ Flux `/img2img` 콜라주 (3장 → 1024×1024 PNG) 합성 + 생성 동작
+- ✅ 16 endpoints 등록 (`/ai-chat`, `/analyze-reference`, `/ai-generate-with-refs` 신규)
+
+### 다음 세션 인계
+
+1. **사용자 테스트 후 피드백** — 콜라주 + img2img 결과의 한국 음식 일치도. strength 0.4-0.7 범위 슬라이더 노출 가능성
+2. **image-service 자동 시작** — 현재 Windows 부팅 후 수동 실행. NSSM 또는 작업 스케줄러로 시스템 서비스화
+3. **codex-pro agent 17K 토큰 시스템 프롬프트** — 매 호출 17K 토큰 사용. 프롬프트 정제 전용 가벼운 agent 신규 등록 검토
+4. **OpenClaw socat 우회 영구화 검증** — twinverse-ai 재부팅 시 systemd 서비스 자동 시작 확인 필요
+5. **Orbitron secrets 등록** — production 배포 시 `OPENCLAW_GATEWAY_TOKEN` 환경변수 secrets 관리
+
+---
