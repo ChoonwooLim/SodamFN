@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# override=True: .env 가 시스템 환경변수보다 우선 (dev 환경에서 잘못된 시스템 변수 회피)
+load_dotenv(override=True)
 
 # Social Login Credentials (Retrieved from TwinVerse)
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")

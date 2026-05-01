@@ -4,7 +4,9 @@ import os
 from dotenv import load_dotenv
 
 # Load .env file (contains DATABASE_URL for Orbitron PostgreSQL)
-load_dotenv()
+# override=True: .env 가 시스템 환경변수보다 우선 (dev 환경에서 잘못된 시스템 변수 회피)
+# production(Orbitron)에는 .env 파일이 없어 자동으로 시스템 환경변수만 사용
+load_dotenv(override=True)
 
 # DATABASE_URL: Orbitron PostgreSQL server
 # Fallback to SQLite only if DATABASE_URL is not set (emergency fallback)
