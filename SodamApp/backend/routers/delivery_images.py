@@ -513,8 +513,11 @@ async def analyze_reference_image(
 # ══════════════════════════════════════════════════
 # 참고 이미지 + img2img 콜라주 합성 (한국 음식 인식 약점 우회)
 # ══════════════════════════════════════════════════
-def _compose_reference_collage(images_bytes: List[bytes], target_size: tuple = (1024, 1024)) -> bytes:
+def _compose_reference_collage(images_bytes: List[bytes], target_size: tuple = (512, 512)) -> bytes:
     """N장의 참고 이미지를 1장의 콜라주로 합성.
+    크기 결정: 512×512 — Flux model CPU offload 모드에서 1024×1024 img2img 가
+    step 당 100s+ 로 매우 느림 (매 step VAE encode/decode + GPU↔CPU transfer 누적).
+    512 면 step 당 10-15s. 결과를 더 크게 원하면 [HD/4K 업그레이드] 버튼 (Real-ESRGAN) 사용.
     Flux img2img init_image 로 사용 → LLaVA 묘사 부정확 / Flux 한국 음식 인식 약점을
     실제 이미지 픽셀로 우회. 단순한 균등 분할:
       n=1 → resize 만; n=2 → 좌우; n=3 → 가로 3분할; n=4 → 2x2; n≥5 → ⌈√n⌉ × ⌈n/cols⌉ 그리드."""
@@ -560,7 +563,7 @@ async def ai_generate_with_refs(
     prompt: str = Form(...),
     name: str = Form("AI 생성 이미지"),
     category: str = Form("김밥류"),
-    strength: float = Form(0.6),
+    strength: float = Form(0.55),  # effective_steps = ceil(steps*strength) 작게 유지
     steps: int = Form(4),
     files: List[UploadFile] = File(...),
     session: Session = Depends(get_session),

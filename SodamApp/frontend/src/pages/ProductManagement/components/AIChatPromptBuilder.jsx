@@ -223,7 +223,7 @@ export default function AIChatPromptBuilder({ onGenerate, onClose, onSaved }) {
       formData.append('prompt', englishPrompt);
       formData.append('name', `AI 채팅 - ${new Date().toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })}`);
       formData.append('category', '김밥류');
-      formData.append('strength', '0.65');
+      formData.append('strength', '0.55');
       formData.append('steps', '4');
       ready.forEach((r) => formData.append('files', r.file, r.file.name || 'ref.png'));
 
@@ -232,7 +232,7 @@ export default function AIChatPromptBuilder({ onGenerate, onClose, onSaved }) {
         formData,
         {
           headers: { ...getAuthHeaders(), 'Content-Type': 'multipart/form-data' },
-          timeout: 240000,
+          timeout: 600000,  // 10분 — Flux 콜라주 img2img 안전 여유
         }
       );
       const url = res.data?.data?.image_url;
