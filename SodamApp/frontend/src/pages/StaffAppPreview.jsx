@@ -17,9 +17,22 @@ export default function StaffAppPreview() {
     const [device, setDevice] = useState('phone');
     const [iframeKey, setIframeKey] = useState(0);
 
-    // Get business_id from localStorage for staff app isolation
-    const adminBid = localStorage.getItem('business_id');
+    // SuperAdmin이 view-as 모드에 있을 때 business_id가 ""로 덮어쓰여진 케이스를 위해
+    // view_as_business_id 폴백을 둠.
+    const adminBid =
+        localStorage.getItem('business_id') ||
+        localStorage.getItem('view_as_business_id') ||
+        '';
+
+    const buildIframeUrl = (key) => {
+        const params = new URLSearchParams();
+        if (adminBid) params.set('bid', adminBid);
+        params.set('_t', String(key));
+        return `${STAFF_APP_URL}?${params.toString()}`;
+    };
+
     const staffUrl = adminBid ? `${STAFF_APP_URL}?bid=${adminBid}` : STAFF_APP_URL;
+    const iframeSrc = buildIframeUrl(iframeKey);
 
     const currentDevice = DEVICE_PRESETS.find(d => d.id === device);
 
@@ -67,7 +80,7 @@ export default function StaffAppPreview() {
                     <div className="desktop-frame">
                         <iframe
                             key={iframeKey}
-                            src={`${staffUrl}&_t=${iframeKey}`}
+                            src={iframeSrc}
                             title="직원용 앱"
                             className="desktop-iframe"
                             allow="geolocation; notifications"
@@ -93,7 +106,7 @@ export default function StaffAppPreview() {
                         {/* App content */}
                         <iframe
                             key={iframeKey}
-                            src={`${staffUrl}&_t=${iframeKey}`}
+                            src={iframeSrc}
                             title="직원용 앱"
                             className="phone-iframe"
                             allow="geolocation; notifications"
