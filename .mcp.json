@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "kicc-easypay": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@kicc/easypay-mcp"],
+      "env": {}
+    }
+  }
+}
