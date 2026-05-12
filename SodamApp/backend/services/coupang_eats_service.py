@@ -362,17 +362,47 @@ class CoupangEatsClient:
         except Exception as e:  # noqa: BLE001
             raise CoupangEatsError(f"통신 실패 [/order/condition]: {e}") from e
         self._check_response(r)
-        raw = r.json()
-        # 응답 루트 = data 또는 직접 — HAR 기준 직접 노출
-        # totalSalePrice 가 top-level 에 있음
-        if isinstance(raw, dict) and "data" in raw and "totalSalePrice" not in raw:
-            raw = raw["data"]
-        page_vo = raw.get("orderPageVo") or {}
+        try:
+            raw = r.json()
+        except Exception as e:  # noqa: BLE001
+            raise CoupangEatsError(
+                f"order/condition JSON 파싱 실패: {e} body={(r.text or '')[:200]}"
+            ) from e
+
+        # 응답 구조 다양성 대응:
+        # ① {"totalSalePrice":..., "orderPageVo":{...}}   (HAR 캡처 기준)
+        # ② {"data": {"totalSalePrice":..., "orderPageVo":{...}}}  (API 버전에 따라)
+        # ③ {"code":..., "data": null}  (조건에 데이터 없을 때)
+        # ④ null / {} / "" 등 비정상
+        if raw is None:
+            log.warning("order/condition: response is None — returning empty")
+            return OrderFetchResult(0, 0, 0, [], {})
+        if not isinstance(raw, dict):
+            log.warning("order/condition: response is not dict (type=%s)", type(raw).__name__)
+            return OrderFetchResult(0, 0, 0, [], {"_raw": raw})
+
+        # data 래핑 unwrap (있을 때만)
+        data_root = raw
+        if "data" in raw and "totalSalePrice" not in raw:
+            inner = raw.get("data")
+            if isinstance(inner, dict):
+                data_root = inner
+            elif inner is None:
+                # 빈 응답 — 주문 0건
+                log.info("order/condition: data is null (no orders in range)")
+                return OrderFetchResult(0, 0, 0, [], raw)
+
+        page_vo = data_root.get("orderPageVo") if isinstance(data_root, dict) else None
+        if not isinstance(page_vo, dict):
+            page_vo = {}
         orders = page_vo.get("content") or []
+        if not isinstance(orders, list):
+            orders = []
+
         return OrderFetchResult(
-            total_sale_price=int(float(raw.get("totalSalePrice") or 0)),
-            total_order_count=int(raw.get("totalOrderCount") or 0),
-            avg_order_amount=int(float(raw.get("avgOrderAmount") or 0)),
+            total_sale_price=int(float(data_root.get("totalSalePrice") or 0)),
+            total_order_count=int(data_root.get("totalOrderCount") or 0),
+            avg_order_amount=int(float(data_root.get("avgOrderAmount") or 0)),
             orders=orders,
             raw=raw,
         )
@@ -437,14 +467,24 @@ class CoupangEatsClient:
         except Exception as e:  # noqa: BLE001
             raise CoupangEatsError(f"통신 실패 [/settlement]: {e}") from e
         self._check_response(r)
-        raw = r.json()
+        try:
+            raw = r.json()
+        except Exception as e:  # noqa: BLE001
+            raise CoupangEatsError(
+                f"settlement JSON 파싱 실패: {e} body={(r.text or '')[:200]}"
+            ) from e
+        if raw is None:
+            return SettlementFetchResult(0, 0, [], {})
         data = raw.get("data") if isinstance(raw, dict) else None
         if not isinstance(data, dict):
             data = raw if isinstance(raw, dict) else {}
+        contents = data.get("contents") or []
+        if not isinstance(contents, list):
+            contents = []
         return SettlementFetchResult(
             total_elements=int(data.get("totalElements") or 0),
             total_pages=int(data.get("totalPages") or 0),
-            contents=data.get("contents") or [],
+            contents=contents,
             raw=raw,
         )
 

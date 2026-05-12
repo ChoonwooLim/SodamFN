@@ -687,6 +687,65 @@ def debug_probe(
     }
 
 
+@router.get("/debug/raw-orders")
+def debug_raw_orders(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    page_size: int = 10,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """디버그 — fetch_orders 응답 raw 그대로 노출. 응답 구조 파악용.
+
+    start/end 미지정 시 어제 하루.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred or not cred.store_id:
+            raise HTTPException(404, "자격증명/매장 ID 미등록")
+        store_id = cred.store_id
+
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    try:
+        start_d = datetime.date.fromisoformat(start) if start else yesterday
+        end_d = datetime.date.fromisoformat(end) if end else yesterday
+    except ValueError as e:
+        raise HTTPException(400, f"날짜 형식 오류: {e}") from e
+    start_dt = datetime.datetime.combine(start_d, datetime.time.min)
+    end_dt = datetime.datetime.combine(end_d, datetime.time.max)
+
+    def _action(client: CoupangEatsClient):
+        return client.fetch_orders(store_id, start_dt, end_dt,
+                                   page_number=0, page_size=page_size)
+
+    try:
+        (res, refreshed) = _execute_with_refresh(bid, _action)
+        return {
+            "store_id": store_id,
+            "start": start_d.isoformat(),
+            "end": end_d.isoformat(),
+            "summary": {
+                "total_sale_price": res.total_sale_price,
+                "total_order_count": res.total_order_count,
+                "avg_order_amount": res.avg_order_amount,
+                "fetched_orders_in_page": len(res.orders),
+            },
+            "first_order": res.orders[0] if res.orders else None,
+            "raw_response": res.raw,
+            "auth_refreshed": refreshed,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("debug raw-orders failed: %s", e, exc_info=True)
+        raise HTTPException(500, f"raw-orders 실패: {e}") from e
+
+
 @router.get("/dashboard")
 def fetch_dashboard(
     admin: User = Depends(get_admin_user),
