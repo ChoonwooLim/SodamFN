@@ -163,4 +163,7 @@ def build_ssv_request(params: dict[str, Any], datasets: Optional[dict[str, dict]
             for row_type, values in ds.get("rows", []):
                 row_line = row_type + "".join(US + str(v if v is not None else "") for v in values)
                 parts.append(row_line)
-    return RS.join(parts)
+            # Dataset 종결: 빈 RS 추가 (이지포스 서버 파서가 row 종결로 기대)
+            parts.append("")
+    # 전체 종결: trailing RS 한 번 더 (HAR 원본과 동일)
+    return RS.join(parts) + RS

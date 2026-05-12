@@ -20,7 +20,7 @@ from typing import Optional
 
 import httpx
 
-from services.nexacro_ssv import RS, US, build_ssv_request, parse_ssv, SsvResponse
+from services.nexacro_ssv import build_ssv_request, parse_ssv, SsvResponse
 
 
 BASE_URL = "https://smart.easypos.net"
@@ -97,14 +97,24 @@ class EasyPosClient:
     # ───── 내부 HTTP 헬퍼 ────────────────────────────────────
 
     def _ssv_post(self, path: str, params: dict[str, str],
-                  *, datasets: Optional[dict] = None) -> SsvResponse:
+                  *, datasets: Optional[dict] = None,
+                  in_secure: int = 1, out_secure: int = 1) -> SsvResponse:
         """SSV 형식 POST. 응답도 SSV.
 
         HAR 분석 기준 헤더 — Content-Type: text/xml, Accept: application/xml,
         X-Requested-With: XMLHttpRequest 가 필수. (이지포스가 XHR 만 허용)
+
+        보안모드 파라미터:
+          - in_secure=1  : 요청 body 의 일부 필드(USER_ID/USER_PW) 가 클라이언트단
+                          암호화 (이지포스 JS 가 SEED/AES 로 처리) — 평문 보내면 실패
+          - in_secure=0  : 평문 전송 시도 (서버가 받아주는지 불확실 — 테스트 필요)
+          - out_secure=0 : 응답을 평문 SSV 로 받음 (기본 1 도 보통 평문 응답)
+
+        로그인은 in_secure=0 시도 → 실패 시 in_secure=1 + 자체 암호화 구현 필요.
+        매출 조회 등은 ID/PW 가 body 에 안 들어가서 보안모드 무관.
         """
         body = build_ssv_request(params, datasets=datasets)
-        url = f"{path}?inSecureMode=1&outSecureMode=1"
+        url = f"{path}?inSecureMode={in_secure}&outSecureMode={out_secure}"
         try:
             r = self._client.post(
                 url,
@@ -134,49 +144,68 @@ class EasyPosClient:
     # ───── 로그인 ────────────────────────────────────────────
 
     def login(self, easypos_id: str, password: str) -> LoginResult:
-        """이지포스 로그인 — JSESSIONID 발급.
+        """이지포스 로그인 — POST /cm/selectEasyPosLogin.do.
 
-        실제 로그인 endpoint 는 사장님 추가 HAR 캡처 후 정확히 확정. 현재는
-        가장 가능성 높은 두 후보를 순차 시도:
+        HAR 분석 (2026-05-12) 으로 확정한 endpoint. 요청 body 는 dsIn Dataset
+        형식 — USER_ID/USER_PW/ADMIN_FG 컬럼 3개에 row 1줄.
 
-        1) /cm/loginAction.do (SSV)
-        2) /cm/login.do        (SSV)
+        이지포스는 기본 보안모드(inSecureMode=1) 에서 USER_ID/USER_PW 를
+        클라이언트 JS 가 SEED/AES 로 미리 암호화해서 보낸다. 우리는 일단
+        평문 모드(inSecureMode=0) 로 시도 → 서버가 받아주면 성공.
+        평문 모드 거부 시엔 별도 암호화 구현이 필요한데, 현 시점엔 미구현.
 
-        둘 다 실패 시 마지막 시도 응답을 그대로 raise.
+        특수 ErrorCode:
+          - 5636: "현재 비밀번호는 정책에 맞지 않습니다. 변경하십시오."
+                  → 사장님이 smart.easypos.net 에서 비밀번호 변경 필요.
         """
-        login_params = {
-            "USER_ID": easypos_id,
-            "USER_PW": password,
-            "ADMIN_FG": "0",
-            "CHK_ID": easypos_id,
+        # dsIn Dataset 1줄 — HAR 분석 기준 정확한 구조
+        datasets = {
+            "dsIn": {
+                "columns": ["USER_ID:STRING(256)", "USER_PW:STRING(256)",
+                            "ADMIN_FG:STRING(256)"],
+                "rows": [("N", [easypos_id, password, "0"])],
+            }
         }
-        candidates = ["/cm/loginAction.do", "/cm/login.do", "/cm/checkLogin.do"]
+        params = {
+            "easyposid": easypos_id,
+            "adminId": "undefined",
+            "adminPw": "undefined",
+            "contents": "undefined",
+            "CHK_ID": "",
+        }
 
-        last_err: Optional[Exception] = None
-        for path in candidates:
-            try:
-                resp = self._ssv_post(path, login_params)
-                # 응답에 SHOP_NAME 등이 있으면 성공
-                info = (resp.first("gdsLoginInfo") or resp.first("dsLoginInfo")
-                        or resp.first("dsOut") or {})
-                if info.get("SHOP_NAME") or info.get("USER_ID"):
-                    self._logged_in = True
-                    self._easypos_id = easypos_id
-                    return LoginResult(
-                        ok=True,
-                        shop_name=info.get("SHOP_NAME"),
-                        erp_shop_code=info.get("ERP_SHOP_CODE"),
-                        head_office_no=info.get("HEAD_OFFICE_NO"),
-                        user_name=info.get("USER_NM"),
-                        raw_login_info=info,
-                    )
-            except EasyPosError as e:
-                last_err = e
-                log.info("login candidate %s failed: %s", path, e)
+        try:
+            resp = self._ssv_post(
+                "/cm/selectEasyPosLogin.do",
+                params,
+                datasets=datasets,
+                in_secure=0,   # 평문 시도 — 실패 시 1 + 자체 암호화 필요
+                out_secure=1,
+            )
+        except EasyPosError as e:
+            # parse_ssv 에서 ErrorCode != 0 일 때 raise — 비번 만료 5636 등도 잡힘
+            return LoginResult(
+                ok=False,
+                error_message=f"이지포스 로그인 실패: {e}",
+            )
 
-        # 모두 실패 — 사장님께 정확한 endpoint 안내 요청 필요
-        msg = f"로그인 endpoint 미확정 — 사장님 HAR 추가 캡처 필요 (last: {last_err})"
-        return LoginResult(ok=False, error_message=msg)
+        info = resp.first("gdsLoginInfo") or {}
+        if not (info.get("SHOP_NAME") or info.get("USER_ID")):
+            return LoginResult(
+                ok=False,
+                error_message="로그인 응답에 매장 정보 없음 — endpoint 변경 가능성",
+            )
+
+        self._logged_in = True
+        self._easypos_id = easypos_id
+        return LoginResult(
+            ok=True,
+            shop_name=info.get("SHOP_NAME"),
+            erp_shop_code=info.get("ERP_SHOP_CODE"),
+            head_office_no=info.get("HEAD_OFFICE_NO"),
+            user_name=info.get("USER_NM"),
+            raw_login_info=info,
+        )
 
     def check_session(self) -> bool:
         """기존 세션이 살아있는지 확인. checkLoginStatus 는 ID/PW 없이 호출 가능."""
