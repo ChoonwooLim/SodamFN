@@ -813,14 +813,22 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
             const names = cookies.map(c => c.name);
             if (cookies.length > 0) {
                 setParsed(cookies);
-                const hasAuth = names.some(n => /^EATS_(AT|RT)$/i.test(n) || /AUTH/i.test(n));
-                const hasAkamai = names.some(n => /^_?abck$/i.test(n) || /^bm_sz$/i.test(n) || /^ak_bmsc$/i.test(n));
+                // 쿠팡이츠 인증: EATS_AT/RT (구버전) 또는 unify-token + account-id (신버전 통합)
+                const hasAuth = names.some(n =>
+                    /^EATS_(AT|RT)$/i.test(n)
+                    || /^unify-token$/i.test(n)
+                    || /^account-id$/i.test(n)
+                    || /AUTH/i.test(n)
+                );
+                const hasAkamai = names.some(n =>
+                    /^_?abck$/i.test(n) || /^bm_/i.test(n) || /^ak_bmsc$/i.test(n)
+                );
                 if (!hasAuth && !hasAkamai) {
-                    setParseErr(`⚠ ${cookies.length}개 쿠키를 인식했지만 EATS_AT / _abck / bm_sz 등 핵심 쿠키가 없습니다. Network 탭의 cookie 헤더를 통째로 복사했는지 확인하세요.`);
+                    setParseErr(`⚠ ${cookies.length}개 쿠키 인식했지만 인증 / Akamai 쿠키 모두 없습니다. Network 탭의 cookie 헤더를 통째로 복사했는지 확인하세요.`);
                 } else if (!hasAuth) {
-                    setParseErr(`⚠ Akamai 쿠키는 있지만 EATS_AT/RT 가 없습니다 — 인증 거부될 가능성.`);
+                    setParseErr(`⚠ Akamai 쿠키는 있지만 unify-token / EATS_AT 등 인증 쿠키가 없습니다 — 인증 거부 가능.`);
                 } else if (!hasAkamai) {
-                    setParseErr(`⚠ 인증 쿠키는 있지만 _abck/bm_sz 같은 Akamai 쿠키가 없습니다 — 봇 차단될 가능성.`);
+                    setParseErr(`⚠ 인증 쿠키는 있지만 _abck / bm_sz 같은 Akamai 쿠키가 없습니다 — 봇 차단 가능.`);
                 }
                 return;
             }

@@ -398,15 +398,18 @@ def submit_manual_cookies(
     if not body.cookies:
         raise HTTPException(400, "쿠키 list 가 비어있습니다.")
 
-    # 인증 쿠키 sanity check — 핵심 쿠키 1개라도 있어야 함
-    cookie_names = {(c.get("name") or "").upper() for c in body.cookies}
-    has_auth = any(
-        n in cookie_names
-        for n in ("EATS_AT", "EATS_RT", "X-EATS-AT", "X-EATS-RT", "AUTH-TOKEN")
+    # 인증 쿠키 sanity check — 신/구버전 모두 허용
+    # 구버전: EATS_AT / EATS_RT
+    # 신버전(2026~): unify-token + account-id (통합 인증)
+    cookie_names_upper = {(c.get("name") or "").upper() for c in body.cookies}
+    cookie_names_lower = {(c.get("name") or "").lower() for c in body.cookies}
+    has_auth = (
+        any(n in cookie_names_upper for n in ("EATS_AT", "EATS_RT", "AUTH-TOKEN"))
+        or "unify-token" in cookie_names_lower
+        or "account-id" in cookie_names_lower
     )
     if not has_auth:
-        # 경고만 — 쿠키 이름이 바뀌었을 수 있으니 차단하지는 않음
-        log.warning("manual cookies missing common auth names, names=%s", cookie_names)
+        log.warning("manual cookies missing common auth names, names=%s", cookie_names_upper)
 
     with Session(engine) as s:
         row = s.exec(
@@ -630,12 +633,16 @@ def debug_probe(
             except Exception as e:  # noqa: BLE001
                 return {"error": f"쿠키 복호화 실패: {e}"}
 
-    # 필수 쿠키 분석
+    # 필수 쿠키 분석 — 신/구버전 모두 인식
     cookie_names = [(c.get("name") or "").strip() for c in cookies]
-    auth_cookies = [n for n in cookie_names if n.upper() in
-                    ("EATS_AT", "EATS_RT", "X-EATS-AT", "X-EATS-RT", "AUTH-TOKEN")]
-    akamai_cookies = [n for n in cookie_names if n.lower() in
-                      ("_abck", "bm_sz", "bm_sv", "ak_bmsc", "akaalb_", "akacd_")]
+    auth_cookies = [n for n in cookie_names if (
+        n.upper() in ("EATS_AT", "EATS_RT", "AUTH-TOKEN")
+        or n.lower() in ("unify-token", "account-id")
+    )]
+    akamai_cookies = [n for n in cookie_names if (
+        n.lower().startswith("bm_")
+        or n.lower() in ("_abck", "abck", "ak_bmsc")
+    )]
     csrf_cookies = [n for n in cookie_names if "xsrf" in n.lower() or "csrf" in n.lower()]
 
     # 실 호출 시도 (whoami — 가장 가벼움)
