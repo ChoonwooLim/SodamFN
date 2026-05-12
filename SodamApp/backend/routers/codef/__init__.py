@@ -4,6 +4,6 @@
 - card_sync:   동기화 트리거 (cron + 사용자 버튼) + 이력
 - budget:      이달 호출/비용 + 월 예산 설정
 """
-from . import connections, card_sync, budget
+from . import connections, card_sync, budget, card_merchants
 
-__all__ = ["connections", "card_sync", "budget"]
+__all__ = ["connections", "card_sync", "budget", "card_merchants"]
