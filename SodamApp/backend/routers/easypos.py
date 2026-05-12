@@ -203,6 +203,7 @@ def test_login(
                 "user_name": login.user_name,
                 "erp_shop_code": login.erp_shop_code,
                 "pos_list": pos_list,
+                "warning_message": login.warning_message,
             }
 
 

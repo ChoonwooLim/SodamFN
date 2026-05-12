@@ -106,7 +106,11 @@ export default function EasyPosModuleDetail() {
         try {
             const res = await api.post('/easypos/test-login');
             setTestResult(res.data);
-            showMsg('로그인 성공!');
+            if (res.data.warning_message) {
+                showMsg(`로그인 성공! (경고: ${res.data.warning_message})`);
+            } else {
+                showMsg('로그인 성공!');
+            }
             // 자격증명 상태도 새로 가져옴 (verified_at 갱신)
             const credRes = await api.get('/easypos/credential');
             setCred(credRes.data);

@@ -48,6 +48,7 @@ class LoginResult:
     user_name: Optional[str] = None
     raw_login_info: dict = field(default_factory=dict)
     error_message: Optional[str] = None
+    warning_message: Optional[str] = None  # 인증 성공이지만 정책 경고 (예: 비번 만료)
 
 
 @dataclass
@@ -84,6 +85,22 @@ class EasyPosClient:
         )
         self._logged_in = False
         self._easypos_id: Optional[str] = None
+        self._warmed_up = False
+
+    def _warmup_session(self) -> None:
+        """index.jsp GET 으로 JSESSIONID 발급 — 모든 XHR 호출 전 필수.
+
+        이지포스 백엔드는 Spring/JSP 기반이라 JSESSIONID 가 없으면 RSA 키쌍
+        매칭이 안 된다. 한 인스턴스당 1회만.
+        """
+        if self._warmed_up:
+            return
+        try:
+            r = self._client.get("/index.jsp")
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            raise EasyPosError(f"세션 발급 통신 실패: {e}") from e
+        self._warmed_up = True
 
     def __enter__(self) -> "EasyPosClient":
         return self
@@ -116,6 +133,9 @@ class EasyPosClient:
         로그인은 in_secure=0 시도 → 실패 시 in_secure=1 + 자체 암호화 구현 필요.
         매출 조회 등은 ID/PW 가 body 에 안 들어가서 보안모드 무관.
         """
+        # XHR 호출 전 세션 warm-up 필수 — JSESSIONID 없으면 RSA 키쌍 매칭 실패
+        self._warmup_session()
+
         body = build_ssv_request(params, datasets=datasets)
         url = f"{path}?inSecureMode={in_secure}&outSecureMode={out_secure}"
         try:
@@ -138,12 +158,8 @@ class EasyPosClient:
 
         resp = parse_ssv(r.text)
         if not resp.ok:
-            # 디버그: 응답의 ErrorCode + msg + 첫 200chars body 포함
-            extra = ""
-            if "selectEasyPosLogin" in path:
-                extra = f" [code={resp.error_code} cookies={len(self._client.cookies)}]"
             raise EasyPosError(
-                f"이지포스 응답 오류 [{path}]: {resp.error_msg or 'unknown'}{extra}",
+                f"이지포스 응답 오류 [{path}]: {resp.error_msg or 'unknown'}",
                 error_code=resp.error_code,
             )
         return resp
@@ -216,16 +232,17 @@ class EasyPosClient:
         """이지포스 로그인 — RSA 공개키 발급 → ID/PW 암호화 → selectEasyPosLogin.do.
 
         흐름 (이지포스 JS FRM_LOGINMAIN.xfdl.js 재현):
+          0) GET /index.jsp — JSESSIONID 세션 쿠키 발급 (warm-up)
           1) POST /cm/checkLoginStatus.do  → 공개키(modulus, exponent) hex
           2) USER_ID, USER_PW 를 RSA-PKCS1v15 로 암호화 → 64 byte hex 문자열
           3) POST /cm/selectEasyPosLogin.do — 암호화된 dsIn Dataset 전송
 
-        특수 ErrorCode:
+        Soft warning ErrorCode:
           - 5636: "현재 비밀번호는 정책에 맞지 않습니다. 변경하십시오."
-                  → 사장님이 smart.easypos.net 에서 비밀번호 변경 필요.
-          - 그 외 응답 ErrorCode!=0 은 parse_ssv 가 EasyPosError 로 raise.
+                  세션 인증은 성공 — 매장 정보 정상 응답. warning_message 로 노출.
         """
         try:
+            self._warmup_session()
             modulus_hex, exponent_hex = self._fetch_public_key()
             secured_id = self._rsa_encrypt(easypos_id, modulus_hex, exponent_hex)
             secured_pw = self._rsa_encrypt(password, modulus_hex, exponent_hex)
@@ -236,20 +253,6 @@ class EasyPosClient:
                 ok=False,
                 error_message=f"RSA 암호화 실패: {e}",
             )
-
-        # 임시 디버그 — 평문 길이/문자코드, cipher 길이를 클라이언트 응답에 담는다.
-        # Orbitron logger stdout 수집이 비어있어서 화면 메시지로 직접 노출.
-        # 평문 PW는 절대 노출 X — 길이와 charcode 만.
-        self._last_debug = (
-            f"id_len={len(easypos_id)} "
-            f"id_codes={[ord(c) for c in easypos_id[:6]]} "
-            f"pw_len={len(password)} "
-            f"pw_codes={[ord(c) for c in password[:4]]} "
-            f"mod_len={len(modulus_hex)} "
-            f"exp={exponent_hex} "
-            f"sec_id_len={len(secured_id)} "
-            f"sec_pw_len={len(secured_pw)}"
-        )
 
         datasets = {
             "dsIn": {
@@ -266,38 +269,50 @@ class EasyPosClient:
             "CHK_ID": "",
         }
 
+        # 5636(비번 만료) 은 매장 정보가 응답에 채워지는 soft warning — 직접 호출 후
+        # 응답 파싱 시 분기 처리.
+        url = "/cm/selectEasyPosLogin.do?inSecureMode=1&outSecureMode=1"
+        body = build_ssv_request(params, datasets=datasets)
         try:
-            resp = self._ssv_post(
-                "/cm/selectEasyPosLogin.do",
-                params,
-                datasets=datasets,
-                in_secure=1,   # 이제 진짜 보안모드 — USER_ID/USER_PW 가 RSA 암호문
-                out_secure=1,
+            r = self._client.post(
+                url, content=body.encode("utf-8"),
+                headers={
+                    "Content-Type": "text/xml",
+                    "Accept": "application/xml, text/xml, */*",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Origin": self.base_url,
+                    "Referer": f"{self.base_url}/easyposnx/index.html",
+                },
             )
-        except EasyPosError as e:
-            # 디버그 정보 함께 노출 — 사장님 화면에서 진단 가능
-            dbg = getattr(self, "_last_debug", "no-debug")
-            return LoginResult(
-                ok=False,
-                error_message=f"이지포스 로그인 실패: {e} [DEBUG {dbg}]",
-            )
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            return LoginResult(ok=False, error_message=f"이지포스 통신 실패: {e}")
 
+        resp = parse_ssv(r.text)
         info = resp.first("gdsLoginInfo") or {}
-        if not (info.get("SHOP_NAME") or info.get("USER_ID")):
+        has_shop = bool(info.get("SHOP_NAME") or info.get("USER_ID"))
+
+        # 매장 정보 응답에 있으면 인증 자체는 통과. 5636 등은 warning 으로 노출.
+        if has_shop:
+            warning = None
+            if resp.error_code not in ("0", "0000", ""):
+                warning = f"[{resp.error_code}] {resp.error_msg}"
+            self._logged_in = True
+            self._easypos_id = easypos_id
             return LoginResult(
-                ok=False,
-                error_message="로그인 응답에 매장 정보 없음 — ID/PW 확인 필요",
+                ok=True,
+                shop_name=info.get("SHOP_NAME"),
+                erp_shop_code=info.get("ERP_SHOP_CODE"),
+                head_office_no=info.get("HEAD_OFFICE_NO"),
+                user_name=info.get("USER_NM"),
+                raw_login_info=info,
+                warning_message=warning,
             )
 
-        self._logged_in = True
-        self._easypos_id = easypos_id
+        # 매장 정보 없음 — 실제 인증 실패
         return LoginResult(
-            ok=True,
-            shop_name=info.get("SHOP_NAME"),
-            erp_shop_code=info.get("ERP_SHOP_CODE"),
-            head_office_no=info.get("HEAD_OFFICE_NO"),
-            user_name=info.get("USER_NM"),
-            raw_login_info=info,
+            ok=False,
+            error_message=f"이지포스 로그인 실패: [{resp.error_code}] {resp.error_msg or 'ID/PW 확인 필요'}",
         )
 
     def check_session(self) -> bool:
