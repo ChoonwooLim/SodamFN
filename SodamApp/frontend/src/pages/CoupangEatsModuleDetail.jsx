@@ -790,22 +790,45 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                 return;
             }
         } catch {
-            // 2) Cookie header format "name1=value1; name2=value2"
-            try {
-                const cookies = trimmed.split(';').map(p => {
-                    const [k, ...v] = p.trim().split('=');
-                    return { name: k, value: v.join('='), domain: '.coupangeats.com', path: '/' };
-                }).filter(c => c.name && c.value !== undefined);
-                if (cookies.length > 0) {
-                    setParsed(cookies);
-                    return;
+            // continue to header parser
+        }
+        // 2) Cookie header format "name1=value1; name2=value2"
+        //    Application 탭 테이블에서 탭/줄바꿈으로 복사된 경우도 best-effort 처리
+        try {
+            const cookies = trimmed
+                // 줄바꿈 + 탭 → 세미콜론 통일
+                .replace(/\r?\n/g, ';')
+                .replace(/\t+/g, '=')
+                .split(';')
+                .map(p => {
+                    const eq = p.indexOf('=');
+                    if (eq < 0) return null;
+                    const name = p.slice(0, eq).trim();
+                    const value = p.slice(eq + 1).trim();
+                    if (!name || /\s/.test(name)) return null;   // name에 공백 있으면 깨진 입력
+                    return { name, value, domain: '.coupangeats.com', path: '/' };
+                })
+                .filter(Boolean);
+            // 핵심 인증 쿠키 sanity check — 누락 시 경고
+            const names = cookies.map(c => c.name);
+            if (cookies.length > 0) {
+                setParsed(cookies);
+                const hasAuth = names.some(n => /^EATS_(AT|RT)$/i.test(n) || /AUTH/i.test(n));
+                const hasAkamai = names.some(n => /^_?abck$/i.test(n) || /^bm_sz$/i.test(n) || /^ak_bmsc$/i.test(n));
+                if (!hasAuth && !hasAkamai) {
+                    setParseErr(`⚠ ${cookies.length}개 쿠키를 인식했지만 EATS_AT / _abck / bm_sz 등 핵심 쿠키가 없습니다. Network 탭의 cookie 헤더를 통째로 복사했는지 확인하세요.`);
+                } else if (!hasAuth) {
+                    setParseErr(`⚠ Akamai 쿠키는 있지만 EATS_AT/RT 가 없습니다 — 인증 거부될 가능성.`);
+                } else if (!hasAkamai) {
+                    setParseErr(`⚠ 인증 쿠키는 있지만 _abck/bm_sz 같은 Akamai 쿠키가 없습니다 — 봇 차단될 가능성.`);
                 }
-            } catch (e) {
-                setParseErr('JSON 배열 또는 "name=value; name=value" 형식이 아닙니다.');
                 return;
             }
+        } catch (e) {
+            setParseErr('파싱 실패: ' + (e?.message || e));
+            return;
         }
-        setParseErr('인식되는 쿠키 형식이 없습니다.');
+        setParseErr('인식되는 쿠키 형식이 없습니다. JSON 배열 또는 "name=value; name=value" 형식 필요.');
     }
 
     async function submit(e) {
@@ -842,13 +865,18 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                 </div>
 
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-                    <p className="font-semibold mb-1">📋 쿠키 추출 방법</p>
+                    <p className="font-semibold mb-1">📋 쿠키 추출 방법 (반드시 Network 탭 사용)</p>
                     <ol className="list-decimal ml-4 space-y-0.5">
-                        <li>크롬에서 <a href="https://store.coupangeats.com" target="_blank" rel="noopener" className="text-blue-700 underline inline-flex items-center gap-0.5">store.coupangeats.com<ExternalLink className="w-3 h-3" /></a> 로그인</li>
-                        <li>F12 → <strong>Application</strong> 탭 → <strong>Cookies</strong> → `https://store.coupangeats.com` 선택</li>
-                        <li>전체 선택 (Ctrl+A) → 우클릭 → <strong>Copy as JSON</strong></li>
-                        <li>또는 <strong>Network</strong> 탭 → 아무 요청 → Request Headers 의 <code>cookie:</code> 값 전체 복사</li>
+                        <li>크롬에서 <a href="https://store.coupangeats.com" target="_blank" rel="noopener" className="text-blue-700 underline inline-flex items-center gap-0.5">store.coupangeats.com<ExternalLink className="w-3 h-3" /></a> 에 로그인</li>
+                        <li>F12 → <strong>Network</strong> 탭 → <strong>Preserve log</strong> ✅ 체크 → F5 새로고침</li>
+                        <li>요청 list 에서 아무 <code>coupangeats.com</code> 요청 1개 클릭 (예: <code>whoami</code>, <code>home-banner</code>)</li>
+                        <li>우측 <strong>Headers</strong> 탭 → 아래로 스크롤 → <strong>Request Headers</strong> 섹션</li>
+                        <li><code>cookie:</code> 로 시작하는 줄의 값 전체 (보통 2000~5000자) 마우스 드래그 → <strong>Ctrl+C</strong></li>
+                        <li>아래 텍스트박스에 그대로 붙여넣기 → "쿠키 N개 인식" 표시 (15~30개 정상)</li>
                     </ol>
+                    <p className="mt-2 text-amber-800 font-semibold">
+                        ⚠️ Application 탭의 Cookies 테이블을 직접 복사하지 마세요 — 탭으로 깨진 형식이라 인식 실패합니다.
+                    </p>
                 </div>
 
                 <label className="block mb-3">
