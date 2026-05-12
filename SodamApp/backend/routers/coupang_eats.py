@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import datetime
-import json
 import logging
 from typing import Any, Callable, Optional
 
@@ -28,7 +27,6 @@ from database import engine
 from models import (
     CoupangEatsCredential,
     CoupangEatsOrder,
-    CoupangEatsSettlement,
     CoupangEatsSyncLog,
     User,
 )
@@ -605,6 +603,81 @@ def list_sync_logs(
             .limit(min(max(limit, 1), 200))
         ).all()
         return [_log_dto(r) for r in rows]
+
+
+@router.get("/debug/probe")
+def debug_probe(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """디버그 — 현재 DB 쿠키 list + whoami 호출 응답 raw 노출.
+
+    수동 쿠키 입력이 401 받을 때 정확한 원인 추적용. 쿠키 *이름*만 노출 (값은 비공개).
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred:
+            raise HTTPException(404, "자격증명 미등록")
+        cookies = []
+        if cred.cookies_encrypted:
+            try:
+                cookies = deserialize_cookies(decrypt_text(cred.cookies_encrypted))
+            except Exception as e:  # noqa: BLE001
+                return {"error": f"쿠키 복호화 실패: {e}"}
+
+    # 필수 쿠키 분석
+    cookie_names = [(c.get("name") or "").strip() for c in cookies]
+    auth_cookies = [n for n in cookie_names if n.upper() in
+                    ("EATS_AT", "EATS_RT", "X-EATS-AT", "X-EATS-RT", "AUTH-TOKEN")]
+    akamai_cookies = [n for n in cookie_names if n.lower() in
+                      ("_abck", "bm_sz", "bm_sv", "ak_bmsc", "akaalb_", "akacd_")]
+    csrf_cookies = [n for n in cookie_names if "xsrf" in n.lower() or "csrf" in n.lower()]
+
+    # 실 호출 시도 (whoami — 가장 가벼움)
+    client = CoupangEatsClient(cookies)
+    probe_result: dict = {}
+    try:
+        from services.coupang_eats_service import BASE_URL
+        url = f"{BASE_URL}/api/v1/merchant/whoami"
+        referer = f"{BASE_URL}/merchant/management/home/"
+        r = client._session.get(
+            url,
+            headers=client._common_headers(referer),
+            timeout=10,
+        )
+        probe_result = {
+            "status_code": r.status_code,
+            "content_type": r.headers.get("content-type"),
+            "response_body_first_500": (r.text or "")[:500],
+            "response_headers": dict(r.headers),
+        }
+    except Exception as e:  # noqa: BLE001
+        probe_result = {"error": str(e)}
+    finally:
+        client.close()
+
+    return {
+        "cookies_total": len(cookies),
+        "cookie_names": cookie_names,
+        "cookie_domains": list({(c.get("domain") or "-") for c in cookies}),
+        "auth_cookies_present": auth_cookies or "❌ 없음 — EATS_AT/EATS_RT 필요",
+        "akamai_cookies_present": akamai_cookies or "❌ 없음 — _abck/bm_sz 필요 (Akamai 봇 검증)",
+        "csrf_cookies_present": csrf_cookies or "(없음 — GET 호출엔 보통 불필요)",
+        "probe": probe_result,
+        "diagnosis": (
+            "✅ 쿠키 구성 OK — 응답 body 확인 필요"
+            if (auth_cookies and akamai_cookies)
+            else f"⚠️ 쿠키 누락: " + (
+                "Akamai 쿠키 (_abck, bm_sz 등) 없음 — 봇 차단 거의 확실" if not akamai_cookies
+                else "인증 쿠키 (EATS_AT) 없음"
+            )
+        ),
+    }
 
 
 @router.get("/dashboard")

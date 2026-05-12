@@ -258,23 +258,32 @@ class CoupangEatsClient:
         return h
 
     def _check_response(self, r) -> None:
-        """401/403 → CookieInvalidError, 그 외 4xx/5xx → CoupangEatsError."""
+        """401/403 → CookieInvalidError, 그 외 4xx/5xx → CoupangEatsError.
+
+        응답 body 의 앞 240자를 에러 메시지에 포함 (사장님이 UI 에서 원인 추적 가능).
+        """
+        body_preview = ""
+        try:
+            body_preview = (r.text or "")[:240].replace("\n", " ").replace("\r", " ")
+        except Exception:
+            pass
         if r.status_code in (401, 403):
             raise CookieInvalidError(
-                f"세션 쿠키 만료/무효 (HTTP {r.status_code}) — 자동 재로그인 필요",
+                f"세션 쿠키 거부 (HTTP {r.status_code}) — "
+                f"인증 쿠키(EATS_AT/EATS_RT) 또는 Akamai 쿠키(_abck/bm_sz) 누락 가능성. "
+                f"응답: {body_preview}",
                 status_code=r.status_code,
             )
-        # 봇 차단 가능성 (Akamai 가 403 대신 200 + interstitial HTML 보내는 경우도)
         if r.status_code >= 400:
             raise CoupangEatsError(
-                f"쿠팡이츠 API 오류 HTTP {r.status_code}: {(r.text or '')[:200]}",
+                f"쿠팡이츠 API 오류 HTTP {r.status_code}: {body_preview}",
                 status_code=r.status_code,
             )
         ctype = r.headers.get("content-type", "")
         if "application/json" not in ctype.lower():
-            # JSON 기대했는데 HTML 반환 → 거의 확실히 Akamai interstitial
             raise CookieInvalidError(
-                f"쿠팡이츠가 JSON 대신 {ctype} 반환 — 봇 차단/세션 만료 가능성",
+                f"쿠팡이츠가 JSON 대신 {ctype} 반환 (HTTP {r.status_code}) — "
+                f"Akamai interstitial 또는 차단 페이지 가능성. 응답: {body_preview}",
                 status_code=r.status_code,
             )
 
