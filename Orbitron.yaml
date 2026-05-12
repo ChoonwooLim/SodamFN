@@ -79,6 +79,9 @@ services:
         value: "qwen2.5:7b"  # PSU 안정 범위 (14b는 크래시 위험)
       - key: AI_CLASSIFY_TIMEOUT_SEC
         value: "30"
+      # 이동식 단말기 카드매출 (코페이 등) 수수료율 — 매출 역산용
+      - key: KOPAY_COMMISSION_RATE
+        value: "0.0275"  # 2.75% (코페이 정산 명세 기준 조정 가능)
       - key: TTS_SERVER_URL
         value: "http://192.168.219.117:8101"  # TTS (Edge-TTS / XTTS v2) - reserved
       - key: MUSIC_SERVER_URL

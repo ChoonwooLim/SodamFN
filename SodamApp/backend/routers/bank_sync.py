@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from datetime import date, datetime, timedelta
 from typing import List, Optional
@@ -169,7 +170,7 @@ class ManualAccountIn(BaseModel):
 class TxUpdateIn(BaseModel):
     classified_as: Optional[str] = Field(
         None,
-        description="revenue/expense/purchase/transfer/excluded/unclassified/card_settlement/pay_settlement/delivery_settlement",
+        description="revenue/expense/purchase/transfer/excluded/unclassified/card_settlement/pay_settlement/delivery_settlement/mobile_settlement",
     )
     vendor_id: Optional[int] = None
     user_memo: Optional[str] = None
@@ -799,7 +800,7 @@ def list_transactions(
     end_date: Optional[str] = Query(None),
     classified_as: Optional[str] = Query(
         None,
-        description="unclassified/revenue/expense/purchase/transfer/excluded/card_settlement/pay_settlement/delivery_settlement",
+        description="unclassified/revenue/expense/purchase/transfer/excluded/card_settlement/pay_settlement/delivery_settlement/mobile_settlement",
     ),
     direction: Optional[str] = Query(None, description="in / out / all"),
     q: Optional[str] = Query(None, description="remark1 부분검색"),
@@ -876,7 +877,7 @@ def update_transaction(
         if body.classified_as is not None:
             valid = {
                 "unclassified", "revenue", "expense", "purchase", "transfer", "excluded",
-                "card_settlement", "pay_settlement", "delivery_settlement",
+                "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
             }
             if body.classified_as not in valid:
                 raise HTTPException(status_code=400, detail=f"classified_as 값 오류: {body.classified_as}")
@@ -970,6 +971,32 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
         dr = _link_delivery_settlement(sess, tx)
         if dr:
             tx.linked_delivery_revenue_id = dr.id
+        return
+
+    # 5-2) 이동식 단말기 카드매출 정산 (코페이 등) → PayPayment + DailyExpense 매출
+    #   다른 settlement 과 달리 매출 원본이 별도로 없으므로 DailyExpense 도 생성한다.
+    #   수수료는 PayPayment.fees 에 자동 역산.
+    if tx.classified_as == "mobile_settlement" and tx.in_amount > 0:
+        pp = _create_mobile_settlement(sess, tx)
+        if pp:
+            tx.linked_pay_payment_id = pp.id
+            # 매출 DailyExpense 생성 (sales_amount = 카드결재 원본)
+            vendor = _get_or_create_vendor(
+                sess, tx.business_id, pp.pay_corp, "revenue", category="이동식카드매출"
+            )
+            de = DailyExpense(
+                business_id=tx.business_id,
+                date=tx.trans_date,
+                vendor_name=pp.pay_corp,
+                vendor_id=vendor.id,
+                amount=pp.sales_amount,  # 매출은 수수료 차감 전 결재 원본
+                category="이동식카드매출",
+                payment_method="Card",
+                note=f"{tx.remark1 or ''} / 수수료 {pp.fees:,}원 차감 후 입금 {pp.net_deposit:,}원",
+            )
+            sess.add(de)
+            sess.flush()
+            tx.linked_daily_id = de.id
         return
 
     # 6) 일반 매출 (입금이 카드/페이/배달이 아닌데 수동으로 revenue 분류된 경우) → DailyExpense
@@ -1096,6 +1123,41 @@ def _create_pay_settlement(sess, tx: BankTransaction) -> Optional[PayPayment]:
     return pp
 
 
+def _create_mobile_settlement(sess, tx: BankTransaction) -> Optional[PayPayment]:
+    """이동식 단말기 카드매출 정산 입금 → PayPayment 신규 생성 + 수수료 자동 역산.
+
+    일반 페이 정산과 다른 점:
+      - POS 미경유 별도 카드매출이라 매출 원본이 없음 → 입금액 + 수수료율로 sales_amount 역산
+      - DailyExpense 매출 row 도 함께 생성 (호출자 _materialize_link 가 처리)
+
+    역산 공식:
+      sales_amount = round(net_deposit / (1 - commission_rate))
+      fees         = sales_amount - net_deposit
+
+    수수료율은 _get_mobile_commission_rate(pay_corp) 가 환경변수에서 읽음.
+    """
+    s = _resolve_settlement(tx.remark1, tx.remark2)
+    pay_corp = s[1] if s and s[0] == "mobile" else "기타이동식"
+    rate = _get_mobile_commission_rate(pay_corp)
+    net = tx.in_amount or 0
+    sales = round(net / (1 - rate)) if 0 < rate < 1 else net
+    fees = sales - net
+    pp = PayPayment(
+        business_id=tx.business_id,
+        payment_date=tx.trans_date,
+        pay_corp=pay_corp,
+        sales_amount=sales,
+        fees=fees,
+        vat_on_fees=0,
+        net_deposit=net,
+        source="bank_sync_mobile",  # 일반 pay_settlement 과 구분 (집계 시 분기)
+        synced_at=datetime.now(),
+    )
+    sess.add(pp)
+    sess.flush()
+    return pp
+
+
 def _link_delivery_settlement(sess, tx: BankTransaction) -> Optional[DeliveryRevenue]:
     """배달앱 정산 입금 → DeliveryRevenue (같은 channel/year/month) 매칭 또는 생성.
 
@@ -1210,6 +1272,23 @@ DELIVERY_CHANNEL_MAP: List[tuple] = [
     ("음식배달",     "기타배달"),
 ]
 
+# (키워드, PayPayment.pay_corp 표준명, 수수료율)
+# 이동식 단말기 (POS 미경유 별도 카드매출). 일반 페이결제와 달리
+# 매출 원본이 별도로 없으므로 매출에 포함되어야 함. 수수료율 역산 적용.
+# 코페이는 환경변수 KOPAY_COMMISSION_RATE 로 조정 가능 (기본 2.75%)
+MOBILE_CHANNEL_MAP: List[tuple] = [
+    ("코페이",       "코페이"),
+]
+
+def _get_mobile_commission_rate(pay_corp: str) -> float:
+    """이동식 단말기 PG 별 수수료율. 환경변수로 조정 가능."""
+    if pay_corp == "코페이":
+        try:
+            return float(os.getenv("KOPAY_COMMISSION_RATE") or "0.0275")
+        except (TypeError, ValueError):
+            return 0.0275
+    return 0.0275  # 기타 이동식 PG 기본값
+
 TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
 
 
@@ -1265,6 +1344,10 @@ def _resolve_settlement(remark1: Optional[str], remark2: Optional[str]) -> Optio
     for kw, name in DELIVERY_CHANNEL_MAP:
         if kw in text:
             return ("delivery", name)
+    # MOBILE (코페이 등 이동식 단말기 카드매출) — PAY 보다 먼저 매칭 (수수료 역산+매출 인식 다름)
+    for kw, name in MOBILE_CHANNEL_MAP:
+        if kw in text:
+            return ("mobile", name)
     for kw, name in PAY_CHANNEL_MAP:
         if kw in text:
             return ("pay", name)
@@ -1398,6 +1481,8 @@ def _classify_one_tx(
                 return "pay_settlement"
             if stype == "delivery":
                 return "delivery_settlement"
+            if stype == "mobile":
+                return "mobile_settlement"
 
     # 3) 학습 패턴 (settlement 미매칭 시 적용)
     if tx.remark1 and tx.remark1 in learned_remarks:
@@ -1434,6 +1519,7 @@ def _classify_txs(
     counts = {
         "revenue": 0, "expense": 0, "purchase": 0, "transfer": 0,
         "card_settlement": 0, "pay_settlement": 0, "delivery_settlement": 0,
+        "mobile_settlement": 0,
         "learned": 0, "skip": 0,
     }
     if not txs:
@@ -2132,12 +2218,14 @@ def reclassify_settlements(
             "card": "card_settlement",
             "pay": "pay_settlement",
             "delivery": "delivery_settlement",
+            "mobile": "mobile_settlement",
         }
         counts = {
             "scanned": len(rows),
             "card_settlement": 0,
             "pay_settlement": 0,
             "delivery_settlement": 0,
+            "mobile_settlement": 0,
             "skipped_manual": 0,
             "skipped_no_match": 0,
             "already_correct": 0,
@@ -2283,7 +2371,7 @@ def get_settlement_stats(
                 "tx_count": d["rows"],
             })
 
-        # --- 페이 ---
+        # --- 페이 + 이동식 카드매출 (PayPayment 공유, source 로 분기) ---
         pay_payments = sess.exec(
             select(PayPayment).where(
                 PayPayment.business_id == bid,
@@ -2292,24 +2380,32 @@ def get_settlement_stats(
             )
         ).all()
         pay_groups: dict = {}
+        mobile_groups: dict = {}
         for pp in pay_payments:
-            g = pay_groups.setdefault(pp.pay_corp, {"sales_amount": 0, "net_deposit": 0, "fees": 0, "rows": 0})
+            target = mobile_groups if pp.source == "bank_sync_mobile" else pay_groups
+            g = target.setdefault(pp.pay_corp, {"sales_amount": 0, "net_deposit": 0, "fees": 0, "rows": 0})
             g["sales_amount"] += pp.sales_amount or 0
             g["net_deposit"] += pp.net_deposit or 0
             g["fees"] += pp.fees or 0
             g["rows"] += 1
-        pay_rows = []
-        for corp in sorted(pay_groups.keys()):
-            g = pay_groups[corp]
-            rate = round(g["fees"] / g["sales_amount"] * 100, 2) if g["sales_amount"] > 0 else None
-            pay_rows.append({
-                "corp": corp,
-                "sales_amount": g["sales_amount"],
-                "net_deposit": g["net_deposit"],
-                "fees": g["fees"],
-                "fee_rate_pct": rate,
-                "tx_count": g["rows"],
-            })
+
+        def _group_to_rows(groups: dict) -> list:
+            rows = []
+            for corp in sorted(groups.keys()):
+                g = groups[corp]
+                rate = round(g["fees"] / g["sales_amount"] * 100, 2) if g["sales_amount"] > 0 else None
+                rows.append({
+                    "corp": corp,
+                    "sales_amount": g["sales_amount"],
+                    "net_deposit": g["net_deposit"],
+                    "fees": g["fees"],
+                    "fee_rate_pct": rate,
+                    "tx_count": g["rows"],
+                })
+            return rows
+
+        pay_rows = _group_to_rows(pay_groups)
+        mobile_rows = _group_to_rows(mobile_groups)
 
         # --- 배달앱 ---
         delivery_rows_db = sess.exec(
@@ -2343,6 +2439,7 @@ def get_settlement_stats(
             "month": month,
             "card": card_rows,
             "pay": pay_rows,
+            "mobile": mobile_rows,
             "delivery": delivery_rows,
         }
     finally:

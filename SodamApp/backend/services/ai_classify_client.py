@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 VALID_CLASSES = {
-    "card_settlement", "pay_settlement", "delivery_settlement",
+    "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
     "transfer", "revenue", "expense", "purchase", "excluded", "unclassified",
 }
 
@@ -45,6 +45,8 @@ SYSTEM_PROMPT = (
     "토스/서울페이/제로페이/페이코/SSG페이/KCP 등 페이사명 포함\n"
     "- delivery_settlement: 배달앱 정산 입금. 적요에 쿠팡이츠/쿠팡페이/쿠팡/배달의민족/"
     "배민/우아한형제/요기요/땡겨요/음식배달 등 포함\n"
+    "- mobile_settlement: 이동식 단말기 카드매출 정산 (POS 미경유). "
+    "적요에 코페이 등 포함. 매장 POS 와 별도라 매출에 포함됨\n"
     "- transfer: 본인 자행 이체 (적요에 '내계좌'/'자행이체'/'본인이체' 포함)\n"
     "- revenue: 일반 매출 입금 (위 카테고리 아닌 사업 관련 입금)\n"
     "- excluded: 개인 송금/사업 무관 입금\n\n"

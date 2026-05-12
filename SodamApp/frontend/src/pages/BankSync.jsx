@@ -28,6 +28,8 @@ const CLASSIFIED_LABELS = {
     card_settlement:     { label: '카드입금', color: 'bg-violet-100 text-violet-700' },
     pay_settlement:      { label: '페이입금', color: 'bg-fuchsia-100 text-fuchsia-700' },
     delivery_settlement: { label: '배달입금', color: 'bg-rose-100 text-rose-700' },
+    // 2026-05-12: 이동식 단말기 카드매출 (코페이 등) — 매출에 포함, 수수료 역산
+    mobile_settlement:   { label: '이동식카드', color: 'bg-sky-100 text-sky-700' },
 };
 
 function fmtWon(n) {
@@ -275,7 +277,7 @@ export default function BankSync() {
             alert(
                 `자동 분류 완료\n총 ${res.data.processed}건 처리\n`
                 + `매출 ${c.revenue || 0} · 지출 ${c.expense || 0} · 매입 ${c.purchase || 0} · 이체 ${c.transfer || 0}\n`
-                + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0}\n`
+                + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0} · 이동식카드 ${c.mobile_settlement || 0}\n`
                 + `학습 ${c.learned || 0} · 미분류 ${c.skip || 0}`
             );
             fetchTxs();
@@ -373,7 +375,7 @@ export default function BankSync() {
             const c = res.data.counts;
             alert(
                 `정산 재분류 완료\n총 ${c.scanned}건 검사\n`
-                + `카드입금 ${c.card_settlement} · 페이입금 ${c.pay_settlement} · 배달입금 ${c.delivery_settlement}\n`
+                + `카드입금 ${c.card_settlement} · 페이입금 ${c.pay_settlement} · 배달입금 ${c.delivery_settlement} · 이동식카드 ${c.mobile_settlement || 0}\n`
                 + `이미 정확 ${c.already_correct} · 키워드 미매칭 ${c.skipped_no_match} · 수동분류 보호 ${c.skipped_manual}`
             );
             fetchTxs();
@@ -1583,6 +1585,12 @@ function SettlementTab() {
                         rows={data.pay}
                         corpLabel="페이"
                         emptyMsg="이번 달 페이 정산 데이터가 없습니다. 페이 매출 원본 데이터가 없으면 수수료율이 산출되지 않습니다."
+                    />
+                    <SettlementSection
+                        title="📱 이동식 카드매출 (코페이 등)"
+                        rows={data.mobile}
+                        corpLabel="이동식PG"
+                        emptyMsg="이번 달 이동식 단말기 카드매출이 없습니다. 매출은 수수료 역산 자동 적용 (KOPAY_COMMISSION_RATE 환경변수 조정 가능)."
                     />
                     <SettlementSection
                         title="🛵 배달앱 정산"
