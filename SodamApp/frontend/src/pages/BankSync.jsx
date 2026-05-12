@@ -3,6 +3,19 @@ import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle,
 import api from '../api';
 
 const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
+const AI_MODEL_KEY = 'bankSyncAiModel_v1';
+
+function loadAiModelSetting() {
+    try {
+        const v = JSON.parse(localStorage.getItem(AI_MODEL_KEY) || 'null');
+        if (v && typeof v === 'object' && v.provider) return v;
+    } catch (e) { /* ignore */ }
+    return { provider: 'ollama', model: 'qwen2.5:7b' };
+}
+
+function saveAiModelSetting(v) {
+    try { localStorage.setItem(AI_MODEL_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
+}
 
 const CLASSIFIED_LABELS = {
     unclassified: { label: '미분류', color: 'bg-slate-100 text-slate-600' },
@@ -271,13 +284,27 @@ export default function BankSync() {
         }
     }
 
+    // AI 모델 설정 (localStorage 영속화)
+    const [aiModel, setAiModel] = useState(loadAiModelSetting);
+    const [aiModelsCatalog, setAiModelsCatalog] = useState(null); // {default_provider, providers: {ollama: {...}, openclaw: {...}}}
+
+    useEffect(() => { saveAiModelSetting(aiModel); }, [aiModel]);
+    useEffect(() => {
+        // 가용 모델 목록 1회 조회
+        api.get('/bank-sync/ai-classify/models')
+            .then(r => setAiModelsCatalog(r.data))
+            .catch(() => { /* AI 미설정 시 조용히 실패 */ });
+    }, []);
+
     // AI 분류 제안 모달 state
     const [aiModal, setAiModal] = useState(null); // { tx, suggestion, loading, error }
 
     async function handleAiSuggest(tx) {
         setAiModal({ tx, suggestion: null, loading: true, error: null });
         try {
-            const res = await api.post(`/bank-sync/transactions/${tx.id}/ai-classify-suggest`);
+            const res = await api.post(`/bank-sync/transactions/${tx.id}/ai-classify-suggest`, {
+                provider: aiModel.provider, model: aiModel.model,
+            });
             setAiModal({ tx, suggestion: res.data, loading: false, error: null });
         } catch (e) {
             setAiModal({ tx, suggestion: null, loading: false, error: e.response?.data?.detail || e.message });
@@ -313,6 +340,8 @@ export default function BankSync() {
                 max_items: 50,
                 min_confidence: 0.7,
                 apply: true,
+                provider: aiModel.provider,
+                model: aiModel.model,
             };
             const res = await api.post('/bank-sync/transactions/ai-classify-batch', body);
             alert(
@@ -498,6 +527,7 @@ export default function BankSync() {
                             {t.label}
                         </button>
                     ))}
+                    <AIModelSelector value={aiModel} onChange={setAiModel} catalog={aiModelsCatalog} />
                     <AutoRefreshControl
                         autoRefresh={autoRefresh}
                         setAutoRefresh={setAutoRefresh}
@@ -542,10 +572,10 @@ export default function BankSync() {
                     <SettlementTab />
                 )}
                 {tab === 'audit' && (
-                    <AuditTab accounts={accounts} onRefreshTxs={fetchTxs} />
+                    <AuditTab accounts={accounts} onRefreshTxs={fetchTxs} aiModel={aiModel} />
                 )}
                 {tab === 'chat' && (
-                    <ChatTab />
+                    <ChatTab aiModel={aiModel} />
                 )}
             </div>
 
@@ -689,6 +719,56 @@ function AISuggestModal({ state, onClose, onApply }) {
         </div>
     );
 }
+
+function AIModelSelector({ value, onChange, catalog }) {
+    // catalog: {default_provider, providers: {ollama: {configured, models}, openclaw: {configured, models}}}
+    const providers = catalog?.providers || {};
+    const ollamaModels = providers.ollama?.models || [];
+    const ollamaConfigured = providers.ollama?.configured;
+    const openclawConfigured = providers.openclaw?.configured;
+    const openclawModel = catalog?.default_openclaw_model || 'openclaw/codex-pro';
+
+    // 옵션: ollama 모델 N개 + openclaw 1개 (있으면)
+    const options = [];
+    if (ollamaConfigured) {
+        for (const m of ollamaModels) {
+            options.push({ provider: 'ollama', model: m, label: `Ollama · ${m}` });
+        }
+    }
+    if (openclawConfigured) {
+        options.push({ provider: 'openclaw', model: openclawModel, label: `OpenClaw · ${openclawModel} (GPT-5.5)` });
+    }
+    // 미설정/카탈로그 없음일 때 fallback
+    if (options.length === 0) {
+        options.push({ provider: value.provider, model: value.model, label: `${value.provider} · ${value.model}` });
+    }
+
+    const currentKey = `${value.provider}:${value.model}`;
+    return (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs">
+            <Sparkles size={12} className="text-fuchsia-500" />
+            <span className="text-slate-500 font-semibold">AI:</span>
+            <select
+                value={currentKey}
+                onChange={e => {
+                    const [provider, ...rest] = e.target.value.split(':');
+                    onChange({ provider, model: rest.join(':') });
+                }}
+                className="bg-transparent border-0 text-xs font-mono focus:outline-none cursor-pointer text-slate-700"
+                title="AI 모델 선택 — 모든 AI 호출(분류 제안, 일괄, 감사, 분석)에 자동 적용"
+            >
+                {options.map(o => {
+                    const k = `${o.provider}:${o.model}`;
+                    return <option key={k} value={k}>{o.label}</option>;
+                })}
+            </select>
+            {!ollamaConfigured && !openclawConfigured && (
+                <span className="text-rose-500 text-[10px]" title="AI 미설정">⚠️</span>
+            )}
+        </div>
+    );
+}
+
 
 function AutoRefreshControl({ autoRefresh, setAutoRefresh, refreshing, lastRefresh, countdown, fmtCountdown }) {
     const enabled = autoRefresh.enabled;
@@ -1588,7 +1668,7 @@ function SettlementSection({ title, rows, corpLabel, keyCol = 'corp', emptyMsg }
 // 이미 분류된 거래에 대해 AI가 다른 분류를 고신뢰도로 제안하면 의심으로 플래그
 // ============================================================
 
-function AuditTab({ accounts, onRefreshTxs }) {
+function AuditTab({ accounts, onRefreshTxs, aiModel }) {
     const today = new Date().toISOString().slice(0, 10);
     const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const [filter, setFilter] = useState({
@@ -1616,6 +1696,8 @@ function AuditTab({ accounts, onRefreshTxs }) {
                 max_items: parseInt(filter.max_items) || 100,
                 min_disagreement_confidence: parseFloat(filter.min_disagreement_confidence) || 0.75,
                 skip_manual: filter.skip_manual,
+                provider: aiModel?.provider,
+                model: aiModel?.model,
             };
             const res = await api.post('/bank-sync/audit/run', body);
             setResult(res.data);
@@ -1638,7 +1720,11 @@ function AuditTab({ accounts, onRefreshTxs }) {
         if (!confirm(`선택된 ${ids.length}건의 AI 제안 분류를 적용합니다. 계속할까요?\n(수동 분류 거래는 보호됩니다)`)) return;
         setApplying(true);
         try {
-            const res = await api.post('/bank-sync/audit/apply', { tx_ids: ids });
+            const res = await api.post('/bank-sync/audit/apply', {
+                tx_ids: ids,
+                provider: aiModel?.provider,
+                model: aiModel?.model,
+            });
             alert(`적용 완료: ${res.data.applied}건 / 스킵 ${res.data.skipped} / 오류 ${res.data.errors}`);
             onRefreshTxs?.();
             runAudit();
@@ -1844,11 +1930,12 @@ const CHAT_SUGGESTIONS = [
     "수수료를 가장 많이 떼는 채널은 어디야?",
 ];
 
-function ChatTab() {
+function ChatTab({ aiModel }) {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [contextSummary, setContextSummary] = useState(null);
+    const [modelUsed, setModelUsed] = useState(null);
     const scrollRef = useRef(null);
 
     useEffect(() => {
@@ -1865,9 +1952,14 @@ function ChatTab() {
         setInput('');
         setSending(true);
         try {
-            const res = await api.post('/bank-sync/chat', { messages: next });
+            const res = await api.post('/bank-sync/chat', {
+                messages: next,
+                provider: aiModel?.provider,
+                model: aiModel?.model,
+            });
             setMessages([...next, { role: 'assistant', content: res.data.answer }]);
             setContextSummary(res.data.context_summary);
+            setModelUsed(res.data.model_used);
         } catch (e) {
             setMessages([...next, {
                 role: 'assistant',
@@ -1898,6 +1990,7 @@ function ChatTab() {
                 {contextSummary && (
                     <div className="mt-2 text-[11px] text-slate-500 font-mono">
                         분석 컨텍스트: {contextSummary.months.join(', ')} · 계좌 {contextSummary.accounts}개 · 거래 {contextSummary.total_transactions}건
+                        {modelUsed && <span className="ml-2 text-indigo-500">[{modelUsed}]</span>}
                     </div>
                 )}
             </div>
