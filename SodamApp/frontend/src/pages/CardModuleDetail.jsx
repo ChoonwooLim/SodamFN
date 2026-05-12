@@ -82,37 +82,70 @@ export default function CardModuleDetail() {
                 </Link>
 
                 <header className="mb-6">
-                    <h1 className="text-2xl font-bold text-slate-800">카드 매출 자동수집</h1>
+                    <h1 className="text-2xl font-bold text-slate-800">카드사 가맹점번호 관리</h1>
                     <p className="text-sm text-slate-500 mt-1">
-                        CODEF 마이데이터 — 14개 카드사 사업자 매출(승인 + 청구 + 가맹점) 자동 적재
+                        사장님 카드사·PG 가맹점번호 기록 — 매출 자동수집은 별도 흐름
                     </p>
                 </header>
 
-                <div className="flex items-center gap-2 mb-6">
-                    <button
-                        onClick={() => setRegisterOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        카드사 등록
-                    </button>
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing || activeCount === 0}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm disabled:opacity-50"
-                        title={activeCount === 0 ? '먼저 카드사를 등록하세요' : '지금 동기화'}
-                    >
-                        <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                        지금 동기화
-                    </button>
-                    <button
-                        onClick={() => setHistoryOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm"
-                    >
-                        <History className="w-4 h-4" />
-                        이력
-                    </button>
+                <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-200">
+                    <h3 className="text-sm font-bold text-blue-900 mb-2 flex items-center gap-1.5">
+                        💡 카드 매출은 어떻게 자동 수집되나요?
+                    </h3>
+                    <div className="text-sm text-blue-900 space-y-2 leading-relaxed">
+                        <p>
+                            카드사가 가맹점에 발급하는 별도 관리 사이트 (KB위즈카드/신한SBSP 등) ID·PW 가 있어야
+                            CODEF 로 매출을 직접 가져올 수 있는데, <strong>대부분 사장님이 보유하지 않는 정보</strong>입니다.
+                        </p>
+                        <p>
+                            <strong>셈하나는 다음 2가지 흐름으로 자동 매출 추적이 가능</strong>합니다:
+                        </p>
+                        <ol className="list-decimal pl-5 space-y-1">
+                            <li>
+                                <strong>이지포스 POS daily Excel 업로드</strong> → 매출관리 페이지
+                                (결재 원본 + 카드사별 합계 정확)
+                            </li>
+                            <li>
+                                <strong>신한은행 거래내역 자동수집</strong> → 외부연동 / 계좌 거래내역
+                                (수수료 차감 후 정산 입금 자동 분류 + 수수료율 역산)
+                            </li>
+                        </ol>
+                        <p>
+                            아래 가맹점번호 표는 <strong>기록용·세무사 자료용</strong>으로 등록·관리만 합니다.
+                            매출 수집 자체는 위 2가지 흐름이 이미 처리 중이라 별도 연결 작업 불필요.
+                        </p>
+                    </div>
                 </div>
+
+                {/* CODEF 카드사 등록·동기화 도구 — superadmin 전용 디버그용 */}
+                {localStorage.getItem('user_role') === 'superadmin' && (
+                    <div className="flex items-center gap-2 mb-6 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        <span className="text-[10px] text-slate-400 font-semibold mr-2">SuperAdmin 도구:</span>
+                        <button
+                            onClick={() => setRegisterOpen(true)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200"
+                            title="CODEF 카드사 연결 (개인 사용 내역 PoC, 가맹점주에겐 비추천)"
+                        >
+                            <Plus className="w-3 h-3" />
+                            CODEF 카드사 연결
+                        </button>
+                        <button
+                            onClick={handleSync}
+                            disabled={syncing || activeCount === 0}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200 disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
+                            지금 동기화
+                        </button>
+                        <button
+                            onClick={() => setHistoryOpen(true)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200"
+                        >
+                            <History className="w-3 h-3" />
+                            이력
+                        </button>
+                    </div>
+                )}
 
                 {msg && (
                     <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
@@ -151,8 +184,7 @@ export default function CardModuleDetail() {
                                         <th className="text-left px-3 py-2">카드사 / PG</th>
                                         <th className="text-left px-3 py-2">가맹점번호</th>
                                         <th className="text-left px-3 py-2">등록일</th>
-                                        <th className="text-left px-3 py-2">CODEF</th>
-                                        <th className="text-left px-3 py-2">매출 수집</th>
+                                        <th className="text-left px-3 py-2">매출 추적 경로</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -161,70 +193,39 @@ export default function CardModuleDetail() {
                                             <td className="px-3 py-2 font-medium text-slate-800">{m.card_corp}</td>
                                             <td className="px-3 py-2 font-mono text-slate-700">{m.merchant_id}</td>
                                             <td className="px-3 py-2 text-xs text-slate-500">{m.registered_at || '-'}</td>
-                                            <td className="px-3 py-2">
-                                                {m.codef_supported ? (
-                                                    m.codef_connected ? (
-                                                        <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                                                            <CheckCircle2 size={12} /> 연결됨
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-slate-500">
-                                                            지원 (미연결)
-                                                        </span>
-                                                    )
-                                                ) : (
-                                                    <span className="text-xs text-slate-400">PG · 별도</span>
-                                                )}
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                {m.codef_supported ? (
-                                                    m.codef_connected ? (
-                                                        <button
-                                                            onClick={handleSync}
-                                                            className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                                                        >
-                                                            🔄 매출 동기화
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => setRegisterOpen(true)}
-                                                            className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 rounded hover:bg-emerald-100"
-                                                        >
-                                                            + CODEF 연결
-                                                        </button>
-                                                    )
-                                                ) : (
-                                                    <span className="text-xs text-slate-400">
-                                                        Excel/정산서 업로드
-                                                    </span>
-                                                )}
+                                            <td className="px-3 py-2 text-xs text-slate-600">
+                                                이지포스 + 신한 거래내역으로 자동 처리
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                             <div className="bg-slate-50 px-4 py-2 text-[11px] text-slate-500 border-t border-slate-100">
-                                💡 CODEF 지원 카드사 9종 (KB/NH/롯데/하나/신한/현대/우리/BC/삼성) 은 자동 매출 수집 가능.
-                                네이버페이·카카오페이·제로페이 등 PG 는 정산서 별도 처리.
+                                💡 가맹점번호는 세무·정산 기록용. 매출 자동수집은 위 안내처럼 이지포스 + 은행거래내역으로 처리됩니다.
                             </div>
                         </div>
                     )}
                 </section>
 
-                <h2 className="text-base font-semibold text-slate-700 mb-3">
-                    등록된 카드사 ({activeCount}/{conns.length})
-                </h2>
+                {/* CODEF 카드사 연결 목록 — superadmin 전용 (가맹점주에겐 무의미) */}
+                {localStorage.getItem('user_role') === 'superadmin' && (
+                    <>
+                        <h2 className="text-base font-semibold text-slate-700 mb-3">
+                            CODEF 카드사 연결 ({activeCount}/{conns.length}) <span className="text-[10px] text-slate-400">— SuperAdmin 디버그</span>
+                        </h2>
 
-                {loading ? (
-                    <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
-                        불러오는 중...
-                    </div>
-                ) : (
-                    <CardConnectionList
-                        connections={conns}
-                        onChanged={fetchConns}
-                        onReverify={() => setRegisterOpen(true)}
-                    />
+                        {loading ? (
+                            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
+                                불러오는 중...
+                            </div>
+                        ) : (
+                            <CardConnectionList
+                                connections={conns}
+                                onChanged={fetchConns}
+                                onReverify={() => setRegisterOpen(true)}
+                            />
+                        )}
+                    </>
                 )}
 
                 <CardConnectionRegisterModal
