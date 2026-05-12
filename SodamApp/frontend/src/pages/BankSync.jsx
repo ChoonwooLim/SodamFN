@@ -251,11 +251,14 @@ export default function BankSync() {
         }
     }
 
-    async function fetchTxs() {
+    async function fetchTxs(customFilter) {
+        // customFilter 가 제공되면 그것을 사용 (state setFilter 후 race condition 방지)
+        // 없으면 현재 filter state 사용 (기존 호출 호환)
+        const f = customFilter || filter;
         setTxLoading(true);
         try {
             const params = new URLSearchParams();
-            Object.entries(filter).forEach(([k, v]) => {
+            Object.entries(f).forEach(([k, v]) => {
                 if (v) params.append(k, v);
             });
             params.append('limit', '200');
@@ -1337,19 +1340,22 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
     const [helpOpen, setHelpOpen] = useState(false);
     const [bulkSyncing, setBulkSyncing] = useState(false);
 
-    // 월별 빠른 필터: filter.start_date/end_date 를 해당 월로 설정
+    // 월별 빠른 필터: filter.start_date/end_date 를 해당 월로 설정 + 즉시 fetch
+    // setFilter 는 비동기라 onApply 가 이전 closure 를 잡는 race condition 회피 위해
+    // 새 filter 를 onApply 에 직접 전달
     function applyMonthFilter(year, month) {
         const start = `${year}-${String(month).padStart(2, '0')}-01`;
-        // 월말 계산
         const lastDay = new Date(year, month, 0).getDate();
         const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-        setFilter({ ...filter, start_date: start, end_date: end });
-        setTimeout(() => onApply?.(), 0);
+        const newFilter = { ...filter, start_date: start, end_date: end };
+        setFilter(newFilter);
+        onApply?.(newFilter);
     }
 
     function clearDateFilter() {
-        setFilter({ ...filter, start_date: '', end_date: '' });
-        setTimeout(() => onApply?.(), 0);
+        const newFilter = { ...filter, start_date: '', end_date: '' };
+        setFilter(newFilter);
+        onApply?.(newFilter);
     }
 
     async function handleBulkSync() {
