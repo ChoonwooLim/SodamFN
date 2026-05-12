@@ -1307,3 +1307,95 @@ class CodefBudgetSetting(SQLModel, table=True):
     last_hardlimit_sent_at: Optional[datetime.datetime] = None
     current_month_first_day: Optional[datetime.date] = None
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+# ──────────────────────────────────────────────────────────────────
+# EasyPOS (이지포스 smart.easypos.net) — KICC POS 매출 자동수집
+# ──────────────────────────────────────────────────────────────────
+
+class EasyPosCredential(SQLModel, table=True):
+    """이지포스 가맹점 로그인 자격증명 — business 당 1건.
+
+    password_encrypted 는 Fernet 대칭 암호화 (services.crypto_util).
+    """
+    __table_args__ = (
+        Index("ix_easypos_cred_business", "business_id"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", unique=True, index=True)
+    easypos_id: str = Field(description="이지포스 가맹점 로그인 ID (보통 사업자번호)")
+    password_encrypted: str = Field(description="Fernet 암호화 비밀번호")
+    shop_name: Optional[str] = None
+    erp_shop_code: Optional[str] = None
+    head_office_no: Optional[str] = None
+    status: str = Field(default="active", index=True)
+    last_verified_at: Optional[datetime.datetime] = None
+    last_failed_at: Optional[datetime.datetime] = None
+    last_error_message: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class EasyPosSaleReceipt(SQLModel, table=True):
+    """이지포스 영수증 단위 raw 매출. selectSalePerDayList.do 응답을 그대로 적재.
+
+    (business_id, sale_date, pos_no, receipt_no) 가 유일.
+    셈하나 Revenue 일자집계는 별도 cron 또는 view 에서 sum 한다.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "sale_date", "pos_no", "receipt_no",
+                         name="uq_easypos_receipt"),
+        Index("ix_easypos_receipt_biz_date", "business_id", "sale_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    sale_date: datetime.date = Field(index=True)            # 영업일자
+    pos_no: str = Field(max_length=4)                        # POS번호 (01,02)
+    receipt_no: str = Field(max_length=16)                   # 영수증번호
+    sale_time: Optional[str] = Field(default=None, max_length=8)   # HH:MM
+    payment_time: Optional[str] = Field(default=None, max_length=8)
+    sale_flag: Optional[str] = Field(default=None, max_length=2)   # Y=매출, C=취소 등
+
+    total_amount: int = 0       # 총매출 (부가세 포함)
+    net_amount: int = 0         # 순매출 (부가세 제외)
+    net_sales: int = 0          # NET매출 (순매출 - 할인)
+    vat: int = 0
+    service_charge: int = 0     # 봉사료
+    discount: int = 0
+    customer_count: int = 0
+
+    # 결제수단별 금액
+    cash_amount: int = 0
+    card_amount: int = 0
+    point_amount: int = 0
+    voucher_amount: int = 0
+    cashback_amount: int = 0
+    prepaid_card_amount: int = 0
+    credit_amount: int = 0       # 외상
+    exchange_voucher_amount: int = 0
+    employee_card_amount: int = 0
+    e_money_amount: int = 0
+
+    sale_type: Optional[str] = Field(default=None, max_length=2)
+    raw_json: Optional[str] = None   # 원본 SSV row 직렬화 (디버그용)
+    synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class EasyPosSyncLog(SQLModel, table=True):
+    """이지포스 동기화 이력. 운영/장애 추적용."""
+    __table_args__ = (
+        Index("ix_easypos_synclog_biz_date", "business_id", "started_at"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    sync_mode: str = Field(default="daily")          # daily / manual / backfill
+    target_date: Optional[datetime.date] = None
+    started_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    finished_at: Optional[datetime.datetime] = None
+    status: str = Field(default="running")            # running / success / failed
+    receipts_fetched: int = 0
+    receipts_inserted: int = 0
+    receipts_updated: int = 0
+    total_sales: int = 0
+    error_message: Optional[str] = None
+    triggered_by: str = Field(default="cron")         # cron / manual / superadmin

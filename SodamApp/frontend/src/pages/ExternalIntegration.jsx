@@ -16,6 +16,7 @@ export default function ExternalIntegration() {
     const [budget, setBudget] = useState(null);
     const [cardStats, setCardStats] = useState({ activeCount: 0, totalCount: 0, failedCount: 0 });
     const [bankStats, setBankStats] = useState({ accountCount: 0, txCount: 0, codefActiveCount: 0 });
+    const [easyposStats, setEasyposStats] = useState({ registered: false, lastVerifiedAt: null, status: null });
     const [budgetModalOpen, setBudgetModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
@@ -28,7 +29,7 @@ export default function ExternalIntegration() {
             const today = new Date();
             const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
 
-            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes] = await Promise.all([
+            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes] = await Promise.all([
                 api.get('/codef/budget/current'),
                 api.get('/codef/connections', { params: { type: 'card' } }),
                 api.get('/bank-sync/accounts').catch(() => ({ data: [] })),
@@ -36,6 +37,7 @@ export default function ExternalIntegration() {
                     params: { start_date: monthStart, limit: 1 },
                 }).catch(() => ({ data: { total: 0 } })),
                 api.get('/codef/connections', { params: { type: 'bank' } }).catch(() => ({ data: { connections: [] } })),
+                api.get('/easypos/credential').catch(() => ({ data: { registered: false } })),
             ]);
             setBudget(budgetRes.data);
             const cardConns = cardConnRes.data.connections || [];
@@ -49,6 +51,12 @@ export default function ExternalIntegration() {
                 accountCount: Array.isArray(bankAccountsRes.data) ? bankAccountsRes.data.length : 0,
                 txCount: bankTxRes.data?.total || 0,
                 codefActiveCount: bankConns.filter((c) => c.status === 'active').length,
+            });
+            const ep = easyposRes.data || {};
+            setEasyposStats({
+                registered: !!ep.registered,
+                lastVerifiedAt: ep.last_verified_at || null,
+                status: ep.status || null,
             });
         } catch (e) {
             setErr(e.response?.data?.detail || '데이터를 불러오지 못했습니다.');
@@ -90,7 +98,7 @@ export default function ExternalIntegration() {
                 </div>
 
                 <h2 className="text-lg font-semibold text-slate-800 mb-4">통합 모듈</h2>
-                <ModuleGrid cardStats={cardStats} bankStats={bankStats} />
+                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} />
 
                 <BudgetSettingsModal
                     isOpen={budgetModalOpen}

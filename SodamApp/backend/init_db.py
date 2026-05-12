@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, select
 from database import engine
-from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck, BusinessStore, PayPayment  # noqa: F401 - import all models so create_all creates their tables
+from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck, BusinessStore, PayPayment, EasyPosCredential, EasyPosSaleReceipt, EasyPosSyncLog  # noqa: F401 - import all models so create_all creates their tables
 from services.database_service import DatabaseService
 from routers.auth import get_password_hash
 from sqlalchemy import text

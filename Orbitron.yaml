@@ -153,6 +153,13 @@ services:
         value: "100"
       - key: NOTIFICATION_TEMPLATE_CODEF_EXPIRED
         value: ""  # ⚠️ 팝빌 알림톡 검수 후 templateCode 등록
+      # ─────────────────────────────────────────────
+      # EasyPOS (KICC smart.easypos.net) — POS 매출 자동수집
+      # Fernet 마스터 키 — 이지포스 비밀번호 DB 보관용 대칭 암호화.
+      # ⚠️ 변경 시 기존 자격증명 복호 불가 → 사장님 재입력 필요.
+      # ─────────────────────────────────────────────
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        value: ""  # ⚠️ Orbitron Secrets에 48자+ random URL-safe string
     healthCheck:
       path: /api/health
       interval: 30

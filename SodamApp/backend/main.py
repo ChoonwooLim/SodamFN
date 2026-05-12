@@ -167,6 +167,10 @@ app.include_router(codef_card_sync.router)
 app.include_router(codef_budget.router)
 app.include_router(codef_card_merchants.router)
 
+# EasyPOS (KICC smart.easypos.net) — POS 매출 자동수집 (비공식 가맹점 세션)
+from routers import easypos
+app.include_router(easypos.router)
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""

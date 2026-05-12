@@ -1,4 +1,4 @@
-import { CreditCard, Building2, Users, FileText, IdCard } from 'lucide-react';
+import { CreditCard, Building2, Users, FileText, IdCard, Store } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
@@ -27,6 +27,16 @@ const MODULES = [
         active: true,
         href: '/external-integration/banks',
         description: '20+ 은행 입출금 자동수집 (CODEF 마이데이터)',
+    },
+    {
+        id: 'easypos',
+        title: 'POS 매출',
+        provider: 'KICC 이지포스',
+        icon: Store,
+        color: 'emerald',
+        active: true,
+        href: '/external-integration/easypos',
+        description: '이지포스 영수증 단위 매출 야간 자동수집',
     },
     {
         id: 'insurance',
@@ -79,14 +89,24 @@ function ModuleCard({ module, stats }) {
         );
     }
 
+    const isEmerald = module.color === 'emerald';
+    const borderCls = isEmerald
+        ? 'border-emerald-200 hover:border-emerald-400'
+        : 'border-blue-200 hover:border-blue-400';
+    const iconCls = isEmerald ? 'text-emerald-600' : 'text-blue-600';
+    const badgeCls = isEmerald
+        ? 'bg-emerald-50 text-emerald-700'
+        : 'bg-blue-50 text-blue-700';
+    const linkCls = isEmerald ? 'text-emerald-600' : 'text-blue-600';
+
     return (
         <Link
             to={module.href}
-            className="block bg-white border border-blue-200 rounded-xl p-5 hover:border-blue-400 hover:shadow-sm transition-all"
+            className={`block bg-white border ${borderCls} rounded-xl p-5 hover:shadow-sm transition-all`}
         >
             <div className="flex items-center justify-between mb-3">
-                <Icon className="w-7 h-7 text-blue-600" />
-                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                <Icon className={`w-7 h-7 ${iconCls}`} />
+                <span className={`text-xs px-2 py-0.5 rounded-full ${badgeCls}`}>
                     {module.provider}
                 </span>
             </div>
@@ -124,19 +144,43 @@ function ModuleCard({ module, stats }) {
                     )}
                 </div>
             )}
-            <div className="mt-3 text-blue-600 text-sm font-medium">관리 →</div>
+            {stats && module.id === 'easypos' && (
+                <div className="text-sm space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                        <span>자격증명</span>
+                        <span className="font-semibold">
+                            {stats.registered ? '✓ 등록됨' : '— 미등록'}
+                        </span>
+                    </div>
+                    {stats.lastVerifiedAt && (
+                        <div className="text-xs text-emerald-700">
+                            ✓ 마지막 인증 {stats.lastVerifiedAt.slice(0, 10)}
+                        </div>
+                    )}
+                    {stats.status === 'failed' && (
+                        <div className="text-xs text-amber-700">
+                            ⚠ 인증 실패 — 재로그인 필요
+                        </div>
+                    )}
+                </div>
+            )}
+            <div className={`mt-3 ${linkCls} text-sm font-medium`}>관리 →</div>
         </Link>
     );
 }
 
-export default function ModuleGrid({ cardStats, bankStats }) {
+export default function ModuleGrid({ cardStats, bankStats, easyposStats }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {MODULES.map((m) => (
                 <ModuleCard
                     key={m.id}
                     module={m}
-                    stats={m.id === 'cards' ? cardStats : m.id === 'banks' ? bankStats : null}
+                    stats={
+                        m.id === 'cards' ? cardStats :
+                        m.id === 'banks' ? bankStats :
+                        m.id === 'easypos' ? easyposStats : null
+                    }
                 />
             ))}
         </div>
