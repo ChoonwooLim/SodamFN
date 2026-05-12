@@ -171,6 +171,11 @@ app.include_router(codef_card_merchants.router)
 from routers import easypos
 app.include_router(easypos.router)
 
+# 쿠팡이츠 (store.coupangeats.com) — 배달앱 매출 자동수집
+# Playwright(자동 로그인 — Akamai sensor 통과) + curl_cffi(매출 API — TLS fingerprint 우회) 하이브리드
+from routers import coupang_eats
+app.include_router(coupang_eats.router)
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""

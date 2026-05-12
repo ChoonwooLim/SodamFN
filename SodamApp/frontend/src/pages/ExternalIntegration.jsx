@@ -17,6 +17,7 @@ export default function ExternalIntegration() {
     const [cardStats, setCardStats] = useState({ activeCount: 0, totalCount: 0, failedCount: 0 });
     const [bankStats, setBankStats] = useState({ accountCount: 0, txCount: 0, codefActiveCount: 0 });
     const [easyposStats, setEasyposStats] = useState({ registered: false, lastVerifiedAt: null, status: null });
+    const [coupangEatsStats, setCoupangEatsStats] = useState({ registered: false, cookiesPresent: false, lastVerifiedAt: null, status: null, loginMethod: null });
     const [budgetModalOpen, setBudgetModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
@@ -29,7 +30,7 @@ export default function ExternalIntegration() {
             const today = new Date();
             const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
 
-            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes] = await Promise.all([
+            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes, coupangEatsRes] = await Promise.all([
                 api.get('/codef/budget/current'),
                 api.get('/codef/connections', { params: { type: 'card' } }),
                 api.get('/bank-sync/accounts').catch(() => ({ data: [] })),
@@ -38,6 +39,7 @@ export default function ExternalIntegration() {
                 }).catch(() => ({ data: { total: 0 } })),
                 api.get('/codef/connections', { params: { type: 'bank' } }).catch(() => ({ data: { connections: [] } })),
                 api.get('/easypos/credential').catch(() => ({ data: { registered: false } })),
+                api.get('/coupang-eats/credential').catch(() => ({ data: { registered: false } })),
             ]);
             setBudget(budgetRes.data);
             const cardConns = cardConnRes.data.connections || [];
@@ -57,6 +59,15 @@ export default function ExternalIntegration() {
                 registered: !!ep.registered,
                 lastVerifiedAt: ep.last_verified_at || null,
                 status: ep.status || null,
+            });
+            const ce = coupangEatsRes.data || {};
+            setCoupangEatsStats({
+                registered: !!ce.registered,
+                cookiesPresent: !!ce.cookies_present,
+                lastVerifiedAt: ce.last_verified_at || null,
+                status: ce.status || null,
+                loginMethod: ce.login_method || null,
+                shopName: ce.shop_name || null,
             });
         } catch (e) {
             setErr(e.response?.data?.detail || '데이터를 불러오지 못했습니다.');
@@ -98,7 +109,7 @@ export default function ExternalIntegration() {
                 </div>
 
                 <h2 className="text-lg font-semibold text-slate-800 mb-4">통합 모듈</h2>
-                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} />
+                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} coupangEatsStats={coupangEatsStats} />
 
                 <BudgetSettingsModal
                     isOpen={budgetModalOpen}

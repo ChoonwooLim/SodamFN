@@ -1399,3 +1399,159 @@ class EasyPosSyncLog(SQLModel, table=True):
     total_sales: int = 0
     error_message: Optional[str] = None
     triggered_by: str = Field(default="cron")         # cron / manual / superadmin
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 쿠팡이츠 (store.coupangeats.com) — 배달앱 매출 자동수집
+# 비공식 가맹점 세션 (Akamai Bot Manager 우회: Playwright + curl_cffi)
+# spec: KICC EasyPOS 와 동일한 4-모델 패턴 (Credential / Order / Settlement / SyncLog)
+# ──────────────────────────────────────────────────────────────────────────
+
+class CoupangEatsCredential(SQLModel, table=True):
+    """쿠팡이츠 사장님 포털 로그인 자격증명 — business 당 1건.
+
+    인증 흐름:
+      1) login_id/password 를 Playwright 헤드리스 브라우저에 주입 → Akamai sensor 자동 통과
+      2) 인증 쿠키를 cookies_json 에 Fernet 암호화 저장
+      3) 이후 매출 API 는 curl_cffi (Chrome TLS fingerprint) 로 쿠키만 사용해 직접 호출
+      4) 401 발생 시 자동 재로그인 → 쿠키 갱신
+
+    수동 쿠키 폴백:
+      - Playwright 가 차단되거나 자격증명 미등록 시, 사장님이 브라우저 F12 로
+        쿠키를 복사해 cookies_json 에 직접 입력 가능 (login_method='manual')
+    """
+    __table_args__ = (
+        Index("ix_ce_cred_business", "business_id"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", unique=True, index=True)
+
+    # 자격증명 (자동 로그인용 — 수동 쿠키 입력만 쓰면 비울 수 있음)
+    login_id: Optional[str] = Field(default=None, description="쿠팡이츠 사장님 로그인 ID")
+    password_encrypted: Optional[str] = Field(default=None, description="Fernet 암호화 비밀번호")
+
+    # 매장 메타
+    store_id: Optional[int] = Field(default=None, index=True,
+                                    description="쿠팡이츠 매장 ID (예: 823245)")
+    shop_name: Optional[str] = None
+
+    # 세션 쿠키 (Fernet 암호화된 JSON 직렬화 — list[dict])
+    cookies_encrypted: Optional[str] = Field(default=None, description="Fernet(json.dumps(cookies))")
+    cookies_obtained_at: Optional[datetime.datetime] = None
+    cookies_expires_at: Optional[datetime.datetime] = Field(default=None,
+                                                            description="가장 빠른 만료 쿠키의 시간 (휴리스틱)")
+    login_method: str = Field(default="auto", description="auto=Playwright / manual=사장님 직접 입력")
+
+    # 상태
+    status: str = Field(default="active", index=True,
+                        description="active / failed / expired / cookie_invalid")
+    last_verified_at: Optional[datetime.datetime] = None
+    last_failed_at: Optional[datetime.datetime] = None
+    last_error_message: Optional[str] = None
+    consecutive_failures: int = Field(default=0,
+                                      description="연속 실패 횟수 — Akamai 차단 휴리스틱")
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class CoupangEatsOrder(SQLModel, table=True):
+    """쿠팡이츠 주문 단위 raw 매출.
+
+    소스: POST /api/v1/merchant/web/order/condition 응답의 orderPageVo.content[]
+    중복 키: (business_id, order_id) — order_id 는 쿠팡이츠 전역 unique.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "order_id", name="uq_ce_order"),
+        Index("ix_ce_order_biz_date", "business_id", "ordered_at"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    store_id: int = Field(index=True)
+    order_id: str = Field(max_length=32, description="쿠팡이츠 주문 ID (정수 문자열)")
+    abbr_order_id: Optional[str] = Field(default=None, max_length=16, description="짧은 주문번호 (예: 202KF6)")
+
+    ordered_at: Optional[datetime.datetime] = Field(default=None, index=True,
+                                                    description="주문 일시 (KST)")
+    delivered_at: Optional[datetime.datetime] = None
+
+    # 금액
+    total_sale_price: int = 0                # 총 주문가
+    discount_amount: int = 0
+    cancelled: bool = Field(default=False)
+
+    # 결제/배달
+    payment_method: Optional[str] = Field(default=None, max_length=32,
+                                          description="card / cash / coupay 등")
+    order_status: Optional[str] = Field(default=None, max_length=32,
+                                        description="DELIVERED / CANCELLED 등")
+    delivery_type: Optional[str] = Field(default=None, max_length=32,
+                                         description="배달 / 포장 / pickup 등")
+
+    # raw (디버그/재처리용)
+    items_json: Optional[str] = Field(default=None, description="메뉴/수량/옵션 list")
+    raw_json: Optional[str] = Field(default=None, description="전체 응답 row 직렬화")
+
+    synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class CoupangEatsSettlement(SQLModel, table=True):
+    """쿠팡이츠 일별 정산 내역.
+
+    소스: GET /api/v1/merchant/transactions/{storeId}/settlement-management-data
+    중복 키: (business_id, settlement_date, settlement_type, seller_transfer_id)
+      - WITHDRAWAL(출금) 은 seller_transfer_id 가 NULL 이라 동일 날짜 1건만 허용.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "settlement_date", "settlement_type",
+                         "seller_transfer_id", name="uq_ce_settlement"),
+        Index("ix_ce_settle_biz_date", "business_id", "settlement_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    store_id: int = Field(index=True)
+
+    settlement_date: datetime.date = Field(index=True)
+    settlement_type: str = Field(max_length=16, description="SETTLEMENT / WITHDRAWAL")
+    amount: int = 0                          # 정산액 / 출금액
+    balance: int = 0                         # 잔액 (해당 시점)
+    start_date: Optional[datetime.date] = None
+    end_date: Optional[datetime.date] = None
+    seller_transfer_id: Optional[int] = Field(default=None, index=True,
+                                              description="정산 식별자 (WITHDRAWAL은 NULL)")
+
+    raw_json: Optional[str] = None
+    synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class CoupangEatsSyncLog(SQLModel, table=True):
+    """쿠팡이츠 동기화 이력. 운영/장애 추적용."""
+    __table_args__ = (
+        Index("ix_ce_synclog_biz_date", "business_id", "started_at"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    sync_mode: str = Field(default="full",
+                           description="orders / settlements / full / auth-refresh")
+    target_start: Optional[datetime.date] = None
+    target_end: Optional[datetime.date] = None
+
+    started_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    finished_at: Optional[datetime.datetime] = None
+    status: str = Field(default="running")           # running / success / failed / partial
+
+    # 통계
+    orders_fetched: int = 0
+    orders_inserted: int = 0
+    orders_updated: int = 0
+    settlements_fetched: int = 0
+    settlements_inserted: int = 0
+    settlements_updated: int = 0
+    total_sales: int = 0                              # 기간 주문 합계 (취소 제외)
+
+    # 트리거/에러
+    error_message: Optional[str] = None
+    triggered_by: str = Field(default="cron",
+                              description="cron / manual / superadmin / auth-failure")
+    auth_refreshed: bool = Field(default=False,
+                                 description="이 동기화 중 자동 재로그인 발생 여부")

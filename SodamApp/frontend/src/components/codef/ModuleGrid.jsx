@@ -1,4 +1,4 @@
-import { CreditCard, Building2, Users, FileText, IdCard, Store } from 'lucide-react';
+import { CreditCard, Building2, Users, FileText, IdCard, Store, Bike } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
@@ -37,6 +37,16 @@ const MODULES = [
         active: true,
         href: '/external-integration/easypos',
         description: '이지포스 영수증 단위 매출 야간 자동수집',
+    },
+    {
+        id: 'coupang-eats',
+        title: '쿠팡이츠 매출',
+        provider: '배달앱 자동수집',
+        icon: Bike,
+        color: 'orange',
+        active: true,
+        href: '/external-integration/coupang-eats',
+        description: 'Playwright + curl_cffi 로 주문/정산 야간 자동수집 (Akamai 우회)',
     },
     {
         id: 'insurance',
@@ -89,15 +99,31 @@ function ModuleCard({ module, stats }) {
         );
     }
 
-    const isEmerald = module.color === 'emerald';
-    const borderCls = isEmerald
-        ? 'border-emerald-200 hover:border-emerald-400'
-        : 'border-blue-200 hover:border-blue-400';
-    const iconCls = isEmerald ? 'text-emerald-600' : 'text-blue-600';
-    const badgeCls = isEmerald
-        ? 'bg-emerald-50 text-emerald-700'
-        : 'bg-blue-50 text-blue-700';
-    const linkCls = isEmerald ? 'text-emerald-600' : 'text-blue-600';
+    const colorMap = {
+        emerald: {
+            border: 'border-emerald-200 hover:border-emerald-400',
+            icon: 'text-emerald-600',
+            badge: 'bg-emerald-50 text-emerald-700',
+            link: 'text-emerald-600',
+        },
+        orange: {
+            border: 'border-orange-200 hover:border-orange-400',
+            icon: 'text-orange-600',
+            badge: 'bg-orange-50 text-orange-700',
+            link: 'text-orange-600',
+        },
+        blue: {
+            border: 'border-blue-200 hover:border-blue-400',
+            icon: 'text-blue-600',
+            badge: 'bg-blue-50 text-blue-700',
+            link: 'text-blue-600',
+        },
+    };
+    const c = colorMap[module.color] || colorMap.blue;
+    const borderCls = c.border;
+    const iconCls = c.icon;
+    const badgeCls = c.badge;
+    const linkCls = c.link;
 
     return (
         <Link
@@ -164,12 +190,44 @@ function ModuleCard({ module, stats }) {
                     )}
                 </div>
             )}
+            {stats && module.id === 'coupang-eats' && (
+                <div className="text-sm space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                        <span>자격증명</span>
+                        <span className="font-semibold">
+                            {stats.registered
+                                ? (stats.loginMethod === 'auto' ? '🤖 자동' : '✋ 수동')
+                                : '— 미등록'}
+                        </span>
+                    </div>
+                    {stats.shopName && (
+                        <div className="text-xs text-slate-600 truncate">
+                            🏪 {stats.shopName}
+                        </div>
+                    )}
+                    {stats.registered && stats.cookiesPresent && stats.lastVerifiedAt && (
+                        <div className="text-xs text-orange-700">
+                            ✓ 마지막 인증 {stats.lastVerifiedAt.slice(0, 10)}
+                        </div>
+                    )}
+                    {stats.registered && !stats.cookiesPresent && (
+                        <div className="text-xs text-amber-700">
+                            ⚠ 쿠키 없음 — 로그인 필요
+                        </div>
+                    )}
+                    {stats.status === 'cookie_invalid' && (
+                        <div className="text-xs text-red-700">
+                            ✗ 쿠키 만료/차단
+                        </div>
+                    )}
+                </div>
+            )}
             <div className={`mt-3 ${linkCls} text-sm font-medium`}>관리 →</div>
         </Link>
     );
 }
 
-export default function ModuleGrid({ cardStats, bankStats, easyposStats }) {
+export default function ModuleGrid({ cardStats, bankStats, easyposStats, coupangEatsStats }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {MODULES.map((m) => (
@@ -179,7 +237,8 @@ export default function ModuleGrid({ cardStats, bankStats, easyposStats }) {
                     stats={
                         m.id === 'cards' ? cardStats :
                         m.id === 'banks' ? bankStats :
-                        m.id === 'easypos' ? easyposStats : null
+                        m.id === 'easypos' ? easyposStats :
+                        m.id === 'coupang-eats' ? coupangEatsStats : null
                     }
                 />
             ))}

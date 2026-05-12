@@ -32,6 +32,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY SodamApp/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Playwright Chromium 다운로드 + 시스템 의존성 자동 설치
+# (쿠팡이츠 사장님 포털 자동 로그인 — Akamai sensor 통과용)
+# 이미지 크기 ~300MB 증가. 컨테이너 cold start 시 1회만 다운로드.
+RUN python -m playwright install --with-deps chromium
+
 COPY SodamApp/backend/ ./
 COPY start.py ./start.py
 

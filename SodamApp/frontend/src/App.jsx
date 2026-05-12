@@ -25,6 +25,7 @@ const ExternalIntegration = React.lazy(() => import('./pages/ExternalIntegration
 const CardModuleDetail = React.lazy(() => import('./pages/CardModuleDetail'));
 const BankModuleDetail = React.lazy(() => import('./pages/BankModuleDetail'));
 const EasyPosModuleDetail = React.lazy(() => import('./pages/EasyPosModuleDetail'));
+const CoupangEatsModuleDetail = React.lazy(() => import('./pages/CoupangEatsModuleDetail'));
 const ProfitLoss = React.lazy(() => import('./pages/ProfitLoss'));
 const RevenueManagement = React.lazy(() => import('./pages/RevenueManagement'));
 const PurchaseManagement = React.lazy(() => import('./pages/PurchaseManagement'));
@@ -168,6 +169,7 @@ export default function App() {
               <Route path="/external-integration/cards" element={<ProtectedRoute adminOnly><CardModuleDetail /></ProtectedRoute>} />
               <Route path="/external-integration/banks" element={<ProtectedRoute adminOnly><BankModuleDetail /></ProtectedRoute>} />
               <Route path="/external-integration/easypos" element={<ProtectedRoute adminOnly><EasyPosModuleDetail /></ProtectedRoute>} />
+              <Route path="/external-integration/coupang-eats" element={<ProtectedRoute adminOnly><CoupangEatsModuleDetail /></ProtectedRoute>} />
               <Route path="/finance/profitloss" element={<ProtectedRoute adminOnly><ProfitLoss /></ProtectedRoute>} />
               <Route path="/revenue" element={<ProtectedRoute adminOnly><RevenueManagement /></ProtectedRoute>} />
               <Route path="/purchase" element={<ProtectedRoute adminOnly><PurchaseManagement /></ProtectedRoute>} />

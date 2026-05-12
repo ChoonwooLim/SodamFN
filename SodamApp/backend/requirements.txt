@@ -26,6 +26,15 @@ pdfplumber==0.11.6
 requests==2.32.4
 httpx==0.28.1
 
+# curl_cffi — Chrome TLS fingerprint 위조 (Akamai/Cloudflare 우회용)
+# 쿠팡이츠 매출 API 직접 호출 (httpx 의 표준 TLS 핑거프린트는 봇 탐지에 노출됨)
+curl_cffi>=0.7.0
+
+# Playwright — Akamai sensor 통과용 헤드리스 Chromium
+# 쿠팡이츠 사장님 포털 자동 로그인 (sensor_data POST 가 브라우저 환경 검증)
+playwright>=1.49.0
+playwright-stealth>=1.0.6
+
 # Security
 cryptography==45.0.6
 PyJWT==2.10.1
