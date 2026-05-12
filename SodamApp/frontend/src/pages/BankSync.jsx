@@ -573,6 +573,7 @@ export default function BankSync() {
                         onDiagnose={runDiagnose}
                         onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
                         onRegistAccount={() => setRegistOpen(true)}
+                        isSuperAdmin={localStorage.getItem('user_role') === 'superadmin'}
                     />
                 )}
                 {tab === 'transactions' && (
@@ -1173,49 +1174,60 @@ function DiagnoseModal({ data, loading, env, onClose, onRerun }) {
     );
 }
 
-function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose, onManualAdd, onRegistAccount }) {
+function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose, onManualAdd, onRegistAccount, isSuperAdmin }) {
+    // 일반 admin 에게는 [계좌 직접 등록] 만 노출. 다른 진출 경로는 혼란 방지로 숨김.
+    // superadmin (디버그 권한) 에게는 보조 도구 함께 표시.
     return (
         <div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
                 <button
                     onClick={onRegistAccount}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all"
-                    title="팝빌 사이트 안 들어가고 셈하나에서 직접 계좌 등록 (RegistBankAccount API)"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm"
+                    title="셈하나에서 신한·국민 등 은행 계좌를 직접 등록합니다."
                 >
                     <Plus size={14} />
                     계좌 직접 등록
                 </button>
-                <button
-                    onClick={onSync}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-xl text-sm font-semibold hover:bg-slate-900 transition-all disabled:opacity-50"
-                >
-                    {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                    팝빌에서 계좌 동기화
-                </button>
-                <button
-                    onClick={onManualAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold hover:bg-indigo-200 transition-all"
-                    title="listBankAccount 권한 이슈 우회: 계좌 정보 수동 입력 (DB만, 팝빌 등록 X)"
-                >
-                    <Plus size={14} />
-                    계좌 메타 추가
-                </button>
-                <button
-                    onClick={onOpenMgtUrl}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-all"
-                >
-                    <ExternalLink size={14} />
-                    팝빌 관리 페이지 열기
-                </button>
-                <button
-                    onClick={onDiagnose}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-100 transition-all ml-auto"
-                    title="팝빌 연결 상태를 상세히 진단합니다"
-                >
-                    <Stethoscope size={14} />
-                    연결 진단
-                </button>
+
+                {isSuperAdmin && (
+                    <>
+                        <span className="text-slate-300 text-xs px-1">|</span>
+                        <span className="text-[10px] text-slate-400 self-center">SuperAdmin 도구:</span>
+                        <button
+                            onClick={onSync}
+                            disabled={loading}
+                            title="팝빌에 등록된 계좌 리스트 조회 → DB 동기화"
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200 transition-all disabled:opacity-50"
+                        >
+                            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            팝빌 동기화
+                        </button>
+                        <button
+                            onClick={onManualAdd}
+                            title="listBankAccount 권한 이슈 우회: 계좌 정보 수동 입력 (DB만, 팝빌 등록 X)"
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200 transition-all"
+                        >
+                            <Plus size={12} />
+                            DB 메타 추가
+                        </button>
+                        <button
+                            onClick={onOpenMgtUrl}
+                            title="팝빌 관리 페이지를 새 탭으로 열기"
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs hover:bg-slate-200 transition-all"
+                        >
+                            <ExternalLink size={12} />
+                            팝빌 관리
+                        </button>
+                        <button
+                            onClick={onDiagnose}
+                            title="팝빌 연결 상태를 상세히 진단합니다"
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs hover:bg-amber-100 transition-all ml-auto"
+                        >
+                            <Stethoscope size={12} />
+                            진단
+                        </button>
+                    </>
+                )}
             </div>
 
             {syncMsg && (
@@ -1229,7 +1241,9 @@ function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull,
                 <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
                     <Landmark size={40} className="mx-auto text-slate-300 mb-3" />
                     <p className="text-sm text-slate-500">등록된 계좌가 없습니다.</p>
-                    <p className="text-xs text-slate-400 mt-1">팝빌 관리 페이지에서 계좌를 등록한 뒤 "팝빌에서 계좌 동기화"를 눌러주세요.</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        위 <span className="text-emerald-600 font-semibold">[계좌 직접 등록]</span> 버튼으로 신한·국민 등 은행 계좌를 등록해주세요.
+                    </p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
