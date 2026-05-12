@@ -593,22 +593,49 @@ def upsert_orders(session, business_id: int, store_id: int,
             )
         ).first()
 
+        # 일시 — 실제 응답: createdAt (epoch ms)
         ordered_at = _parse_kst_datetime(
-            row.get("orderedAt") or row.get("orderTime") or row.get("createdAt")
+            row.get("createdAt") or row.get("orderedAt") or row.get("orderTime")
         )
         delivered_at = _parse_kst_datetime(
-            row.get("deliveredAt") or row.get("completedAt")
+            row.get("completedAt") or row.get("deliveredAt")
         )
 
-        total_money = row.get("totalSalePriceMoney") or {}
+        # 총 금액 — 실제 응답: totalAmount / totalAmountMoney.units (우선)
+        # salePrice / initialSalePrice 도 후보
+        total_money = (
+            row.get("totalAmountMoney")
+            or row.get("salePriceMoney")
+            or row.get("totalSalePriceMoney")
+            or {}
+        )
         total_amount = (
             _to_int(total_money.get("units"))
+            or _to_int(row.get("totalAmount"))
+            or _to_int(row.get("salePrice"))
             or _to_int(row.get("totalSalePrice"))
-            or _to_int(row.get("orderAmount"))
+            or _to_int(row.get("initialSalePrice"))
         )
 
-        order_status = str(row.get("orderStatus") or row.get("status") or "").strip() or None
-        cancelled = (order_status or "").upper() in ("CANCELLED", "CANCELED", "REFUNDED")
+        # 할인 — discountPrice / discountPriceMoney
+        discount_money = row.get("discountPriceMoney") or {}
+        discount_amount = (
+            _to_int(discount_money.get("units"))
+            or _to_int(row.get("discountPrice"))
+            or _to_int(row.get("discountAmount"))
+        )
+
+        # 상태 — 실제: status (COMPLETED / CANCELED / PARTIAL_CANCELED 등)
+        order_status = str(row.get("status") or row.get("orderStatus") or "").strip() or None
+        canceled_amount = _to_int(
+            (row.get("canceledAmountMoney") or {}).get("units")
+            or row.get("canceledAmount")
+        )
+        cancelled = (
+            (order_status or "").upper() in ("CANCELLED", "CANCELED", "REFUNDED")
+            or bool(row.get("partialCanceled"))
+            or canceled_amount > 0
+        )
 
         items = row.get("items") or row.get("orderItems") or row.get("menus")
         items_blob = None
@@ -631,7 +658,7 @@ def upsert_orders(session, business_id: int, store_id: int,
             ordered_at=ordered_at,
             delivered_at=delivered_at,
             total_sale_price=total_amount,
-            discount_amount=_to_int(row.get("discountAmount")),
+            discount_amount=discount_amount,
             cancelled=cancelled,
             payment_method=(row.get("paymentMethod") or row.get("paymentType") or None),
             order_status=order_status,
