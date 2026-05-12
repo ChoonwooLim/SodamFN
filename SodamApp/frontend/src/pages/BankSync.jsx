@@ -1374,12 +1374,16 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
             });
             const t = res.data.totals;
             const sr = res.data.settlement_reclassify;
+            const skipped = res.data.skipped_months || [];
             alert(
                 `일괄 동기화 완료 (${year}년)\n\n`
                 + `총 조회 ${t.fetched}건 · 신규 ${t.inserted}건 · 중복 ${t.duplicated}건\n`
                 + (sr
                     ? `정산 재분류: 카드 ${sr.card_settlement} · 페이 ${sr.pay_settlement} · 배달 ${sr.delivery_settlement} · 이동식 ${sr.mobile_settlement}\n`
-                    + `(이미 정확 ${sr.already_correct} · 수동분류 보호 ${sr.skipped_manual} · 미매칭 ${sr.skipped_no_match})`
+                    + `(이미 정확 ${sr.already_correct} · 수동분류 보호 ${sr.skipped_manual} · 미매칭 ${sr.skipped_no_match})\n`
+                    : '')
+                + (skipped.length > 0
+                    ? `\n⚠️ ${skipped.join(', ')} 은 popbill 3개월 한도 초과로 자동 동기화 불가.\n신한 인터넷뱅킹에서 거래내역 Excel 다운로드 후 별도 업로드 필요.`
                     : '')
             );
             onApply?.();

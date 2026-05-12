@@ -2427,9 +2427,25 @@ def pull_monthly_bulk(
                     end_d = today
 
                 month_label = f"{body.year}-{m:02d}"
+                # popbill EasyFinBank 정책: 현재일로부터 3개월 초과 조회 불가 (-18000030)
+                # 미리 클램프 — start_d 가 3개월 전 미만이면 그 시점으로 조정 또는 스킵
+                popbill_min = today - timedelta(days=92)  # 3개월 + 약간 여유
+                if end_d < popbill_min:
+                    per_month.append({
+                        "account_id": acc.id,
+                        "account_label": f"{acc.bank_name} {_mask_account(acc.account_number)}",
+                        "month": month_label,
+                        "skipped": "popbill 3개월 한도 초과 — 신한 인터넷뱅킹 거래내역 Excel 다운로드 후 별도 업로드 필요",
+                    })
+                    continue
+                clamped = False
+                if start_d < popbill_min:
+                    start_d = popbill_min
+                    clamped = True
+
                 try:
                     r = _do_pull(service, acc, bid, start_d, end_d, 500)
-                    per_month.append({
+                    entry = {
                         "account_id": acc.id,
                         "account_label": f"{acc.bank_name} {_mask_account(acc.account_number)}",
                         "month": month_label,
@@ -2437,7 +2453,11 @@ def pull_monthly_bulk(
                         "inserted": r["inserted"],
                         "duplicated": r["duplicated"],
                         "auto_classified": r["auto_classified"],
-                    })
+                    }
+                    if clamped:
+                        entry["clamped_start_date"] = start_d.isoformat()
+                        entry["clamped_note"] = "popbill 3개월 한도로 시작일 자동 조정"
+                    per_month.append(entry)
                     total_fetched += r["total_fetched"]
                     total_inserted += r["inserted"]
                     total_duplicated += r["duplicated"]
@@ -2511,13 +2531,16 @@ def pull_monthly_bulk(
             service.session.commit()
             settlement_reclassify = sr_counts
 
+        skipped_months = [pm for pm in per_month if "skipped" in pm]
         return {
             "per_month": per_month,
             "totals": {
                 "fetched": total_fetched,
                 "inserted": total_inserted,
                 "duplicated": total_duplicated,
+                "skipped_months": len(skipped_months),
             },
+            "skipped_months": [pm["month"] for pm in skipped_months],
             "settlement_reclassify": settlement_reclassify,
         }
     finally:
