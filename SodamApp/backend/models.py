@@ -312,6 +312,32 @@ class CardPayment(SQLModel, table=True):
     connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
     synced_at: Optional[datetime.datetime] = None
 
+
+class PayPayment(SQLModel, table=True):
+    """간편결제(페이) 정산 입금 — CardPayment 와 동일 구조의 페이 전용 테이블.
+
+    카카오페이/네이버페이/토스/서울페이/제로페이 등의 정산 입금을 분해 저장한다.
+    매출 원본은 현재 별도 테이블이 없으므로 bank-sync 자동 분류 시점에는
+    sales_amount/fees=0 으로 생성되고, 추후 페이 매출 데이터가 들어오면
+    채워지는 구조 (sales_amount - net_deposit = fees, 수수료율 = fees/sales_amount).
+    """
+    __table_args__ = (
+        Index("ix_paypayment_business_date", "business_id", "payment_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    payment_date: datetime.date = Field(index=True)  # 입금일자
+    pay_corp: str = Field(index=True)                # 페이사명 (카카오페이/네이버페이/토스/서울페이/제로페이)
+    sales_amount: int = 0                             # 매출금액 (이후 채워질 수 있음)
+    fees: int = 0                                     # 수수료 (sales_amount - net_deposit)
+    vat_on_fees: int = 0
+    net_deposit: int = 0                              # 실입금액 (bank-sync 자동 매칭)
+    bank: Optional[str] = None
+
+    source: str = Field(default="bank_sync", index=True)  # 'bank_sync' | 'excel' | 'manual'
+    source_meta: Optional[str] = None
+    synced_at: Optional[datetime.datetime] = None
+
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(index=True, unique=True)
@@ -588,6 +614,8 @@ class MonthlyProfitLoss(SQLModel, table=True):
 class DeliveryRevenue(SQLModel, table=True):
     """배달앱 월별 정산 요약"""
     id: Optional[int] = Field(default=None, primary_key=True)
+    # 2026-05-12: 다중 사업장 격리 — 기존 컬럼 누락으로 사업장간 데이터 섞임 위험 (자동 마이그레이션으로 추가)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
     channel: str = Field(index=True)          # 쿠팡/배민/요기요/땡겨요
     year: int = Field(index=True)
     month: int = Field(index=True)
@@ -596,6 +624,8 @@ class DeliveryRevenue(SQLModel, table=True):
     settlement_amount: int = 0                 # 정산금액 (실제 입금액)
     order_count: int = 0                       # 주문 건수
     fee_breakdown: Optional[str] = None        # 수수료 세부내역 (JSON)
+    # 2026-05-12: bank-sync 자동 생성 vs 사용자 업로드 구분 (수수료 역산 시 신뢰도 판단용)
+    source: str = Field(default="excel", index=True)  # 'excel' | 'bank_sync' | 'manual'
 
 
 class DailyExpense(SQLModel, table=True):
@@ -999,6 +1029,10 @@ class BankTransaction(SQLModel, table=True):
     linked_expense_id: Optional[int] = Field(default=None, foreign_key="expense.id", index=True)
     # 신규: 매출관리/매입관리 화면이 읽는 DailyExpense 통합 테이블 링크
     linked_daily_id: Optional[int] = Field(default=None, foreign_key="dailyexpense.id", index=True)
+    # 2026-05-12: 카드/페이/배달앱 정산 분류 — 매출 중복 방지 + 수수료 역산
+    linked_card_payment_id: Optional[int] = Field(default=None, foreign_key="cardpayment.id", index=True)
+    linked_pay_payment_id: Optional[int] = Field(default=None, foreign_key="paypayment.id", index=True)
+    linked_delivery_revenue_id: Optional[int] = Field(default=None, foreign_key="deliveryrevenue.id", index=True)
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id", index=True)
 
     user_memo: Optional[str] = None              # 사용자가 단 메모

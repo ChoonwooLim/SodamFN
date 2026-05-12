@@ -27,7 +27,10 @@ from sqlmodel import select, or_
 
 from collections import Counter, defaultdict
 
-from models import User, BankAccount, BankTransaction, Vendor, DailyExpense
+from models import (
+    User, BankAccount, BankTransaction, Vendor, DailyExpense,
+    CardPayment, PayPayment, DeliveryRevenue, CardSalesApproval,
+)
 from routers.auth import get_admin_user
 from services.database_service import DatabaseService
 from services.bank_sync_service import (
@@ -123,6 +126,10 @@ def _tx_to_dict(tx: BankTransaction, acc: Optional[BankAccount] = None) -> dict:
         "classified_at": tx.classified_at.isoformat() if tx.classified_at else None,
         "linked_revenue_id": tx.linked_revenue_id,
         "linked_expense_id": tx.linked_expense_id,
+        "linked_daily_id": tx.linked_daily_id,
+        "linked_card_payment_id": tx.linked_card_payment_id,
+        "linked_pay_payment_id": tx.linked_pay_payment_id,
+        "linked_delivery_revenue_id": tx.linked_delivery_revenue_id,
         "vendor_id": tx.vendor_id,
         "user_memo": tx.user_memo,
     }
@@ -160,7 +167,10 @@ class ManualAccountIn(BaseModel):
 
 
 class TxUpdateIn(BaseModel):
-    classified_as: Optional[str] = Field(None, description="revenue/expense/purchase/transfer/excluded/unclassified")
+    classified_as: Optional[str] = Field(
+        None,
+        description="revenue/expense/purchase/transfer/excluded/unclassified/card_settlement/pay_settlement/delivery_settlement",
+    )
     vendor_id: Optional[int] = None
     user_memo: Optional[str] = None
 
@@ -787,7 +797,10 @@ def list_transactions(
     account_id: Optional[int] = Query(None),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    classified_as: Optional[str] = Query(None, description="unclassified/revenue/expense/purchase/transfer/excluded"),
+    classified_as: Optional[str] = Query(
+        None,
+        description="unclassified/revenue/expense/purchase/transfer/excluded/card_settlement/pay_settlement/delivery_settlement",
+    ),
     direction: Optional[str] = Query(None, description="in / out / all"),
     q: Optional[str] = Query(None, description="remark1 부분검색"),
     limit: int = Query(200, ge=1, le=1000),
@@ -861,7 +874,10 @@ def update_transaction(
             raise HTTPException(status_code=404, detail="거래내역을 찾을 수 없습니다.")
 
         if body.classified_as is not None:
-            valid = {"unclassified", "revenue", "expense", "purchase", "transfer", "excluded"}
+            valid = {
+                "unclassified", "revenue", "expense", "purchase", "transfer", "excluded",
+                "card_settlement", "pay_settlement", "delivery_settlement",
+            }
             if body.classified_as not in valid:
                 raise HTTPException(status_code=400, detail=f"classified_as 값 오류: {body.classified_as}")
             tx.classified_as = body.classified_as
@@ -894,30 +910,69 @@ def update_transaction(
 
 
 def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
-    """tx.classified_as 에 맞춰 DailyExpense 레코드 생성/갱신/삭제.
+    """tx.classified_as 에 맞춰 DailyExpense / CardPayment / PayPayment / DeliveryRevenue 동기화.
 
-    - revenue: 입금액 → DailyExpense + revenue Vendor 자동 매칭/생성 → 매출관리에 표시
-    - expense/purchase: 출금액 → DailyExpense (vendor_id null 허용) → 매입관리에 표시
-    - 기존 linked 있으면 갱신 (분류 변경시)
-    - transfer/excluded/unclassified: 기존 link 제거
+    - revenue: 입금액 → DailyExpense (미매칭 입금이 수동 revenue 분류된 경우만 — 카드/페이/배달은 settlement 로 빠짐)
+    - expense/purchase: 출금액 → DailyExpense
+    - card_settlement: CardPayment 매칭 또는 생성 (DailyExpense 미생성 — 매출 중복 방지)
+    - pay_settlement: PayPayment 생성 (매출 원본 없으므로 항상 신규)
+    - delivery_settlement: DeliveryRevenue 월별 매칭 또는 생성
+    - transfer/excluded/unclassified: 기존 link 모두 제거
 
     레거시: linked_revenue_id / linked_expense_id 필드는 보존(기존 데이터 호환).
-    실제 화면 연동은 linked_daily_id 통해 수행.
     """
     sess = service.session
 
-    # 1) 기존 DailyExpense 링크 정리 — 분류가 바뀌면 항상 새로 만든다
+    # 1) 기존 링크 정리 — 분류가 바뀌면 항상 새로 만든다
     if tx.linked_daily_id:
         old = sess.get(DailyExpense, tx.linked_daily_id)
         if old:
             sess.delete(old)
         tx.linked_daily_id = None
+    if tx.linked_card_payment_id:
+        old_cp = sess.get(CardPayment, tx.linked_card_payment_id)
+        if old_cp and old_cp.source == "bank_sync":
+            # bank-sync 가 자동 생성한 행만 삭제. excel/codef 로 들어온 행은 보존.
+            sess.delete(old_cp)
+        tx.linked_card_payment_id = None
+    if tx.linked_pay_payment_id:
+        old_pp = sess.get(PayPayment, tx.linked_pay_payment_id)
+        if old_pp and old_pp.source == "bank_sync":
+            sess.delete(old_pp)
+        tx.linked_pay_payment_id = None
+    if tx.linked_delivery_revenue_id:
+        old_dr = sess.get(DeliveryRevenue, tx.linked_delivery_revenue_id)
+        if old_dr and old_dr.source == "bank_sync":
+            # 사용자 업로드 정산명세서(excel)은 보존, bank-sync 자동 생성만 삭제
+            sess.delete(old_dr)
+        tx.linked_delivery_revenue_id = None
 
     # 2) 분류가 transfer/excluded/unclassified 면 링크만 제거하고 종료
     if tx.classified_as in ("transfer", "excluded", "unclassified"):
         return
 
-    # 3) 매출 (입금)
+    # 3) 카드 정산 입금 → CardPayment (DailyExpense 미생성)
+    if tx.classified_as == "card_settlement" and tx.in_amount > 0:
+        cp = _link_card_settlement(sess, tx)
+        if cp:
+            tx.linked_card_payment_id = cp.id
+        return
+
+    # 4) 페이 정산 입금 → PayPayment (DailyExpense 미생성)
+    if tx.classified_as == "pay_settlement" and tx.in_amount > 0:
+        pp = _create_pay_settlement(sess, tx)
+        if pp:
+            tx.linked_pay_payment_id = pp.id
+        return
+
+    # 5) 배달앱 정산 입금 → DeliveryRevenue 월별 (DailyExpense 미생성)
+    if tx.classified_as == "delivery_settlement" and tx.in_amount > 0:
+        dr = _link_delivery_settlement(sess, tx)
+        if dr:
+            tx.linked_delivery_revenue_id = dr.id
+        return
+
+    # 6) 일반 매출 (입금이 카드/페이/배달이 아닌데 수동으로 revenue 분류된 경우) → DailyExpense
     if tx.classified_as == "revenue" and tx.in_amount > 0:
         channel_name, vcategory, payment = _resolve_revenue_channel(tx.remark1, tx.remark2)
         vendor = _get_or_create_vendor(
@@ -938,7 +993,7 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
         tx.linked_daily_id = de.id
         return
 
-    # 4) 매입/지출 (출금)
+    # 7) 매입/지출 (출금)
     if tx.classified_as in ("expense", "purchase") and tx.out_amount > 0:
         vendor_name = tx.remark1 or tx.remark2 or "은행출금"
         category = "매입" if tx.classified_as == "purchase" else "기타비용"
@@ -946,7 +1001,7 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
             business_id=tx.business_id,
             date=tx.trans_date,
             vendor_name=vendor_name,
-            vendor_id=tx.vendor_id,  # 매칭 안된 경우 None — 매입관리는 null 허용
+            vendor_id=tx.vendor_id,
             amount=tx.out_amount,
             category=category,
             payment_method="이체",
@@ -958,62 +1013,239 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
 
 
 # ============================================================
+# Settlement 매칭/생성 헬퍼 (2026-05-12)
+# ============================================================
+
+def _link_card_settlement(sess, tx: BankTransaction) -> Optional[CardPayment]:
+    """카드 정산 입금 → CardPayment 매칭 시도 → 미매칭 시 신규 생성.
+
+    매칭 단계:
+      1) Exact: business_id + payment_date == trans_date + card_corp + net_deposit == in_amount
+      2) Fuzzy: payment_date in [T-3, T] + card_corp + |net_deposit - in_amount| <= 1000
+      3) Create: source='bank_sync', sales_amount=0, fees=0, net_deposit=in_amount
+         → 추후 카드사 정산명세 Excel 업로드되면 sales_amount/fees 채워질 수 있음
+    """
+    s = _resolve_settlement(tx.remark1, tx.remark2)
+    card_corp = s[1] if s and s[0] == "card" else "기타카드정산"
+
+    # 1) Exact match
+    cp = sess.exec(
+        select(CardPayment).where(
+            CardPayment.business_id == tx.business_id,
+            CardPayment.payment_date == tx.trans_date,
+            CardPayment.card_corp == card_corp,
+            CardPayment.net_deposit == tx.in_amount,
+        )
+    ).first()
+    if cp:
+        return cp
+
+    # 2) Fuzzy match — ±3일 + 같은 카드사 + 금액 차 1000원 이하
+    fuzzy_start = tx.trans_date - timedelta(days=3)
+    candidates = sess.exec(
+        select(CardPayment).where(
+            CardPayment.business_id == tx.business_id,
+            CardPayment.payment_date >= fuzzy_start,
+            CardPayment.payment_date <= tx.trans_date,
+            CardPayment.card_corp == card_corp,
+        )
+    ).all()
+    for c in candidates:
+        if abs((c.net_deposit or 0) - tx.in_amount) <= 1000:
+            return c
+
+    # 3) Create new — bank-sync 가 가장 먼저 잡은 정산 입금
+    cp = CardPayment(
+        business_id=tx.business_id,
+        payment_date=tx.trans_date,
+        card_corp=card_corp,
+        sales_amount=0,
+        fees=0,
+        vat_on_fees=0,
+        net_deposit=tx.in_amount,
+        source="bank_sync",
+        synced_at=datetime.now(),
+    )
+    sess.add(cp)
+    sess.flush()
+    return cp
+
+
+def _create_pay_settlement(sess, tx: BankTransaction) -> Optional[PayPayment]:
+    """페이 정산 입금 → PayPayment 신규 생성.
+
+    이지포스 POS daily 가 페이결제를 카드 합계에 통합하므로 매출 원본 데이터가 없다.
+    따라서 매칭 시도 없이 항상 새 행 생성. sales_amount/fees=0 으로 두고,
+    추후 페이 매출 원본 입력 경로가 생기면 그때 채워진다.
+    """
+    s = _resolve_settlement(tx.remark1, tx.remark2)
+    pay_corp = s[1] if s and s[0] == "pay" else "기타페이"
+    pp = PayPayment(
+        business_id=tx.business_id,
+        payment_date=tx.trans_date,
+        pay_corp=pay_corp,
+        sales_amount=0,
+        fees=0,
+        vat_on_fees=0,
+        net_deposit=tx.in_amount,
+        source="bank_sync",
+        synced_at=datetime.now(),
+    )
+    sess.add(pp)
+    sess.flush()
+    return pp
+
+
+def _link_delivery_settlement(sess, tx: BankTransaction) -> Optional[DeliveryRevenue]:
+    """배달앱 정산 입금 → DeliveryRevenue (같은 channel/year/month) 매칭 또는 생성.
+
+    배달앱은 월별 1행 누적 구조 (DeliveryRevenue 기존 정의).
+    - 같은 (business_id, channel, year, month) 행이 source='excel' 이면 사용자 업로드된 정산명세서.
+      → 입금건은 그 행에 link 만, settlement_amount 변경 안 함.
+    - source='bank_sync' 면 우리가 만든 행 → settlement_amount 에 누적 (월 여러 번 입금).
+    - 없으면 신규 생성.
+    """
+    s = _resolve_settlement(tx.remark1, tx.remark2)
+    channel = s[1] if s and s[0] == "delivery" else "기타배달"
+
+    dr = sess.exec(
+        select(DeliveryRevenue).where(
+            DeliveryRevenue.business_id == tx.business_id,
+            DeliveryRevenue.channel == channel,
+            DeliveryRevenue.year == tx.trans_date.year,
+            DeliveryRevenue.month == tx.trans_date.month,
+        )
+    ).first()
+
+    if dr:
+        if dr.source == "bank_sync":
+            # bank-sync 자동 생성 행은 월 내 여러 입금 누적
+            dr.settlement_amount = (dr.settlement_amount or 0) + tx.in_amount
+            sess.add(dr)
+        # excel 업로드 행은 보존 (사용자 업로드한 정산명세서가 우선)
+        return dr
+
+    # 신규 생성
+    dr = DeliveryRevenue(
+        business_id=tx.business_id,
+        channel=channel,
+        year=tx.trans_date.year,
+        month=tx.trans_date.month,
+        total_sales=0,
+        total_fees=0,
+        settlement_amount=tx.in_amount,
+        order_count=0,
+        source="bank_sync",
+    )
+    sess.add(dr)
+    sess.flush()
+    return dr
+
+
+# ============================================================
 # 매출 채널 매핑 (입금 remark → 표준 채널명/카테고리)
 # 우선순위: 위에서 아래 순서대로 first-match
 # ============================================================
 
-REVENUE_CHANNEL_MAP: List[tuple] = [
-    # (키워드, 표준 vendor_name, Vendor.category, payment_method)
-    # 배달앱 — delivery 카테고리
-    ("쿠팡이츠", "쿠팡이츠", "delivery", "Card"),
-    ("쿠팡페이", "쿠팡이츠", "delivery", "Card"),
-    ("쿠팡", "쿠팡이츠", "delivery", "Card"),
-    ("배달의민족", "배달의민족", "delivery", "Card"),
-    ("배달의민", "배달의민족", "delivery", "Card"),
-    ("배민", "배달의민족", "delivery", "Card"),
-    ("요기요", "요기요", "delivery", "Card"),
-    ("음식배달", "음식배달", "delivery", "Card"),
-    # 페이먼트/간편결제 — store 카테고리
-    ("카카오페이", "카카오페이", "store", "Card"),
-    ("네이버페이", "네이버페이", "store", "Card"),
-    ("네이버", "네이버페이", "store", "Card"),
-    ("토스", "토스페이", "store", "Card"),
-    ("서울페이", "서울페이", "store", "Card"),
-    ("제로페이", "제로페이", "store", "Card"),
-    # 카드 매입 정산 — store 카테고리
-    ("카드매입", "카드매입", "store", "Card"),
-    ("매입대금", "카드매입", "store", "Card"),
-    ("매출표", "카드매입", "store", "Card"),
-    ("BC카드", "카드매입", "store", "Card"),
-    ("신한카드", "카드매입", "store", "Card"),
-    ("KB국민카드", "카드매입", "store", "Card"),
-    ("국민카드", "카드매입", "store", "Card"),
-    ("삼성카드", "카드매입", "store", "Card"),
-    ("현대카드", "카드매입", "store", "Card"),
-    ("롯데카드", "카드매입", "store", "Card"),
-    ("하나카드", "카드매입", "store", "Card"),
-    ("NH카드", "카드매입", "store", "Card"),
-    ("우리카드", "카드매입", "store", "Card"),
-    ("나이스결제", "카드매입", "store", "Card"),
-    ("NICE", "카드매입", "store", "Card"),
-    ("KG이니시스", "카드매입", "store", "Card"),
-    ("이니시스", "카드매입", "store", "Card"),
-    # 카드 매입 약식 패턴 (팝빌 test 데이터에서 관측: "FB자금"/"FB이체"/"원신한")
-    # 입금 한정으로 적용되므로 출금 건은 영향 없음
-    ("원신한", "카드매입", "store", "Card"),
-    ("FB자금", "카드매입", "store", "Card"),
-    ("FB이체", "카드매입", "store", "Card"),
+# ============================================================
+# 정산 채널 매핑 — 카드 / 페이 / 배달앱 3그룹 분리 (2026-05-12)
+# 매출 중복 방지 + 수수료 역산을 위해 settlement 분류값과 표준명을 같이 결정.
+# first-match 순서이므로 더 구체적인 키워드를 위에 둔다.
+# ============================================================
+
+# (키워드, CardPayment.card_corp 표준명)
+CARD_CHANNEL_MAP: List[tuple] = [
+    # 정확한 카드사명 우선 — 길이/구체성 순
+    ("KB국민카드", "KB국민카드"),
+    ("국민카드", "KB국민카드"),
+    ("KG이니시스", "KG이니시스"),
+    ("이니시스", "KG이니시스"),
+    ("나이스결제", "나이스페이먼츠"),
+    ("나이스페이", "나이스페이먼츠"),
+    ("NICE", "나이스페이먼츠"),
+    ("BC카드", "BC카드"),
+    ("비씨카드", "BC카드"),
+    ("신한카드", "신한카드"),
+    ("원신한", "신한카드"),       # 신한카드 정산 약식 패턴
+    ("삼성카드", "삼성카드"),
+    ("현대카드", "현대카드"),
+    ("롯데카드", "롯데카드"),
+    ("하나카드", "하나카드"),
+    ("NH카드", "NH카드"),
+    ("농협카드", "NH카드"),
+    ("우리카드", "우리카드"),
+    # 카드사 미식별 정산 — 기타카드정산으로 묶음
+    ("카드매입", "기타카드정산"),
+    ("매입대금", "기타카드정산"),
+    ("매출표", "기타카드정산"),
+    ("FB자금", "기타카드정산"),    # 팝빌 test 패턴
+    ("FB이체", "기타카드정산"),
+]
+
+# (키워드, PayPayment.pay_corp 표준명)
+PAY_CHANNEL_MAP: List[tuple] = [
+    ("카카오페이", "카카오페이"),
+    ("네이버페이", "네이버페이"),
+    ("네이버",     "네이버페이"),
+    ("토스페이",   "토스페이"),
+    ("토스",       "토스페이"),
+    ("서울페이",   "서울페이"),
+    ("제로페이",   "제로페이"),
+    ("페이코",     "페이코"),
+    ("SSG페이",    "SSG페이"),
+    ("KCP",        "KCP페이"),
+]
+
+# (키워드, DeliveryRevenue.channel 표준명)
+DELIVERY_CHANNEL_MAP: List[tuple] = [
+    ("쿠팡이츠",     "쿠팡이츠"),
+    ("쿠팡페이",     "쿠팡이츠"),
+    ("쿠팡",         "쿠팡이츠"),
+    ("배달의민족",   "배달의민족"),
+    ("배달의민",     "배달의민족"),
+    ("우아한형제",   "배달의민족"),
+    ("배민",         "배달의민족"),
+    ("요기요",       "요기요"),
+    ("땡겨요",       "땡겨요"),
+    ("음식배달",     "기타배달"),
 ]
 
 TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
 
 
-def _resolve_revenue_channel(remark1: Optional[str], remark2: Optional[str]) -> tuple:
-    """입금 remark → (vendor_name, category, payment_method). 미매칭이면 ('기타매출', 'store', 'Card')."""
+def _resolve_settlement(remark1: Optional[str], remark2: Optional[str]) -> Optional[tuple]:
+    """입금 remark → (settlement_type, standard_name) 또는 None.
+
+    Returns:
+      ("card",     "신한카드")
+      ("pay",      "카카오페이")
+      ("delivery", "쿠팡이츠")
+      None  — 어느 그룹에도 매칭 안됨
+
+    매칭 우선순위: DELIVERY → PAY → CARD.
+    배달앱 키워드가 가장 명확하고 카드사명이 가장 포괄적이므로 그 순서로.
+    """
     text = " ".join(filter(None, [remark1, remark2])).strip()
-    for keyword, name, category, payment in REVENUE_CHANNEL_MAP:
-        if keyword in text:
-            return name, category, payment
+    if not text:
+        return None
+    for kw, name in DELIVERY_CHANNEL_MAP:
+        if kw in text:
+            return ("delivery", name)
+    for kw, name in PAY_CHANNEL_MAP:
+        if kw in text:
+            return ("pay", name)
+    for kw, name in CARD_CHANNEL_MAP:
+        if kw in text:
+            return ("card", name)
+    return None
+
+
+def _resolve_revenue_channel(remark1: Optional[str], remark2: Optional[str]) -> tuple:
+    """[LEGACY] 미매칭 입금에 대한 폴백 채널 결정.
+
+    settlement 분리(2026-05-12) 이후로는 카드/페이/배달이 settlement 분류로 빠지므로
+    이 함수는 _resolve_settlement 가 None 일 때만 호출됨 (기타매출 처리).
+    """
     return "기타매출", "store", "Card"
 
 
@@ -1102,14 +1334,19 @@ def _classify_one_tx(
     if any(k in remark for k in TRANSFER_KEYWORDS):
         return "transfer"
 
-    # 3) 입금 → 매출 (channel map 매칭 또는 미매칭 시 unclassified 유지)
+    # 3) 입금 → settlement 우선 (카드/페이/배달앱 정산 — 매출 중복 방지)
     if tx.in_amount > 0:
-        # 입금은 채널 매핑 시도 (매칭 실패시 기타매출 처리는 _materialize_link에서)
-        # 키워드 매칭이 1개라도 되면 revenue 로 분류
-        for keyword, _name, _cat, _pay in REVENUE_CHANNEL_MAP:
-            if keyword in remark:
-                return "revenue"
-        # 매칭 안 되면 미분류 유지 (자동 default 매출은 보수적으로 비활성)
+        s = _resolve_settlement(tx.remark1, tx.remark2)
+        if s is not None:
+            stype, _name = s
+            if stype == "card":
+                return "card_settlement"
+            if stype == "pay":
+                return "pay_settlement"
+            if stype == "delivery":
+                return "delivery_settlement"
+        # 카드/페이/배달이 아닌 입금 — 손님 직접 송금 등. 자동 default 매출은 위험하므로
+        # 미분류 유지 (사용자가 manual classify 하거나 학습 패턴이 쌓이면 자동 분류됨).
         return None
 
     # 4) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
@@ -1136,7 +1373,11 @@ def _classify_txs(
 
     Returns counts dict: {revenue, expense, purchase, transfer, learned, skip}
     """
-    counts = {"revenue": 0, "expense": 0, "purchase": 0, "transfer": 0, "learned": 0, "skip": 0}
+    counts = {
+        "revenue": 0, "expense": 0, "purchase": 0, "transfer": 0,
+        "card_settlement": 0, "pay_settlement": 0, "delivery_settlement": 0,
+        "learned": 0, "skip": 0,
+    }
     if not txs:
         return counts
 
@@ -1182,17 +1423,22 @@ def auto_classify(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """규칙 기반 자동 분류 (학습 패턴 + 채널 매핑 + 벤더 매칭 + 출금 default).
+    """규칙 기반 자동 분류 (학습 패턴 + settlement 매핑 + 벤더 매칭 + 출금 default).
 
     분류 우선순위 (_classify_one_tx 안에서):
       1. 학습 패턴: 이 사업장에서 같은 remark1 으로 분류된 과거 이력 (>=80% 합의)
       2. 이체 키워드 → transfer
-      3. 입금 + REVENUE_CHANNEL_MAP 매칭 → revenue (채널별 Vendor 자동 생성)
-      4. 출금 + 벤더 매칭 → expense/purchase (vendor.vendor_type/category 따라 결정)
-      5. 출금 + 미매칭 → expense (기본값. 사용자가 수동 보정 가능)
+      3. 입금 + DELIVERY/PAY/CARD 매핑 매칭 →
+         card_settlement / pay_settlement / delivery_settlement (매출 중복 방지)
+      4. 입금 + 매칭 없음 → 미분류 (수동 보정 또는 학습으로 채워짐)
+      5. 출금 + 벤더 매칭 → expense/purchase (vendor.vendor_type/category 따라 결정)
+      6. 출금 + 미매칭 → expense (기본값. 사용자가 수동 보정 가능)
 
-    분류된 tx 는 즉시 DailyExpense 레코드를 생성/갱신하여
-    매출관리(/revenue) · 매입관리(/purchase) 화면에 자동 노출.
+    분류된 tx 는 즉시 적절한 레코드를 생성/갱신:
+      - revenue/expense/purchase → DailyExpense (매출관리/매입관리 노출)
+      - card_settlement → CardPayment (수수료 역산 데이터)
+      - pay_settlement → PayPayment
+      - delivery_settlement → DeliveryRevenue (월별 누적)
     """
     bid = _resolve_bid(admin, x_view_as_business)
     service = DatabaseService()
@@ -1238,5 +1484,155 @@ def delete_account(
         service.session.delete(acc)
         service.session.commit()
         return {"deleted": True, "removed_transactions": len(txs)}
+    finally:
+        service.close()
+
+
+# ============================================================
+# 수수료 역산 통계 (2026-05-12)
+# ============================================================
+
+@router.get("/settlement-stats")
+def get_settlement_stats(
+    year: int = Query(..., description="대상 연도"),
+    month: int = Query(..., description="대상 월 (1-12)"),
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """월별 카드/페이/배달앱 정산 통계 — 수수료 역산.
+
+    카드:
+      - 같은 (business_id, card_corp, year, month) 의 CardSalesApproval 합 = sales_amount
+      - 같은 그룹의 CardPayment 합 = net_deposit
+      - fees = sales - net_deposit (sales >= deposit 인 경우만)
+      - fee_rate_pct = fees / sales * 100
+
+    페이:
+      - PayPayment 의 net_deposit 만 표시. sales_amount 가 채워져 있으면 rate 산출.
+
+    배달앱:
+      - DeliveryRevenue 의 total_sales / total_fees / settlement_amount 그대로 사용.
+      - fee_rate_pct = total_fees / total_sales * 100
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="month 는 1-12")
+    start = date(year, month, 1)
+    if month == 12:
+        next_start = date(year + 1, 1, 1)
+    else:
+        next_start = date(year, month + 1, 1)
+    end = next_start - timedelta(days=1)
+
+    service = DatabaseService()
+    try:
+        sess = service.session
+
+        # --- 카드 ---
+        card_payments = sess.exec(
+            select(CardPayment).where(
+                CardPayment.business_id == bid,
+                CardPayment.payment_date >= start,
+                CardPayment.payment_date <= end,
+            )
+        ).all()
+        card_approvals = sess.exec(
+            select(CardSalesApproval).where(
+                CardSalesApproval.business_id == bid,
+                CardSalesApproval.approval_date >= start,
+                CardSalesApproval.approval_date <= end,
+                CardSalesApproval.status == "승인",
+            )
+        ).all()
+        # group by card_corp
+        deposit_by_corp: dict = {}
+        for cp in card_payments:
+            d = deposit_by_corp.setdefault(cp.card_corp, {"net_deposit": 0, "rows": 0, "fees_recorded": 0})
+            d["net_deposit"] += cp.net_deposit or 0
+            d["fees_recorded"] += cp.fees or 0
+            d["rows"] += 1
+        sales_by_corp: dict = {}
+        for ap in card_approvals:
+            sales_by_corp[ap.card_corp] = sales_by_corp.get(ap.card_corp, 0) + (ap.amount or 0)
+        all_corps = set(deposit_by_corp.keys()) | set(sales_by_corp.keys())
+        card_rows = []
+        for corp in sorted(all_corps):
+            sales = sales_by_corp.get(corp, 0)
+            d = deposit_by_corp.get(corp, {"net_deposit": 0, "rows": 0, "fees_recorded": 0})
+            deposit = d["net_deposit"]
+            # 기록된 fees 가 있으면 우선 사용, 없으면 sales - deposit
+            fees = d["fees_recorded"] if d["fees_recorded"] > 0 else max(sales - deposit, 0)
+            rate = round(fees / sales * 100, 2) if sales > 0 else None
+            card_rows.append({
+                "corp": corp,
+                "sales_amount": sales,
+                "net_deposit": deposit,
+                "fees": fees,
+                "fee_rate_pct": rate,
+                "tx_count": d["rows"],
+            })
+
+        # --- 페이 ---
+        pay_payments = sess.exec(
+            select(PayPayment).where(
+                PayPayment.business_id == bid,
+                PayPayment.payment_date >= start,
+                PayPayment.payment_date <= end,
+            )
+        ).all()
+        pay_groups: dict = {}
+        for pp in pay_payments:
+            g = pay_groups.setdefault(pp.pay_corp, {"sales_amount": 0, "net_deposit": 0, "fees": 0, "rows": 0})
+            g["sales_amount"] += pp.sales_amount or 0
+            g["net_deposit"] += pp.net_deposit or 0
+            g["fees"] += pp.fees or 0
+            g["rows"] += 1
+        pay_rows = []
+        for corp in sorted(pay_groups.keys()):
+            g = pay_groups[corp]
+            rate = round(g["fees"] / g["sales_amount"] * 100, 2) if g["sales_amount"] > 0 else None
+            pay_rows.append({
+                "corp": corp,
+                "sales_amount": g["sales_amount"],
+                "net_deposit": g["net_deposit"],
+                "fees": g["fees"],
+                "fee_rate_pct": rate,
+                "tx_count": g["rows"],
+            })
+
+        # --- 배달앱 ---
+        delivery_rows_db = sess.exec(
+            select(DeliveryRevenue).where(
+                DeliveryRevenue.business_id == bid,
+                DeliveryRevenue.year == year,
+                DeliveryRevenue.month == month,
+            )
+        ).all()
+        delivery_rows = []
+        for dr in sorted(delivery_rows_db, key=lambda r: r.channel):
+            sales = dr.total_sales or 0
+            fees = dr.total_fees or 0
+            settlement = dr.settlement_amount or 0
+            # fees 가 기록 안 됐고 sales 가 있으면 sales - settlement 로 추정
+            if fees == 0 and sales > 0 and settlement > 0:
+                fees = max(sales - settlement, 0)
+            rate = round(fees / sales * 100, 2) if sales > 0 else None
+            delivery_rows.append({
+                "channel": dr.channel,
+                "total_sales": sales,
+                "settlement_amount": settlement,
+                "total_fees": fees,
+                "fee_rate_pct": rate,
+                "order_count": dr.order_count or 0,
+                "source": dr.source,
+            })
+
+        return {
+            "year": year,
+            "month": month,
+            "card": card_rows,
+            "pay": pay_rows,
+            "delivery": delivery_rows,
+        }
     finally:
         service.close()

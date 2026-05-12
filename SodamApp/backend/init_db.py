@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, select
 from database import engine
-from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck, BusinessStore  # noqa: F401 - import all models so create_all creates their tables
+from models import User, Suggestion, StaffChatMessage, InventoryItem, InventoryCheck, BusinessStore, PayPayment  # noqa: F401 - import all models so create_all creates their tables
 from services.database_service import DatabaseService
 from routers.auth import get_password_hash
 from sqlalchemy import text
@@ -82,6 +82,13 @@ def _run_migrations():
         ("faxtransmission", "attachment_files", "TEXT"),
         # 2026-04-30: 외국인 직원 영문 이름 (증명서/계약서용)
         ("staff", "name_eng", "VARCHAR"),
+        # 2026-05-12: 카드/페이/배달앱 정산 분류 (bank-sync 매출 중복 방지 + 수수료 역산)
+        ("banktransaction", "linked_card_payment_id", "INTEGER"),
+        ("banktransaction", "linked_pay_payment_id", "INTEGER"),
+        ("banktransaction", "linked_delivery_revenue_id", "INTEGER"),
+        # DeliveryRevenue 가 multi-tenant 격리 위해 business_id 필요 — 기존엔 누락되어 있었음
+        ("deliveryrevenue", "business_id", "INTEGER"),
+        ("deliveryrevenue", "source", "VARCHAR DEFAULT 'excel'"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")

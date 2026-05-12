@@ -11,6 +11,10 @@ const CLASSIFIED_LABELS = {
     purchase: { label: '매입', color: 'bg-amber-100 text-amber-700' },
     transfer: { label: '이체', color: 'bg-blue-100 text-blue-700' },
     excluded: { label: '제외', color: 'bg-slate-200 text-slate-500' },
+    // 2026-05-12: 카드/페이/배달앱 정산 입금 — 매출과 분리 (중복 방지)
+    card_settlement:     { label: '카드입금',   color: 'bg-violet-100 text-violet-700' },
+    pay_settlement:      { label: '페이입금',   color: 'bg-fuchsia-100 text-fuchsia-700' },
+    delivery_settlement: { label: '배달앱입금', color: 'bg-rose-100 text-rose-700' },
 };
 
 function fmtWon(n) {
@@ -255,7 +259,12 @@ export default function BankSync() {
             };
             const res = await api.post('/bank-sync/transactions/auto-classify', body);
             const c = res.data.counts;
-            alert(`자동 분류 완료\n총 ${res.data.processed}건 처리\n매출 ${c.revenue} · 지출 ${c.expense} · 매입 ${c.purchase} · 이체 ${c.transfer} · 미분류 ${c.skip}`);
+            alert(
+                `자동 분류 완료\n총 ${res.data.processed}건 처리\n`
+                + `매출 ${c.revenue || 0} · 지출 ${c.expense || 0} · 매입 ${c.purchase || 0} · 이체 ${c.transfer || 0}\n`
+                + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달앱입금 ${c.delivery_settlement || 0}\n`
+                + `학습 ${c.learned || 0} · 미분류 ${c.skip || 0}`
+            );
             fetchTxs();
         } catch (e) {
             alert('자동 분류 실패: ' + (e.response?.data?.detail || e.message));
@@ -286,6 +295,7 @@ export default function BankSync() {
     const tabs = useMemo(() => ([
         { key: 'accounts', label: '등록 계좌' },
         { key: 'transactions', label: txTabLabel },
+        { key: 'settlement', label: '정산·수수료' },
     ]), [txTabLabel]);
 
     // localStorage 저장
@@ -414,7 +424,7 @@ export default function BankSync() {
                     />
                 </div>
 
-                {tab === 'accounts' ? (
+                {tab === 'accounts' && (
                     <AccountsTab
                         accounts={accounts}
                         loading={loading}
@@ -426,7 +436,8 @@ export default function BankSync() {
                         onDiagnose={runDiagnose}
                         onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
                     />
-                ) : (
+                )}
+                {tab === 'transactions' && (
                     <TransactionsTab
                         txs={txs}
                         accounts={accounts}
@@ -439,6 +450,9 @@ export default function BankSync() {
                         onUpdate={updateTx}
                         onAutoClassify={handleAutoClassify}
                     />
+                )}
+                {tab === 'settlement' && (
+                    <SettlementTab />
                 )}
             </div>
 
@@ -1174,6 +1188,170 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                         </tbody>
                     </table>
                 )}
+            </div>
+        </div>
+    );
+}
+
+
+// ============================================================
+// 정산·수수료 탭 (2026-05-12) — 카드/페이/배달앱 정산 통계 + 수수료율 역산
+// ============================================================
+
+function SettlementTab() {
+    const today = new Date();
+    const [year, setYear] = useState(today.getFullYear());
+    const [month, setMonth] = useState(today.getMonth() + 1);
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [err, setErr] = useState(null);
+
+    async function fetchStats() {
+        setLoading(true);
+        setErr(null);
+        try {
+            const res = await api.get('/bank-sync/settlement-stats', { params: { year, month } });
+            setData(res.data);
+        } catch (e) {
+            setErr(e?.response?.data?.detail || e.message);
+            setData(null);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => { fetchStats(); /* eslint-disable-next-line */ }, [year, month]);
+
+    const yearOptions = [];
+    for (let y = today.getFullYear(); y >= today.getFullYear() - 3; y--) yearOptions.push(y);
+
+    return (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <h2 className="text-lg font-bold text-slate-800">정산·수수료 통계</h2>
+                <div className="flex gap-2">
+                    <select
+                        value={year}
+                        onChange={e => setYear(parseInt(e.target.value))}
+                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    >
+                        {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
+                    </select>
+                    <select
+                        value={month}
+                        onChange={e => setMonth(parseInt(e.target.value))}
+                        className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm"
+                    >
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                            <option key={m} value={m}>{m}월</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={fetchStats}
+                        className="px-3 py-2 bg-slate-800 text-white rounded-lg text-sm hover:bg-slate-700"
+                    >
+                        <RefreshCw size={14} className="inline mr-1" /> 새로고침
+                    </button>
+                </div>
+            </div>
+
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-800 mb-6">
+                <strong>수수료율 역산 방식:</strong>{' '}
+                카드는 같은 (카드사·월) 의 <span className="font-mono">CardSalesApproval</span> 승인합과{' '}
+                <span className="font-mono">CardPayment</span> 입금합 차이로 산출. 페이/배달앱은 정산 명세서에
+                기록된 수수료가 있으면 그 값을, 없으면 매출 대비 입금 차이로 추정.
+            </div>
+
+            {loading && <div className="text-center py-10 text-slate-400"><Loader2 className="animate-spin inline mr-2" /> 로딩 중...</div>}
+            {err && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{err}</div>}
+
+            {data && !loading && (
+                <div className="space-y-6">
+                    <SettlementSection
+                        title="🟪 카드사 정산"
+                        rows={data.card}
+                        corpLabel="카드사"
+                        emptyMsg="이번 달 카드 정산 데이터가 없습니다."
+                    />
+                    <SettlementSection
+                        title="🟪 페이 정산"
+                        rows={data.pay}
+                        corpLabel="페이"
+                        emptyMsg="이번 달 페이 정산 데이터가 없습니다. 페이 매출 원본 데이터가 없으면 수수료율이 산출되지 않습니다."
+                    />
+                    <SettlementSection
+                        title="🛵 배달앱 정산"
+                        rows={data.delivery}
+                        corpLabel="배달앱"
+                        keyCol="channel"
+                        emptyMsg="이번 달 배달앱 정산 데이터가 없습니다."
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SettlementSection({ title, rows, corpLabel, keyCol = 'corp', emptyMsg }) {
+    if (!rows || rows.length === 0) {
+        return (
+            <div>
+                <h3 className="text-sm font-bold text-slate-700 mb-2">{title}</h3>
+                <div className="text-xs text-slate-400 bg-slate-50 rounded-xl p-4 text-center">{emptyMsg}</div>
+            </div>
+        );
+    }
+    const totalSales = rows.reduce((s, r) => s + (r.sales_amount || r.total_sales || 0), 0);
+    const totalDeposit = rows.reduce((s, r) => s + (r.net_deposit || r.settlement_amount || 0), 0);
+    const totalFees = rows.reduce((s, r) => s + (r.fees || r.total_fees || 0), 0);
+    const avgRate = totalSales > 0 ? (totalFees / totalSales * 100).toFixed(2) : null;
+
+    return (
+        <div>
+            <h3 className="text-sm font-bold text-slate-700 mb-2">
+                {title}{' '}
+                <span className="text-xs font-normal text-slate-500">
+                    ({rows.length}개 · 평균 수수료율 {avgRate != null ? `${avgRate}%` : '—'})
+                </span>
+            </h3>
+            <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead className="bg-slate-50">
+                        <tr className="text-xs text-slate-500">
+                            <th className="px-3 py-2 text-left font-semibold">{corpLabel}</th>
+                            <th className="px-3 py-2 text-right font-semibold">매출원본</th>
+                            <th className="px-3 py-2 text-right font-semibold">실입금</th>
+                            <th className="px-3 py-2 text-right font-semibold">수수료</th>
+                            <th className="px-3 py-2 text-right font-semibold">수수료율</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows.map(r => {
+                            const sales = r.sales_amount ?? r.total_sales ?? 0;
+                            const deposit = r.net_deposit ?? r.settlement_amount ?? 0;
+                            const fees = r.fees ?? r.total_fees ?? 0;
+                            const rate = r.fee_rate_pct;
+                            return (
+                                <tr key={r[keyCol]} className="border-t border-slate-100">
+                                    <td className="px-3 py-2 font-medium text-slate-800">{r[keyCol]}</td>
+                                    <td className="px-3 py-2 text-right font-mono">{sales > 0 ? sales.toLocaleString('ko-KR') : '—'}</td>
+                                    <td className="px-3 py-2 text-right font-mono">{deposit > 0 ? deposit.toLocaleString('ko-KR') : '—'}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-orange-600">{fees > 0 ? fees.toLocaleString('ko-KR') : '—'}</td>
+                                    <td className="px-3 py-2 text-right font-mono font-semibold">
+                                        {rate != null ? `${rate}%` : <span className="text-slate-300">—</span>}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
+                            <td className="px-3 py-2 text-slate-800">합계</td>
+                            <td className="px-3 py-2 text-right font-mono">{totalSales > 0 ? totalSales.toLocaleString('ko-KR') : '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono">{totalDeposit > 0 ? totalDeposit.toLocaleString('ko-KR') : '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono text-orange-600">{totalFees > 0 ? totalFees.toLocaleString('ko-KR') : '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono">{avgRate != null ? `${avgRate}%` : '—'}</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     );
