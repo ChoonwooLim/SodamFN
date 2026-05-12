@@ -334,9 +334,32 @@ class PayPayment(SQLModel, table=True):
     net_deposit: int = 0                              # 실입금액 (bank-sync 자동 매칭)
     bank: Optional[str] = None
 
-    source: str = Field(default="bank_sync", index=True)  # 'bank_sync' | 'excel' | 'manual'
+    source: str = Field(default="bank_sync", index=True)  # 'bank_sync' | 'bank_sync_mobile' | 'excel' | 'manual'
     source_meta: Optional[str] = None
     synced_at: Optional[datetime.datetime] = None
+
+
+class MobilePgConfig(SQLModel, table=True):
+    """사업장별 이동식 단말기 PG 설정 (코페이/KSnet/키움페이 등).
+
+    bank-sync 자동 분류 시 입금 적요에 keyword 가 매칭되면 mobile_settlement 로 분류하고
+    commission_rate 를 이용해 매출 원본을 역산. 사장님이 UI 에서 직접 CRUD.
+
+    동일 사업장에 여러 PG 등록 가능. is_active=False 면 매칭 제외.
+    """
+    __table_args__ = (
+        Index("ix_mobilepg_business_active", "business_id", "is_active"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    name: str  # 표시명 ('코페이')
+    keyword: str  # 적요 매칭 substring ('코페이')
+    commission_rate: float = Field(default=0.0275)  # 2.75%
+    note: Optional[str] = None  # 메모 (수수료율 출처/명세서 일자 등)
+    is_active: bool = Field(default=True)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

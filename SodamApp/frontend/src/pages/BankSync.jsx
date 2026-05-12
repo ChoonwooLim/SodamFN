@@ -1512,6 +1512,7 @@ function SettlementTab() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState(null);
+    const [pgModalOpen, setPgModalOpen] = useState(false);
 
     async function fetchStats() {
         setLoading(true);
@@ -1537,6 +1538,13 @@ function SettlementTab() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <h2 className="text-lg font-bold text-slate-800">정산·수수료 통계</h2>
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => setPgModalOpen(true)}
+                        title="코페이/KSnet 등 이동식 단말기 PG 등록·수수료율 조정"
+                        className="px-3 py-2 bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-sm font-semibold hover:bg-sky-200"
+                    >
+                        📱 이동식 PG 설정
+                    </button>
                     <select
                         value={year}
                         onChange={e => setYear(parseInt(e.target.value))}
@@ -1561,6 +1569,8 @@ function SettlementTab() {
                     </button>
                 </div>
             </div>
+
+            {pgModalOpen && <MobilePgManagerModal onClose={() => setPgModalOpen(false)} />}
 
             <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-800 mb-6">
                 <strong>수수료율 역산 방식:</strong>{' '}
@@ -1604,6 +1614,254 @@ function SettlementTab() {
         </div>
     );
 }
+
+// 이동식 단말기 PG 설정 관리자 모달 — 사장님이 직접 CRUD
+// 코페이/KSnet/키움페이 등 사업장별로 등록·수수료율 조정 가능
+function MobilePgManagerModal({ onClose }) {
+    const [pgs, setPgs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [editing, setEditing] = useState(null); // {id?, name, keyword, commission_pct, note, is_active}
+    const [saving, setSaving] = useState(false);
+
+    async function load() {
+        setLoading(true);
+        try {
+            const res = await api.get('/bank-sync/mobile-pgs');
+            setPgs(res.data);
+        } catch (e) {
+            alert('로드 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => { load(); }, []);
+
+    function startNew() {
+        setEditing({ name: '', keyword: '', commission_pct: 2.75, note: '', is_active: true });
+    }
+
+    function startEdit(pg) {
+        setEditing({
+            id: pg.id,
+            name: pg.name,
+            keyword: pg.keyword,
+            commission_pct: (pg.commission_rate * 100).toFixed(3).replace(/\.?0+$/, ''),
+            note: pg.note || '',
+            is_active: pg.is_active,
+        });
+    }
+
+    async function save() {
+        if (!editing.name?.trim() || !editing.keyword?.trim()) {
+            alert('표시명·키워드는 필수입니다.');
+            return;
+        }
+        const rate = parseFloat(editing.commission_pct) / 100;
+        if (!(rate >= 0 && rate <= 0.2)) {
+            alert('수수료율은 0~20% 사이로 입력하세요.');
+            return;
+        }
+        setSaving(true);
+        try {
+            const payload = {
+                name: editing.name.trim(),
+                keyword: editing.keyword.trim(),
+                commission_rate: rate,
+                note: editing.note?.trim() || null,
+                is_active: editing.is_active,
+            };
+            if (editing.id) {
+                await api.patch(`/bank-sync/mobile-pgs/${editing.id}`, payload);
+            } else {
+                await api.post('/bank-sync/mobile-pgs', payload);
+            }
+            setEditing(null);
+            await load();
+        } catch (e) {
+            alert('저장 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function removePg(pg) {
+        if (!confirm(`'${pg.name}' PG 설정을 삭제할까요?\n(이미 분류된 과거 거래는 그대로 유지됩니다)`)) return;
+        try {
+            await api.delete(`/bank-sync/mobile-pgs/${pg.id}`);
+            await load();
+        } catch (e) {
+            alert('삭제 실패: ' + (e.response?.data?.detail || e.message));
+        }
+    }
+
+    async function toggleActive(pg) {
+        try {
+            await api.patch(`/bank-sync/mobile-pgs/${pg.id}`, { is_active: !pg.is_active });
+            await load();
+        } catch (e) {
+            alert('토글 실패: ' + (e.response?.data?.detail || e.message));
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="px-5 py-4 bg-gradient-to-r from-sky-500 to-cyan-500 text-white flex items-center justify-between">
+                    <div>
+                        <h3 className="font-bold flex items-center gap-2">📱 이동식 단말기 PG 설정</h3>
+                        <p className="text-xs text-sky-100 mt-0.5">
+                            코페이·KSnet·키움페이 등. 적요 키워드로 자동 매칭 + 수수료율로 매출 역산.
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5">
+                    {editing ? (
+                        <div className="bg-slate-50 rounded-xl p-4 mb-4 space-y-3 border border-slate-200">
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-slate-800">{editing.id ? 'PG 수정' : '새 PG 등록'}</h4>
+                                <button
+                                    onClick={() => setEditing(null)}
+                                    className="text-slate-400 hover:text-slate-600 text-xs"
+                                >취소</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">표시명 *</label>
+                                    <input
+                                        type="text"
+                                        value={editing.name}
+                                        onChange={e => setEditing({ ...editing, name: e.target.value })}
+                                        placeholder="코페이"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">적요 매칭 키워드 *</label>
+                                    <input
+                                        type="text"
+                                        value={editing.keyword}
+                                        onChange={e => setEditing({ ...editing, keyword: e.target.value })}
+                                        placeholder="코페이"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">수수료율 (%)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="20"
+                                        value={editing.commission_pct}
+                                        onChange={e => setEditing({ ...editing, commission_pct: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">예: 2.75 = 2.75%</p>
+                                </div>
+                                <div className="flex items-end">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={editing.is_active}
+                                            onChange={e => setEditing({ ...editing, is_active: e.target.checked })}
+                                        />
+                                        활성 (분류에 사용)
+                                    </label>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="text-xs text-slate-500 mb-1 block">메모 (선택)</label>
+                                    <input
+                                        type="text"
+                                        value={editing.note}
+                                        onChange={e => setEditing({ ...editing, note: e.target.value })}
+                                        placeholder="2026-05 명세서 기준 등"
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                onClick={save}
+                                disabled={saving}
+                                className="w-full mt-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-semibold hover:bg-sky-700 disabled:opacity-50"
+                            >
+                                {saving ? <Loader2 className="animate-spin inline mr-1" size={14} /> : <CheckCircle2 className="inline mr-1" size={14} />}
+                                저장
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={startNew}
+                            className="w-full mb-3 px-4 py-2.5 border-2 border-dashed border-sky-300 text-sky-600 rounded-xl text-sm font-semibold hover:bg-sky-50"
+                        >
+                            <Plus size={16} className="inline mr-1" /> 새 PG 추가 (예: KSnet, 키움페이)
+                        </button>
+                    )}
+
+                    {loading ? (
+                        <div className="text-center py-8 text-slate-400">
+                            <Loader2 className="animate-spin inline mr-2" size={16} /> 로딩 중...
+                        </div>
+                    ) : pgs.length === 0 && !editing ? (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+                            등록된 PG가 없습니다. 시스템은 코페이만 기본 인식하므로 다른 이동식 단말기(KSnet, 키움페이, 한국정보통신 등)를
+                            쓰시면 위 "새 PG 추가" 버튼으로 등록해주세요.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {pgs.map(pg => (
+                                <div
+                                    key={pg.id}
+                                    className={`flex items-center gap-3 p-3 rounded-xl border ${pg.is_active ? 'bg-white border-sky-200' : 'bg-slate-50 border-slate-200 opacity-60'}`}
+                                >
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-slate-800">{pg.name}</span>
+                                            <span className="text-xs text-slate-500">키워드: <code className="bg-slate-100 px-1.5 py-0.5 rounded">{pg.keyword}</code></span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 mt-1">
+                                            수수료율 <span className="font-mono font-bold">{pg.commission_pct}%</span>
+                                            {pg.note && <span className="text-slate-400 ml-3">— {pg.note}</span>}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => toggleActive(pg)}
+                                        title={pg.is_active ? '비활성화' : '활성화'}
+                                        className={`px-2 py-1 rounded text-xs ${pg.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}
+                                    >
+                                        {pg.is_active ? '활성' : '비활성'}
+                                    </button>
+                                    <button
+                                        onClick={() => startEdit(pg)}
+                                        className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded"
+                                    >
+                                        수정
+                                    </button>
+                                    <button
+                                        onClick={() => removePg(pg)}
+                                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+                    💡 등록 후 거래내역 탭의 [정산 재분류] 를 실행하면 과거 거래도 자동으로 이동식카드로 재분류됩니다.
+                    수수료율은 코페이 정산 명세서를 받으시면 정확한 값으로 조정해주세요.
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 function SettlementSection({ title, rows, corpLabel, keyCol = 'corp', emptyMsg }) {
     if (!rows || rows.length === 0) {

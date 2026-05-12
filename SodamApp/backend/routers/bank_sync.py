@@ -31,6 +31,7 @@ from collections import Counter, defaultdict
 from models import (
     User, BankAccount, BankTransaction, Vendor, DailyExpense,
     CardPayment, PayPayment, DeliveryRevenue, CardSalesApproval,
+    MobilePgConfig,
 )
 from routers.auth import get_admin_user
 from services.database_service import DatabaseService
@@ -1123,22 +1124,43 @@ def _create_pay_settlement(sess, tx: BankTransaction) -> Optional[PayPayment]:
     return pp
 
 
+def _match_mobile_pg(sess, business_id: int, remark1: Optional[str], remark2: Optional[str]) -> Optional[MobilePgConfig]:
+    """사업장 등록 mobile PG 중 적요와 매칭되는 첫 번째 룰 반환."""
+    text = " ".join(filter(None, [remark1, remark2])).strip()
+    if not text:
+        return None
+    pgs = sess.exec(
+        select(MobilePgConfig).where(
+            MobilePgConfig.business_id == business_id,
+            MobilePgConfig.is_active == True,  # noqa: E712
+        )
+    ).all()
+    for pg in pgs:
+        if pg.keyword and pg.keyword in text:
+            return pg
+    return None
+
+
 def _create_mobile_settlement(sess, tx: BankTransaction) -> Optional[PayPayment]:
     """이동식 단말기 카드매출 정산 입금 → PayPayment 신규 생성 + 수수료 자동 역산.
 
-    일반 페이 정산과 다른 점:
-      - POS 미경유 별도 카드매출이라 매출 원본이 없음 → 입금액 + 수수료율로 sales_amount 역산
-      - DailyExpense 매출 row 도 함께 생성 (호출자 _materialize_link 가 처리)
+    PG 결정 우선순위:
+      1) 사업장 MobilePgConfig (사장님이 UI 로 등록한 룰) — name, commission_rate 사용
+      2) 폴백: _resolve_settlement 하드코딩 ('코페이' 키워드, KOPAY_COMMISSION_RATE env)
 
     역산 공식:
       sales_amount = round(net_deposit / (1 - commission_rate))
       fees         = sales_amount - net_deposit
-
-    수수료율은 _get_mobile_commission_rate(pay_corp) 가 환경변수에서 읽음.
     """
-    s = _resolve_settlement(tx.remark1, tx.remark2)
-    pay_corp = s[1] if s and s[0] == "mobile" else "기타이동식"
-    rate = _get_mobile_commission_rate(pay_corp)
+    pg = _match_mobile_pg(sess, tx.business_id, tx.remark1, tx.remark2)
+    if pg:
+        pay_corp = pg.name
+        rate = pg.commission_rate or 0.0275
+    else:
+        s = _resolve_settlement(tx.remark1, tx.remark2)
+        pay_corp = s[1] if s and s[0] == "mobile" else "기타이동식"
+        rate = _get_mobile_commission_rate(pay_corp)
+
     net = tx.in_amount or 0
     sales = round(net / (1 - rate)) if 0 < rate < 1 else net
     fees = sales - net
@@ -1533,13 +1555,32 @@ def _classify_txs(
     ).all()
     vendor_by_name = {v.name.strip(): v for v in vendors if v.name}
 
+    # 사업장별 mobile PG 룰 (1회 로드)
+    mobile_pgs = sess.exec(
+        select(MobilePgConfig).where(
+            MobilePgConfig.business_id == business_id,
+            MobilePgConfig.is_active == True,  # noqa: E712
+        )
+    ).all()
+
     learned_remarks = _build_learned_remark_map(sess, business_id)
 
     for tx in txs:
         if only_unclassified and tx.classified_as != "unclassified":
             continue
 
-        new_class = _classify_one_tx(tx, vendor_by_name, learned_remarks)
+        # Step A: 사업장 mobile PG 룰 우선 (입금만)
+        new_class = None
+        if tx.in_amount and tx.in_amount > 0 and mobile_pgs:
+            text = " ".join(filter(None, [tx.remark1, tx.remark2])).strip()
+            for pg in mobile_pgs:
+                if pg.keyword and pg.keyword in text:
+                    new_class = "mobile_settlement"
+                    break
+
+        # Step B: 기본 분류 (기존 로직 — 이체/카드/페이/배달/하드코딩 코페이 등)
+        if not new_class:
+            new_class = _classify_one_tx(tx, vendor_by_name, learned_remarks)
         if not new_class:
             counts["skip"] += 1
             continue
@@ -2232,12 +2273,29 @@ def reclassify_settlements(
         }
         now = datetime.now()
 
+        # 사업장 mobile PG 룰 (사용자 등록) 1회 로드
+        user_mobile_pgs = service.session.exec(
+            select(MobilePgConfig).where(
+                MobilePgConfig.business_id == bid,
+                MobilePgConfig.is_active == True,  # noqa: E712
+            )
+        ).all()
+
         for tx in rows:
-            s = _resolve_settlement(tx.remark1, tx.remark2)
-            if s is None:
-                counts["skipped_no_match"] += 1
-                continue
-            stype, _name = s
+            # 사업장 PG 룰 우선
+            stype = None
+            if user_mobile_pgs:
+                text = " ".join(filter(None, [tx.remark1, tx.remark2])).strip()
+                for pg in user_mobile_pgs:
+                    if pg.keyword and pg.keyword in text:
+                        stype = "mobile"
+                        break
+            if not stype:
+                s = _resolve_settlement(tx.remark1, tx.remark2)
+                if s is None:
+                    counts["skipped_no_match"] += 1
+                    continue
+                stype, _name = s
             target = target_map[stype]
 
             if tx.classified_as == target:
@@ -2283,6 +2341,152 @@ def delete_account(
         service.session.delete(acc)
         service.session.commit()
         return {"deleted": True, "removed_transactions": len(txs)}
+    finally:
+        service.close()
+
+
+# ============================================================
+# 이동식 단말기 PG 설정 — 사업장별 CRUD (2026-05-12)
+# 코페이/KSnet/키움페이 등 — 사장님이 직접 등록·수수료율 조정
+# ============================================================
+
+class MobilePgIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50, description="표시명 (예: '코페이')")
+    keyword: str = Field(..., min_length=1, max_length=100, description="적요 매칭 키워드")
+    commission_rate: float = Field(default=0.0275, ge=0, le=0.2,
+        description="수수료율 (0~0.2, 예: 0.0275 = 2.75%)")
+    note: Optional[str] = Field(default=None, max_length=500)
+    is_active: bool = Field(default=True)
+
+
+class MobilePgPatchIn(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    keyword: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    commission_rate: Optional[float] = Field(default=None, ge=0, le=0.2)
+    note: Optional[str] = Field(default=None, max_length=500)
+    is_active: Optional[bool] = None
+
+
+def _pg_to_dict(pg: MobilePgConfig) -> dict:
+    return {
+        "id": pg.id,
+        "name": pg.name,
+        "keyword": pg.keyword,
+        "commission_rate": pg.commission_rate,
+        "commission_pct": round((pg.commission_rate or 0) * 100, 3),
+        "note": pg.note,
+        "is_active": pg.is_active,
+        "created_at": pg.created_at.isoformat() if pg.created_at else None,
+        "updated_at": pg.updated_at.isoformat() if pg.updated_at else None,
+    }
+
+
+@router.get("/mobile-pgs")
+def list_mobile_pgs(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """사업장의 이동식 PG 설정 리스트."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        rows = service.session.exec(
+            select(MobilePgConfig)
+            .where(MobilePgConfig.business_id == bid)
+            .order_by(MobilePgConfig.created_at.desc())
+        ).all()
+        return [_pg_to_dict(r) for r in rows]
+    finally:
+        service.close()
+
+
+@router.post("/mobile-pgs")
+def create_mobile_pg(
+    body: MobilePgIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """이동식 PG 신규 등록."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        # 동일 사업장 + 동일 키워드 중복 방지
+        existing = service.session.exec(
+            select(MobilePgConfig).where(
+                MobilePgConfig.business_id == bid,
+                MobilePgConfig.keyword == body.keyword,
+            )
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=f"이미 등록된 키워드입니다: '{body.keyword}' (PG: {existing.name})",
+            )
+        pg = MobilePgConfig(
+            business_id=bid,
+            name=body.name.strip(),
+            keyword=body.keyword.strip(),
+            commission_rate=body.commission_rate,
+            note=body.note,
+            is_active=body.is_active,
+        )
+        service.session.add(pg)
+        service.session.commit()
+        service.session.refresh(pg)
+        return _pg_to_dict(pg)
+    finally:
+        service.close()
+
+
+@router.patch("/mobile-pgs/{pg_id}")
+def update_mobile_pg(
+    pg_id: int,
+    body: MobilePgPatchIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """이동식 PG 수정 (수수료율 조정 등)."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        pg = service.session.get(MobilePgConfig, pg_id)
+        if not pg or pg.business_id != bid:
+            raise HTTPException(status_code=404, detail="PG 설정을 찾을 수 없습니다.")
+        if body.name is not None:
+            pg.name = body.name.strip()
+        if body.keyword is not None:
+            pg.keyword = body.keyword.strip()
+        if body.commission_rate is not None:
+            pg.commission_rate = body.commission_rate
+        if body.note is not None:
+            pg.note = body.note
+        if body.is_active is not None:
+            pg.is_active = body.is_active
+        pg.updated_at = datetime.now()
+        service.session.add(pg)
+        service.session.commit()
+        service.session.refresh(pg)
+        return _pg_to_dict(pg)
+    finally:
+        service.close()
+
+
+@router.delete("/mobile-pgs/{pg_id}")
+def delete_mobile_pg(
+    pg_id: int,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """이동식 PG 삭제 (이미 분류된 과거 거래는 그대로 유지)."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        pg = service.session.get(MobilePgConfig, pg_id)
+        if not pg or pg.business_id != bid:
+            raise HTTPException(status_code=404, detail="PG 설정을 찾을 수 없습니다.")
+        service.session.delete(pg)
+        service.session.commit()
+        return {"deleted": True, "id": pg_id}
     finally:
         service.close()
 
