@@ -177,7 +177,9 @@ def test_login(
                 cred.status = "failed"
                 s.add(cred)
                 s.commit()
-                raise HTTPException(401, login.error_message or "로그인 실패")
+                # 422: 외부 시스템 인증 실패 — 401 쓰면 프론트 axios interceptor 가
+                # 셈하나 세션 만료로 오해해서 자동 로그아웃 됨.
+                raise HTTPException(422, login.error_message or "이지포스 로그인 실패")
             # 매장정보 동기화
             cred.shop_name = login.shop_name or cred.shop_name
             cred.erp_shop_code = login.erp_shop_code or cred.erp_shop_code
@@ -310,7 +312,7 @@ def fetch_dashboard(
     with EasyPosClient() as c:
         login = c.login(cred.easypos_id, password)
         if not login.ok:
-            raise HTTPException(401, login.error_message or "로그인 실패")
+            raise HTTPException(422, login.error_message or "이지포스 로그인 실패")
         return c.fetch_dashboard(cred.easypos_id)
 
 
