@@ -1465,6 +1465,59 @@ def auto_classify(
         service.close()
 
 
+def _select_learned_examples(session, business_id: int, current_remark1: Optional[str], limit: int = 3) -> list[dict]:
+    """현재 거래의 remark1 과 매칭되는 과거 수동 분류 사례 조회.
+
+    AI 분류기에 사업장 특화 few-shot 으로 주입할 데이터.
+    선정 기준:
+      1. 같은 business_id
+      2. classified_by='manual' (학습 신뢰도 높은 시그널)
+      3. remark1 매칭 점수: exact > substring > char-set overlap
+
+    Returns:
+        [{remark1, remark2, in_amount, out_amount, classified_as}, ...]
+        최대 limit 건.
+    """
+    if not current_remark1:
+        return []
+    candidates = session.exec(
+        select(BankTransaction)
+        .where(
+            BankTransaction.business_id == business_id,
+            BankTransaction.classified_by == "manual",
+            BankTransaction.classified_as != "unclassified",
+            BankTransaction.remark1.isnot(None),
+        )
+        .order_by(BankTransaction.classified_at.desc())
+        .limit(100)
+    ).all()
+    scored = []
+    cur_chars = set(current_remark1)
+    for r in candidates:
+        if not r.remark1:
+            continue
+        if r.remark1 == current_remark1:
+            score = 100
+        elif r.remark1 in current_remark1 or current_remark1 in r.remark1:
+            score = 50
+        else:
+            overlap = len(cur_chars & set(r.remark1))
+            score = overlap if overlap >= 3 else 0
+        if score > 0:
+            scored.append((score, r))
+    scored.sort(key=lambda x: -x[0])
+    return [
+        {
+            "remark1": r.remark1,
+            "remark2": r.remark2 or "",
+            "in_amount": r.in_amount or 0,
+            "out_amount": r.out_amount or 0,
+            "classified_as": r.classified_as,
+        }
+        for _, r in scored[:limit]
+    ]
+
+
 @router.get("/ai-classify/health")
 def ai_classify_health(admin: User = Depends(get_admin_user)):
     """AI 분류 서비스 상태 점검 (provider/model/도달가능성)."""
@@ -1493,9 +1546,11 @@ def ai_classify_suggest(
         if not ai.configured():
             raise HTTPException(status_code=503, detail="AI 분류 서비스 미설정 (OLLAMA_URL 확인).")
         try:
+            learned_cases = _select_learned_examples(service.session, bid, tx.remark1, limit=3)
             result = ai.suggest(
                 remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
                 in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+                learned_cases=learned_cases,
             )
             return {"tx_id": tx_id, **result}
         except AIClassifyError as e:
@@ -1556,9 +1611,11 @@ def ai_classify_batch(
         now = datetime.now()
         for tx in rows:
             try:
+                learned_cases = _select_learned_examples(service.session, bid, tx.remark1, limit=3)
                 s = ai.suggest(
                     remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
                     in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+                    learned_cases=learned_cases,
                 )
             except AIClassifyError as e:
                 errors += 1
@@ -1586,6 +1643,360 @@ def ai_classify_batch(
             "errors": errors,
             "suggestions": suggestions,
         }
+    finally:
+        service.close()
+
+
+def _build_analysis_context(session, business_id: int) -> dict:
+    """Phase 3 대화형 분석을 위한 사업장 재무 컨텍스트 수집.
+
+    최근 3개월 settlement_stats + 분류 분포 + 등록 계좌 수 등.
+    """
+    today = date.today()
+    months = []
+    # 최근 3개월 (이번 달 포함)
+    y, m = today.year, today.month
+    for _ in range(3):
+        months.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    months.reverse()
+
+    settlement_summary = []
+    for yy, mm in months:
+        start = date(yy, mm, 1)
+        if mm == 12:
+            next_start = date(yy + 1, 1, 1)
+        else:
+            next_start = date(yy, mm + 1, 1)
+        end = next_start - timedelta(days=1)
+
+        card_payments = session.exec(
+            select(CardPayment).where(
+                CardPayment.business_id == business_id,
+                CardPayment.payment_date >= start,
+                CardPayment.payment_date <= end,
+            )
+        ).all()
+        card_approvals = session.exec(
+            select(CardSalesApproval).where(
+                CardSalesApproval.business_id == business_id,
+                CardSalesApproval.approval_date >= start,
+                CardSalesApproval.approval_date <= end,
+                CardSalesApproval.status == "승인",
+            )
+        ).all()
+        pay_payments = session.exec(
+            select(PayPayment).where(
+                PayPayment.business_id == business_id,
+                PayPayment.payment_date >= start,
+                PayPayment.payment_date <= end,
+            )
+        ).all()
+        delivery = session.exec(
+            select(DeliveryRevenue).where(
+                DeliveryRevenue.business_id == business_id,
+                DeliveryRevenue.year == yy,
+                DeliveryRevenue.month == mm,
+            )
+        ).all()
+
+        card_sales = sum(a.amount or 0 for a in card_approvals)
+        card_deposit = sum(c.net_deposit or 0 for c in card_payments)
+        card_fees = sum(c.fees or 0 for c in card_payments) or max(card_sales - card_deposit, 0)
+        card_rate = round(card_fees / card_sales * 100, 2) if card_sales > 0 else None
+
+        pay_deposit = sum(p.net_deposit or 0 for p in pay_payments)
+        pay_sales = sum(p.sales_amount or 0 for p in pay_payments)
+        pay_fees = sum(p.fees or 0 for p in pay_payments)
+        pay_rate = round(pay_fees / pay_sales * 100, 2) if pay_sales > 0 else None
+
+        delivery_sales = sum(d.total_sales or 0 for d in delivery)
+        delivery_deposit = sum(d.settlement_amount or 0 for d in delivery)
+        delivery_fees = sum(d.total_fees or 0 for d in delivery)
+        delivery_rate = round(delivery_fees / delivery_sales * 100, 2) if delivery_sales > 0 else None
+
+        settlement_summary.append({
+            "year": yy, "month": mm,
+            "card": {"sales": card_sales, "deposit": card_deposit, "fees": card_fees, "rate_pct": card_rate},
+            "pay":  {"deposit": pay_deposit, "sales": pay_sales, "fees": pay_fees, "rate_pct": pay_rate},
+            "delivery": {"sales": delivery_sales, "deposit": delivery_deposit, "fees": delivery_fees, "rate_pct": delivery_rate},
+        })
+
+    # 분류 분포 (전체)
+    classification_dist: dict = {}
+    rows = session.exec(
+        select(BankTransaction).where(BankTransaction.business_id == business_id)
+    ).all()
+    for r in rows:
+        c = r.classified_as or "unclassified"
+        classification_dist[c] = classification_dist.get(c, 0) + 1
+
+    # 등록 계좌
+    accounts = session.exec(
+        select(BankAccount).where(BankAccount.business_id == business_id)
+    ).all()
+
+    return {
+        "today": today.isoformat(),
+        "settlement_summary": settlement_summary,
+        "classification_distribution": classification_dist,
+        "total_transactions": len(rows),
+        "accounts": [{"bank": a.bank_name, "alias": a.alias} for a in accounts],
+    }
+
+
+CHAT_SYSTEM_PROMPT = """당신은 한국 자영업 사업장 재무 분석 전문가입니다.
+은행 거래내역, 카드 정산, 페이 결제, 배달앱 정산 데이터를 보고 사장님께
+숫자 근거가 있는 명확하고 짧은 한국어 답변을 합니다.
+
+규칙:
+- 반드시 제공된 [컨텍스트] 데이터에만 근거해 답하세요. 데이터에 없는 사실을 만들어내지 마세요.
+- 숫자는 천 단위 쉼표로 표기하고, 비율은 % 단위로.
+- 추세·비교가 필요하면 월별 비교 표 또는 짧은 bullet 로 정리.
+- 정보가 부족하면 "더 자세히 분석하려면 X 데이터가 필요합니다" 라고 명시.
+- 절대 추측·과장·홍보성 표현 금지. 친근하지만 사실 중심.
+- 답변은 보통 3-6 문장 또는 짧은 표. 길어도 200단어 이내."""
+
+
+class ChatIn(BaseModel):
+    messages: list[dict] = Field(...,
+        description="대화 히스토리. [{role: 'user'|'assistant', content: '...'}, ...]")
+
+
+@router.post("/chat")
+def chat(
+    body: ChatIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """Phase 3 — 사업장 재무 데이터에 대한 자연어 분석.
+
+    사장님 질문을 받으면 백엔드가 자동으로 사업장의 settlement·분류 분포 등
+    재무 컨텍스트를 수집해 LLM 시스템 프롬프트에 주입 후 응답.
+
+    Request:
+        messages: 누적 대화 (최신 user 메시지 포함)
+
+    Response:
+        {answer, context_summary}
+    """
+    from services.ai_classify_client import get_ai_classifier, AIClassifyError
+    bid = _resolve_bid(admin, x_view_as_business)
+    ai = get_ai_classifier()
+    if not ai.configured():
+        raise HTTPException(status_code=503, detail="AI 서비스 미설정.")
+
+    if not body.messages or not any(m.get("role") == "user" for m in body.messages):
+        raise HTTPException(status_code=400, detail="사용자 메시지가 필요합니다.")
+
+    service = DatabaseService()
+    try:
+        ctx = _build_analysis_context(service.session, bid)
+        context_text = (
+            "[컨텍스트 — 본 사업장 재무 데이터]\n"
+            f"오늘 날짜: {ctx['today']}\n"
+            f"등록 계좌: {len(ctx['accounts'])}개 — "
+            + ", ".join(f"{a['bank']}({a['alias'] or '-'})" for a in ctx['accounts'])
+            + "\n전체 거래 수: " + str(ctx['total_transactions']) + "건\n"
+            "\n분류 분포:\n"
+            + "\n".join(f"  - {k}: {v}건" for k, v in sorted(ctx['classification_distribution'].items(), key=lambda x: -x[1]))
+            + "\n\n최근 3개월 정산 통계:\n"
+        )
+        for m in ctx['settlement_summary']:
+            context_text += (
+                f"\n  [{m['year']}-{m['month']:02d}]\n"
+                f"    카드: 매출 {m['card']['sales']:,}원 / 입금 {m['card']['deposit']:,}원 / "
+                f"수수료 {m['card']['fees']:,}원 ({m['card']['rate_pct']}%)\n"
+                f"    페이: 매출 {m['pay']['sales']:,}원 / 입금 {m['pay']['deposit']:,}원 / "
+                f"수수료 {m['pay']['fees']:,}원 ({m['pay']['rate_pct']}%)\n"
+                f"    배달: 매출 {m['delivery']['sales']:,}원 / 입금 {m['delivery']['deposit']:,}원 / "
+                f"수수료 {m['delivery']['fees']:,}원 ({m['delivery']['rate_pct']}%)\n"
+            )
+
+        messages = [
+            {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+            {"role": "system", "content": context_text},
+            *body.messages,
+        ]
+
+        try:
+            answer = ai.chat(messages)
+        except AIClassifyError as e:
+            raise HTTPException(status_code=502, detail=f"AI 분석 실패: {e}")
+
+        return {
+            "answer": answer.strip(),
+            "context_summary": {
+                "months": [f"{m['year']}-{m['month']:02d}" for m in ctx['settlement_summary']],
+                "accounts": len(ctx['accounts']),
+                "total_transactions": ctx['total_transactions'],
+            },
+        }
+    finally:
+        service.close()
+
+
+class AuditIn(BaseModel):
+    account_id: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    max_items: int = Field(default=100, le=300,
+        description="검사 대상 거래 수 (호출 비용 제한)")
+    min_disagreement_confidence: float = Field(default=0.75, ge=0, le=1,
+        description="AI 신뢰도가 이 이상이고 현재 분류와 다를 때만 의심으로 플래그")
+    skip_manual: bool = Field(default=True,
+        description="수동 분류 거래는 검사 제외 (사용자 의도 보호)")
+
+
+@router.post("/audit/run")
+def audit_run(
+    body: AuditIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """AI 감사 — 이미 분류된 거래에 대해 AI가 다른 분류를 고신뢰도로 제안하는 케이스 탐지.
+
+    동작:
+    - classified_as != 'unclassified' 인 거래를 max_items 만큼 샘플링
+    - 각 거래에 대해 AI 분류 호출 (학습 인식)
+    - AI 신뢰도 >= min_disagreement_confidence AND AI 분류 != 현재 분류 → 의심으로 플래그
+    - 결과 리스트 반환 (자동 변경 없음 — UI 에서 사용자가 선택적 승인)
+
+    Returns:
+        {processed, suspicious_count, suspicious: [{tx_id, ...tx_info, current_class,
+                                                     ai_class, ai_confidence, ai_reason}]}
+    """
+    from services.ai_classify_client import get_ai_classifier, AIClassifyError
+    bid = _resolve_bid(admin, x_view_as_business)
+    ai = get_ai_classifier()
+    if not ai.configured():
+        raise HTTPException(status_code=503, detail="AI 분류 서비스 미설정.")
+
+    service = DatabaseService()
+    try:
+        stmt = select(BankTransaction).where(
+            BankTransaction.business_id == bid,
+            BankTransaction.classified_as != "unclassified",
+        )
+        if body.account_id:
+            stmt = stmt.where(BankTransaction.account_id == body.account_id)
+        if body.start_date:
+            stmt = stmt.where(BankTransaction.trans_date >= _parse_date(body.start_date))
+        if body.end_date:
+            stmt = stmt.where(BankTransaction.trans_date <= _parse_date(body.end_date))
+        if body.skip_manual:
+            stmt = stmt.where(BankTransaction.classified_by != "manual")
+
+        rows = service.session.exec(stmt.order_by(BankTransaction.trans_date.desc())).all()[: body.max_items]
+
+        suspicious = []
+        errors = 0
+        for tx in rows:
+            try:
+                learned_cases = _select_learned_examples(service.session, bid, tx.remark1, limit=3)
+                s = ai.suggest(
+                    remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
+                    in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+                    learned_cases=learned_cases,
+                )
+            except AIClassifyError:
+                errors += 1
+                continue
+
+            if (
+                s["classified_as"] != "unclassified"
+                and s["classified_as"] != tx.classified_as
+                and s["confidence"] >= body.min_disagreement_confidence
+            ):
+                suspicious.append({
+                    "tx_id": tx.id,
+                    "trans_date": tx.trans_date.isoformat() if tx.trans_date else None,
+                    "remark1": tx.remark1,
+                    "remark2": tx.remark2,
+                    "in_amount": tx.in_amount or 0,
+                    "out_amount": tx.out_amount or 0,
+                    "current_class": tx.classified_as,
+                    "current_classified_by": tx.classified_by,
+                    "ai_class": s["classified_as"],
+                    "ai_standard_name": s["standard_name"],
+                    "ai_confidence": s["confidence"],
+                    "ai_reason": s["reason"],
+                    "ai_used_learned": s.get("used_learned", 0),
+                })
+
+        return {
+            "processed": len(rows),
+            "errors": errors,
+            "suspicious_count": len(suspicious),
+            "suspicious": suspicious,
+            "settings": {
+                "min_disagreement_confidence": body.min_disagreement_confidence,
+                "skip_manual": body.skip_manual,
+            },
+        }
+    finally:
+        service.close()
+
+
+class AuditApplyIn(BaseModel):
+    tx_ids: list[int] = Field(..., description="감사 결과 중 AI 제안을 수락할 tx id 리스트")
+
+
+@router.post("/audit/apply")
+def audit_apply(
+    body: AuditApplyIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """감사 결과 중 사용자가 수락한 tx 들에 대해 AI 제안을 실제로 적용.
+
+    프론트엔드는 audit_run 결과를 보여주고 사용자가 체크박스로 선택한 tx_id들을 전달.
+    각 tx 마다 AI 재호출 (race condition 방지: 데이터가 audit_run 시점과 같다고 가정).
+    """
+    from services.ai_classify_client import get_ai_classifier, AIClassifyError
+    bid = _resolve_bid(admin, x_view_as_business)
+    ai = get_ai_classifier()
+    if not ai.configured():
+        raise HTTPException(status_code=503, detail="AI 분류 서비스 미설정.")
+
+    service = DatabaseService()
+    try:
+        applied = 0
+        skipped = 0
+        errors = 0
+        now = datetime.now()
+        for tx_id in body.tx_ids:
+            tx = service.session.get(BankTransaction, tx_id)
+            if not tx or tx.business_id != bid:
+                skipped += 1
+                continue
+            if tx.classified_by == "manual":
+                skipped += 1
+                continue
+            try:
+                learned_cases = _select_learned_examples(service.session, bid, tx.remark1, limit=3)
+                s = ai.suggest(
+                    remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
+                    in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+                    learned_cases=learned_cases,
+                )
+            except AIClassifyError:
+                errors += 1
+                continue
+            if s["classified_as"] in {"unclassified", tx.classified_as}:
+                skipped += 1
+                continue
+            tx.classified_as = s["classified_as"]
+            tx.classified_by = "ai_audit"
+            tx.classified_at = now
+            _materialize_link(service, tx)
+            service.session.add(tx)
+            applied += 1
+        service.session.commit()
+        return {"requested": len(body.tx_ids), "applied": applied, "skipped": skipped, "errors": errors}
     finally:
         service.close()
 

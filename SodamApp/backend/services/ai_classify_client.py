@@ -82,25 +82,71 @@ FEW_SHOT_EXAMPLES = [
 ]
 
 
-def _build_messages(
-    remark1: str, remark2: str, remark3: str,
-    in_amount: int, out_amount: int,
-) -> list[dict]:
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for user_text, assistant_json in FEW_SHOT_EXAMPLES:
-        messages.append({"role": "user", "content": user_text})
-        messages.append({
-            "role": "assistant",
-            "content": json.dumps(assistant_json, ensure_ascii=False),
-        })
-    user_text = (
+def _format_tx_user_text(remark1: str, remark2: str, remark3: str, in_amount: int, out_amount: int) -> str:
+    return (
         f'적요1: "{remark1 or ""}"\n'
         f'적요2: "{remark2 or ""}"\n'
         f'적요3: "{remark3 or ""}"\n'
         f'입금액: {in_amount or 0:,}원\n'
         f'출금액: {out_amount or 0:,}원'
     )
-    messages.append({"role": "user", "content": user_text})
+
+
+def _build_messages(
+    remark1: str, remark2: str, remark3: str,
+    in_amount: int, out_amount: int,
+    learned_cases: Optional[list[dict]] = None,
+) -> list[dict]:
+    """LLM messages 구성.
+
+    Args:
+        remark1/2/3, in/out_amount: 현재 분류 대상 거래
+        learned_cases: 사업장 과거 수동 분류 사례. 각 dict는
+            {remark1, remark2, in_amount, out_amount, classified_as, standard_name?}.
+            제공되면 일반 few-shot 뒤에 사업장 특화 few-shot 으로 추가.
+    """
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # 1) 일반 few-shot (4건, 하드코딩)
+    for user_text, assistant_json in FEW_SHOT_EXAMPLES:
+        messages.append({"role": "user", "content": user_text})
+        messages.append({
+            "role": "assistant",
+            "content": json.dumps(assistant_json, ensure_ascii=False),
+        })
+
+    # 2) 사업장 특화 few-shot (학습 데이터, 동적)
+    if learned_cases:
+        messages.append({
+            "role": "system",
+            "content": (
+                "이하는 본 사업장에서 사장님이 직접 수동 분류하신 과거 사례입니다. "
+                "이 패턴을 본 사업장의 비즈니스 규칙으로 간주하고 우선 참고하세요. "
+                "동일/유사 적요가 같은 분류로 일관되게 적용되는지 확인하세요."
+            ),
+        })
+        for case in learned_cases[:5]:  # 최대 5건
+            ex_user = _format_tx_user_text(
+                case.get("remark1", ""), case.get("remark2", ""), case.get("remark3", ""),
+                case.get("in_amount", 0), case.get("out_amount", 0),
+            )
+            ex_assistant = {
+                "classified_as": case.get("classified_as", "unclassified"),
+                "standard_name": case.get("standard_name", ""),
+                "confidence": 0.95,
+                "reason": "본 사업장 과거 수동 분류 사례",
+            }
+            messages.append({"role": "user", "content": ex_user})
+            messages.append({
+                "role": "assistant",
+                "content": json.dumps(ex_assistant, ensure_ascii=False),
+            })
+
+    # 3) 현재 거래
+    messages.append({
+        "role": "user",
+        "content": _format_tx_user_text(remark1, remark2, remark3, in_amount, out_amount),
+    })
     return messages
 
 
@@ -180,10 +226,16 @@ class AIClassifyClient:
         remark3: Optional[str] = None,
         in_amount: int = 0,
         out_amount: int = 0,
+        learned_cases: Optional[list[dict]] = None,
     ) -> dict:
         """단일 거래에 대한 AI 분류 제안.
 
-        Returns: {classified_as, standard_name, confidence, reason, provider}
+        Args:
+            learned_cases: 사업장 과거 수동 분류 사례. 제공되면 dynamic few-shot.
+                각 dict: {remark1, remark2, remark3?, in_amount, out_amount,
+                          classified_as, standard_name?}
+
+        Returns: {classified_as, standard_name, confidence, reason, provider, used_learned}
         Raises: AIClassifyError
         """
         if not self.configured():
@@ -192,10 +244,13 @@ class AIClassifyClient:
         messages = _build_messages(
             remark1 or "", remark2 or "", remark3 or "",
             in_amount, out_amount,
+            learned_cases=learned_cases,
         )
 
         if self.provider == "ollama":
-            return self._suggest_ollama(messages)
+            result = self._suggest_ollama(messages)
+            result["used_learned"] = len(learned_cases or [])
+            return result
         raise AIClassifyError(f"미지원 provider: {self.provider}")
 
     def _suggest_ollama(self, messages: list[dict]) -> dict:
@@ -218,6 +273,40 @@ class AIClassifyClient:
             result = _parse_response(content)
             result["provider"] = f"ollama:{self.ollama_model}"
             return result
+        except httpx.HTTPError as e:
+            raise AIClassifyError(f"Ollama 호출 실패: {e}")
+
+
+    def chat(self, messages: list[dict], options: Optional[dict] = None) -> str:
+        """범용 채팅 호출 (Phase 3 대화형 분석용).
+
+        Args:
+            messages: OpenAI-style chat 메시지 [{role: system|user|assistant, content: ...}]
+            options: 추가 Ollama 옵션 (temperature, num_predict 등)
+
+        Returns:
+            assistant 응답 텍스트
+        """
+        if not self.configured():
+            raise AIClassifyError(f"AI 미설정 (provider={self.provider})")
+        if self.provider != "ollama":
+            raise AIClassifyError(f"미지원 provider: {self.provider}")
+        try:
+            payload = {
+                "model": self.ollama_model,
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0.3, "num_predict": 800, **(options or {})},
+            }
+            r = httpx.post(
+                f"{self.ollama_url}/api/chat",
+                json=payload,
+                timeout=self.timeout * 2,  # 분석은 더 길어질 수 있음
+            )
+            if r.status_code != 200:
+                raise AIClassifyError(f"Ollama {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            return (data.get("message") or {}).get("content") or ""
         except httpx.HTTPError as e:
             raise AIClassifyError(f"Ollama 호출 실패: {e}")
 

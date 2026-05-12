@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles } from 'lucide-react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles, Send, MessageSquare } from 'lucide-react';
 import api from '../api';
 
 const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
@@ -378,6 +378,8 @@ export default function BankSync() {
         { key: 'accounts', label: '등록 계좌' },
         { key: 'transactions', label: txTabLabel },
         { key: 'settlement', label: '정산·수수료' },
+        { key: 'audit', label: 'AI 감사' },
+        { key: 'chat', label: 'AI 분석' },
     ]), [txTabLabel]);
 
     // localStorage 저장
@@ -538,6 +540,12 @@ export default function BankSync() {
                 )}
                 {tab === 'settlement' && (
                     <SettlementTab />
+                )}
+                {tab === 'audit' && (
+                    <AuditTab accounts={accounts} onRefreshTxs={fetchTxs} />
+                )}
+                {tab === 'chat' && (
+                    <ChatTab />
                 )}
             </div>
 
@@ -1573,3 +1581,402 @@ function SettlementSection({ title, rows, corpLabel, keyCol = 'corp', emptyMsg }
         </div>
     );
 }
+
+
+// ============================================================
+// AI 감사 탭 (2026-05-12 Phase 2)
+// 이미 분류된 거래에 대해 AI가 다른 분류를 고신뢰도로 제안하면 의심으로 플래그
+// ============================================================
+
+function AuditTab({ accounts, onRefreshTxs }) {
+    const today = new Date().toISOString().slice(0, 10);
+    const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const [filter, setFilter] = useState({
+        account_id: '',
+        start_date: monthAgo,
+        end_date: today,
+        max_items: 100,
+        min_disagreement_confidence: 0.75,
+        skip_manual: true,
+    });
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState(null);
+    const [selected, setSelected] = useState({});
+    const [applying, setApplying] = useState(false);
+
+    async function runAudit() {
+        setLoading(true);
+        setResult(null);
+        setSelected({});
+        try {
+            const body = {
+                account_id: filter.account_id ? parseInt(filter.account_id) : null,
+                start_date: filter.start_date || null,
+                end_date: filter.end_date || null,
+                max_items: parseInt(filter.max_items) || 100,
+                min_disagreement_confidence: parseFloat(filter.min_disagreement_confidence) || 0.75,
+                skip_manual: filter.skip_manual,
+            };
+            const res = await api.post('/bank-sync/audit/run', body);
+            setResult(res.data);
+            const sel = {};
+            res.data.suspicious.forEach(s => { sel[s.tx_id] = true; });
+            setSelected(sel);
+        } catch (e) {
+            alert('감사 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function applySelected() {
+        const ids = Object.entries(selected).filter(([, v]) => v).map(([k]) => parseInt(k));
+        if (ids.length === 0) {
+            alert('적용할 항목을 선택하세요.');
+            return;
+        }
+        if (!confirm(`선택된 ${ids.length}건의 AI 제안 분류를 적용합니다. 계속할까요?\n(수동 분류 거래는 보호됩니다)`)) return;
+        setApplying(true);
+        try {
+            const res = await api.post('/bank-sync/audit/apply', { tx_ids: ids });
+            alert(`적용 완료: ${res.data.applied}건 / 스킵 ${res.data.skipped} / 오류 ${res.data.errors}`);
+            onRefreshTxs?.();
+            runAudit();
+        } catch (e) {
+            alert('적용 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setApplying(false);
+        }
+    }
+
+    const allSelected = result && result.suspicious.length > 0 && result.suspicious.every(s => selected[s.tx_id]);
+
+    return (
+        <div className="space-y-4">
+            <div className="bg-gradient-to-r from-fuchsia-50 to-rose-50 border border-fuchsia-200 rounded-xl p-4">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <Sparkles size={18} className="text-fuchsia-600" />
+                    AI 분류 감사
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                    이미 분류된 거래에 대해 AI(qwen2.5:7b)가 다른 분류를 <strong>고신뢰도</strong>로 제안하는 케이스만 표시합니다.
+                    자동 변경은 없으며, 체크박스로 선택하여 수동 승인합니다. 수동 분류된 거래는 검사에서 제외됩니다.
+                </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">계좌</label>
+                        <select
+                            value={filter.account_id}
+                            onChange={e => setFilter({ ...filter, account_id: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        >
+                            <option value="">전체</option>
+                            {accounts.map(a => (
+                                <option key={a.id} value={a.id}>{a.bank_name} {a.account_number_masked}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">시작일</label>
+                        <input type="date" value={filter.start_date}
+                            onChange={e => setFilter({ ...filter, start_date: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">종료일</label>
+                        <input type="date" value={filter.end_date}
+                            onChange={e => setFilter({ ...filter, end_date: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">최대 검사 건수</label>
+                        <input type="number" min={10} max={300} step={10} value={filter.max_items}
+                            onChange={e => setFilter({ ...filter, max_items: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                    </div>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                    <label className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500">의심 신뢰도 임계</span>
+                        <input type="number" min={0.5} max={0.99} step={0.05}
+                            value={filter.min_disagreement_confidence}
+                            onChange={e => setFilter({ ...filter, min_disagreement_confidence: e.target.value })}
+                            className="w-20 px-2 py-1 border border-slate-200 rounded text-xs ml-1" />
+                    </label>
+                    <label className="flex items-center gap-1 text-xs text-slate-600">
+                        <input type="checkbox" checked={filter.skip_manual}
+                            onChange={e => setFilter({ ...filter, skip_manual: e.target.checked })} />
+                        수동 분류 거래 검사 제외 (권장)
+                    </label>
+                    <button
+                        onClick={runAudit}
+                        disabled={loading}
+                        className="ml-auto flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white rounded-lg text-sm font-semibold hover:from-fuchsia-700 hover:to-rose-700 disabled:opacity-50"
+                    >
+                        {loading ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />}
+                        {loading ? '감사 중...' : '감사 실행'}
+                    </button>
+                </div>
+            </div>
+
+            {result && !loading && (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <div className="text-sm">
+                            <span className="font-semibold">검사 {result.processed}건</span>
+                            <span className="text-slate-400 mx-2">·</span>
+                            <span className="text-rose-600 font-semibold">의심 {result.suspicious_count}건</span>
+                            {result.errors > 0 && (
+                                <>
+                                    <span className="text-slate-400 mx-2">·</span>
+                                    <span className="text-amber-600">오류 {result.errors}건</span>
+                                </>
+                            )}
+                        </div>
+                        {result.suspicious_count > 0 && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        const sel = {};
+                                        if (!allSelected) {
+                                            result.suspicious.forEach(s => { sel[s.tx_id] = true; });
+                                        }
+                                        setSelected(sel);
+                                    }}
+                                    className="px-3 py-1 text-xs text-slate-600 hover:bg-slate-100 rounded"
+                                >
+                                    {allSelected ? '전체 해제' : '전체 선택'}
+                                </button>
+                                <button
+                                    onClick={applySelected}
+                                    disabled={applying}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                    {applying ? <Loader2 className="animate-spin" size={12} /> : <CheckCircle2 size={12} />}
+                                    선택 적용 ({Object.values(selected).filter(Boolean).length})
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {result.suspicious_count === 0 ? (
+                        <div className="p-10 text-center text-slate-400">
+                            <CheckCircle2 className="inline mr-2" size={18} />
+                            의심 케이스가 없습니다. 분류가 일관성 있게 잘 되어 있습니다.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50 text-xs text-slate-500 uppercase">
+                                    <tr>
+                                        <th className="px-3 py-2 w-8"></th>
+                                        <th className="text-left px-3 py-2">날짜</th>
+                                        <th className="text-left px-3 py-2">적요</th>
+                                        <th className="text-right px-3 py-2">금액</th>
+                                        <th className="text-left px-3 py-2">현재</th>
+                                        <th className="text-left px-3 py-2">AI 제안</th>
+                                        <th className="text-right px-3 py-2">신뢰도</th>
+                                        <th className="text-left px-3 py-2">근거</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {result.suspicious.map(s => {
+                                        const curLabel = CLASSIFIED_LABELS[s.current_class]?.label || s.current_class;
+                                        const curColor = CLASSIFIED_LABELS[s.current_class]?.color || '';
+                                        const aiLabel = CLASSIFIED_LABELS[s.ai_class]?.label || s.ai_class;
+                                        const aiColor = CLASSIFIED_LABELS[s.ai_class]?.color || '';
+                                        const confidence = Math.round(s.ai_confidence * 100);
+                                        return (
+                                            <tr key={s.tx_id} className="hover:bg-slate-50/50">
+                                                <td className="px-3 py-2 text-center">
+                                                    <input type="checkbox"
+                                                        checked={!!selected[s.tx_id]}
+                                                        onChange={e => setSelected({ ...selected, [s.tx_id]: e.target.checked })} />
+                                                </td>
+                                                <td className="px-3 py-2 text-xs text-slate-600">{fmtDate(s.trans_date)}</td>
+                                                <td className="px-3 py-2">
+                                                    <div className="font-medium">{s.remark1}</div>
+                                                    {s.remark2 && <div className="text-xs text-slate-400">{s.remark2}</div>}
+                                                </td>
+                                                <td className="px-3 py-2 text-right font-mono text-xs">
+                                                    {s.in_amount > 0 && <span className="text-emerald-600">+{s.in_amount.toLocaleString()}</span>}
+                                                    {s.out_amount > 0 && <span className="text-rose-600">-{s.out_amount.toLocaleString()}</span>}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${curColor}`}>{curLabel}</span>
+                                                    <div className="text-[10px] text-slate-400 mt-0.5">{s.current_classified_by}</div>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${aiColor}`}>{aiLabel}</span>
+                                                    {s.ai_standard_name && <div className="text-[10px] text-slate-500 mt-0.5">{s.ai_standard_name}</div>}
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                    <span className={`font-bold text-sm ${confidence >= 80 ? 'text-emerald-600' : confidence >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>{confidence}%</span>
+                                                </td>
+                                                <td className="px-3 py-2 text-xs text-slate-600 max-w-xs">{s.ai_reason}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+
+// ============================================================
+// AI 분석 탭 (2026-05-12 Phase 3)
+// 자연어 질의 → 사업장 재무 컨텍스트 자동 수집 → LLM 분석
+// ============================================================
+
+const CHAT_SUGGESTIONS = [
+    "이번 달 카드 수수료율이 지난 달 대비 어떻게 됐어?",
+    "최근 3개월 배달앱 매출 추이 알려줘",
+    "페이 결제 비중이 늘었는지 줄었는지 분석해줘",
+    "분류가 가장 많은 카테고리 3개와 비중은?",
+    "수수료를 가장 많이 떼는 채널은 어디야?",
+];
+
+function ChatTab() {
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState('');
+    const [sending, setSending] = useState(false);
+    const [contextSummary, setContextSummary] = useState(null);
+    const scrollRef = useRef(null);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages, sending]);
+
+    async function send(text) {
+        const q = (text ?? input).trim();
+        if (!q || sending) return;
+        const next = [...messages, { role: 'user', content: q }];
+        setMessages(next);
+        setInput('');
+        setSending(true);
+        try {
+            const res = await api.post('/bank-sync/chat', { messages: next });
+            setMessages([...next, { role: 'assistant', content: res.data.answer }]);
+            setContextSummary(res.data.context_summary);
+        } catch (e) {
+            setMessages([...next, {
+                role: 'assistant',
+                content: `❌ 분석 실패: ${e.response?.data?.detail || e.message}`,
+                error: true,
+            }]);
+        } finally {
+            setSending(false);
+        }
+    }
+
+    function reset() {
+        setMessages([]);
+        setContextSummary(null);
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="bg-gradient-to-r from-indigo-50 to-fuchsia-50 border border-indigo-200 rounded-xl p-4">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <MessageSquare size={18} className="text-indigo-600" />
+                    AI 재무 분석
+                </h2>
+                <p className="text-sm text-slate-600 mt-1">
+                    사업장의 카드/페이/배달 정산, 수수료율, 분류 분포 등 데이터를 기반으로
+                    자연어 질문에 답합니다. (qwen2.5:7b — 로컬, 무료)
+                </p>
+                {contextSummary && (
+                    <div className="mt-2 text-[11px] text-slate-500 font-mono">
+                        분석 컨텍스트: {contextSummary.months.join(', ')} · 계좌 {contextSummary.accounts}개 · 거래 {contextSummary.total_transactions}건
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col" style={{ height: '60vh', minHeight: 400 }}>
+                <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {messages.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                            <MessageSquare size={32} className="mb-2 opacity-40" />
+                            <p className="text-sm mb-4">아래 추천 질문을 클릭하거나 직접 질문해보세요.</p>
+                            <div className="flex flex-wrap gap-2 max-w-2xl justify-center">
+                                {CHAT_SUGGESTIONS.map((s, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => send(s)}
+                                        className="px-3 py-1.5 text-xs bg-slate-100 hover:bg-indigo-100 text-slate-700 hover:text-indigo-700 rounded-full transition-colors"
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        messages.map((m, i) => (
+                            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-2xl px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
+                                    m.role === 'user'
+                                        ? 'bg-indigo-600 text-white rounded-br-sm'
+                                        : m.error
+                                            ? 'bg-rose-50 border border-rose-200 text-rose-700'
+                                            : 'bg-slate-100 text-slate-800 rounded-bl-sm'
+                                }`}>
+                                    {m.content}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    {sending && (
+                        <div className="flex justify-start">
+                            <div className="bg-slate-100 px-4 py-2.5 rounded-2xl">
+                                <Loader2 className="animate-spin inline mr-2 text-slate-400" size={14} />
+                                <span className="text-xs text-slate-500">분석 중...</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="border-t border-slate-100 p-3">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={e => setInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
+                            disabled={sending}
+                            placeholder="질문을 입력하세요... (예: 이번 달 카드 수수료율이 왜 올랐어?)"
+                            className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-400 disabled:bg-slate-50"
+                        />
+                        {messages.length > 0 && (
+                            <button
+                                onClick={reset}
+                                title="대화 초기화"
+                                className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg"
+                            >
+                                <RefreshCw size={14} />
+                            </button>
+                        )}
+                        <button
+                            onClick={() => send()}
+                            disabled={sending || !input.trim()}
+                            className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-white rounded-xl text-sm font-semibold hover:from-indigo-700 hover:to-fuchsia-700 disabled:opacity-50"
+                        >
+                            <Send size={14} />
+                            전송
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
