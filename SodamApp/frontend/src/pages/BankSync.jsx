@@ -2860,8 +2860,7 @@ function CodefHistoricalModal({ accounts, onClose, onSuccess }) {
         setSubmitting(true);
         try {
             const payload = {
-                bank_code: selectedAcc?.bank_code,
-                account_number: selectedAcc?.account_number_masked?.replace(/\D/g, '') || '',
+                account_id: parseInt(form.account_id),
                 fast_id: form.fast_id,
                 fast_pwd: form.fast_pwd,
                 start_date: form.start_date,

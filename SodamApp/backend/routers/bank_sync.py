@@ -2484,8 +2484,7 @@ def regist_bank_account(
 
 
 class CodefHistoricalPullIn(BaseModel):
-    bank_code: str = Field(..., description="은행 코드 (예: 0088 신한)")
-    account_number: str = Field(..., description="계좌번호")
+    account_id: int = Field(..., description="등록된 계좌 ID (BankAccount.id)")
     fast_id: str = Field(..., description="조회전용 ID")
     fast_pwd: str = Field(..., description="조회전용 비밀번호")
     start_date: str = Field(..., description="YYYY-MM-DD (popbill 3개월 한도 이전 범위)")
@@ -2523,22 +2522,27 @@ def codef_pull_historical(
 
     service = DatabaseService()
     try:
-        # 1) CodefConnection 확보 (재인증 또는 신규 발급)
+        # 1) BankAccount 먼저 조회 (account_id 기반 — 평문 계좌번호 + bank_code 확보)
+        acc = service.session.get(BankAccount, body.account_id)
+        if not acc or acc.business_id != bid:
+            raise HTTPException(404, "해당 계좌가 등록되어 있지 않습니다.")
+        bank_code = acc.bank_code
+        account_number_plain = re.sub(r"\D", "", acc.account_number or "")
+
+        # 2) CodefConnection 확보 (재인증 또는 신규 발급)
         conn_svc = CodefConnectionService(service.session.bind)
         existing = service.session.exec(
             select(CodefConnection).where(
                 CodefConnection.business_id == bid,
-                CodefConnection.organization_code == body.bank_code,
+                CodefConnection.organization_code == bank_code,
                 CodefConnection.organization_type == "bank",
             )
         ).first()
         try:
             if existing and existing.status == "active":
-                # 기존 connectedId 재사용. 만약 거래내역 조회에서 만료 에러 나면 재인증 트리거.
                 conn = existing
                 connected_id = conn.connected_id
             else:
-                # 신규 발급 또는 재인증
                 if existing:
                     conn = conn_svc.reverify(existing.id, {
                         "id": body.fast_id,
@@ -2546,7 +2550,7 @@ def codef_pull_historical(
                         "client_type": body.client_type,
                     })
                 else:
-                    conn = conn_svc.register_bank(bid, body.bank_code, {
+                    conn = conn_svc.register_bank(bid, bank_code, {
                         "id": body.fast_id,
                         "password": body.fast_pwd,
                         "client_type": body.client_type,
@@ -2562,17 +2566,6 @@ def codef_pull_historical(
         except CodefAPIError as e:
             raise HTTPException(502, f"CODEF 등록 실패 [{e.code}]: {e.message}")
 
-        # 2) BankAccount 조회 (이미 등록되어 있어야 함)
-        acc = service.session.exec(
-            select(BankAccount).where(
-                BankAccount.business_id == bid,
-                BankAccount.bank_code == body.bank_code,
-                BankAccount.account_number == re.sub(r"\D", "", body.account_number),
-            )
-        ).first()
-        if not acc:
-            raise HTTPException(404, "해당 계좌가 등록되어 있지 않습니다. 먼저 계좌를 등록하세요.")
-
         # 3) CODEF 거래내역 조회
         client = CodefClient()
         url_path = (
@@ -2582,8 +2575,8 @@ def codef_pull_historical(
         )
         codef_params = {
             "connectedId": connected_id,
-            "organization": body.bank_code,
-            "account": re.sub(r"\D", "", body.account_number),
+            "organization": bank_code,
+            "account": account_number_plain,
             "startDate": sd.strftime("%Y%m%d"),
             "endDate": ed.strftime("%Y%m%d"),
             "orderBy": "1",       # 과거→최신
