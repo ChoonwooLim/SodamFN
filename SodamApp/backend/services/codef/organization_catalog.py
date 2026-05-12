@@ -71,7 +71,17 @@ _BANKS: tuple[Organization, ...] = (
     Organization("0092", "토스뱅크", "bank", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
 )
 
-_ALL: dict[str, Organization] = {o.code: o for o in (*_CARDS, *_BANKS)}
+# 주요 PG (Payment Gateway) — 2026-05-13 추가
+# CODEF 카탈로그 기준. 네이버페이/카카오페이/토스페이/페이코 4종 가맹점 매출 자동수집.
+# (제로페이는 CODEF 카탈로그 미등재 — Excel 정산서 업로드로 별도 처리)
+_PAYMENTS: tuple[Organization, ...] = (
+    Organization("0521", "네이버페이", "card", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0523", "페이코", "card", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0524", "카카오페이", "card", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0525", "토스페이", "card", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+)
+
+_ALL: dict[str, Organization] = {o.code: o for o in (*_CARDS, *_PAYMENTS, *_BANKS)}
 
 
 def get_organizations() -> dict[str, Organization]:

@@ -19,7 +19,6 @@ from sqlmodel import Session, select
 from database import engine
 from models import User, CardMerchant
 from routers.auth import get_admin_user
-from services.codef.organization_catalog import get_organization
 
 router = APIRouter(prefix="/api/codef/card-merchants", tags=["codef"])
 
@@ -48,14 +47,15 @@ CARD_CORP_TO_CODEF: dict = {
     "BC카드": "0361",
     "비씨카드": "0361",
     "삼성카드": "0364",
-    # PG 사 (CODEF 카드 카탈로그 미지원 — None 으로 마킹)
-    "카카오페이": None,
-    "네이버페이": None,
-    "Npay": None,
-    "제로페이": None,
-    "토스페이": None,
-    "페이코": None,
-    "SSG페이": None,
+    # PG (Payment Gateway) — CODEF 카탈로그 지원 (2026-05-13 통합)
+    "네이버페이": "0521",
+    "Npay":      "0521",
+    "페이코":     "0523",
+    "카카오페이": "0524",
+    "토스페이":   "0525",
+    # CODEF 미지원 PG → None (Excel/정산서 업로드 별도 처리)
+    "제로페이":   None,
+    "SSG페이":   None,
 }
 
 
