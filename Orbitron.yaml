@@ -72,6 +72,13 @@ services:
       # See C:\WORK\infra-docs\ai-shared-registry.md for full policy
       - key: OLLAMA_URL
         value: "http://192.168.219.117:11434"  # Ollama LLM (qwen2.5/mistral/llava)
+      # bank-sync AI 분류 (Phase 1, 2026-05-12)
+      - key: AI_CLASSIFY_PROVIDER
+        value: "ollama"  # ollama (default) | openclaw (fallback, 미구현)
+      - key: OLLAMA_CLASSIFY_MODEL
+        value: "qwen2.5:7b"  # PSU 안정 범위 (14b는 크래시 위험)
+      - key: AI_CLASSIFY_TIMEOUT_SEC
+        value: "30"
       - key: TTS_SERVER_URL
         value: "http://192.168.219.117:8101"  # TTS (Edge-TTS / XTTS v2) - reserved
       - key: MUSIC_SERVER_URL

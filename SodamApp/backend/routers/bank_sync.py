@@ -1465,6 +1465,131 @@ def auto_classify(
         service.close()
 
 
+@router.get("/ai-classify/health")
+def ai_classify_health(admin: User = Depends(get_admin_user)):
+    """AI 분류 서비스 상태 점검 (provider/model/도달가능성)."""
+    from services.ai_classify_client import get_ai_classifier
+    return get_ai_classifier().health()
+
+
+@router.post("/transactions/{tx_id}/ai-classify-suggest")
+def ai_classify_suggest(
+    tx_id: int,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """단일 거래에 대한 AI(Ollama qwen2.5:7b) 분류 제안.
+
+    적용은 별도(PATCH /transactions/{id} 호출). 이 endpoint는 제안만 반환.
+    """
+    from services.ai_classify_client import get_ai_classifier, AIClassifyError
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        tx = service.session.get(BankTransaction, tx_id)
+        if not tx or tx.business_id != bid:
+            raise HTTPException(status_code=404, detail="거래를 찾을 수 없습니다.")
+        ai = get_ai_classifier()
+        if not ai.configured():
+            raise HTTPException(status_code=503, detail="AI 분류 서비스 미설정 (OLLAMA_URL 확인).")
+        try:
+            result = ai.suggest(
+                remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
+                in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+            )
+            return {"tx_id": tx_id, **result}
+        except AIClassifyError as e:
+            raise HTTPException(status_code=502, detail=f"AI 분류 실패: {e}")
+    finally:
+        service.close()
+
+
+class AIClassifyBatchIn(BaseModel):
+    account_id: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    only_unclassified: bool = True
+    max_items: int = Field(default=50, le=200, description="과도한 호출 방지")
+    min_confidence: float = Field(default=0.7, ge=0, le=1,
+        description="이 이상의 confidence만 자동 적용. 미만은 suggestions 로만 반환")
+    apply: bool = Field(default=False,
+        description="True 면 min_confidence 이상은 자동 적용. False면 제안만 반환")
+
+
+@router.post("/transactions/ai-classify-batch")
+def ai_classify_batch(
+    body: AIClassifyBatchIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """필터된 거래들에 대해 AI 분류 일괄 제안(또는 자동 적용).
+
+    동작:
+    - max_items 만큼 LLM 호출 (Ollama qwen2.5:7b)
+    - apply=True 면 min_confidence 이상은 즉시 적용 (classified_by='ai_qwen')
+    - apply=False 면 suggestions 배열만 반환 (UI에서 사용자 일괄 승인)
+    - manual 분류 거래는 절대 덮어쓰지 않음
+    """
+    from services.ai_classify_client import get_ai_classifier, AIClassifyError
+    bid = _resolve_bid(admin, x_view_as_business)
+    ai = get_ai_classifier()
+    if not ai.configured():
+        raise HTTPException(status_code=503, detail="AI 분류 서비스 미설정.")
+
+    service = DatabaseService()
+    try:
+        stmt = select(BankTransaction).where(BankTransaction.business_id == bid)
+        if body.account_id:
+            stmt = stmt.where(BankTransaction.account_id == body.account_id)
+        if body.start_date:
+            stmt = stmt.where(BankTransaction.trans_date >= _parse_date(body.start_date))
+        if body.end_date:
+            stmt = stmt.where(BankTransaction.trans_date <= _parse_date(body.end_date))
+        if body.only_unclassified:
+            stmt = stmt.where(BankTransaction.classified_as == "unclassified")
+
+        rows = service.session.exec(stmt).all()[: body.max_items]
+
+        suggestions = []
+        applied = 0
+        errors = 0
+        now = datetime.now()
+        for tx in rows:
+            try:
+                s = ai.suggest(
+                    remark1=tx.remark1, remark2=tx.remark2, remark3=tx.remark3,
+                    in_amount=tx.in_amount or 0, out_amount=tx.out_amount or 0,
+                )
+            except AIClassifyError as e:
+                errors += 1
+                suggestions.append({"tx_id": tx.id, "error": str(e)[:200]})
+                continue
+
+            entry = {"tx_id": tx.id, **s}
+            suggestions.append(entry)
+
+            if body.apply and tx.classified_by != "manual" and s["confidence"] >= body.min_confidence:
+                if s["classified_as"] != "unclassified" and s["classified_as"] != tx.classified_as:
+                    tx.classified_as = s["classified_as"]
+                    tx.classified_by = "ai_qwen"
+                    tx.classified_at = now
+                    _materialize_link(service, tx)
+                    service.session.add(tx)
+                    applied += 1
+
+        if body.apply and applied > 0:
+            service.session.commit()
+
+        return {
+            "processed": len(rows),
+            "applied": applied,
+            "errors": errors,
+            "suggestions": suggestions,
+        }
+    finally:
+        service.close()
+
+
 class ReclassifySettlementsIn(BaseModel):
     account_id: Optional[int] = None
     start_date: Optional[str] = None

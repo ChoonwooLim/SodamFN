@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock } from 'lucide-react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles } from 'lucide-react';
 import api from '../api';
 
 const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
@@ -271,6 +271,61 @@ export default function BankSync() {
         }
     }
 
+    // AI 분류 제안 모달 state
+    const [aiModal, setAiModal] = useState(null); // { tx, suggestion, loading, error }
+
+    async function handleAiSuggest(tx) {
+        setAiModal({ tx, suggestion: null, loading: true, error: null });
+        try {
+            const res = await api.post(`/bank-sync/transactions/${tx.id}/ai-classify-suggest`);
+            setAiModal({ tx, suggestion: res.data, loading: false, error: null });
+        } catch (e) {
+            setAiModal({ tx, suggestion: null, loading: false, error: e.response?.data?.detail || e.message });
+        }
+    }
+
+    async function applyAiSuggestion() {
+        if (!aiModal?.suggestion) return;
+        const { tx, suggestion } = aiModal;
+        try {
+            await api.patch(`/bank-sync/transactions/${tx.id}`, {
+                classified_as: suggestion.classified_as,
+            });
+            setAiModal(null);
+            fetchTxs();
+        } catch (e) {
+            alert('적용 실패: ' + (e.response?.data?.detail || e.message));
+        }
+    }
+
+    async function handleAiBatch() {
+        if (!confirm(
+            '필터에 해당하는 미분류 거래(최대 50건)에 대해 AI(Ollama qwen2.5:7b) 분류를 일괄 제안합니다.\n'
+            + '신뢰도 70% 이상 항목만 자동 적용. 미만은 제안 리스트로 반환.\n'
+            + '수동 분류는 보호됩니다.\n\n계속할까요?'
+        )) return;
+        try {
+            const body = {
+                account_id: filter.account_id ? parseInt(filter.account_id) : null,
+                start_date: filter.start_date || null,
+                end_date: filter.end_date || null,
+                only_unclassified: true,
+                max_items: 50,
+                min_confidence: 0.7,
+                apply: true,
+            };
+            const res = await api.post('/bank-sync/transactions/ai-classify-batch', body);
+            alert(
+                `AI 일괄 분류 완료\n`
+                + `검사 ${res.data.processed}건 · 자동 적용 ${res.data.applied}건 · 오류 ${res.data.errors}건\n`
+                + `(신뢰도 70% 미만은 적용되지 않음 — 개별 ✨ 버튼으로 검토)`
+            );
+            fetchTxs();
+        } catch (e) {
+            alert('AI 일괄 분류 실패: ' + (e.response?.data?.detail || e.message));
+        }
+    }
+
     async function handleReclassifySettlements() {
         if (!confirm(
             '입금 거래 중 카드사·페이사·배달앱 키워드가 매칭되는 항목을 '
@@ -477,6 +532,8 @@ export default function BankSync() {
                         onUpdate={updateTx}
                         onAutoClassify={handleAutoClassify}
                         onReclassifySettlements={handleReclassifySettlements}
+                        onAiSuggest={handleAiSuggest}
+                        onAiBatch={handleAiBatch}
                     />
                 )}
                 {tab === 'settlement' && (
@@ -517,6 +574,110 @@ export default function BankSync() {
                     onSubmit={handleManualAdd}
                 />
             )}
+
+            {aiModal && (
+                <AISuggestModal
+                    state={aiModal}
+                    onClose={() => setAiModal(null)}
+                    onApply={applyAiSuggestion}
+                />
+            )}
+        </div>
+    );
+}
+
+function AISuggestModal({ state, onClose, onApply }) {
+    const { tx, suggestion, loading, error } = state;
+    const suggestedLabel = suggestion ? CLASSIFIED_LABELS[suggestion.classified_as]?.label || suggestion.classified_as : '';
+    const suggestedColor = suggestion ? CLASSIFIED_LABELS[suggestion.classified_as]?.color || 'bg-slate-100 text-slate-600' : '';
+    const confidencePct = suggestion ? Math.round(suggestion.confidence * 100) : 0;
+    const confidenceColor = confidencePct >= 80 ? 'text-emerald-600'
+        : confidencePct >= 60 ? 'text-amber-600'
+        : 'text-rose-600';
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                <div className="px-5 py-4 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Sparkles size={18} />
+                        <h3 className="font-bold">AI 분류 제안</h3>
+                    </div>
+                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <div className="px-5 py-4 space-y-3">
+                    <div className="bg-slate-50 rounded-xl p-3 text-sm">
+                        <div className="text-xs text-slate-400 mb-1">대상 거래</div>
+                        <div className="font-medium text-slate-700">{tx.remark1 || '-'}</div>
+                        {tx.remark2 && <div className="text-xs text-slate-500">{tx.remark2}</div>}
+                        <div className="flex gap-3 mt-2 text-xs">
+                            {tx.in_amount > 0 && <span className="text-emerald-600 font-mono">입금 {fmtWon(tx.in_amount)}</span>}
+                            {tx.out_amount > 0 && <span className="text-rose-600 font-mono">출금 {fmtWon(tx.out_amount)}</span>}
+                            <span className="text-slate-400">{fmtDate(tx.trans_date)}</span>
+                        </div>
+                    </div>
+
+                    {loading && (
+                        <div className="text-center py-8">
+                            <Loader2 className="animate-spin inline mr-2 text-fuchsia-500" size={20} />
+                            <span className="text-sm text-slate-500">AI가 분석 중입니다... (1~3초)</span>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-sm text-rose-700">
+                            <AlertCircle size={14} className="inline mr-1" />
+                            {error}
+                        </div>
+                    )}
+
+                    {suggestion && !loading && (
+                        <>
+                            <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400">제안 분류</span>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${suggestedColor}`}>
+                                        {suggestedLabel}
+                                    </span>
+                                </div>
+                                {suggestion.standard_name && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-400">표준명</span>
+                                        <span className="text-sm font-mono text-slate-700">{suggestion.standard_name}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-slate-400">신뢰도</span>
+                                    <span className={`text-sm font-bold ${confidenceColor}`}>{confidencePct}%</span>
+                                </div>
+                                <div className="pt-2 border-t border-slate-100">
+                                    <div className="text-xs text-slate-400 mb-1">근거</div>
+                                    <div className="text-sm text-slate-700">{suggestion.reason}</div>
+                                </div>
+                                <div className="text-[10px] text-slate-300 pt-1">{suggestion.provider}</div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={onClose}
+                                    className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50"
+                                >
+                                    닫기
+                                </button>
+                                <button
+                                    onClick={onApply}
+                                    className="flex-1 px-4 py-2 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white rounded-xl text-sm font-semibold hover:from-fuchsia-700 hover:to-rose-700"
+                                >
+                                    <CheckCircle2 size={14} className="inline mr-1" /> 수락 적용
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
@@ -1067,7 +1228,7 @@ function PullModal({ acc, form, setForm, pulling, result, onClose, onExecute }) 
     );
 }
 
-function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements }) {
+function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements, onAiSuggest, onAiBatch }) {
     return (
         <div>
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
@@ -1152,6 +1313,13 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                         >
                             <RefreshCw size={12} /> 정산 재분류
                         </button>
+                        <button
+                            onClick={onAiBatch}
+                            title="미분류 거래에 AI(Ollama qwen2.5:7b) 분류 제안 일괄 실행. 신뢰도 70%↑만 자동 적용"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white rounded-lg text-xs font-semibold hover:from-fuchsia-700 hover:to-rose-700"
+                        >
+                            <Sparkles size={12} /> AI 분류
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1203,18 +1371,32 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                                         {tx.balance != null ? tx.balance.toLocaleString('ko-KR') : '-'}
                                     </td>
                                     <td className="px-4 py-3">
-                                        <select
-                                            value={tx.classified_as}
-                                            onChange={e => onUpdate(tx, { classified_as: e.target.value })}
-                                            className={`px-2 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${CLASSIFIED_LABELS[tx.classified_as]?.color || ''}`}
-                                        >
-                                            {Object.entries(CLASSIFIED_LABELS).map(([k, v]) => (
-                                                <option key={k} value={k}>{v.label}</option>
-                                            ))}
-                                        </select>
+                                        <div className="flex items-center gap-1">
+                                            <select
+                                                value={tx.classified_as}
+                                                onChange={e => onUpdate(tx, { classified_as: e.target.value })}
+                                                className={`px-2 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer ${CLASSIFIED_LABELS[tx.classified_as]?.color || ''}`}
+                                            >
+                                                {Object.entries(CLASSIFIED_LABELS).map(([k, v]) => (
+                                                    <option key={k} value={k}>{v.label}</option>
+                                                ))}
+                                            </select>
+                                            {onAiSuggest && (
+                                                <button
+                                                    onClick={() => onAiSuggest(tx)}
+                                                    title="AI(qwen2.5:7b) 분류 제안 받기"
+                                                    className="p-1 text-fuchsia-500 hover:text-fuchsia-700 hover:bg-fuchsia-50 rounded transition-colors"
+                                                >
+                                                    <Sparkles size={14} />
+                                                </button>
+                                            )}
+                                        </div>
                                         {tx.classified_by && (
                                             <div className="text-[10px] text-slate-400 mt-1">
-                                                {tx.classified_by === 'auto' ? '자동' : tx.classified_by === 'manual' ? '수동' : tx.classified_by}
+                                                {tx.classified_by === 'auto' ? '자동'
+                                                    : tx.classified_by === 'manual' ? '수동'
+                                                    : tx.classified_by === 'ai_qwen' ? 'AI'
+                                                    : tx.classified_by}
                                             </div>
                                         )}
                                     </td>
