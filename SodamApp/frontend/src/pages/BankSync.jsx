@@ -13,7 +13,7 @@ const CLASSIFIED_LABELS = {
     excluded: { label: '제외', color: 'bg-slate-200 text-slate-500' },
     // 2026-05-12: 카드/페이/배달앱 정산 입금 — 매출과 분리 (중복 방지)
     card_settlement:     { label: '카드입금', color: 'bg-violet-100 text-violet-700' },
-    pay_settlement:      { label: '페이',     color: 'bg-fuchsia-100 text-fuchsia-700' },
+    pay_settlement:      { label: '페이입금', color: 'bg-fuchsia-100 text-fuchsia-700' },
     delivery_settlement: { label: '배달입금', color: 'bg-rose-100 text-rose-700' },
 };
 
@@ -262,12 +262,39 @@ export default function BankSync() {
             alert(
                 `자동 분류 완료\n총 ${res.data.processed}건 처리\n`
                 + `매출 ${c.revenue || 0} · 지출 ${c.expense || 0} · 매입 ${c.purchase || 0} · 이체 ${c.transfer || 0}\n`
-                + `카드입금 ${c.card_settlement || 0} · 페이 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0}\n`
+                + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0}\n`
                 + `학습 ${c.learned || 0} · 미분류 ${c.skip || 0}`
             );
             fetchTxs();
         } catch (e) {
             alert('자동 분류 실패: ' + (e.response?.data?.detail || e.message));
+        }
+    }
+
+    async function handleReclassifySettlements() {
+        if (!confirm(
+            '입금 거래 중 카드사·페이사·배달앱 키워드가 매칭되는 항목을 '
+            + '카드입금·페이입금·배달입금으로 강제 재분류합니다.\n'
+            + '기존 분류(제외/매출/매입 등)와 학습 패턴을 무시합니다.\n'
+            + '(수동 분류는 보호됩니다)\n\n계속할까요?'
+        )) return;
+        try {
+            const body = {
+                account_id: filter.account_id ? parseInt(filter.account_id) : null,
+                start_date: filter.start_date || null,
+                end_date: filter.end_date || null,
+                override_manual: false,
+            };
+            const res = await api.post('/bank-sync/transactions/reclassify-settlements', body);
+            const c = res.data.counts;
+            alert(
+                `정산 재분류 완료\n총 ${c.scanned}건 검사\n`
+                + `카드입금 ${c.card_settlement} · 페이입금 ${c.pay_settlement} · 배달입금 ${c.delivery_settlement}\n`
+                + `이미 정확 ${c.already_correct} · 키워드 미매칭 ${c.skipped_no_match} · 수동분류 보호 ${c.skipped_manual}`
+            );
+            fetchTxs();
+        } catch (e) {
+            alert('정산 재분류 실패: ' + (e.response?.data?.detail || e.message));
         }
     }
 
@@ -449,6 +476,7 @@ export default function BankSync() {
                         onApply={fetchTxs}
                         onUpdate={updateTx}
                         onAutoClassify={handleAutoClassify}
+                        onReclassifySettlements={handleReclassifySettlements}
                     />
                 )}
                 {tab === 'settlement' && (
@@ -1039,7 +1067,7 @@ function PullModal({ acc, form, setForm, pulling, result, onClose, onExecute }) 
     );
 }
 
-function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify }) {
+function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements }) {
     return (
         <div>
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
@@ -1116,6 +1144,13 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700"
                         >
                             <Tag size={12} /> 자동 분류
+                        </button>
+                        <button
+                            onClick={onReclassifySettlements}
+                            title="입금 거래 중 카드사/페이/배달앱 키워드 매칭 건을 강제로 재분류 (기존 분류 무시)"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700"
+                        >
+                            <RefreshCw size={12} /> 정산 재분류
                         </button>
                     </div>
                 </div>

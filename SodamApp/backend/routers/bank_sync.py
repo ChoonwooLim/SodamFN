@@ -1326,15 +1326,13 @@ def _classify_one_tx(
     if not remark:
         return None
 
-    # 1) 학습 패턴 (가장 강한 시그널 — 과거 분류 인계)
-    if tx.remark1 and tx.remark1 in learned_remarks:
-        return learned_remarks[tx.remark1]
-
-    # 2) 이체 키워드 (revenue 키워드보다 우선)
+    # 1) 이체 키워드 (항상 우선)
     if any(k in remark for k in TRANSFER_KEYWORDS):
         return "transfer"
 
-    # 3) 입금 → settlement 우선 (카드/페이/배달앱 정산 — 매출 중복 방지)
+    # 2) 입금 + settlement 매핑 매칭 — 학습 패턴보다 우선 (명확한 비즈니스 규칙)
+    #    카드사/페이사/배달앱 이름이 remark 에 있으면 settlement 가 확실하므로
+    #    과거 '제외'/'매출' 로 학습된 패턴이 있어도 settlement 로 분류한다.
     if tx.in_amount > 0:
         s = _resolve_settlement(tx.remark1, tx.remark2)
         if s is not None:
@@ -1345,11 +1343,16 @@ def _classify_one_tx(
                 return "pay_settlement"
             if stype == "delivery":
                 return "delivery_settlement"
-        # 카드/페이/배달이 아닌 입금 — 손님 직접 송금 등. 자동 default 매출은 위험하므로
-        # 미분류 유지 (사용자가 manual classify 하거나 학습 패턴이 쌓이면 자동 분류됨).
+
+    # 3) 학습 패턴 (settlement 미매칭 시 적용)
+    if tx.remark1 and tx.remark1 in learned_remarks:
+        return learned_remarks[tx.remark1]
+
+    # 4) 입금 + settlement 미매칭 + 학습 없음 → 미분류 유지
+    if tx.in_amount > 0:
         return None
 
-    # 4) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
+    # 5) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
     if tx.out_amount > 0:
         for name, v in vendor_by_name.items():
             if name and name in remark:
@@ -1456,6 +1459,89 @@ def auto_classify(
 
         rows = service.session.exec(stmt).all()
         counts = _classify_txs(service, bid, rows, only_unclassified=body.only_unclassified)
+        service.session.commit()
+        return {"processed": len(rows), "counts": counts}
+    finally:
+        service.close()
+
+
+class ReclassifySettlementsIn(BaseModel):
+    account_id: Optional[int] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    override_manual: bool = Field(
+        default=False,
+        description="True 면 classified_by='manual' 도 덮어씀. 기본 False (수동 분류 보호)",
+    )
+
+
+@router.post("/transactions/reclassify-settlements")
+def reclassify_settlements(
+    body: ReclassifySettlementsIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """입금 거래 중 카드사/페이/배달앱 키워드 매칭되는 건을 settlement 로 강제 재분류.
+
+    기존 분류 (excluded/revenue/expense 등) 와 학습 패턴을 무시하고
+    _resolve_settlement 매칭이 우선. CardPayment/PayPayment/DeliveryRevenue 자동 생성.
+    classified_by='manual' 은 override_manual=True 가 아닌 한 보호.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        stmt = select(BankTransaction).where(
+            BankTransaction.business_id == bid,
+            BankTransaction.in_amount > 0,
+        )
+        if body.account_id:
+            stmt = stmt.where(BankTransaction.account_id == body.account_id)
+        if body.start_date:
+            stmt = stmt.where(BankTransaction.trans_date >= _parse_date(body.start_date))
+        if body.end_date:
+            stmt = stmt.where(BankTransaction.trans_date <= _parse_date(body.end_date))
+
+        rows = service.session.exec(stmt).all()
+
+        target_map = {
+            "card": "card_settlement",
+            "pay": "pay_settlement",
+            "delivery": "delivery_settlement",
+        }
+        counts = {
+            "scanned": len(rows),
+            "card_settlement": 0,
+            "pay_settlement": 0,
+            "delivery_settlement": 0,
+            "skipped_manual": 0,
+            "skipped_no_match": 0,
+            "already_correct": 0,
+        }
+        now = datetime.now()
+
+        for tx in rows:
+            s = _resolve_settlement(tx.remark1, tx.remark2)
+            if s is None:
+                counts["skipped_no_match"] += 1
+                continue
+            stype, _name = s
+            target = target_map[stype]
+
+            if tx.classified_as == target:
+                counts["already_correct"] += 1
+                continue
+
+            if tx.classified_by == "manual" and not body.override_manual:
+                counts["skipped_manual"] += 1
+                continue
+
+            tx.classified_as = target
+            tx.classified_by = "reclassify_settlement"
+            tx.classified_at = now
+            _materialize_link(service, tx)
+            service.session.add(tx)
+            counts[target] += 1
+
         service.session.commit()
         return {"processed": len(rows), "counts": counts}
     finally:
