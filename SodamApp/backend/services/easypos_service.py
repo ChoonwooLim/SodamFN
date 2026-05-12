@@ -136,17 +136,14 @@ class EasyPosClient:
         except httpx.HTTPError as e:
             raise EasyPosError(f"이지포스 통신 실패 [{path}]: {e}") from e
 
-        # 임시 디버그 — 로그인 응답 raw 일부 로깅 (cipher 정확성 진단용)
-        if "selectEasyPosLogin" in path:
-            log.warning("[easypos.login.resp.debug] status=%d len=%d body[:600]=%r",
-                        r.status_code, len(r.text), r.text[:600])
-            log.warning("[easypos.login.resp.cookies] %s",
-                        dict(self._client.cookies.items()))
-
         resp = parse_ssv(r.text)
         if not resp.ok:
+            # 디버그: 응답의 ErrorCode + msg + 첫 200chars body 포함
+            extra = ""
+            if "selectEasyPosLogin" in path:
+                extra = f" [code={resp.error_code} cookies={len(self._client.cookies)}]"
             raise EasyPosError(
-                f"이지포스 응답 오류 [{path}]: {resp.error_msg or 'unknown'}",
+                f"이지포스 응답 오류 [{path}]: {resp.error_msg or 'unknown'}{extra}",
                 error_code=resp.error_code,
             )
         return resp
@@ -240,15 +237,18 @@ class EasyPosClient:
                 error_message=f"RSA 암호화 실패: {e}",
             )
 
-        # 임시 디버그 — 평문 길이/문자코드, cipher 길이, 공개키 정보 로깅.
-        # 사장님 매장 데이터라 실제 PW 평문은 절대 로그에 안 남기고 길이만.
-        log.warning(
-            "[easypos.login.debug] id_len=%d id_codes=%s pw_len=%d pw_codes=%s "
-            "mod_len=%d exp=%s sec_id_len=%d sec_pw_len=%d",
-            len(easypos_id), [ord(c) for c in easypos_id[:6]],
-            len(password), [ord(c) for c in password[:4]],
-            len(modulus_hex), exponent_hex,
-            len(secured_id), len(secured_pw),
+        # 임시 디버그 — 평문 길이/문자코드, cipher 길이를 클라이언트 응답에 담는다.
+        # Orbitron logger stdout 수집이 비어있어서 화면 메시지로 직접 노출.
+        # 평문 PW는 절대 노출 X — 길이와 charcode 만.
+        self._last_debug = (
+            f"id_len={len(easypos_id)} "
+            f"id_codes={[ord(c) for c in easypos_id[:6]]} "
+            f"pw_len={len(password)} "
+            f"pw_codes={[ord(c) for c in password[:4]]} "
+            f"mod_len={len(modulus_hex)} "
+            f"exp={exponent_hex} "
+            f"sec_id_len={len(secured_id)} "
+            f"sec_pw_len={len(secured_pw)}"
         )
 
         datasets = {
@@ -275,7 +275,12 @@ class EasyPosClient:
                 out_secure=1,
             )
         except EasyPosError as e:
-            return LoginResult(ok=False, error_message=f"이지포스 로그인 실패: {e}")
+            # 디버그 정보 함께 노출 — 사장님 화면에서 진단 가능
+            dbg = getattr(self, "_last_debug", "no-debug")
+            return LoginResult(
+                ok=False,
+                error_message=f"이지포스 로그인 실패: {e} [DEBUG {dbg}]",
+            )
 
         info = resp.first("gdsLoginInfo") or {}
         if not (info.get("SHOP_NAME") or info.get("USER_ID")):
