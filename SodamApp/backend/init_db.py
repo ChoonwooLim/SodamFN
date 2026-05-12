@@ -89,6 +89,22 @@ def _run_migrations():
         # DeliveryRevenue 가 multi-tenant 격리 위해 business_id 필요 — 기존엔 누락되어 있었음
         ("deliveryrevenue", "business_id", "INTEGER"),
         ("deliveryrevenue", "source", "VARCHAR DEFAULT 'excel'"),
+        # CODEF Phase 1 출처 추적 — database.py 의 _run_codef_phase1_migrations 와 동일
+        # init_db 가 startup 진입점이므로 여기서도 마이그레이션. (이전엔 빠져있어 production 에
+        # cardpayment.source 컬럼이 없는 상태 → reclassify-settlements 호출 시 500)
+        ("cardsalesapproval", "source", "VARCHAR DEFAULT 'excel'"),
+        ("cardsalesapproval", "source_meta", "TEXT"),
+        ("cardsalesapproval", "connection_id", "INTEGER"),
+        ("cardsalesapproval", "synced_at", "TIMESTAMP"),
+        ("cardpayment", "source", "VARCHAR DEFAULT 'excel'"),
+        ("cardpayment", "source_meta", "TEXT"),
+        ("cardpayment", "connection_id", "INTEGER"),
+        ("cardpayment", "synced_at", "TIMESTAMP"),
+        # 2026-05-12: PayPayment 신규 테이블 자체는 metadata.create_all 이 생성하지만
+        # 만약 SQLModel metadata mismatch 로 누락되면 아래가 보강.
+        ("paypayment", "source", "VARCHAR DEFAULT 'bank_sync'"),
+        ("paypayment", "source_meta", "TEXT"),
+        ("paypayment", "synced_at", "TIMESTAMP"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")
