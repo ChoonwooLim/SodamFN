@@ -1213,17 +1213,48 @@ DELIVERY_CHANNEL_MAP: List[tuple] = [
 TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
 
 
+# remark1 = "{카드사 약자}{6+ digits}" 형태의 정산 입금 패턴
+# 한국 카드사 매출 정산 표준 포맷 (예: 롯데9924419309, NH17831866, 하나92510497, SHC140990276)
+# 우 = ambiguous (우리카드 vs 우XX 개인), 현 = ambiguous (현대카드 vs 현XX 개인) → 제외
+CARD_PREFIX_MAP: dict = {
+    "NH":   "NH카드",
+    "KB":   "KB국민카드",
+    "하나":  "하나카드",      # 하나은행 송금도 '하나' 시작하지만 그땐 한글 이름 옴 (digits 패턴 아님)
+    "롯데":  "롯데카드",
+    "SHC":  "신한카드",       # Shinhan Card 표준 정산 코드
+    "신한":  "신한카드",
+    "삼성":  "삼성카드",
+    "비씨":  "BC카드",
+    "BC":   "BC카드",
+}
+
+# remark1 끝에 카드사 약자 붙는 패턴 (예: "743149798BC")
+CARD_SUFFIX_MAP: dict = {
+    "BC": "BC카드",
+}
+
+# remark2 = "(은행명)" 정산 은행 힌트 — remark1 매칭 실패 시 폴백
+# (우리)/(외환) 는 ambiguous 라 제외
+SETTLEMENT_BANK_HINT: dict = {
+    "(국민)": "KB국민카드",
+    "(농협)": "NH카드",
+    "(하나)": "하나카드",
+}
+
+_CARD_PREFIX_RE = re.compile(r'^([가-힣A-Z]+)(\d{6,})$')
+_CARD_SUFFIX_RE = re.compile(r'^(\d{6,})([A-Z]{2,})$')
+
+
 def _resolve_settlement(remark1: Optional[str], remark2: Optional[str]) -> Optional[tuple]:
     """입금 remark → (settlement_type, standard_name) 또는 None.
 
-    Returns:
-      ("card",     "신한카드")
-      ("pay",      "카카오페이")
-      ("delivery", "쿠팡이츠")
-      None  — 어느 그룹에도 매칭 안됨
-
-    매칭 우선순위: DELIVERY → PAY → CARD.
-    배달앱 키워드가 가장 명확하고 카드사명이 가장 포괄적이므로 그 순서로.
+    매칭 우선순위:
+      1. DELIVERY 키워드 (가장 구체적)
+      2. PAY 키워드
+      3. CARD 키워드 (전체 문자열)
+      4. CARD prefix+digits 패턴 (예: 'NH17831866' → NH카드)
+      5. CARD suffix 패턴 (예: '743149798BC' → BC카드)
+      6. CARD remark2 은행 힌트 (예: '(국민)' → KB국민카드)
     """
     text = " ".join(filter(None, [remark1, remark2])).strip()
     if not text:
@@ -1237,6 +1268,28 @@ def _resolve_settlement(remark1: Optional[str], remark2: Optional[str]) -> Optio
     for kw, name in CARD_CHANNEL_MAP:
         if kw in text:
             return ("card", name)
+    # 4) remark1 prefix + digits
+    if remark1:
+        r1 = remark1.strip()
+        m = _CARD_PREFIX_RE.match(r1)
+        if m:
+            prefix = m.group(1)
+            # 긴 prefix 먼저 매칭 (롯데/하나/SHC 등 2글자 이상이 NH/KB/BC 보다 우선)
+            for p in sorted(CARD_PREFIX_MAP.keys(), key=lambda x: -len(x)):
+                if prefix == p or prefix.startswith(p):
+                    return ("card", CARD_PREFIX_MAP[p])
+        # 5) suffix pattern (예: 743149798BC)
+        m2 = _CARD_SUFFIX_RE.match(r1)
+        if m2:
+            suffix = m2.group(2)
+            if suffix in CARD_SUFFIX_MAP:
+                return ("card", CARD_SUFFIX_MAP[suffix])
+    # 6) remark2 (은행) 힌트 — remark1 이 digits 만 있을 때 보조
+    if remark2:
+        r2 = remark2.strip()
+        for kw, name in SETTLEMENT_BANK_HINT.items():
+            if kw in r2:
+                return ("card", name)
     return None
 
 
