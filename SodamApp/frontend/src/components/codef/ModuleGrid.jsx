@@ -23,10 +23,10 @@ const MODULES = [
         title: '계좌 거래내역',
         provider: 'CODEF / 팝빌',
         icon: Building2,
-        color: 'slate',
-        active: false,
-        phase: 'Phase 2',
-        description: '20+ 은행 입출금 내역 자동수집',
+        color: 'blue',
+        active: true,
+        href: '/finance/bank-sync',
+        description: '20+ 은행 입출금 내역 자동수집 + AI 분류',
     },
     {
         id: 'insurance',
@@ -92,7 +92,7 @@ function ModuleCard({ module, stats }) {
             </div>
             <h3 className="text-base font-semibold text-slate-800 mb-1">{module.title}</h3>
             <p className="text-sm text-slate-500 mb-3">{module.description}</p>
-            {stats && (
+            {stats && module.id === 'cards' && (
                 <div className="text-sm">
                     <div className="flex justify-between text-slate-700">
                         <span>등록 카드사</span>
@@ -107,19 +107,36 @@ function ModuleCard({ module, stats }) {
                     )}
                 </div>
             )}
+            {stats && module.id === 'banks' && (
+                <div className="text-sm space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                        <span>등록 계좌</span>
+                        <span className="font-semibold">{stats.accountCount}개</span>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                        <span>이번 달 거래</span>
+                        <span className="font-semibold">{stats.txCount?.toLocaleString() || 0}건</span>
+                    </div>
+                    {stats.codefActiveCount > 0 && (
+                        <div className="text-xs text-emerald-700">
+                            ✓ CODEF 연결 {stats.codefActiveCount}건 활성
+                        </div>
+                    )}
+                </div>
+            )}
             <div className="mt-3 text-blue-600 text-sm font-medium">관리 →</div>
         </Link>
     );
 }
 
-export default function ModuleGrid({ cardStats }) {
+export default function ModuleGrid({ cardStats, bankStats }) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {MODULES.map((m) => (
                 <ModuleCard
                     key={m.id}
                     module={m}
-                    stats={m.id === 'cards' ? cardStats : null}
+                    stats={m.id === 'cards' ? cardStats : m.id === 'banks' ? bankStats : null}
                 />
             ))}
         </div>
