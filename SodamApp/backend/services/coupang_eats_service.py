@@ -412,25 +412,44 @@ class CoupangEatsClient:
                          start: datetime.datetime,
                          end: datetime.datetime,
                          *,
-                         page_size: int = 100,
-                         max_pages: int = 50) -> list[dict]:
+                         page_size: int = 10,
+                         max_pages: int = 500) -> list[dict]:
         """모든 페이지 순회 — orders list 만 평탄화.
 
-        max_pages 안전장치로 무한 루프 방지.
+        page_size 기본 10 — HAR 캡처 기준 쿠팡이츠가 큰 page_size 거부 (빈 응답).
+        max_pages 안전장치 (10*500 = 5000건 한도).
         """
         all_orders: list[dict] = []
         for page in range(max_pages):
             res = self.fetch_orders(store_id, start, end,
                                     page_number=page, page_size=page_size)
+            log.info(
+                "fetch_all_orders: page=%d size=%d got=%d total_elem=%d total_sales=%d",
+                page, page_size, len(res.orders),
+                res.total_order_count, res.total_sale_price,
+            )
             all_orders.extend(res.orders)
-            page_vo = res.raw.get("orderPageVo") or {}
-            total_elem = page_vo.get("totalElements") or res.total_order_count
+
+            # data_root 에서 orderPageVo 추출 (raw 가 wrapping 됐을 수 있어 양쪽 시도)
+            page_vo = None
+            for cand in (res.raw, res.raw.get("data") if isinstance(res.raw, dict) else None):
+                if isinstance(cand, dict) and isinstance(cand.get("orderPageVo"), dict):
+                    page_vo = cand["orderPageVo"]
+                    break
+            page_vo = page_vo or {}
+
+            total_elem = int(page_vo.get("totalElements") or res.total_order_count or 0)
             last_page = page_vo.get("lastPageNumber")
-            if last_page is not None and page >= int(last_page):
-                break
-            if len(all_orders) >= int(total_elem):
-                break
+
             if not res.orders:
+                break
+            if last_page is not None:
+                try:
+                    if page >= int(last_page):
+                        break
+                except (TypeError, ValueError):
+                    pass
+            if total_elem > 0 and len(all_orders) >= total_elem:
                 break
         return all_orders
 
