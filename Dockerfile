@@ -27,7 +27,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev \
     libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libfribidi0 \
     fonts-nanum fonts-noto-cjk \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Timezone: 호스트 cron 이 KST 기준으로 실행되므로 컨테이너도 KST 통일.
+# 그렇지 않으면 date.today() / "어제" 계산이 UTC 기준이 되어 1일 차이 발생.
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 COPY SodamApp/backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
