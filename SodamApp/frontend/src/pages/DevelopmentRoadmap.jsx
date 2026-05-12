@@ -279,6 +279,8 @@ const phases = [
                     { text: '이동식 단말기 카드매출 (코페이/KSnet) — 수수료 역산 + 사용자 PG 설정 UI (SaaS 다중매장)', done: true },
                     { text: '입금 분류 4종 신규 — 현금매출/현금입금/차입금/기타입금 + 매출 인식 분리', done: true },
                     { text: 'KICC 이지포스 POS 매출 자동수집 — RSA-PKCS1v15 + JSESSIONID warm-up 비공식 API 역공학 + 야간 cron (5/11 검증: 영수증 309건/235만원)', done: true },
+                    { text: '쿠팡이츠 배달앱 매출 자동수집 — Playwright + curl_cffi(Chrome120 TLS 위조) 하이브리드 + unify-token 신버전 인증 + 수동 쿠키 폴백 + 야간 cron (1개월 백필 검증: 주문 436건/696만원)', done: true },
+                    { text: 'Orbitron 호스트 cron 등록 — EasyPOS 03:00 + 쿠팡이츠 04:00 일별 자동 동기화 + Docker timezone Asia/Seoul 통일', done: true },
                 ],
             },
             {

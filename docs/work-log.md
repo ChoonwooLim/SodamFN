@@ -1143,3 +1143,84 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 5. **Popbill EasyFinBank LIVE 운영 전환** — 2026-05-13부터 -99010016 해제 예정, 전체 동기화 1회로 1~5월 재pull 권장
 
 ---
+
+
+## 2026-05-13
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 쿠팡이츠 배달앱 매출 자동수집 — Phase 2 Playwright + curl_cffi 하이브리드 풀스택 | 완료 |
+| fix  | 쿠팡이츠 통합 구현 7회 버그픽스 (인증 / 파서 / 필드 매핑 / API 제약) | 완료 |
+| infra | Docker 이미지 timezone Asia/Seoul 통일 | 완료 |
+| infra | Orbitron 호스트 cron 등록 — EasyPOS 03:00 + 쿠팡이츠 04:00 일별 자동 동기화 | 완료 |
+
+### 세부 내용
+
+**1) 쿠팡이츠 배달앱 매출 자동수집 — 풀스택 (커밋 8건) — 오늘의 메인 작업**
+
+소담김밥 PT용 자가 사용 + 정식 회사 전환 시 공식 API 협의 예정.
+사장님 명시 원칙 "PT 일정 무관, 최고 퀄리티+편의성을 위해 어떤 비용도 감수 가능" 적용.
+
+- HAR 캡처 분석으로 비공식 API endpoint 역공학:
+  - POST /api/v1/merchant/login (평문 JSON, RSA 없음 — EasyPOS 보다 쉬움)
+  - POST /api/v1/merchant/web/order/condition (주문 단위 raw)
+  - GET /api/v1/merchant/transactions/{storeId}/settlement-management-data (일별 정산)
+  - GET /api/v1/merchant/whoami (세션 검증)
+- 인증 우회 전략 — 하이브리드:
+  - 자동 로그인: Playwright 헤드리스 Chromium + stealth → Akamai sensor 자동 통과 시도
+  - 매출 API: curl_cffi (Chrome120 TLS handshake/HTTP2 frame order 위조)
+  - 401 자동 감지 → 자동 재로그인 → 1회 재시도 로직
+- DB 모델 4종 신규: CoupangEatsCredential / CoupangEatsOrder / CoupangEatsSettlement / CoupangEatsSyncLog
+- 신규 서비스 2개: services/coupang_eats_service.py (curl_cffi), services/coupang_eats_login.py (Playwright)
+- 신규 라우터: routers/coupang_eats.py 11 endpoints (자격증명 CRUD + manual-cookies 폴백 + test-login + sync/manual + sync/cron-trigger + sync/logs + dashboard + debug/probe + debug/raw-orders)
+- 신규 페이지: pages/CoupangEatsModuleDetail.jsx (~700줄) — 자격증명/수동쿠키/실시간대시보드/수동동기화/이력
+- 외부연동 모듈 카드 활성화 (orange 테마)
+- 의존성 추가: curl_cffi>=0.7.0, playwright>=1.49.0, playwright-stealth>=1.0.6
+- Dockerfile: `python -m playwright install --with-deps chromium` (이미지 ~300MB 증가)
+
+**2) 디버깅 여정 (실시간 진단 + 7회 패치)**
+
+- 1차: 자동 로그인 Akamai 차단 확인 → Phase 1 폴백 (수동 쿠키 입력 방식) 정착
+- 2차: 수동 쿠키 입력 HTTP 401 — 디버그 endpoint /debug/probe 추가, 응답 body 240자 노출
+- 3차: 사장님 cookie 분석 — 21개 인식했지만 쿠팡이츠가 EATS_AT/RT 가 아닌 `unify-token + account-id` 신버전 인증 사용 발견 → sanity check 패치
+- 4차: 사장님 Application 탭 직접 복사로 쿠키 1개만 깨진 형식으로 들어감 → 모달 안내문 Network 탭 cookie 헤더 사용으로 변경 + 파서 견고화 (탭/줄바꿈 best-effort)
+- 5차: fetch_orders 500 (AttributeError NoneType) → None / 비-dict 응답 안전 처리 + /debug/raw-orders endpoint 추가
+- 6차: 주문 0건 (실제는 14건) → debug/raw-orders 응답 분석으로 필드명 mismatch 확정. createdAt(NOT orderedAt), totalAmount(NOT totalSalePrice), status(NOT orderStatus) 정정
+- 7차: 주문 여전히 0건, DB 직접 조회 결과 CoupangEatsOrder=0, CoupangEatsSettlement=54 → fetch_all_orders page_size 100 거부, 10 으로 변경 → 1개월 백필 436건 / 6,968,900원 성공
+
+**3) Orbitron cron 등록 (인프라)**
+
+- 호스트(stevenlim@192.168.219.101) crontab 에 2개 라인 추가:
+  - `0 3 * * *` → EasyPOS 동기화
+  - `0 4 * * *` → 쿠팡이츠 동기화
+- 즉시 테스트 통과 (EasyPOS 309건/235만원, 쿠팡이츠 14건/27.65만원 update)
+- timezone 발견: 컨테이너 UTC, 호스트 KST → target_date 1일 차이 → Dockerfile `TZ=Asia/Seoul` 추가로 통일
+
+**4) 검증 결과**
+
+| 항목 | 결과 |
+|------|------|
+| 어제 (5/12) 매출 | 14건 / 188,000원 |
+| 1개월 백필 (4/12 ~ 5/12) | 436건 / 6,968,900원 |
+| 7일 매출 (실시간 대시보드) | 1,738,000원 / 98건 (cancelled 제외) |
+| 자동수집 cron | 매일 KST 04:00 정상 작동 검증 |
+
+### 다음 세션 인계
+
+1. **TZ 패치 재배포 후 cron 정확성 검증** — 내일(5/14) 새벽 03:00/04:00 cron 실행 결과 docker logs + 동기화 이력에서 target_date 일치 여부 확인
+2. **사장님 보안 조치** — 대화 로그에 노출된 cookie (unify-token 등) 무효화 필요. 쿠팡이츠 로그아웃 → 재로그인 → 새 cookie 추출 → 셈하나 "쿠키 수동 갱신" 으로 교체
+3. **쿠키 갱신 주기 모니터링** — 가장 빠른 만료 쿠키 기준 일주일~1개월. 401 발생 시 cron 이력에 실패로 표시 → 알림 시스템 고려
+4. **배민 / 요기요 동일 패턴 확장** — 쿠팡이츠 패턴 완성됐으니 각 ~1일 작업. HAR 캡처 → 응답 구조 분석 → 필드 매핑 → DB 모델 → Router → 페이지
+5. **이메일 정산서 파싱 폴백 검토** — 쿠팡이츠가 매일 이메일로 정산서 발송. 합법 + 안정. HAR 역공학 차단 시 자동 폴백 경로
+6. **정식 회사 전환 시 공식 API 협의 필수** — 비공식 API 의존은 일시적 다리. 다수 가맹점 운영 전에 쿠팡이츠/배민/요기요 B2B API 협상 필요
+
+### 흥미로운 진단 데이터
+
+- 쿠팡이츠 7일 매출 1,844,500원 (포털) vs 셈하나 1,738,000원 (DB cancelled 제외): 차이는 cancelled 2건 (32,000원) + 시간차 1건 (74,500원) → cancelled 제외 정책 옵션 C 유지
+- 쿠팡이츠 unify-token 도입 시점: 2026년 초 추정 (HAR 캡처 응답 분석 기준)
+- Akamai Bot Manager sensor_data POST 경로 패턴: `/YqaJ3sMCd0pM/...` (난독화)
+
+---
+
