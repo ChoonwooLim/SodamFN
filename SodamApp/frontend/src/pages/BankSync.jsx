@@ -57,14 +57,21 @@ export default function BankSync() {
     const [loading, setLoading] = useState(false);
     const [syncMsg, setSyncMsg] = useState(null);
 
-    // Transactions
+    // Transactions — 기본 필터는 이번 달 (사장님 요구: 월별 기본 뷰)
+    const _today = new Date();
+    const _curY = _today.getFullYear();
+    const _curM = _today.getMonth() + 1;
+    const _monthStart = `${_curY}-${String(_curM).padStart(2, '0')}-01`;
+    const _lastDay = new Date(_curY, _curM, 0).getDate();
+    const _monthEnd = `${_curY}-${String(_curM).padStart(2, '0')}-${String(_lastDay).padStart(2, '0')}`;
+
     const [txs, setTxs] = useState([]);
     const [txTotal, setTxTotal] = useState(0);
     const [txLoading, setTxLoading] = useState(false);
     const [filter, setFilter] = useState({
         account_id: '',
-        start_date: '',
-        end_date: '',
+        start_date: _monthStart,
+        end_date: _monthEnd,
         classified_as: '',
         direction: '',
         q: '',
@@ -1328,8 +1335,105 @@ function PullModal({ acc, form, setForm, pulling, result, onClose, onExecute }) 
 
 function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements, onAiSuggest, onAiBatch }) {
     const [helpOpen, setHelpOpen] = useState(false);
+    const [bulkSyncing, setBulkSyncing] = useState(false);
+
+    // 월별 빠른 필터: filter.start_date/end_date 를 해당 월로 설정
+    function applyMonthFilter(year, month) {
+        const start = `${year}-${String(month).padStart(2, '0')}-01`;
+        // 월말 계산
+        const lastDay = new Date(year, month, 0).getDate();
+        const end = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+        setFilter({ ...filter, start_date: start, end_date: end });
+        setTimeout(() => onApply?.(), 0);
+    }
+
+    function clearDateFilter() {
+        setFilter({ ...filter, start_date: '', end_date: '' });
+        setTimeout(() => onApply?.(), 0);
+    }
+
+    async function handleBulkSync() {
+        const year = new Date().getFullYear();
+        if (!confirm(
+            `${year}년 1월부터 오늘까지 모든 계좌의 거래내역을 일괄 동기화합니다.\n`
+            + `(팝빌에서 pull → 자동 분류 → 정산 재분류까지 한 번에)\n\n`
+            + `이미 가져온 거래는 중복 제외됩니다. 계속할까요?`
+        )) return;
+        setBulkSyncing(true);
+        try {
+            const res = await api.post('/bank-sync/pull-monthly-bulk', {
+                year,
+                start_month: 1,
+                auto_reclassify_settlements: true,
+            });
+            const t = res.data.totals;
+            const sr = res.data.settlement_reclassify;
+            alert(
+                `일괄 동기화 완료 (${year}년)\n\n`
+                + `총 조회 ${t.fetched}건 · 신규 ${t.inserted}건 · 중복 ${t.duplicated}건\n`
+                + (sr
+                    ? `정산 재분류: 카드 ${sr.card_settlement} · 페이 ${sr.pay_settlement} · 배달 ${sr.delivery_settlement} · 이동식 ${sr.mobile_settlement}\n`
+                    + `(이미 정확 ${sr.already_correct} · 수동분류 보호 ${sr.skipped_manual} · 미매칭 ${sr.skipped_no_match})`
+                    : '')
+            );
+            onApply?.();
+        } catch (e) {
+            alert('일괄 동기화 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setBulkSyncing(false);
+        }
+    }
+
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const isMonthActive = (m) => filter.start_date === `${currentYear}-${String(m).padStart(2, '0')}-01`;
     return (
         <div>
+            {/* 월별 빠른 필터 + 일괄 동기화 */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-3 mb-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500 font-semibold">월별:</span>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                    const past = m > currentMonth;
+                    const active = isMonthActive(m);
+                    return (
+                        <button
+                            key={m}
+                            onClick={() => applyMonthFilter(currentYear, m)}
+                            disabled={past}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                active
+                                    ? 'bg-slate-800 text-white'
+                                    : past
+                                        ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            {m}월
+                        </button>
+                    );
+                })}
+                <button
+                    onClick={clearDateFilter}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                        !filter.start_date && !filter.end_date
+                            ? 'bg-slate-800 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                    전체
+                </button>
+                <span className="text-slate-300 mx-2">|</span>
+                <button
+                    onClick={handleBulkSync}
+                    disabled={bulkSyncing}
+                    title={`${currentYear}년 1월~오늘 모든 계좌 거래내역 popbill 에서 일괄 가져오기 + 자동 분류 + 정산 재분류`}
+                    className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg text-xs font-semibold hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50"
+                >
+                    {bulkSyncing ? <Loader2 className="animate-spin" size={12} /> : <Download size={12} />}
+                    {bulkSyncing ? '동기화 중...' : `${currentYear}년 전체 동기화`}
+                </button>
+            </div>
+
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-2 mb-3">
                     <select

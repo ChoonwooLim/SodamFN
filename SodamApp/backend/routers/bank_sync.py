@@ -2357,6 +2357,173 @@ def reclassify_settlements(
         service.close()
 
 
+class PullMonthlyBulkIn(BaseModel):
+    year: int = Field(..., description="대상 연도 (예: 2026)")
+    account_id: Optional[int] = Field(default=None,
+        description="특정 계좌만 동기화 (없으면 사업장의 모든 계좌)")
+    start_month: int = Field(default=1, ge=1, le=12)
+    end_month: Optional[int] = Field(default=None,
+        description="없으면 현재월 (당해 연도) 또는 12 (과거 연도)")
+    auto_reclassify_settlements: bool = Field(default=True,
+        description="pull 후 settlement 강제 재분류도 실행")
+
+
+@router.post("/pull-monthly-bulk")
+def pull_monthly_bulk(
+    body: PullMonthlyBulkIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """월별 일괄 동기화 — 연도 + 월 범위 지정해 모든 계좌의 거래내역을 한 번에 pull.
+
+    각 월마다 _do_pull 호출 (popbill API → DB 저장 → 자동 분류 자동 실행).
+    마지막에 settlement 강제 재분류도 옵션으로 실행 (학습 패턴 우선이 이미 가능하지만
+    안전망 차원).
+
+    Returns:
+        {
+          per_month: [{account_id, month, total_fetched, inserted, duplicated, auto_classified, error?}, ...],
+          totals: {fetched, inserted, duplicated},
+          settlement_reclassify: {scanned, card_settlement, pay_settlement, ...} or null
+        }
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        # 계좌 결정
+        if body.account_id:
+            accs = [service.session.get(BankAccount, body.account_id)]
+            if not accs[0] or accs[0].business_id != bid:
+                raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다.")
+        else:
+            accs = service.session.exec(
+                select(BankAccount).where(BankAccount.business_id == bid)
+            ).all()
+            if not accs:
+                raise HTTPException(status_code=400, detail="등록된 계좌가 없습니다.")
+
+        today = date.today()
+        # end_month 결정
+        if body.end_month is None:
+            end_m = today.month if body.year == today.year else 12
+        else:
+            end_m = body.end_month
+
+        per_month = []
+        total_fetched = 0
+        total_inserted = 0
+        total_duplicated = 0
+
+        for acc in accs:
+            for m in range(body.start_month, end_m + 1):
+                start_d = date(body.year, m, 1)
+                if start_d > today:
+                    break
+                if m == 12:
+                    end_d = date(body.year, 12, 31)
+                else:
+                    end_d = date(body.year, m + 1, 1) - timedelta(days=1)
+                if end_d > today:
+                    end_d = today
+
+                month_label = f"{body.year}-{m:02d}"
+                try:
+                    r = _do_pull(service, acc, bid, start_d, end_d, 500)
+                    per_month.append({
+                        "account_id": acc.id,
+                        "account_label": f"{acc.bank_name} {_mask_account(acc.account_number)}",
+                        "month": month_label,
+                        "total_fetched": r["total_fetched"],
+                        "inserted": r["inserted"],
+                        "duplicated": r["duplicated"],
+                        "auto_classified": r["auto_classified"],
+                    })
+                    total_fetched += r["total_fetched"]
+                    total_inserted += r["inserted"]
+                    total_duplicated += r["duplicated"]
+                except RuntimeError as e:
+                    per_month.append({
+                        "account_id": acc.id,
+                        "account_label": f"{acc.bank_name} {_mask_account(acc.account_number)}",
+                        "month": month_label,
+                        "error": str(e)[:200],
+                    })
+                    acc.last_sync_status = "error"
+                    acc.last_sync_error = str(e)[:200]
+                    service.session.add(acc)
+
+        service.session.commit()
+
+        # 정산 강제 재분류 (옵션)
+        settlement_reclassify = None
+        if body.auto_reclassify_settlements:
+            stmt = select(BankTransaction).where(
+                BankTransaction.business_id == bid,
+                BankTransaction.in_amount > 0,
+            )
+            rows = service.session.exec(stmt).all()
+            target_map = {
+                "card": "card_settlement",
+                "pay": "pay_settlement",
+                "delivery": "delivery_settlement",
+                "mobile": "mobile_settlement",
+            }
+            sr_counts = {
+                "scanned": len(rows),
+                "card_settlement": 0, "pay_settlement": 0,
+                "delivery_settlement": 0, "mobile_settlement": 0,
+                "already_correct": 0, "skipped_manual": 0, "skipped_no_match": 0,
+            }
+            now = datetime.now()
+            user_pgs = service.session.exec(
+                select(MobilePgConfig).where(
+                    MobilePgConfig.business_id == bid,
+                    MobilePgConfig.is_active == True,  # noqa: E712
+                )
+            ).all()
+            for tx in rows:
+                stype = None
+                if user_pgs:
+                    text = " ".join(filter(None, [tx.remark1, tx.remark2])).strip()
+                    for pg in user_pgs:
+                        if pg.keyword and pg.keyword in text:
+                            stype = "mobile"
+                            break
+                if not stype:
+                    s = _resolve_settlement(tx.remark1, tx.remark2)
+                    if s is None:
+                        sr_counts["skipped_no_match"] += 1
+                        continue
+                    stype, _name = s
+                target = target_map[stype]
+                if tx.classified_as == target:
+                    sr_counts["already_correct"] += 1
+                    continue
+                if tx.classified_by == "manual":
+                    sr_counts["skipped_manual"] += 1
+                    continue
+                tx.classified_as = target
+                tx.classified_by = "reclassify_settlement"
+                tx.classified_at = now
+                _materialize_link(service, tx)
+                service.session.add(tx)
+                sr_counts[target] += 1
+            service.session.commit()
+            settlement_reclassify = sr_counts
+
+        return {
+            "per_month": per_month,
+            "totals": {
+                "fetched": total_fetched,
+                "inserted": total_inserted,
+                "duplicated": total_duplicated,
+            },
+            "settlement_reclassify": settlement_reclassify,
+        }
+    finally:
+        service.close()
+
+
 @router.delete("/accounts/{account_id}")
 def delete_account(
     account_id: int,
