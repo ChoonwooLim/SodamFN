@@ -136,6 +136,13 @@ class EasyPosClient:
         except httpx.HTTPError as e:
             raise EasyPosError(f"이지포스 통신 실패 [{path}]: {e}") from e
 
+        # 임시 디버그 — 로그인 응답 raw 일부 로깅 (cipher 정확성 진단용)
+        if "selectEasyPosLogin" in path:
+            log.warning("[easypos.login.resp.debug] status=%d len=%d body[:600]=%r",
+                        r.status_code, len(r.text), r.text[:600])
+            log.warning("[easypos.login.resp.cookies] %s",
+                        dict(self._client.cookies.items()))
+
         resp = parse_ssv(r.text)
         if not resp.ok:
             raise EasyPosError(
@@ -232,6 +239,17 @@ class EasyPosClient:
                 ok=False,
                 error_message=f"RSA 암호화 실패: {e}",
             )
+
+        # 임시 디버그 — 평문 길이/문자코드, cipher 길이, 공개키 정보 로깅.
+        # 사장님 매장 데이터라 실제 PW 평문은 절대 로그에 안 남기고 길이만.
+        log.warning(
+            "[easypos.login.debug] id_len=%d id_codes=%s pw_len=%d pw_codes=%s "
+            "mod_len=%d exp=%s sec_id_len=%d sec_pw_len=%d",
+            len(easypos_id), [ord(c) for c in easypos_id[:6]],
+            len(password), [ord(c) for c in password[:4]],
+            len(modulus_hex), exponent_hex,
+            len(secured_id), len(secured_pw),
+        )
 
         datasets = {
             "dsIn": {
