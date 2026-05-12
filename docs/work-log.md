@@ -1064,3 +1064,82 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 5. **Orbitron secrets 등록** — production 배포 시 `OPENCLAW_GATEWAY_TOKEN` 환경변수 secrets 관리
 
 ---
+
+## 2026-05-12
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 은행거래 자동분류 대확장 — 카드/페이/배달 분리, AI 분류, 이동식 PG, 4종 입금 분류 | 완료 |
+| feat | CODEF 마이데이터 통합 — 은행 계좌(공동인증서+간편인증), 카드 가맹점번호, PG 4종 | 완료 |
+| feat | KICC 이지포스 POS 매출 자동수집 — Phase 1 기반 인프라 완성 (RSA + JSESSIONID) | 완료 |
+| fix | 다수 — popbill 3개월 한도, race condition, CODEF remark 매핑, 이지포스 인증 흐름 | 완료 |
+| infra | KICC easypay MCP 서버 등록 (`.mcp.json`) | 완료 |
+
+### 세부 내용
+
+**1) 은행거래내역 자동분류 시스템 대확장 (커밋 17건)**
+
+- 라벨 단축 통일: 카드사입금내역→카드입금, 페이사입금내역→페이입금→페이, 배달앱입금내역→배달입금
+- 정산 매칭 우선순위 재정렬: settlement > learned > rule (학습 패턴이 정산 매칭을 가리던 버그 수정)
+- 카드사 약자+숫자 prefix 패턴 매칭 추가 (NH17831866, KB10175598, 우602406580, 현850570073, SHC...)
+- 코페이/KSnet 등 이동식 단말기 mobile_settlement 신규 분류 + 수수료 역산 (사장님이 사용자단에서 PG/수수료율 직접 등록 → SaaS 다중매장 지원)
+- 4종 신규 입금 분류: 현금매출 / 현금입금 / 차입금 / 기타입금 (매출 인식 분리)
+- 월별 일괄 동기화 + 월별 빠른 필터 UI (race condition 버그 1건 함께 해결 — 4월 클릭 시 5월 데이터 표시)
+- AI 분류 통합 (Phase 1: 제안, Phase 2: 감사, Phase 3: 대화형 분석) — Ollama qwen2.5:7b 무료 로컬 + OpenClaw GPT-5.5 선택 가능
+- 입금 분류 가이드 + 이동식 PG 가이드를 앱 내 HelpModal 컴포넌트로 임베딩
+
+**2) Popbill 3개월 한도 우회 — CODEF 과거 거래 가져오기 (커밋 5건)**
+
+- popbill EasyFinBank 가 발급일로부터 90일 이내 데이터만 제공 → 1~2월 매출 누락 발생
+- CODEF /v1/kr/bank/.../transaction-list API 로 우회 (검증: 1687건 1~5월 데이터 일괄 import 성공)
+- 계좌 직접 등록 RegistBankAccount API 추가 (3가지 인증: ID/PW, 공동인증서, 간편인증) — 사장님이 팝빌 사이트 외부 진출 불필요
+- CODEF 응답 필드 매핑 정정: resAccountDesc3 → remark1(거래상대방), 2→remark2, 4→remark3, 1→remark4
+
+**3) CODEF 마이데이터 통합 (커밋 5건)**
+
+- 외부연동 페이지에 계좌 거래내역 모듈 활성화 (Phase 2 → 활성)
+- `/external-integration/banks` CODEF 전용 페이지 신설 (popbill 완전 배제)
+- 공동인증서(loginType=0) + 간편인증(loginType=5) 추가 — 카카오/네이버/PASS/토스/페이코/삼성 6종
+- 카드 가맹점번호 일괄 등록 (CardMerchant 모델 + bulk upsert + 카드사 14종 + PG 4종 CODEF 매핑)
+- PG 4종 카탈로그 추가: 0521 네이버페이, 0523 페이코, 0524 카카오페이, 0525 토스페이
+- CardModuleDetail 재구성: 가맹점주 시각으로 정리 + SuperAdmin 전용 CODEF 도구 숨김
+
+**4) KICC 이지포스 POS 매출 자동수집 (커밋 8건) — 오늘의 메인 작업**
+
+- HAR 캡처 분석으로 비공식 API 4개 endpoint 역공학:
+  - GET /index.jsp (JSESSIONID warm-up)
+  - POST /cm/checkLoginStatus.do (RSA 공개키 발급)
+  - POST /cm/selectEasyPosLogin.do (RSA 암호문 ID/PW 인증)
+  - POST /sle014/selectSalePerDayList.do (일별 영수증 단위 매출 조회)
+- Nexacro PlatformData SSV (`\x1e` RS / `\x1f` US) 파서/빌더 신규 구현
+- RSA-PKCS1v15 ID/PW 암호화 구현 — cryptography 라이브러리 + RSAPublicNumbers
+- Fernet 대칭 암호화 (`services/crypto_util.py`) — 사장님 비밀번호 DB 보관용
+- 신규 DB 모델 3종: EasyPosCredential, EasyPosSaleReceipt(영수증 raw + 결제수단 10종), EasyPosSyncLog
+- 신규 라우터: 8 endpoints (자격증명 CRUD, test-login, sync/manual, sync/cron-trigger, sync/logs, dashboard)
+- 신규 페이지: `/external-integration/easypos` (EasyPosModuleDetail.jsx)
+- 검증 성공: 5/11 영수증 309건 / 매출 2,357,000원 동기화
+
+**5) 디버깅 여정 (4단계 진단)**
+
+- 1차: 평문 모드(inSecureMode=0) 시도 → "Login 정보 올바르지 않다" → RSA 암호화 필수 확인
+- 2차: RSA 구현 후 동일 에러 → 디버그 로그로 cookies=0 발견 → 세션 식별 문제
+- 3차: 짧은 간격 호출 비교 + JS 코드 분석 → 매 호출마다 새 modulus 발견
+- 4차: Set-Cookie 응답 헤더 직접 확인 → index.jsp GET warm-up 누락 발견 → JSESSIONID 발급 후 정상
+
+**6) 인프라**
+
+- `.mcp.json` 신설: `@kicc/easypay-mcp` MCP 서버 등록 (KICC API 스펙 실시간 조회용)
+- HAR 파일·`2026서류/` 폴더 .gitignore 추가 (실 매출 raw + 세션 정보 보호)
+- `.env` + `Orbitron.yaml` 환경변수: `CREDENTIAL_ENCRYPTION_KEY` (Fernet 마스터 키)
+
+### 다음 세션 인계
+
+1. **Orbitron cron 등록 (사장님)** — `0 3 * * *`로 `/api/easypos/sync/cron-trigger` 호출, X-Cron-Secret 헤더 CODEF cron과 동일값 재사용
+2. **이지포스 비밀번호 강화 권장** — 현재 `1727` 4자리 숫자라 5636 warning 지속. 8자+ 형식으로 변경 후 셈하나 자격증명 재입력
+3. **EasyPos 매출 상세 UI 신설 검토** — 영수증 단위 raw + 결제수단 10종(현금/카드/PG/포인트 등) DB에 다 있음. EasyPosModuleDetail 하단에 상세 섹션 추가 또는 별도 `/finance/easypos-sales` 페이지 신설 결정 필요
+4. **CODEF Demo→Production 전환** — 1일 100회 한도 도달 시 Production 신청
+5. **Popbill EasyFinBank LIVE 운영 전환** — 2026-05-13부터 -99010016 해제 예정, 전체 동기화 1회로 1~5월 재pull 권장
+
+---

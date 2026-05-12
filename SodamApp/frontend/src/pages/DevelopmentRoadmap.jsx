@@ -273,7 +273,12 @@ const phases = [
                     { text: '팝빌 전자세금계산서 Statement 패턴 일괄 적용 (TaxinvoiceRecord + 9 endpoints + DetailModal)', done: true },
                     { text: 'CODEF Phase 1 — 마이데이터 통합 백엔드(11 endpoints + 신규 모델 4 + cron) + 외부연동 hub UI (Phase 2-5 공유 인프라)', done: true },
                     { text: 'CODEF 카드 매출 PoC — 매입 채널 재구조화 결정 후 본격 가동 (현재 PoC 디버깅 사이클 진행)', done: false },
-                    { text: '이지포스(KICC) VAN사 API — 카드 매출 자동수집 (KICC 1600-1234 API 키 발급 대기)', done: false },
+                    { text: 'CODEF 마이데이터 확장 — 계좌(공동인증서+간편인증) + 카드 가맹점번호 일괄 등록 + PG 4종(네이버페이/카카오페이/토스페이/페이코) 통합', done: true },
+                    { text: 'Popbill 3개월 한도 우회 — CODEF 과거 거래 가져오기 (1687건 1~5월 일괄 import 검증)', done: true },
+                    { text: '은행거래 AI 분류 — Ollama qwen2.5:7b 로컬 + OpenClaw GPT-5.5 멀티 프로바이더 (Phase 1 제안 + Phase 2 감사 + Phase 3 대화형)', done: true },
+                    { text: '이동식 단말기 카드매출 (코페이/KSnet) — 수수료 역산 + 사용자 PG 설정 UI (SaaS 다중매장)', done: true },
+                    { text: '입금 분류 4종 신규 — 현금매출/현금입금/차입금/기타입금 + 매출 인식 분리', done: true },
+                    { text: 'KICC 이지포스 POS 매출 자동수집 — RSA-PKCS1v15 + JSESSIONID warm-up 비공식 API 역공학 + 야간 cron (5/11 검증: 영수증 309건/235만원)', done: true },
                 ],
             },
             {

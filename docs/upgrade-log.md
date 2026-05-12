@@ -97,3 +97,18 @@
 | 2026-05-01 | delivery-images 외부 API(Replicate/OpenAI) 전면 제거 → OpenClaw GPT-5.5 + 자체 Flux 단일 파이프라인 (678→232 라인, 신규 어댑터 2종) | refactor | services/openclaw_client.py, services/flux_image_client.py, routers/delivery_images.py, .env, Orbitron.yaml |
 | 2026-05-01 | 대화형 프롬프트 엔지니어링 — GPT-5.5 와 멀티턴 한국어 대화로 식품 사진 요구사항 정제 후 ```prompt``` 영문 블록 확정 → Flux 생성 | feat | services/openclaw_client.py(chat_with_history), services/ollama_vision_client.py, routers/delivery_images.py(/ai-chat,/analyze-reference), components/AIChatPromptBuilder.jsx |
 | 2026-05-01 | 다중 참고 이미지 (최대 6장) → PIL 콜라주 합성 → Flux img2img init_image 우회 경로 (한국 음식 인식 약점 대응) | feat | routers/delivery_images.py(_compose_reference_collage,/ai-generate-with-refs), components/AIChatPromptBuilder.jsx |
+| 2026-05-12 | bank-sync 분류 라벨 단축 통일 (카드입금/페이/배달입금) + settlement 우선순위 재정렬 + 정산 강제 재분류 | feat | routers/bank_sync.py, pages/BankSync.jsx |
+| 2026-05-12 | bank-sync AI 분류 — Ollama qwen2.5:7b 무료 로컬 + OpenClaw GPT-5.5 선택 가능 (Phase 1: 제안, Phase 2: 감사, Phase 3: 대화형) | feat | services/ai_classify_client.py, routers/bank_sync.py, pages/BankSync.jsx |
+| 2026-05-12 | bank-sync 이동식 카드매출 (코페이) 분류 + 수수료 역산 — sales=net÷(1-rate) 공식 자동 적용 | feat | routers/bank_sync.py, models.py (MobilePgConfig) |
+| 2026-05-12 | bank-sync 이동식 PG 설정 UI — 사장님이 직접 PG/수수료율 등록 (SaaS 다중매장 대응) | feat | routers/bank_sync.py, pages/BankSync.jsx |
+| 2026-05-12 | bank-sync 4종 입금 분류 신규 — 현금매출/현금입금/차입금/기타입금 | feat | routers/bank_sync.py, pages/BankSync.jsx |
+| 2026-05-12 | bank-sync 월별 일괄 동기화 + 월별 빠른 필터 UI | feat | routers/bank_sync.py, pages/BankSync.jsx |
+| 2026-05-12 | bank-sync 계좌 직접 등록 — RegistBankAccount API (3가지 인증: ID/PW + 공동인증서 + 간편인증) | feat | routers/bank_sync.py, services/bank_sync_service.py |
+| 2026-05-12 | bank-sync CODEF 과거 거래 가져오기 — popbill 3개월 한도 우회 (1687건 1~5월 일괄 import 검증) | feat | routers/bank_sync.py, services/codef/bank_provider.py |
+| 2026-05-12 | external-integration 계좌 거래내역 모듈 활성화 — Phase 2 → 활성 | feat | components/codef/ModuleGrid.jsx, pages/ExternalIntegration.jsx |
+| 2026-05-12 | external-integration `/external-integration/banks` CODEF 전용 페이지 신설 (popbill 완전 배제) | feat | pages/BankModuleDetail.jsx, App.jsx |
+| 2026-05-12 | external-integration/banks 공동인증서 + 간편인증 추가 (3가지 인증 방식 완성) | feat | services/codef/connection_service.py |
+| 2026-05-12 | codef-cards 가맹점번호 일괄 등록 (CardMerchant 모델 + bulk upsert + 카드사 14종 + PG 4종 CODEF 매핑) | feat | models.py, routers/codef/card_merchants.py, pages/CardModuleDetail.jsx |
+| 2026-05-12 | codef-payments PG 4종 통합 — 네이버페이(0521) 카카오페이(0524) 토스페이(0525) 페이코(0523) | feat | services/codef/organization_catalog.py |
+| 2026-05-12 | infra(mcp) KICC easypay MCP 서버 추가 — `@kicc/easypay-mcp` (API 스펙 실시간 조회) | infra | .mcp.json |
+| 2026-05-12 | **easypos** KICC 이지포스 POS 매출 자동수집 Phase 1 기반 — Nexacro SSV 파서 + Fernet 암호화 + RSA-PKCS1v15 + JSESSIONID warm-up + DB 3종(EasyPosCredential/EasyPosSaleReceipt/EasyPosSyncLog) + 라우터 8 endpoints + `/external-integration/easypos` 페이지. 5/11 309건/235만원 동기화 검증 성공 | feat | services/nexacro_ssv.py, services/easypos_service.py, services/crypto_util.py, routers/easypos.py, models.py, pages/EasyPosModuleDetail.jsx, components/codef/ModuleGrid.jsx, Orbitron.yaml, .env |
