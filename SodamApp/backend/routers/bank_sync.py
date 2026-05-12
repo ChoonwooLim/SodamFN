@@ -171,7 +171,11 @@ class ManualAccountIn(BaseModel):
 class TxUpdateIn(BaseModel):
     classified_as: Optional[str] = Field(
         None,
-        description="revenue/expense/purchase/transfer/excluded/unclassified/card_settlement/pay_settlement/delivery_settlement/mobile_settlement",
+        description=(
+            "revenue/expense/purchase/transfer/excluded/unclassified/"
+            "card_settlement/pay_settlement/delivery_settlement/mobile_settlement/"
+            "cash_revenue/owner_deposit/loan_in/other_income"
+        ),
     )
     vendor_id: Optional[int] = None
     user_memo: Optional[str] = None
@@ -801,7 +805,11 @@ def list_transactions(
     end_date: Optional[str] = Query(None),
     classified_as: Optional[str] = Query(
         None,
-        description="unclassified/revenue/expense/purchase/transfer/excluded/card_settlement/pay_settlement/delivery_settlement/mobile_settlement",
+        description=(
+            "unclassified/revenue/expense/purchase/transfer/excluded/"
+            "card_settlement/pay_settlement/delivery_settlement/mobile_settlement/"
+            "cash_revenue/owner_deposit/loan_in/other_income"
+        ),
     ),
     direction: Optional[str] = Query(None, description="in / out / all"),
     q: Optional[str] = Query(None, description="remark1 부분검색"),
@@ -879,6 +887,7 @@ def update_transaction(
             valid = {
                 "unclassified", "revenue", "expense", "purchase", "transfer", "excluded",
                 "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
+                "cash_revenue", "owner_deposit", "loan_in", "other_income",
             }
             if body.classified_as not in valid:
                 raise HTTPException(status_code=400, detail=f"classified_as 값 오류: {body.classified_as}")
@@ -949,8 +958,15 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
             sess.delete(old_dr)
         tx.linked_delivery_revenue_id = None
 
-    # 2) 분류가 transfer/excluded/unclassified 면 링크만 제거하고 종료
-    if tx.classified_as in ("transfer", "excluded", "unclassified"):
+    # 2) 분류가 transfer/excluded/unclassified/owner_deposit/loan_in/other_income 면
+    #    링크만 제거하고 종료 (DailyExpense 미생성 — 매출 집계에 안 잡힘)
+    #    owner_deposit: 사장님 자금 보충
+    #    loan_in:       차입금/대출 (부채)
+    #    other_income:  영업외수익 (이자/환급 등)
+    if tx.classified_as in (
+        "transfer", "excluded", "unclassified",
+        "owner_deposit", "loan_in", "other_income",
+    ):
         return
 
     # 3) 카드 정산 입금 → CardPayment (DailyExpense 미생성)
@@ -1014,6 +1030,28 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
             amount=tx.in_amount,
             category=vcategory,
             payment_method=payment,
+            note=(tx.remark1 or "") + ((" / " + tx.remark2) if tx.remark2 else ""),
+        )
+        sess.add(de)
+        sess.flush()
+        tx.linked_daily_id = de.id
+        return
+
+    # 6-2) 현금매출 (cash_revenue) — 개인이 손님으로 송금한 입금 → DailyExpense (매출)
+    #   카드/페이/배달이 아니지만 매출로 잡혀야 하는 케이스. 보통 손님 직접 송금.
+    if tx.classified_as == "cash_revenue" and tx.in_amount > 0:
+        channel_name = tx.remark1 or "현금매출"
+        vendor = _get_or_create_vendor(
+            sess, tx.business_id, channel_name, "revenue", category="현금매출"
+        )
+        de = DailyExpense(
+            business_id=tx.business_id,
+            date=tx.trans_date,
+            vendor_name=channel_name,
+            vendor_id=vendor.id,
+            amount=tx.in_amount,
+            category="현금매출",
+            payment_method="Cash",
             note=(tx.remark1 or "") + ((" / " + tx.remark2) if tx.remark2 else ""),
         )
         sess.add(de)

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 VALID_CLASSES = {
     "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
+    "cash_revenue", "owner_deposit", "loan_in", "other_income",
     "transfer", "revenue", "expense", "purchase", "excluded", "unclassified",
 }
 
@@ -47,9 +48,21 @@ SYSTEM_PROMPT = (
     "배민/우아한형제/요기요/땡겨요/음식배달 등 포함\n"
     "- mobile_settlement: 이동식 단말기 카드매출 정산 (POS 미경유). "
     "적요에 코페이 등 포함. 매장 POS 와 별도라 매출에 포함됨\n"
+    "- cash_revenue: 손님이 개인 계좌로 직접 송금한 현금매출. "
+    "사람 이름 + 사업장 관련 적요(상품명/주문번호 등). 매출에 포함\n"
+    "- owner_deposit: 사장님 본인이 사업 계좌에 자금 보충하기 위해 입금. "
+    "사장님 이름이나 '입금'/'자금'/'운영자금' 등 키워드. 매출 X\n"
+    "- loan_in: 차입금/대출/융자 입금. 적요에 '차입금'/'대출'/'융자'/'차용금'. 매출 X\n"
+    "- other_income: 영업외수익. 이자수익/환급/환불/세금환급/포인트환급 등. 매출 X\n"
     "- transfer: 본인 자행 이체 (적요에 '내계좌'/'자행이체'/'본인이체' 포함)\n"
-    "- revenue: 일반 매출 입금 (위 카테고리 아닌 사업 관련 입금)\n"
-    "- excluded: 개인 송금/사업 무관 입금\n\n"
+    "- revenue: 일반 매출 입금 (위 카테고리 아닌 사업 관련 입금, 거의 안 씀)\n"
+    "- excluded: 사업과 완전 무관한 입금 (확실히 개인 거래)\n\n"
+    "[입금 분류 결정 가이드]\n"
+    "- 사람 이름 + 큰 금액 + 단발성 → owner_deposit (사장님 자금) 가능성 높음\n"
+    "- 사람 이름 + 소액 + 빈번 → cash_revenue (손님 송금) 가능성 높음\n"
+    "- '대출'/'차입금'/'국민은행 대출' 등 → loan_in\n"
+    "- '이자'/'환급'/'세금환급'/'환불' → other_income\n"
+    "- 판단 어려우면 unclassified 로 두고 사장님 수동 분류 유도\n\n"
     "[출금 분류]\n"
     "- purchase: 식자재/상품 매입 (도매·식자재 거래처)\n"
     "- expense: 일반 운영 지출 (임대료/관리비/세금/카드대금 등)\n"

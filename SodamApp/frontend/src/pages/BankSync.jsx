@@ -32,6 +32,11 @@ const CLASSIFIED_LABELS = {
     delivery_settlement: { label: '배달입금', color: 'bg-rose-100 text-rose-700' },
     // 2026-05-12: 이동식 단말기 카드매출 (코페이 등) — 매출에 포함, 수수료 역산
     mobile_settlement:   { label: '이동식카드', color: 'bg-sky-100 text-sky-700' },
+    // 2026-05-12: 개인 송금 / 사장님 자금 / 차입금 / 영업외수익 분류
+    cash_revenue:        { label: '현금매출', color: 'bg-emerald-200 text-emerald-800' },  // 매출 인식 (emerald 진하게)
+    owner_deposit:       { label: '현금입금', color: 'bg-teal-100 text-teal-700' },         // 사장님 자금, 매출 X
+    loan_in:             { label: '차입금',   color: 'bg-indigo-100 text-indigo-700' },     // 대출, 매출 X
+    other_income:        { label: '기타입금', color: 'bg-stone-100 text-stone-700' },       // 영업외수익, 매출 X
 };
 
 function fmtWon(n) {
