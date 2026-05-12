@@ -17,31 +17,48 @@ import { CLASSIFIED_LABELS, fmtWon, fmtDate } from './BankSync';
  *   - 거래내역 테이블 (분류 라벨 동일)
  */
 export default function BankModuleDetail() {
+    const today = new Date();
+    const curY = today.getFullYear();
+    const curM = today.getMonth() + 1;
+    const _monthStart = (m) => `${curY}-${String(m).padStart(2, '0')}-01`;
+    const _monthEnd = (m) => {
+        const lastDay = new Date(curY, m, 0).getDate();
+        return `${curY}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    };
+
     const [conns, setConns] = useState([]);
     const [accounts, setAccounts] = useState([]);
     const [txs, setTxs] = useState([]);
+    const [txTotal, setTxTotal] = useState(0);
     const [loading, setLoading] = useState(false);
     const [registerOpen, setRegisterOpen] = useState(false);
-    const [pullModal, setPullModal] = useState(null); // {conn, account}
+    const [pullModal, setPullModal] = useState(null);
     const [msg, setMsg] = useState('');
     const [err, setErr] = useState('');
+    // 월별 필터: 이번 달 기본
+    const [filter, setFilter] = useState({
+        start_date: _monthStart(curM),
+        end_date: _monthEnd(curM),
+    });
 
-    async function fetchAll() {
+    async function fetchAll(customFilter) {
+        const f = customFilter || filter;
         setLoading(true);
         setErr('');
         try {
-            const today = new Date();
-            const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+            const txParams = { source: 'codef', limit: 500 };
+            if (f.start_date) txParams.start_date = f.start_date;
+            if (f.end_date) txParams.end_date = f.end_date;
             const [connRes, accRes, txRes] = await Promise.all([
                 api.get('/codef/connections', { params: { type: 'bank' } }),
                 api.get('/bank-sync/accounts').catch(() => ({ data: [] })),
-                api.get('/bank-sync/transactions', {
-                    params: { source: 'codef', start_date: monthStart, limit: 200 },
-                }).catch(() => ({ data: { items: [], total: 0 } })),
+                api.get('/bank-sync/transactions', { params: txParams })
+                    .catch(() => ({ data: { items: [], total: 0 } })),
             ]);
             setConns(connRes.data.connections || []);
             setAccounts(accRes.data || []);
             setTxs(txRes.data.items || []);
+            setTxTotal(txRes.data.total || 0);
         } catch (e) {
             setErr(e.response?.data?.detail || '데이터를 불러오지 못했습니다.');
         } finally {
@@ -49,7 +66,21 @@ export default function BankModuleDetail() {
         }
     }
 
-    useEffect(() => { fetchAll(); }, []);
+    useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, []);
+
+    function applyMonth(m) {
+        const newF = { start_date: _monthStart(m), end_date: _monthEnd(m) };
+        setFilter(newF);
+        fetchAll(newF);
+    }
+
+    function clearMonth() {
+        const newF = { start_date: '', end_date: '' };
+        setFilter(newF);
+        fetchAll(newF);
+    }
+
+    const isActiveMonth = (m) => filter.start_date === _monthStart(m);
 
     async function updateTxClass(tx, newClass) {
         try {
@@ -143,9 +174,51 @@ export default function BankModuleDetail() {
 
                 {/* 거래내역 테이블 (CODEF source만) */}
                 <section>
-                    <h2 className="text-base font-semibold text-slate-700 mb-3">
-                        거래내역 <span className="text-slate-400 font-normal">(이번 달, 최대 200건)</span>
-                    </h2>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        <h2 className="text-base font-semibold text-slate-700">
+                            거래내역 <span className="text-slate-400 font-normal">({curY}년 · {txTotal.toLocaleString()}건)</span>
+                        </h2>
+                    </div>
+
+                    {/* 월별 빠른 필터 */}
+                    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 mb-3 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-slate-500 font-semibold">월별:</span>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
+                            const past = m > curM;
+                            const active = isActiveMonth(m);
+                            return (
+                                <button
+                                    key={m}
+                                    onClick={() => applyMonth(m)}
+                                    disabled={past}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                        active
+                                            ? 'bg-slate-800 text-white'
+                                            : past
+                                                ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {m}월
+                                </button>
+                            );
+                        })}
+                        <button
+                            onClick={clearMonth}
+                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                                !filter.start_date && !filter.end_date
+                                    ? 'bg-slate-800 text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            전체
+                        </button>
+                        {filter.start_date && (
+                            <span className="text-xs text-slate-400 ml-2">
+                                {filter.start_date} ~ {filter.end_date}
+                            </span>
+                        )}
+                    </div>
                     {txs.length === 0 ? (
                         <div className="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400 text-sm">
                             아직 CODEF 로 가져온 거래내역이 없습니다.<br />
