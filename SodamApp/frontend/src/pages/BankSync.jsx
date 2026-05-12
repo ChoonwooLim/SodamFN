@@ -3,6 +3,7 @@ import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle,
 import api from '../api';
 import HelpModal from '../components/HelpModal';
 import { MOBILE_PG_GUIDE_MD, MOBILE_PG_GUIDE_TITLE } from '../data/help/mobilePgGuide';
+import { DEPOSIT_GUIDE_MD, DEPOSIT_GUIDE_TITLE } from '../data/help/depositClassificationGuide';
 
 const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
 const AI_MODEL_KEY = 'bankSyncAiModel_v1';
@@ -1326,6 +1327,7 @@ function PullModal({ acc, form, setForm, pulling, result, onClose, onExecute }) 
 }
 
 function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements, onAiSuggest, onAiBatch }) {
+    const [helpOpen, setHelpOpen] = useState(false);
     return (
         <div>
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
@@ -1417,6 +1419,13 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                         >
                             <Sparkles size={12} /> AI 분류
                         </button>
+                        <button
+                            onClick={() => setHelpOpen(true)}
+                            title="입금 분류 가이드 — 현금매출·현금입금·차입금·기타입금 사용법"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-50"
+                        >
+                            <HelpCircle size={12} /> 분류 가이드
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1503,6 +1512,14 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                     </table>
                 )}
             </div>
+
+            {helpOpen && (
+                <HelpModal
+                    title={DEPOSIT_GUIDE_TITLE}
+                    markdown={DEPOSIT_GUIDE_MD}
+                    onClose={() => setHelpOpen(false)}
+                />
+            )}
         </div>
     );
 }
