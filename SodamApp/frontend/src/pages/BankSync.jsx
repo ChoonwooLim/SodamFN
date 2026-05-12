@@ -103,6 +103,9 @@ export default function BankSync() {
     // 계좌 직접 등록 (RegistBankAccount API)
     const [registOpen, setRegistOpen] = useState(false);
 
+    // CODEF 과거 거래 가져오기 (popbill 3개월 한도 우회)
+    const [codefHistOpen, setCodefHistOpen] = useState(false);
+
     // Auto-refresh (페이지 열려있는 동안 N분 단위 일괄 갱신)
     const [autoRefresh, setAutoRefresh] = useState(() => {
         try {
@@ -591,6 +594,7 @@ export default function BankSync() {
                         onReclassifySettlements={handleReclassifySettlements}
                         onAiSuggest={handleAiSuggest}
                         onAiBatch={handleAiBatch}
+                        onCodefHistorical={() => setCodefHistOpen(true)}
                     />
                 )}
                 {tab === 'settlement' && (
@@ -653,6 +657,17 @@ export default function BankSync() {
                     onSuccess={() => {
                         setRegistOpen(false);
                         fetchAccounts();
+                    }}
+                />
+            )}
+
+            {codefHistOpen && (
+                <CodefHistoricalModal
+                    accounts={accounts}
+                    onClose={() => setCodefHistOpen(false)}
+                    onSuccess={() => {
+                        setCodefHistOpen(false);
+                        fetchTxs();
                     }}
                 />
             )}
@@ -1373,7 +1388,7 @@ function PullModal({ acc, form, setForm, pulling, result, onClose, onExecute }) 
     );
 }
 
-function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements, onAiSuggest, onAiBatch }) {
+function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFilter, onApply, onUpdate, onAutoClassify, onReclassifySettlements, onAiSuggest, onAiBatch, onCodefHistorical }) {
     const [helpOpen, setHelpOpen] = useState(false);
     const [bulkSyncing, setBulkSyncing] = useState(false);
 
@@ -1577,6 +1592,15 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                         >
                             <HelpCircle size={12} /> 분류 가이드
                         </button>
+                        {onCodefHistorical && (
+                            <button
+                                onClick={onCodefHistorical}
+                                title="popbill 3개월 한도 이전 거래 (예: 2026-01, 2026-02) 를 CODEF 마이데이터로 가져옴"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg text-xs font-semibold hover:from-teal-700 hover:to-cyan-700"
+                            >
+                                <Download size={12} /> 과거 거래 (CODEF)
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -2793,6 +2817,192 @@ function RegistAccountModal({ bankNames, onClose, onSuccess }) {
                     >
                         {submitting ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
                         팝빌에 등록
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+// ============================================================
+// CODEF 과거 거래 가져오기 모달 (2026-05-13)
+// popbill 3개월 한도 우회 — 마이데이터 기반 더 긴 기간 조회
+// ============================================================
+
+function CodefHistoricalModal({ accounts, onClose, onSuccess }) {
+    const [form, setForm] = useState({
+        account_id: accounts[0]?.id || '',
+        fast_id: '',
+        fast_pwd: '',
+        start_date: '2026-01-01',
+        end_date: '2026-02-11',
+        client_type: 'B',
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+    const [showPwd, setShowPwd] = useState(false);
+
+    const selectedAcc = accounts.find(a => a.id == form.account_id);
+
+    async function submit(e) {
+        e?.preventDefault();
+        setError(null);
+        if (!form.account_id) { setError('계좌를 선택하세요.'); return; }
+        if (!form.fast_id || !form.fast_pwd) {
+            setError('조회전용 ID/비밀번호는 필수입니다.');
+            return;
+        }
+        if (!form.start_date || !form.end_date) {
+            setError('시작일/종료일은 필수입니다.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const payload = {
+                bank_code: selectedAcc?.bank_code,
+                account_number: selectedAcc?.account_number_masked?.replace(/\D/g, '') || '',
+                fast_id: form.fast_id,
+                fast_pwd: form.fast_pwd,
+                start_date: form.start_date,
+                end_date: form.end_date,
+                client_type: form.client_type,
+            };
+            const res = await api.post('/bank-sync/codef-pull-historical', payload);
+            alert(
+                `CODEF 과거 거래 가져오기 완료\n`
+                + `기간: ${res.data.start_date} ~ ${res.data.end_date}\n`
+                + `총 조회 ${res.data.total_fetched}건 · 신규 ${res.data.inserted}건 · 중복 ${res.data.duplicated}건`
+            );
+            onSuccess?.();
+        } catch (e) {
+            const status = e.response?.status;
+            const detail = e.response?.data?.detail || e.message;
+            if (status === 428) {
+                setError('CODEF 추가본인확인 (SMS/캡차) 필요 — 신한은행 보안 설정 검토 필요.');
+            } else if (status === 401) {
+                setError('인증 실패: 조회전용 ID/PW 가 잘못되었거나 신한은행 측 차단.');
+            } else {
+                setError(detail);
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="px-5 py-4 bg-gradient-to-r from-teal-600 to-cyan-600 text-white flex items-center justify-between">
+                    <div>
+                        <h3 className="font-bold flex items-center gap-2">📥 CODEF 과거 거래 가져오기</h3>
+                        <p className="text-xs text-teal-100 mt-0.5">
+                            popbill 3개월 한도 이전 거래 (예: 2026-01·02월) 를 마이데이터로 일괄 pull
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={submit} className="flex-1 overflow-y-auto p-5 space-y-3">
+                    {error && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-sm text-rose-700">
+                            <AlertCircle size={14} className="inline mr-1" />
+                            {error}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">대상 계좌 *</label>
+                        <select
+                            value={form.account_id}
+                            onChange={e => setForm({ ...form, account_id: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        >
+                            {accounts.map(a => (
+                                <option key={a.id} value={a.id}>
+                                    {a.bank_name} {a.account_number_masked} {a.alias && `(${a.alias})`}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">시작일 *</label>
+                            <input type="date" value={form.start_date}
+                                onChange={e => setForm({ ...form, start_date: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">종료일 *</label>
+                            <input type="date" value={form.end_date}
+                                onChange={e => setForm({ ...form, end_date: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                    </div>
+
+                    <div className="border-l-4 border-amber-300 bg-amber-50 rounded-r p-3">
+                        <div className="text-xs font-bold text-amber-800 mb-2">
+                            🔐 신한은행 조회전용 계정 (popbill 등록 시 사용한 정보와 동일)
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">조회전용 ID *</label>
+                                <input type="text" value={form.fast_id}
+                                    onChange={e => setForm({ ...form, fast_id: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">조회전용 비밀번호 *</label>
+                                <input
+                                    type={showPwd ? 'text' : 'password'}
+                                    value={form.fast_pwd}
+                                    onChange={e => setForm({ ...form, fast_pwd: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                />
+                            </div>
+                        </div>
+                        <label className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                            <input type="checkbox" checked={showPwd}
+                                onChange={e => setShowPwd(e.target.checked)} />
+                            비밀번호 표시
+                        </label>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-slate-500 mb-1 block">계좌 구분</label>
+                        <select
+                            value={form.client_type}
+                            onChange={e => setForm({ ...form, client_type: e.target.value })}
+                            className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                        >
+                            <option value="B">법인</option>
+                            <option value="P">개인</option>
+                        </select>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 bg-slate-50 rounded p-2">
+                        🔒 자격증명은 CODEF API 로 즉시 암호화 전송 후 셈하나 서버에 저장되지 않습니다.
+                        connectedId 만 DB 에 저장되어 다음부터는 자동 사용됩니다.
+                    </div>
+                </form>
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex gap-2 justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-white"
+                    >
+                        취소
+                    </button>
+                    <button
+                        onClick={submit}
+                        disabled={submitting}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg text-sm font-semibold hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50"
+                    >
+                        {submitting ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                        CODEF 로 가져오기
                     </button>
                 </div>
             </div>

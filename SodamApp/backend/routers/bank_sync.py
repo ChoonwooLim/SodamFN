@@ -2483,6 +2483,219 @@ def regist_bank_account(
         service.close()
 
 
+class CodefHistoricalPullIn(BaseModel):
+    bank_code: str = Field(..., description="은행 코드 (예: 0088 신한)")
+    account_number: str = Field(..., description="계좌번호")
+    fast_id: str = Field(..., description="조회전용 ID")
+    fast_pwd: str = Field(..., description="조회전용 비밀번호")
+    start_date: str = Field(..., description="YYYY-MM-DD (popbill 3개월 한도 이전 범위)")
+    end_date: str = Field(..., description="YYYY-MM-DD")
+    client_type: str = Field(default="B", description="B(법인) or P(개인)")
+
+
+@router.post("/codef-pull-historical")
+def codef_pull_historical(
+    body: CodefHistoricalPullIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """CODEF API 로 popbill 3개월 한도 이전 거래내역 가져오기.
+
+    동작:
+    1. CodefConnection 조회 → 없거나 inactive 면 새로 발급 (auth_payload 사용)
+    2. CODEF /v1/kr/bank/b/account/transaction-list 호출 (법인) 또는 /p/ (개인)
+    3. 응답 거래 → BankTransaction 으로 변환 + 중복 차단 + 자동 분류
+
+    보안: fast_id/fast_pwd 는 메모리 통과만 + 즉시 폐기. DB 저장 X.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    sd = _parse_date(body.start_date)
+    ed = _parse_date(body.end_date)
+    if sd > ed:
+        raise HTTPException(400, "start_date 가 end_date 보다 이전이어야 합니다.")
+
+    from services.codef.connection_service import CodefConnectionService
+    from services.codef.codef_client import CodefClient
+    from services.codef.exceptions import (
+        CodefAuthExpired, CodefAdditionalAuth, CodefAPIError,
+    )
+    from models import CodefConnection
+
+    service = DatabaseService()
+    try:
+        # 1) CodefConnection 확보 (재인증 또는 신규 발급)
+        conn_svc = CodefConnectionService(service.session.bind)
+        existing = service.session.exec(
+            select(CodefConnection).where(
+                CodefConnection.business_id == bid,
+                CodefConnection.organization_code == body.bank_code,
+                CodefConnection.organization_type == "bank",
+            )
+        ).first()
+        try:
+            if existing and existing.status == "active":
+                # 기존 connectedId 재사용. 만약 거래내역 조회에서 만료 에러 나면 재인증 트리거.
+                conn = existing
+                connected_id = conn.connected_id
+            else:
+                # 신규 발급 또는 재인증
+                if existing:
+                    conn = conn_svc.reverify(existing.id, {
+                        "id": body.fast_id,
+                        "password": body.fast_pwd,
+                        "client_type": body.client_type,
+                    })
+                else:
+                    conn = conn_svc.register_bank(bid, body.bank_code, {
+                        "id": body.fast_id,
+                        "password": body.fast_pwd,
+                        "client_type": body.client_type,
+                    })
+                connected_id = conn.connected_id
+        except CodefAuthExpired as e:
+            raise HTTPException(401, f"CODEF 인증 실패: {e.message}")
+        except CodefAdditionalAuth:
+            raise HTTPException(
+                428, "CODEF 추가본인확인이 필요합니다 (SMS/캡차). "
+                "현재 셈하나에서 직접 처리 미지원 — 신한 인터넷뱅킹 보안 설정 검토 필요."
+            )
+        except CodefAPIError as e:
+            raise HTTPException(502, f"CODEF 등록 실패 [{e.code}]: {e.message}")
+
+        # 2) BankAccount 조회 (이미 등록되어 있어야 함)
+        acc = service.session.exec(
+            select(BankAccount).where(
+                BankAccount.business_id == bid,
+                BankAccount.bank_code == body.bank_code,
+                BankAccount.account_number == re.sub(r"\D", "", body.account_number),
+            )
+        ).first()
+        if not acc:
+            raise HTTPException(404, "해당 계좌가 등록되어 있지 않습니다. 먼저 계좌를 등록하세요.")
+
+        # 3) CODEF 거래내역 조회
+        client = CodefClient()
+        url_path = (
+            "/v1/kr/bank/b/account/transaction-list"
+            if body.client_type == "B"
+            else "/v1/kr/bank/p/account/transaction-list"
+        )
+        codef_params = {
+            "connectedId": connected_id,
+            "organization": body.bank_code,
+            "account": re.sub(r"\D", "", body.account_number),
+            "startDate": sd.strftime("%Y%m%d"),
+            "endDate": ed.strftime("%Y%m%d"),
+            "orderBy": "1",       # 과거→최신
+            "inquiryType": "1",   # 전체 (입금+출금)
+        }
+        try:
+            result = client.request_product(url_path, codef_params)
+        except CodefAuthExpired as e:
+            # 인증 만료 → 재인증 자동 시도
+            conn_svc.mark_failed(conn.id, "expired", error_code=e.code, error_message=e.message)
+            conn = conn_svc.reverify(conn.id, {
+                "id": body.fast_id, "password": body.fast_pwd, "client_type": body.client_type,
+            })
+            codef_params["connectedId"] = conn.connected_id
+            result = client.request_product(url_path, codef_params)
+        except CodefAPIError as e:
+            raise HTTPException(502, f"CODEF 조회 실패 [{e.code}]: {e.message}")
+
+        # 4) 응답 거래내역 → BankTransaction 변환 + 저장
+        rows = result.rows
+        if isinstance(rows, dict):
+            # 가끔 dict 형식으로 옴 — resTrHistoryList 추출
+            history = rows.get("resTrHistoryList", [])
+        else:
+            # rows 가 [dict] 형식이면 첫 entry 의 history 추출
+            history = []
+            for r in rows:
+                if isinstance(r, dict):
+                    history.extend(r.get("resTrHistoryList", []))
+
+        new_txs = []
+        inserted = 0
+        duplicated = 0
+        for r in history:
+            trd = r.get("resAccountTrDate", "")
+            trt = r.get("resAccountTrTime", "")
+            if not trd or len(trd) != 8:
+                continue
+            try:
+                td = date(int(trd[:4]), int(trd[4:6]), int(trd[6:8]))
+            except (ValueError, TypeError):
+                continue
+
+            in_amt = int(float(r.get("resAccountIn", "0") or 0))
+            out_amt = int(float(r.get("resAccountOut", "0") or 0))
+            balance = int(float(r.get("resAfterTranBalance", "0") or 0))
+            remark1 = (r.get("resAccountDesc1", "") or "")[:200]
+            remark2 = (r.get("resAccountDesc2", "") or "")[:200]
+            remark3 = (r.get("resAccountDesc3", "") or "")[:200]
+            remark4 = (r.get("resAccountDesc4", "") or "")[:200]
+
+            # CODEF 거래에는 tid 가 없어서 (date, time, in, out, balance, remark1) 조합 unique key 생성
+            tid = f"codef:{trd}{trt}:{in_amt}:{out_amt}:{balance}:{remark1[:30]}"
+
+            existing_tx = service.session.exec(
+                select(BankTransaction).where(
+                    BankTransaction.account_id == acc.id,
+                    BankTransaction.tid == tid,
+                )
+            ).first()
+            if existing_tx:
+                duplicated += 1
+                continue
+
+            tdt = None
+            if trt and len(trt) == 6:
+                try:
+                    tdt = datetime(td.year, td.month, td.day,
+                                   int(trt[:2]), int(trt[2:4]), int(trt[4:6]))
+                except (ValueError, TypeError):
+                    tdt = None
+
+            tx = BankTransaction(
+                business_id=bid,
+                account_id=acc.id,
+                tid=tid,
+                trans_date=td,
+                trans_time=trt or None,
+                trans_dt=tdt,
+                in_amount=in_amt,
+                out_amount=out_amt,
+                balance=balance,
+                remark1=remark1 or None,
+                remark2=remark2 or None,
+                remark3=remark3 or None,
+                remark4=remark4 or None,
+                raw_json=json.dumps(r, ensure_ascii=False),
+            )
+            service.session.add(tx)
+            new_txs.append(tx)
+            inserted += 1
+
+        service.session.flush()
+
+        # 5) 자동 분류
+        classify_counts = _classify_txs(service, bid, new_txs, only_unclassified=True)
+        service.session.commit()
+
+        return {
+            "ok": True,
+            "connected_id": connected_id[:8] + "...",  # 일부만 노출 (보안)
+            "start_date": sd.isoformat(),
+            "end_date": ed.isoformat(),
+            "total_fetched": len(history),
+            "inserted": inserted,
+            "duplicated": duplicated,
+            "auto_classified": classify_counts,
+        }
+    finally:
+        service.close()
+
+
 class PullMonthlyBulkIn(BaseModel):
     year: int = Field(..., description="대상 연도 (예: 2026)")
     account_id: Optional[int] = Field(default=None,

@@ -45,7 +45,33 @@ _CARDS: tuple[Organization, ...] = (
     Organization("0368", "IBK기업카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
 )
 
-_ALL: dict[str, Organization] = {o.code: o for o in _CARDS}
+# 주요 은행 — CODEF 카탈로그 기준 (2026-05-13 Phase 2 확장)
+# 한국 표준 은행코드와 동일. 신한·국민·하나·우리·NH·기업은 ID/PW + 공동인증서 둘 다 지원
+_BANKS: tuple[Organization, ...] = (
+    Organization("0002", "한국산업은행", "bank", (AuthPolicy.CERT,)),
+    Organization("0003", "IBK기업은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0004", "KB국민은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0011", "NH농협은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0020", "우리은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0023", "SC제일은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0027", "한국씨티은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0031", "대구은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0032", "부산은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0034", "광주은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0037", "전북은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0039", "경남은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0045", "새마을금고", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0048", "신협중앙회", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0050", "저축은행중앙회", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0071", "우체국", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0081", "하나은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0088", "신한은행", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0089", "케이뱅크", "bank", (AuthPolicy.ID_PW, AuthPolicy.CERT)),
+    Organization("0090", "카카오뱅크", "bank", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+    Organization("0092", "토스뱅크", "bank", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
+)
+
+_ALL: dict[str, Organization] = {o.code: o for o in (*_CARDS, *_BANKS)}
 
 
 def get_organizations() -> dict[str, Organization]:
@@ -59,3 +85,7 @@ def get_organization(code: str) -> Optional[Organization]:
 
 def list_card_corps() -> list[Organization]:
     return [o for o in _ALL.values() if o.type == "card"]
+
+
+def list_banks() -> list[Organization]:
+    return [o for o in _ALL.values() if o.type == "bank"]
