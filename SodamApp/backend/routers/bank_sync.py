@@ -2623,10 +2623,15 @@ def codef_pull_historical(
             in_amt = int(float(r.get("resAccountIn", "0") or 0))
             out_amt = int(float(r.get("resAccountOut", "0") or 0))
             balance = int(float(r.get("resAfterTranBalance", "0") or 0))
-            remark1 = (r.get("resAccountDesc1", "") or "")[:200]
+            # CODEF 필드 매핑 (popbill 과 의미 일치시킴):
+            #   resAccountDesc3 (거래상대방, 예: '정정길'/'롯데카드') → remark1 (메인 표시 + 분류 키)
+            #   resAccountDesc2 (거래 매체, 예: '모바일')              → remark2 (보조 표시)
+            #   resAccountDesc4 (지점/메모, 예: '광장동')               → remark3
+            #   resAccountDesc1 (대부분 비어있음)                      → remark4
+            remark1 = (r.get("resAccountDesc3", "") or "")[:200]
             remark2 = (r.get("resAccountDesc2", "") or "")[:200]
-            remark3 = (r.get("resAccountDesc3", "") or "")[:200]
-            remark4 = (r.get("resAccountDesc4", "") or "")[:200]
+            remark3 = (r.get("resAccountDesc4", "") or "")[:200]
+            remark4 = (r.get("resAccountDesc1", "") or "")[:200]
 
             # CODEF 거래에는 tid 가 없어서 (date, time, in, out, balance, remark1) 조합 unique key 생성
             tid = f"codef:{trd}{trt}:{in_amt}:{out_amt}:{balance}:{remark1[:30]}"
