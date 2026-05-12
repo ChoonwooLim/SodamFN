@@ -2490,11 +2490,142 @@ def regist_bank_account(
 
 class CodefHistoricalPullIn(BaseModel):
     account_id: int = Field(..., description="등록된 계좌 ID (BankAccount.id)")
-    fast_id: str = Field(..., description="조회전용 ID")
-    fast_pwd: str = Field(..., description="조회전용 비밀번호")
-    start_date: str = Field(..., description="YYYY-MM-DD (popbill 3개월 한도 이전 범위)")
+    start_date: str = Field(..., description="YYYY-MM-DD")
     end_date: str = Field(..., description="YYYY-MM-DD")
     client_type: str = Field(default="B", description="B(법인) or P(개인)")
+    # 인증 방식 (셋 중 하나만 제공)
+    fast_id: Optional[str] = Field(default=None, description="ID/PW: 조회전용 ID")
+    fast_pwd: Optional[str] = Field(default=None, description="ID/PW: 조회전용 비밀번호")
+    cert_file: Optional[str] = Field(default=None, description="공동인증서: signCert.der base64")
+    key_file: Optional[str] = Field(default=None, description="공동인증서: signPri.key base64")
+    cert_pwd: Optional[str] = Field(default=None, description="공동인증서: 인증서 비밀번호 (평문, RSA 암호화 백엔드 수행)")
+    simple_provider: Optional[str] = Field(default=None, description="간편인증: kakao|naver|pass|toss|payco|samsung")
+    user_name: Optional[str] = Field(default=None, description="간편인증: 본인 이름")
+    phone_no: Optional[str] = Field(default=None, description="간편인증: 휴대폰 번호")
+    birth_date: Optional[str] = Field(default=None, description="간편인증: 생년월일 yyMMdd 또는 사업자번호")
+    telecom: Optional[str] = Field(default="0", description="간편인증: 0=SKT/1=KT/2=LG")
+
+
+def _build_codef_auth_payload(body: "CodefHistoricalPullIn") -> dict:
+    """body 에서 CODEF auth_payload (CodefConnectionService.register_bank 용) 추출."""
+    auth: dict = {"client_type": body.client_type or "B"}
+    if body.cert_file and body.key_file:
+        auth.update({
+            "certFile": body.cert_file,
+            "keyFile": body.key_file,
+            "certPwd": body.cert_pwd or "",
+        })
+    elif body.simple_provider:
+        auth.update({
+            "loginType": body.simple_provider,
+            "userName": body.user_name or "",
+            "phoneNo": body.phone_no or "",
+            "birthDate": body.birth_date or "",
+            "telecom": body.telecom or "0",
+        })
+    elif body.fast_id and body.fast_pwd:
+        auth.update({"id": body.fast_id, "password": body.fast_pwd})
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="인증 정보가 부족합니다. (fast_id/fast_pwd) 또는 (cert_file/key_file/cert_pwd) "
+                   "또는 (simple_provider/user_name/phone_no/birth_date) 중 하나 필요"
+        )
+    return auth
+
+
+class CodefRegisterBankIn(BaseModel):
+    account_id: int = Field(..., description="등록된 계좌 ID")
+    client_type: str = Field(default="B")
+    fast_id: Optional[str] = None
+    fast_pwd: Optional[str] = None
+    cert_file: Optional[str] = None
+    key_file: Optional[str] = None
+    cert_pwd: Optional[str] = None
+    simple_provider: Optional[str] = None
+    user_name: Optional[str] = None
+    phone_no: Optional[str] = None
+    birth_date: Optional[str] = None
+    telecom: Optional[str] = "0"
+
+
+@router.post("/codef-register-bank")
+def codef_register_bank(
+    body: CodefRegisterBankIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """CODEF 은행 연결 등록 — 거래 가져오기 없이 connectedId 만 발급/갱신.
+
+    auth_payload 형식:
+      - ID/PW: fast_id + fast_pwd
+      - 공동인증서: cert_file + key_file + cert_pwd
+      - 간편인증: simple_provider + user_name + phone_no + birth_date
+    """
+    from services.codef.connection_service import CodefConnectionService
+    from services.codef.exceptions import (
+        CodefAuthExpired, CodefAdditionalAuth, CodefAPIError,
+    )
+    from models import CodefConnection
+
+    bid = _resolve_bid(admin, x_view_as_business)
+    service = DatabaseService()
+    try:
+        acc = service.session.get(BankAccount, body.account_id)
+        if not acc or acc.business_id != bid:
+            raise HTTPException(404, "계좌를 찾을 수 없습니다.")
+
+        # auth_payload 추출 (HistoricalPullIn 형식과 호환되도록 같은 로직)
+        auth = {"client_type": body.client_type or "B"}
+        if body.cert_file and body.key_file:
+            auth.update({"certFile": body.cert_file, "keyFile": body.key_file, "certPwd": body.cert_pwd or ""})
+        elif body.simple_provider:
+            auth.update({
+                "loginType": body.simple_provider,
+                "userName": body.user_name or "",
+                "phoneNo": body.phone_no or "",
+                "birthDate": body.birth_date or "",
+                "telecom": body.telecom or "0",
+            })
+        elif body.fast_id and body.fast_pwd:
+            auth.update({"id": body.fast_id, "password": body.fast_pwd})
+        else:
+            raise HTTPException(400, "인증 정보 부족")
+
+        conn_svc = CodefConnectionService(service.session.bind)
+        existing = service.session.exec(
+            select(CodefConnection).where(
+                CodefConnection.business_id == bid,
+                CodefConnection.organization_code == acc.bank_code,
+                CodefConnection.organization_type == "bank",
+            )
+        ).first()
+        try:
+            if existing:
+                conn = conn_svc.reverify(existing.id, auth)
+            else:
+                conn = conn_svc.register_bank(bid, acc.bank_code, auth)
+        except CodefAuthExpired as e:
+            raise HTTPException(401, f"CODEF 인증 실패: {e.message}")
+        except CodefAdditionalAuth as e:
+            raise HTTPException(428, {
+                "message": "간편인증 진행 중 — 휴대폰에서 인증을 완료한 뒤 다시 호출하세요.",
+                "method": e.method,
+                "extra_info": e.extra_info,
+            })
+        except CodefAPIError as e:
+            raise HTTPException(502, f"CODEF [{e.code}]: {e.message}")
+
+        return {
+            "ok": True,
+            "connection_id": conn.id,
+            "connected_id": (conn.connected_id or "")[:8] + "...",
+            "auth_method": conn.auth_method,
+            "organization": conn.organization_label,
+            "status": conn.status,
+        }
+    finally:
+        service.close()
 
 
 @router.post("/codef-pull-historical")
@@ -2543,30 +2674,27 @@ def codef_pull_historical(
                 CodefConnection.organization_type == "bank",
             )
         ).first()
+        auth_payload = _build_codef_auth_payload(body)
         try:
             if existing and existing.status == "active":
                 conn = existing
                 connected_id = conn.connected_id
             else:
                 if existing:
-                    conn = conn_svc.reverify(existing.id, {
-                        "id": body.fast_id,
-                        "password": body.fast_pwd,
-                        "client_type": body.client_type,
-                    })
+                    conn = conn_svc.reverify(existing.id, auth_payload)
                 else:
-                    conn = conn_svc.register_bank(bid, bank_code, {
-                        "id": body.fast_id,
-                        "password": body.fast_pwd,
-                        "client_type": body.client_type,
-                    })
+                    conn = conn_svc.register_bank(bid, bank_code, auth_payload)
                 connected_id = conn.connected_id
         except CodefAuthExpired as e:
             raise HTTPException(401, f"CODEF 인증 실패: {e.message}")
-        except CodefAdditionalAuth:
+        except CodefAdditionalAuth as e:
             raise HTTPException(
-                428, "CODEF 추가본인확인이 필요합니다 (SMS/캡차). "
-                "현재 셈하나에서 직접 처리 미지원 — 신한 인터넷뱅킹 보안 설정 검토 필요."
+                428,
+                {
+                    "message": "간편인증/추가본인확인 진행 중 — 휴대폰에서 인증 완료 후 [거래 가져오기] 다시 누르세요.",
+                    "method": e.method,
+                    "extra_info": e.extra_info,
+                }
             )
         except CodefAPIError as e:
             raise HTTPException(502, f"CODEF 등록 실패 [{e.code}]: {e.message}")
@@ -2590,11 +2718,8 @@ def codef_pull_historical(
         try:
             result = client.request_product(url_path, codef_params)
         except CodefAuthExpired as e:
-            # 인증 만료 → 재인증 자동 시도
             conn_svc.mark_failed(conn.id, "expired", error_code=e.code, error_message=e.message)
-            conn = conn_svc.reverify(conn.id, {
-                "id": body.fast_id, "password": body.fast_pwd, "client_type": body.client_type,
-            })
+            conn = conn_svc.reverify(conn.id, auth_payload)
             codef_params["connectedId"] = conn.connected_id
             result = client.request_product(url_path, codef_params)
         except CodefAPIError as e:

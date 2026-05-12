@@ -565,37 +565,113 @@ function BankConnectionRegisterModal({ onClose, onRegistered }) {
 
 
 // ============================================================
-// 거래 가져오기 모달 (codef-pull-historical)
+// 거래 가져오기 모달 (codef-pull-historical) — 3가지 인증 방식 지원
 // ============================================================
 function BankPullModal({ conn, account, onClose, onPulled }) {
+    const [authMethod, setAuthMethod] = useState('id_pw'); // id_pw | cert | simple
     const [form, setForm] = useState({
-        fast_id: '',
-        fast_pwd: '',
+        // 공통
         start_date: '2026-01-01',
         end_date: new Date().toISOString().slice(0, 10),
-        client_type: conn?.organization_label?.includes('법인') ? 'B' : 'B',
+        client_type: 'B',
+        // ID/PW
+        fast_id: '',
+        fast_pwd: '',
+        // 공동인증서 (base64)
+        cert_file: '',
+        cert_file_name: '',
+        key_file: '',
+        key_file_name: '',
+        cert_pwd: '',
+        // 간편인증
+        simple_provider: 'kakao',
+        user_name: '',
+        phone_no: '',
+        birth_date: '',
+        telecom: '0',
     });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
+    const [info, setInfo] = useState(null);
     const [showPwd, setShowPwd] = useState(false);
+
+    async function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result || '';
+                const b64 = String(result).split(',')[1] || result;
+                resolve(b64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function handleFile(field, e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const b64 = await readFileAsBase64(file);
+            setForm({ ...form, [field]: b64, [`${field}_name`]: file.name });
+        } catch (err) {
+            setError('파일 읽기 실패: ' + err.message);
+        }
+    }
+
+    function buildPayload() {
+        const base = {
+            account_id: account.id,
+            start_date: form.start_date,
+            end_date: form.end_date,
+            client_type: form.client_type,
+        };
+        if (authMethod === 'id_pw') {
+            return { ...base, fast_id: form.fast_id, fast_pwd: form.fast_pwd };
+        }
+        if (authMethod === 'cert') {
+            return {
+                ...base,
+                cert_file: form.cert_file,
+                key_file: form.key_file,
+                cert_pwd: form.cert_pwd,
+            };
+        }
+        // simple
+        return {
+            ...base,
+            simple_provider: form.simple_provider,
+            user_name: form.user_name,
+            phone_no: form.phone_no.replace(/-/g, ''),
+            birth_date: form.birth_date.replace(/-/g, ''),
+            telecom: form.telecom,
+        };
+    }
+
+    function validate() {
+        if (authMethod === 'id_pw' && (!form.fast_id || !form.fast_pwd)) {
+            return 'ID/PW 둘 다 필수입니다.';
+        }
+        if (authMethod === 'cert' && (!form.cert_file || !form.key_file)) {
+            return '공동인증서 파일 2개 (signCert.der + signPri.key) 필수입니다.';
+        }
+        if (authMethod === 'simple') {
+            if (!form.user_name || !form.phone_no || !form.birth_date) {
+                return '간편인증은 이름·휴대폰·생년월일(또는 사업자번호) 모두 필수입니다.';
+            }
+        }
+        return null;
+    }
 
     async function submit(e) {
         e?.preventDefault();
         setError(null);
-        if (!form.fast_id || !form.fast_pwd) {
-            setError('조회전용 ID/비밀번호는 필수입니다.');
-            return;
-        }
+        setInfo(null);
+        const v = validate();
+        if (v) { setError(v); return; }
         setSubmitting(true);
         try {
-            const res = await api.post('/bank-sync/codef-pull-historical', {
-                account_id: account.id,
-                fast_id: form.fast_id,
-                fast_pwd: form.fast_pwd,
-                start_date: form.start_date,
-                end_date: form.end_date,
-                client_type: form.client_type,
-            });
+            const res = await api.post('/bank-sync/codef-pull-historical', buildPayload());
             onPulled({
                 inserted: res.data.inserted,
                 duplicated: res.data.duplicated,
@@ -603,18 +679,29 @@ function BankPullModal({ conn, account, onClose, onPulled }) {
             });
         } catch (e) {
             const status = e.response?.status;
-            const detail = e.response?.data?.detail || e.message;
-            if (status === 428) setError('CODEF 추가본인확인 필요 — 은행 보안 설정 검토.');
-            else if (status === 401) setError('인증 실패: ID/PW 재확인.');
-            else setError(detail);
+            const detail = e.response?.data?.detail;
+            if (status === 428) {
+                const msg = typeof detail === 'object' ? detail.message : detail;
+                setInfo(msg || '간편인증 진행 중 — 휴대폰에서 인증 완료 후 [가져오기] 다시 누르세요.');
+            } else if (status === 401) {
+                setError('인증 실패: 입력 정보를 재확인하세요.');
+            } else {
+                setError(typeof detail === 'string' ? detail : (detail?.message || e.message));
+            }
         } finally {
             setSubmitting(false);
         }
     }
 
+    const methodTabs = [
+        { id: 'id_pw', label: 'ID/PW', desc: '조회전용 ID + 비밀번호' },
+        { id: 'cert', label: '공동인증서', desc: '인증서 파일 + 비밀번호' },
+        { id: 'simple', label: '간편인증', desc: '카카오·네이버·PASS 등' },
+    ];
+
     return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                 <div className="px-5 py-4 bg-gradient-to-r from-teal-600 to-cyan-600 text-white flex items-center justify-between">
                     <div>
                         <h3 className="font-bold flex items-center gap-2">📥 CODEF 거래 가져오기</h3>
@@ -626,12 +713,40 @@ function BankPullModal({ conn, account, onClose, onPulled }) {
                         <XIcon size={18} />
                     </button>
                 </div>
+
+                {/* 인증 방식 탭 */}
+                <div className="px-5 pt-4 pb-2 border-b border-slate-100 bg-slate-50">
+                    <div className="text-xs text-slate-500 mb-2 font-semibold">인증 방식 선택</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        {methodTabs.map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => setAuthMethod(m.id)}
+                                className={`text-xs px-2 py-2 rounded-lg font-semibold transition-colors ${
+                                    authMethod === m.id
+                                        ? 'bg-teal-600 text-white'
+                                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                {m.label}
+                                <div className="text-[10px] font-normal mt-0.5 opacity-70">{m.desc}</div>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <form onSubmit={submit} className="flex-1 overflow-y-auto p-5 space-y-3">
                     {error && (
                         <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-sm text-rose-700">
                             <AlertCircle size={14} className="inline mr-1" /> {error}
                         </div>
                     )}
+                    {info && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                            ⏳ {info}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs text-slate-500 mb-1 block">시작일 *</label>
@@ -646,30 +761,148 @@ function BankPullModal({ conn, account, onClose, onPulled }) {
                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
                         </div>
                     </div>
-                    <div className="border-l-4 border-amber-300 bg-amber-50 rounded-r p-3">
-                        <div className="text-xs font-bold text-amber-800 mb-2">🔐 조회전용 계정</div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                    {/* ID/PW 폼 */}
+                    {authMethod === 'id_pw' && (
+                        <div className="border-l-4 border-amber-300 bg-amber-50 rounded-r p-3">
+                            <div className="text-xs font-bold text-amber-800 mb-2">🔐 조회전용 계정</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">ID *</label>
+                                    <input type="text" value={form.fast_id}
+                                        onChange={e => setForm({ ...form, fast_id: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">비밀번호 *</label>
+                                    <input
+                                        type={showPwd ? 'text' : 'password'}
+                                        value={form.fast_pwd}
+                                        onChange={e => setForm({ ...form, fast_pwd: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 공동인증서 폼 */}
+                    {authMethod === 'cert' && (
+                        <div className="border-l-4 border-blue-300 bg-blue-50 rounded-r p-3 space-y-2">
+                            <div className="text-xs font-bold text-blue-800">📜 공동인증서</div>
+                            <p className="text-[11px] text-blue-700">
+                                NPKI 폴더에서 signCert.der 와 signPri.key 두 파일을 업로드.
+                                Windows: <code className="bg-white px-1 rounded">C:\Users\xxx\AppData\LocalLow\NPKI\...</code>
+                            </p>
                             <div>
-                                <label className="text-xs text-slate-500 mb-1 block">ID *</label>
-                                <input type="text" value={form.fast_id}
-                                    onChange={e => setForm({ ...form, fast_id: e.target.value })}
-                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                <label className="text-xs text-slate-500 mb-1 block">signCert.der *</label>
+                                <input
+                                    type="file"
+                                    accept=".der,.cer"
+                                    onChange={e => handleFile('cert_file', e)}
+                                    className="w-full text-xs"
+                                />
+                                {form.cert_file_name && (
+                                    <div className="text-[10px] text-emerald-600 mt-1">✓ {form.cert_file_name}</div>
+                                )}
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500 mb-1 block">비밀번호 *</label>
+                                <label className="text-xs text-slate-500 mb-1 block">signPri.key *</label>
+                                <input
+                                    type="file"
+                                    accept=".key"
+                                    onChange={e => handleFile('key_file', e)}
+                                    className="w-full text-xs"
+                                />
+                                {form.key_file_name && (
+                                    <div className="text-[10px] text-emerald-600 mt-1">✓ {form.key_file_name}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">인증서 비밀번호 *</label>
                                 <input
                                     type={showPwd ? 'text' : 'password'}
-                                    value={form.fast_pwd}
-                                    onChange={e => setForm({ ...form, fast_pwd: e.target.value })}
+                                    value={form.cert_pwd}
+                                    onChange={e => setForm({ ...form, cert_pwd: e.target.value })}
                                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                 />
                             </div>
                         </div>
-                        <label className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                    )}
+
+                    {/* 간편인증 폼 */}
+                    {authMethod === 'simple' && (
+                        <div className="border-l-4 border-fuchsia-300 bg-fuchsia-50 rounded-r p-3 space-y-2">
+                            <div className="text-xs font-bold text-fuchsia-800">📱 간편인증</div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">인증사 *</label>
+                                    <select
+                                        value={form.simple_provider}
+                                        onChange={e => setForm({ ...form, simple_provider: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    >
+                                        <option value="kakao">카카오톡</option>
+                                        <option value="naver">네이버</option>
+                                        <option value="pass">PASS (통신사)</option>
+                                        <option value="toss">토스</option>
+                                        <option value="payco">페이코</option>
+                                        <option value="samsung">삼성패스</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">통신사 *</label>
+                                    <select
+                                        value={form.telecom}
+                                        onChange={e => setForm({ ...form, telecom: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    >
+                                        <option value="0">SKT</option>
+                                        <option value="1">KT</option>
+                                        <option value="2">LG U+</option>
+                                        <option value="3">SKT 알뜰</option>
+                                        <option value="4">KT 알뜰</option>
+                                        <option value="5">LG 알뜰</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">본인 이름 *</label>
+                                <input type="text" value={form.user_name}
+                                    onChange={e => setForm({ ...form, user_name: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">휴대폰 번호 * (하이픈 자동 제거)</label>
+                                <input type="text" value={form.phone_no}
+                                    onChange={e => setForm({ ...form, phone_no: e.target.value })}
+                                    placeholder="010-1234-5678"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">
+                                    {form.client_type === 'B' ? '사업자번호 *' : '생년월일 (yyMMdd) *'}
+                                </label>
+                                <input type="text" value={form.birth_date}
+                                    onChange={e => setForm({ ...form, birth_date: e.target.value })}
+                                    placeholder={form.client_type === 'B' ? '6391201514' : '900101'}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                            <p className="text-[11px] text-fuchsia-700 mt-1">
+                                💡 [가져오기] 클릭 → 휴대폰으로 인증 요청 → 카카오톡/앱에서 인증 완료 →
+                                다시 [가져오기] 한 번 더 누르면 거래내역 수집됩니다.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* 비밀번호 표시 토글 */}
+                    {(authMethod === 'id_pw' || authMethod === 'cert') && (
+                        <label className="flex items-center gap-2 text-xs text-slate-500">
                             <input type="checkbox" checked={showPwd} onChange={e => setShowPwd(e.target.checked)} />
                             비밀번호 표시
                         </label>
-                    </div>
+                    )}
+
                     <div>
                         <label className="text-xs text-slate-500 mb-1 block">계좌 구분</label>
                         <select
@@ -681,7 +914,12 @@ function BankPullModal({ conn, account, onClose, onPulled }) {
                             <option value="P">개인</option>
                         </select>
                     </div>
+
+                    <div className="text-[11px] text-slate-500 bg-slate-50 rounded p-2">
+                        🔒 자격증명·인증서·간편인증 정보는 CODEF API 로 즉시 전송 후 셈하나 서버에 저장되지 않습니다.
+                    </div>
                 </form>
+
                 <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex gap-2 justify-end">
                     <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-white">
                         취소

@@ -49,43 +49,88 @@ class CodefConnectionService:
 
     def register_bank(self, business_id: int, bank_code: str,
                       auth_payload: dict) -> CodefConnection:
-        """은행 connectedId 발급 + CodefConnection 저장.
+        """은행 connectedId 발급 + CodefConnection 저장. 3가지 인증 방식 지원.
 
-        auth_payload 형식 (ID/PW 우선 — 신한 등 조회전용 계정):
-            {"id": "조회전용 ID", "password": "조회전용 PW", "client_type": "B"}
+        auth_payload 형식:
+          ID/PW:       {"id", "password", "client_type"}
+          공동인증서:  {"certFile" (b64), "keyFile" (b64), "certPwd", "client_type"}
+          간편인증:    {"loginType": "kakao"|"naver"|"pass"|"toss"|"payco"|"samsung",
+                       "userName", "phoneNo", "birthDate" or "identity", "client_type"}
         """
         org = get_organization(bank_code)
         if not org or org.type != "bank":
             raise ValueError(f"알 수 없는 은행: {bank_code}")
 
         biz_reg_no = self._get_business_reg_no(business_id)
-        client_type = (auth_payload.get("client_type") or "B").upper()
-        if client_type not in {"P", "B"}:
-            client_type = "B"
-
-        if "password" not in auth_payload or "id" not in auth_payload:
-            raise ValueError("은행 등록은 ID/PW 필수 (id, password)")
-
-        encrypted = self._client.encrypt_password(auth_payload["password"])
-        account = {
-            "countryCode": "KR",
-            "businessType": "BK",  # 은행
-            "clientType": client_type,
-            "organization": org.code,
-            "loginType": "1",       # ID/PW
-            "id": auth_payload["id"],
-            "password": encrypted,
-        }
-        if client_type == "B" and biz_reg_no:
-            account["businessRegNo"] = biz_reg_no
-
-        sdk_payload = {"accountList": [account]}
+        sdk_payload, auth_method = self._build_bank_payload(org, auth_payload, biz_reg_no)
         result = self._client.create_account(sdk_payload)
         return self._upsert_connection(
             business_id=business_id,
             organization=org,
             connected_id=result.connected_id,
-            auth_method="id_pw",
+            auth_method=auth_method,
+        )
+
+    def _build_bank_payload(self, org, auth_payload: dict, biz_reg_no: str) -> tuple[dict, str]:
+        """은행 인증 페이로드 빌드. auth_payload 형식 자동 감지."""
+        client_type = (auth_payload.get("client_type") or "B").upper()
+        if client_type not in {"P", "B"}:
+            client_type = "B"
+
+        base = {
+            "countryCode": "KR",
+            "businessType": "BK",
+            "clientType": client_type,
+            "organization": org.code,
+        }
+        if client_type == "B" and biz_reg_no:
+            base["businessRegNo"] = biz_reg_no
+
+        # 1) 공동인증서
+        if "certFile" in auth_payload and "keyFile" in auth_payload:
+            cert_pwd = auth_payload.get("certPwd") or auth_payload.get("cert_pwd") or ""
+            account = {
+                **base,
+                "loginType": "0",          # 0 = 공동인증서
+                "certType": "1",
+                "certFile": auth_payload["certFile"],
+                "keyFile": auth_payload["keyFile"],
+                "certPassword": self._client.encrypt_password(cert_pwd) if cert_pwd else "",
+            }
+            return {"accountList": [account]}, "cert"
+
+        # 2) 간편인증
+        simple_types = {"kakao", "naver", "pass", "toss", "payco", "samsung"}
+        login_type = (auth_payload.get("loginType") or "").lower()
+        if login_type in simple_types:
+            account = {
+                **base,
+                "loginType": "5",          # 5 = 간편인증
+                "loginTypeLevel": "1",
+                "loginIdentity": login_type,
+                "userName": auth_payload.get("userName", ""),
+                "phoneNo": auth_payload.get("phoneNo", "") or auth_payload.get("phone", ""),
+                "birthDate": auth_payload.get("birthDate", "") or auth_payload.get("identity", ""),
+                "telecom": auth_payload.get("telecom", "0"),
+                "isIdentify": "1",
+                "is2Way": "true",
+            }
+            return {"accountList": [account]}, f"simple_{login_type}"
+
+        # 3) ID/PW (기본)
+        if "id" in auth_payload and "password" in auth_payload:
+            encrypted = self._client.encrypt_password(auth_payload["password"])
+            account = {
+                **base,
+                "loginType": "1",          # 1 = ID/PW
+                "id": auth_payload["id"],
+                "password": encrypted,
+            }
+            return {"accountList": [account]}, "id_pw"
+
+        raise ValueError(
+            "지원 안 되는 auth_payload 형식. id/password 또는 certFile/keyFile "
+            "또는 loginType(kakao/naver/pass/toss/payco/samsung) 중 하나 필요"
         )
 
     def _get_business_reg_no(self, business_id: int) -> str:
