@@ -84,6 +84,23 @@ def _parse_date(v) -> date:
     return date(int(s[:4]), int(s[4:6]), int(s[6:8]))
 
 
+def _safe_codef_amount(v) -> int:
+    """CODEF 응답의 금액 문자열을 int 로 변환. 쉼표/공백/비정상값에 안전.
+
+    실패 시 0 으로 fallback 하여 한 건의 파싱 오류가 전체 수집을 죽이지 않게 한다.
+    """
+    if v is None or v == "":
+        return 0
+    s = str(v).replace(",", "").strip()
+    if not s:
+        return 0
+    try:
+        return int(float(s))
+    except (TypeError, ValueError):
+        logging.getLogger("codef.bank").warning("amount parse fail: %r → 0", v)
+        return 0
+
+
 def _acc_to_dict(acc: BankAccount) -> dict:
     return {
         "id": acc.id,
@@ -2606,7 +2623,9 @@ def codef_register_bank(
             else:
                 conn = conn_svc.register_bank(bid, acc.bank_code, auth)
         except CodefAuthExpired as e:
-            raise HTTPException(401, f"CODEF 인증 실패: {e.message}")
+            # 외부(CODEF) 인증 만료 — 셈하나 JWT 만료가 아니므로 401 사용 금지.
+            # axios interceptor 가 401 받으면 사용자를 강제 로그아웃시킴.
+            raise HTTPException(422, f"CODEF 인증 실패: {e.message}")
         except CodefAdditionalAuth as e:
             raise HTTPException(428, {
                 "message": "간편인증 진행 중 — 휴대폰에서 인증을 완료한 뒤 다시 호출하세요.",
@@ -2686,7 +2705,8 @@ def codef_pull_historical(
                     conn = conn_svc.register_bank(bid, bank_code, auth_payload)
                 connected_id = conn.connected_id
         except CodefAuthExpired as e:
-            raise HTTPException(401, f"CODEF 인증 실패: {e.message}")
+            # 외부(CODEF) 인증 만료 — 셈하나 JWT 만료가 아니므로 401 사용 금지.
+            raise HTTPException(422, f"CODEF 인증 실패: {e.message}")
         except CodefAdditionalAuth as e:
             raise HTTPException(
                 428,
@@ -2750,9 +2770,11 @@ def codef_pull_historical(
             except (ValueError, TypeError):
                 continue
 
-            in_amt = int(float(r.get("resAccountIn", "0") or 0))
-            out_amt = int(float(r.get("resAccountOut", "0") or 0))
-            balance = int(float(r.get("resAfterTranBalance", "0") or 0))
+            # 금액은 "1,234" 같은 쉼표/공백 포함 문자열로 올 수 있음.
+            # 파싱 실패 한 건이 전체 수집을 500 으로 죽이지 않도록 안전 fallback.
+            in_amt = _safe_codef_amount(r.get("resAccountIn"))
+            out_amt = _safe_codef_amount(r.get("resAccountOut"))
+            balance = _safe_codef_amount(r.get("resAfterTranBalance"))
             # CODEF 필드 매핑 (popbill 과 의미 일치시킴):
             #   resAccountDesc3 (거래상대방, 예: '정정길'/'롯데카드') → remark1 (메인 표시 + 분류 키)
             #   resAccountDesc2 (거래 매체, 예: '모바일')              → remark2 (보조 표시)

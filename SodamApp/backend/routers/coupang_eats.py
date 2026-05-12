@@ -615,8 +615,11 @@ def debug_probe(
 ):
     """디버그 — 현재 DB 쿠키 list + whoami 호출 응답 raw 노출.
 
-    수동 쿠키 입력이 401 받을 때 정확한 원인 추적용. 쿠키 *이름*만 노출 (값은 비공개).
+    수동 쿠키 입력이 401 받을 때 정확한 원인 추적용. 쿠키 *이름*만 노출하지만
+    응답 본문/헤더에 Set-Cookie 등 민감 정보가 섞일 수 있어 superadmin 한정.
     """
+    if admin.role != "superadmin":
+        raise HTTPException(403, "디버그 엔드포인트는 superadmin 전용입니다.")
     bid = _resolve_bid(admin, x_view_as_business)
     with Session(engine) as s:
         cred = s.exec(
@@ -697,8 +700,11 @@ def debug_raw_orders(
 ):
     """디버그 — fetch_orders 응답 raw 그대로 노출. 응답 구조 파악용.
 
+    raw 응답에 고객 이름/주소/전화 등 PII 가 그대로 포함되므로 superadmin 한정.
     start/end 미지정 시 어제 하루.
     """
+    if admin.role != "superadmin":
+        raise HTTPException(403, "디버그 엔드포인트는 superadmin 전용입니다.")
     bid = _resolve_bid(admin, x_view_as_business)
     with Session(engine) as s:
         cred = s.exec(
