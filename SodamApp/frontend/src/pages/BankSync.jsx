@@ -12,9 +12,9 @@ const CLASSIFIED_LABELS = {
     transfer: { label: '이체', color: 'bg-blue-100 text-blue-700' },
     excluded: { label: '제외', color: 'bg-slate-200 text-slate-500' },
     // 2026-05-12: 카드/페이/배달앱 정산 입금 — 매출과 분리 (중복 방지)
-    card_settlement:     { label: '카드입금',   color: 'bg-violet-100 text-violet-700' },
-    pay_settlement:      { label: '페이입금',   color: 'bg-fuchsia-100 text-fuchsia-700' },
-    delivery_settlement: { label: '배달앱입금', color: 'bg-rose-100 text-rose-700' },
+    card_settlement:     { label: '카드입금', color: 'bg-violet-100 text-violet-700' },
+    pay_settlement:      { label: '페이',     color: 'bg-fuchsia-100 text-fuchsia-700' },
+    delivery_settlement: { label: '배달입금', color: 'bg-rose-100 text-rose-700' },
 };
 
 function fmtWon(n) {
@@ -262,7 +262,7 @@ export default function BankSync() {
             alert(
                 `자동 분류 완료\n총 ${res.data.processed}건 처리\n`
                 + `매출 ${c.revenue || 0} · 지출 ${c.expense || 0} · 매입 ${c.purchase || 0} · 이체 ${c.transfer || 0}\n`
-                + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달앱입금 ${c.delivery_settlement || 0}\n`
+                + `카드입금 ${c.card_settlement || 0} · 페이 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0}\n`
                 + `학습 ${c.learned || 0} · 미분류 ${c.skip || 0}`
             );
             fetchTxs();
