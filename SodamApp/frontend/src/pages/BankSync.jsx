@@ -20,7 +20,7 @@ function saveAiModelSetting(v) {
     try { localStorage.setItem(AI_MODEL_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
 }
 
-const CLASSIFIED_LABELS = {
+export const CLASSIFIED_LABELS = {
     unclassified: { label: '미분류', color: 'bg-slate-100 text-slate-600' },
     revenue: { label: '매출', color: 'bg-emerald-100 text-emerald-700' },
     expense: { label: '지출', color: 'bg-orange-100 text-orange-700' },
@@ -40,12 +40,12 @@ const CLASSIFIED_LABELS = {
     other_income:        { label: '기타입금', color: 'bg-stone-100 text-stone-700' },       // 영업외수익, 매출 X
 };
 
-function fmtWon(n) {
+export function fmtWon(n) {
     if (n == null || n === 0) return '-';
     return n.toLocaleString('ko-KR') + '원';
 }
 
-function fmtDate(s) {
+export function fmtDate(s) {
     if (!s) return '';
     return s.length >= 10 ? s.slice(0, 10) : s;
 }

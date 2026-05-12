@@ -21,12 +21,12 @@ const MODULES = [
     {
         id: 'banks',
         title: '계좌 거래내역',
-        provider: 'CODEF / 팝빌',
+        provider: 'CODEF',
         icon: Building2,
         color: 'blue',
         active: true,
-        href: '/finance/bank-sync',
-        description: '20+ 은행 입출금 내역 자동수집 + AI 분류',
+        href: '/external-integration/banks',
+        description: '20+ 은행 입출금 자동수집 (CODEF 마이데이터)',
     },
     {
         id: 'insurance',

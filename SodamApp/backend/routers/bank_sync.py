@@ -813,6 +813,7 @@ def list_transactions(
     ),
     direction: Optional[str] = Query(None, description="in / out / all"),
     q: Optional[str] = Query(None, description="remark1 부분검색"),
+    source: Optional[str] = Query(None, description="codef | popbill — 거래 출처 필터 (tid prefix 기반)"),
     limit: int = Query(200, ge=1, le=1000),
     offset: int = Query(0, ge=0),
     admin: User = Depends(get_admin_user),
@@ -832,6 +833,10 @@ def list_transactions(
             stmt = stmt.where(BankTransaction.trans_date <= ed)
         if classified_as:
             stmt = stmt.where(BankTransaction.classified_as == classified_as)
+        if source == "codef":
+            stmt = stmt.where(BankTransaction.tid.like("codef:%"))
+        elif source == "popbill":
+            stmt = stmt.where(~BankTransaction.tid.like("codef:%"))
         if direction == "in":
             stmt = stmt.where(BankTransaction.in_amount > 0)
         elif direction == "out":
