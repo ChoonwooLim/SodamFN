@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles, Send, MessageSquare } from 'lucide-react';
+import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles, Send, MessageSquare, HelpCircle } from 'lucide-react';
 import api from '../api';
+import HelpModal from '../components/HelpModal';
+import { MOBILE_PG_GUIDE_MD, MOBILE_PG_GUIDE_TITLE } from '../data/help/mobilePgGuide';
 
 const AUTO_REFRESH_KEY = 'bankSyncAutoRefresh_v1';
 const AI_MODEL_KEY = 'bankSyncAiModel_v1';
@@ -1513,6 +1515,7 @@ function SettlementTab() {
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState(null);
     const [pgModalOpen, setPgModalOpen] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
 
     async function fetchStats() {
         setLoading(true);
@@ -1538,6 +1541,13 @@ function SettlementTab() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <h2 className="text-lg font-bold text-slate-800">정산·수수료 통계</h2>
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => setHelpOpen(true)}
+                        title="이동식 카드매출 설정 가이드"
+                        className="px-2 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                        <HelpCircle size={14} className="inline mr-1" /> 도움말
+                    </button>
                     <button
                         onClick={() => setPgModalOpen(true)}
                         title="코페이/KSnet 등 이동식 단말기 PG 등록·수수료율 조정"
@@ -1571,6 +1581,13 @@ function SettlementTab() {
             </div>
 
             {pgModalOpen && <MobilePgManagerModal onClose={() => setPgModalOpen(false)} />}
+            {helpOpen && (
+                <HelpModal
+                    title={MOBILE_PG_GUIDE_TITLE}
+                    markdown={MOBILE_PG_GUIDE_MD}
+                    onClose={() => setHelpOpen(false)}
+                />
+            )}
 
             <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 text-xs text-violet-800 mb-6">
                 <strong>수수료율 역산 방식:</strong>{' '}
@@ -1622,6 +1639,7 @@ function MobilePgManagerModal({ onClose }) {
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(null); // {id?, name, keyword, commission_pct, note, is_active}
     const [saving, setSaving] = useState(false);
+    const [helpOpen, setHelpOpen] = useState(false);
 
     async function load() {
         setLoading(true);
@@ -1714,9 +1732,18 @@ function MobilePgManagerModal({ onClose }) {
                             코페이·KSnet·키움페이 등. 적요 키워드로 자동 매칭 + 수수료율로 매출 역산.
                         </p>
                     </div>
-                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
-                        <XIcon size={18} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setHelpOpen(true)}
+                            title="설정 가이드"
+                            className="hover:bg-white/10 p-1.5 rounded transition-colors"
+                        >
+                            <HelpCircle size={18} />
+                        </button>
+                        <button onClick={onClose} className="hover:bg-white/10 p-1.5 rounded">
+                            <XIcon size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5">
@@ -1853,11 +1880,24 @@ function MobilePgManagerModal({ onClose }) {
                     )}
                 </div>
 
-                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
-                    💡 등록 후 거래내역 탭의 [정산 재분류] 를 실행하면 과거 거래도 자동으로 이동식카드로 재분류됩니다.
-                    수수료율은 코페이 정산 명세서를 받으시면 정확한 값으로 조정해주세요.
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
+                    <span>💡 등록 후 거래내역 탭의 [정산 재분류] 를 실행하면 과거 거래도 자동 재분류됩니다.</span>
+                    <button
+                        onClick={() => setHelpOpen(true)}
+                        className="text-sky-600 hover:text-sky-700 hover:underline font-semibold"
+                    >
+                        자세한 가이드 →
+                    </button>
                 </div>
             </div>
+
+            {helpOpen && (
+                <HelpModal
+                    title={MOBILE_PG_GUIDE_TITLE}
+                    markdown={MOBILE_PG_GUIDE_MD}
+                    onClose={() => setHelpOpen(false)}
+                />
+            )}
         </div>
     );
 }
