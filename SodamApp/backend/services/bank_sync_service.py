@@ -327,6 +327,59 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
             logger.warning("getBalance 예외: %s", e)
             return None
 
+    def regist_account(
+        self,
+        bank_code: str,
+        account_number: str,
+        account_pwd: str,
+        account_type: str,
+        identity_number: str,
+        fast_id: Optional[str] = None,
+        fast_pwd: Optional[str] = None,
+        bank_id: Optional[str] = None,
+        account_name: Optional[str] = None,
+        use_period: int = 11,
+        memo: Optional[str] = None,
+    ) -> dict:
+        """팝빌 EasyFinBank.registBankAccount — API 직접 등록.
+
+        은행별 추가 인증 필드:
+          - 신한은행(0088), IM뱅크(0031), 신협중앙회(0048): FastID/FastPWD 필수
+          - 국민은행(0004): BankID 필수
+          - 그 외: 일반 계좌 정보만
+        """
+        PopbillException = self._popbill_exc()
+        try:
+            svc = self._get_svc()
+            from popbill import EasyFinBankAccount  # type: ignore
+            form = EasyFinBankAccount(
+                BankCode=str(bank_code),
+                AccountNumber=_normalize(account_number),
+                AccountPWD=str(account_pwd),
+                AccountType=str(account_type or "법인"),
+                IdentityNumber=_normalize(identity_number),
+                AccountName=account_name or "",
+                BankID=bank_id or "",
+                FastID=fast_id or "",
+                FastPWD=fast_pwd or "",
+                UsePeriod=str(use_period or 11),
+                Memo=memo or "",
+            )
+            resp = svc.registBankAccount(self.corp_num, form, self.user_id)
+            return {
+                "ok": True,
+                "code": _attr(resp, "code"),
+                "message": _attr(resp, "message"),
+            }
+        except PopbillException as pe:
+            return {
+                "ok": False,
+                "code": getattr(pe, "code", None),
+                "message": getattr(pe, "message", str(pe)),
+            }
+        except Exception as e:
+            return {"ok": False, "code": None, "message": f"{e}"}
+
     def check_account_validity(self, bank_code: str, account_number: str) -> dict:
         """계좌 존재/정액제 상태 확인 — getBankAccountInfo + getFlatRateState 조합."""
         PopbillException = self._popbill_exc()

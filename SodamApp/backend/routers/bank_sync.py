@@ -2357,6 +2357,132 @@ def reclassify_settlements(
         service.close()
 
 
+class RegistBankAccountIn(BaseModel):
+    bank_code: str = Field(..., min_length=4, max_length=4, description="은행 4자리 코드 (예: 0088 신한, 0004 국민)")
+    account_number: str = Field(..., min_length=5, max_length=30, description="계좌번호 (하이픈 자동 제거)")
+    account_pwd: str = Field(..., min_length=4, max_length=4, description="계좌 비밀번호 4자리")
+    account_type: str = Field(default="법인", description="법인 또는 개인")
+    identity_number: str = Field(..., description="법인: 사업자번호 / 개인: 생년월일(yyMMdd)")
+    fast_id: Optional[str] = Field(default=None, description="조회전용 ID — 신한/IM/신협 필수")
+    fast_pwd: Optional[str] = Field(default=None, description="조회전용 비밀번호 — 신한/IM/신협 필수")
+    bank_id: Optional[str] = Field(default=None, description="인터넷뱅킹 ID — 국민은행 필수")
+    account_name: Optional[str] = Field(default=None, description="계좌 별칭")
+    use_period: int = Field(default=11, ge=1, le=12, description="정액제 사용 개월수 (1~12, 기본 11)")
+    memo: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.post("/accounts/regist")
+def regist_bank_account(
+    body: RegistBankAccountIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """팝빌 EasyFinBank.registBankAccount API 직접 호출로 계좌 등록.
+
+    동작:
+    1. 은행별 필수 필드 검증 (신한/IM/신협 → FastID/PWD 필수, 국민 → BankID 필수)
+    2. popbill API 호출 (자격증명은 popbill 서버로 즉시 전송 후 메모리 폐기 — DB 저장 없음)
+    3. 성공 시 BankAccount DB 에 upsert (메타정보만, 자격증명 제외)
+    4. 실패 시 popbill 에러 코드 + 메시지 반환
+
+    보안:
+    - account_pwd / fast_pwd / bank_id 는 popbill API 호출 직후 변수에서 사라짐
+    - 응답·로그에 자격증명 절대 포함 안 됨
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    provider = get_provider()
+    if provider.name != "popbill":
+        raise HTTPException(
+            status_code=503,
+            detail=f"popbill provider 가 아닙니다 (현재: {provider.name}). POPBILL_LINK_ID/SECRET_KEY 확인 필요.",
+        )
+
+    # 은행별 필수 필드 검증
+    bank_code = body.bank_code.strip()
+    fast_required_banks = {"0088", "0031", "0048"}  # 신한, IM, 신협
+    bank_id_required_banks = {"0004"}                # 국민
+    if bank_code in fast_required_banks:
+        if not body.fast_id or not body.fast_pwd:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{BANK_NAMES.get(bank_code, bank_code)} 은 조회전용 ID/비밀번호(fast_id, fast_pwd) 필수입니다.",
+            )
+    if bank_code in bank_id_required_banks:
+        if not body.bank_id:
+            raise HTTPException(
+                status_code=400,
+                detail="국민은행은 인터넷뱅킹 ID(bank_id) 필수입니다.",
+            )
+
+    # popbill API 호출 (자격증명 메모리 통과만)
+    result = provider.regist_account(
+        bank_code=bank_code,
+        account_number=body.account_number,
+        account_pwd=body.account_pwd,
+        account_type=body.account_type,
+        identity_number=body.identity_number,
+        fast_id=body.fast_id,
+        fast_pwd=body.fast_pwd,
+        bank_id=body.bank_id,
+        account_name=body.account_name,
+        use_period=body.use_period,
+        memo=body.memo,
+    )
+
+    if not result.get("ok"):
+        raise HTTPException(
+            status_code=502,
+            detail=f"팝빌 등록 실패 [{result.get('code')}] {result.get('message', '알 수 없는 오류')}",
+        )
+
+    # BankAccount DB upsert (자격증명 제외)
+    service = DatabaseService()
+    try:
+        clean_acc = re.sub(r"\D", "", body.account_number)
+        existing = service.session.exec(
+            select(BankAccount).where(
+                BankAccount.business_id == bid,
+                BankAccount.bank_code == bank_code,
+                BankAccount.account_number == clean_acc,
+            )
+        ).first()
+        if existing:
+            existing.alias = body.account_name or existing.alias
+            existing.memo = body.memo or existing.memo
+            existing.last_sync_status = "registered"
+            existing.last_sync_error = None
+            service.session.add(existing)
+            service.session.commit()
+            service.session.refresh(existing)
+            return {
+                "ok": True,
+                "created": False,
+                "account": _acc_to_dict(existing),
+                "popbill_message": result.get("message"),
+            }
+        new_acc = BankAccount(
+            business_id=bid,
+            bank_code=bank_code,
+            bank_name=BANK_NAMES.get(bank_code, bank_code),
+            account_number=clean_acc,
+            account_type=body.account_type,
+            alias=body.account_name,
+            memo=body.memo,
+            last_sync_status="registered",
+        )
+        service.session.add(new_acc)
+        service.session.commit()
+        service.session.refresh(new_acc)
+        return {
+            "ok": True,
+            "created": True,
+            "account": _acc_to_dict(new_acc),
+            "popbill_message": result.get("message"),
+        }
+    finally:
+        service.close()
+
+
 class PullMonthlyBulkIn(BaseModel):
     year: int = Field(..., description="대상 연도 (예: 2026)")
     account_id: Optional[int] = Field(default=None,

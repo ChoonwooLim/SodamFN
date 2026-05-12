@@ -100,6 +100,9 @@ export default function BankSync() {
     const [manualLoading, setManualLoading] = useState(false);
     const [manualResult, setManualResult] = useState(null);
 
+    // 계좌 직접 등록 (RegistBankAccount API)
+    const [registOpen, setRegistOpen] = useState(false);
+
     // Auto-refresh (페이지 열려있는 동안 N분 단위 일괄 갱신)
     const [autoRefresh, setAutoRefresh] = useState(() => {
         try {
@@ -569,6 +572,7 @@ export default function BankSync() {
                         onDelete={handleDeleteAccount}
                         onDiagnose={runDiagnose}
                         onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
+                        onRegistAccount={() => setRegistOpen(true)}
                     />
                 )}
                 {tab === 'transactions' && (
@@ -638,6 +642,17 @@ export default function BankSync() {
                     state={aiModal}
                     onClose={() => setAiModal(null)}
                     onApply={applyAiSuggestion}
+                />
+            )}
+
+            {registOpen && (
+                <RegistAccountModal
+                    bankNames={status?.bank_names}
+                    onClose={() => setRegistOpen(false)}
+                    onSuccess={() => {
+                        setRegistOpen(false);
+                        fetchAccounts();
+                    }}
                 />
             )}
         </div>
@@ -1158,10 +1173,18 @@ function DiagnoseModal({ data, loading, env, onClose, onRerun }) {
     );
 }
 
-function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose, onManualAdd }) {
+function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull, onDelete, onDiagnose, onManualAdd, onRegistAccount }) {
     return (
         <div>
             <div className="flex flex-wrap items-center gap-2 mb-4">
+                <button
+                    onClick={onRegistAccount}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 transition-all"
+                    title="팝빌 사이트 안 들어가고 셈하나에서 직접 계좌 등록 (RegistBankAccount API)"
+                >
+                    <Plus size={14} />
+                    계좌 직접 등록
+                </button>
                 <button
                     onClick={onSync}
                     disabled={loading}
@@ -1172,11 +1195,11 @@ function AccountsTab({ accounts, loading, syncMsg, onSync, onOpenMgtUrl, onPull,
                 </button>
                 <button
                     onClick={onManualAdd}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-all"
-                    title="listBankAccount 권한 이슈 우회: 계좌 정보 수동 입력"
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-sm font-semibold hover:bg-indigo-200 transition-all"
+                    title="listBankAccount 권한 이슈 우회: 계좌 정보 수동 입력 (DB만, 팝빌 등록 X)"
                 >
                     <Plus size={14} />
-                    계좌 수동 추가
+                    계좌 메타 추가
                 </button>
                 <button
                     onClick={onOpenMgtUrl}
@@ -2509,6 +2532,254 @@ function ChatTab({ aiModel }) {
                             전송
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
+// ============================================================
+// 계좌 직접 등록 모달 (2026-05-13) — RegistBankAccount API
+// 팝빌 사이트 안 들어가고 셈하나에서 직접 등록
+// ============================================================
+
+function RegistAccountModal({ bankNames, onClose, onSuccess }) {
+    const [form, setForm] = useState({
+        bank_code: '0088',          // 기본 신한
+        account_number: '',
+        account_pwd: '',
+        account_type: '법인',
+        identity_number: '',
+        fast_id: '',
+        fast_pwd: '',
+        bank_id: '',
+        account_name: '',
+        use_period: 11,
+        memo: '',
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState(null);
+    const [showPwd, setShowPwd] = useState(false);
+
+    const bankList = bankNames ? Object.entries(bankNames) : [['0088', '신한은행']];
+    const fastRequiredBanks = ['0088', '0031', '0048'];
+    const bankIdRequiredBanks = ['0004'];
+    const fastRequired = fastRequiredBanks.includes(form.bank_code);
+    const bankIdRequired = bankIdRequiredBanks.includes(form.bank_code);
+
+    async function submit(e) {
+        e?.preventDefault();
+        setError(null);
+        if (!form.account_number || !form.account_pwd || !form.identity_number) {
+            setError('계좌번호·계좌비밀번호·실명번호는 필수입니다.');
+            return;
+        }
+        if (form.account_pwd.length !== 4) {
+            setError('계좌 비밀번호는 4자리여야 합니다.');
+            return;
+        }
+        if (fastRequired && (!form.fast_id || !form.fast_pwd)) {
+            setError(`${bankNames?.[form.bank_code] || form.bank_code} 은 조회전용 ID/비밀번호 필수입니다.`);
+            return;
+        }
+        if (bankIdRequired && !form.bank_id) {
+            setError('국민은행은 인터넷뱅킹 ID 필수입니다.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const payload = {
+                bank_code: form.bank_code,
+                account_number: form.account_number.replace(/\D/g, ''),
+                account_pwd: form.account_pwd,
+                account_type: form.account_type,
+                identity_number: form.identity_number.replace(/\D/g, ''),
+                fast_id: form.fast_id || null,
+                fast_pwd: form.fast_pwd || null,
+                bank_id: form.bank_id || null,
+                account_name: form.account_name || null,
+                use_period: parseInt(form.use_period) || 11,
+                memo: form.memo || null,
+            };
+            const res = await api.post('/bank-sync/accounts/regist', payload);
+            alert(
+                `계좌 등록 성공 ${res.data.created ? '(신규)' : '(이미 등록됨)'}\n`
+                + `${res.data.account.bank_name} ${res.data.account.account_number_masked}\n`
+                + (res.data.popbill_message ? `\n팝빌 응답: ${res.data.popbill_message}` : '')
+            );
+            onSuccess?.();
+        } catch (e) {
+            setError(e.response?.data?.detail || e.message);
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="px-5 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between">
+                    <div>
+                        <h3 className="font-bold flex items-center gap-2">🏦 계좌 직접 등록</h3>
+                        <p className="text-xs text-emerald-100 mt-0.5">
+                            팝빌 사이트 안 들어가고 셈하나에서 바로 등록 (RegistBankAccount API)
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded">
+                        <XIcon size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={submit} className="flex-1 overflow-y-auto p-5 space-y-3">
+                    {error && (
+                        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-sm text-rose-700">
+                            <AlertCircle size={14} className="inline mr-1" />
+                            {error}
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">은행 *</label>
+                            <select
+                                value={form.bank_code}
+                                onChange={e => setForm({ ...form, bank_code: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                            >
+                                {bankList.map(([code, name]) => (
+                                    <option key={code} value={code}>{name} ({code})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">계좌 구분 *</label>
+                            <select
+                                value={form.account_type}
+                                onChange={e => setForm({ ...form, account_type: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                            >
+                                <option value="법인">법인</option>
+                                <option value="개인">개인</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">계좌번호 * (하이픈 자동 제거)</label>
+                            <input type="text" value={form.account_number}
+                                onChange={e => setForm({ ...form, account_number: e.target.value })}
+                                placeholder="110-357-745538"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">계좌 비밀번호 * (4자리)</label>
+                            <input
+                                type={showPwd ? 'text' : 'password'}
+                                value={form.account_pwd}
+                                maxLength={4}
+                                onChange={e => setForm({ ...form, account_pwd: e.target.value.replace(/\D/g, '') })}
+                                placeholder="••••"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="text-xs text-slate-500 mb-1 block">
+                                실명번호 * (법인: 사업자번호 / 개인: 생년월일 yyMMdd)
+                            </label>
+                            <input type="text" value={form.identity_number}
+                                onChange={e => setForm({ ...form, identity_number: e.target.value })}
+                                placeholder="639-12-01514"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono" />
+                        </div>
+                    </div>
+
+                    {fastRequired && (
+                        <div className="border-l-4 border-amber-300 bg-amber-50 rounded-r p-3">
+                            <div className="text-xs font-bold text-amber-800 mb-2">
+                                🔐 {bankNames?.[form.bank_code] || form.bank_code} 은 조회전용 계정 필수
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">조회전용 ID *</label>
+                                    <input type="text" value={form.fast_id}
+                                        onChange={e => setForm({ ...form, fast_id: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 mb-1 block">조회전용 비밀번호 *</label>
+                                    <input
+                                        type={showPwd ? 'text' : 'password'}
+                                        value={form.fast_pwd}
+                                        onChange={e => setForm({ ...form, fast_pwd: e.target.value })}
+                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {bankIdRequired && (
+                        <div className="border-l-4 border-amber-300 bg-amber-50 rounded-r p-3">
+                            <div className="text-xs font-bold text-amber-800 mb-2">
+                                🔐 국민은행은 인터넷뱅킹 ID 필수
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 mb-1 block">인터넷뱅킹 ID *</label>
+                                <input type="text" value={form.bank_id}
+                                    onChange={e => setForm({ ...form, bank_id: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                        </div>
+                    )}
+
+                    <label className="flex items-center gap-2 text-xs text-slate-500">
+                        <input type="checkbox" checked={showPwd}
+                            onChange={e => setShowPwd(e.target.checked)} />
+                        비밀번호 표시
+                    </label>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">계좌 별칭 (선택)</label>
+                            <input type="text" value={form.account_name}
+                                onChange={e => setForm({ ...form, account_name: e.target.value })}
+                                placeholder="예: 소담신한본점"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-slate-500 mb-1 block">정액제 개월수 (1~12, 기본 11)</label>
+                            <input type="number" min={1} max={12} value={form.use_period}
+                                onChange={e => setForm({ ...form, use_period: e.target.value })}
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="text-xs text-slate-500 mb-1 block">메모 (선택)</label>
+                            <input type="text" value={form.memo}
+                                onChange={e => setForm({ ...form, memo: e.target.value })}
+                                placeholder="예: 본점 매출 정산 계좌"
+                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 bg-slate-50 rounded p-2">
+                        🔒 자격증명(비밀번호·조회전용 ID/PW)은 팝빌 API 로 즉시 전송 후 셈하나 서버에 절대 저장되지 않습니다.
+                    </div>
+                </form>
+
+                <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex gap-2 justify-end">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-white"
+                    >
+                        취소
+                    </button>
+                    <button
+                        onClick={submit}
+                        disabled={submitting}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50"
+                    >
+                        {submitting ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle2 size={14} />}
+                        팝빌에 등록
+                    </button>
                 </div>
             </div>
         </div>
