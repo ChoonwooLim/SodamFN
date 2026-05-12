@@ -1214,18 +1214,21 @@ TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체"
 
 
 # remark1 = "{카드사 약자}{6+ digits}" 형태의 정산 입금 패턴
-# 한국 카드사 매출 정산 표준 포맷 (예: 롯데9924419309, NH17831866, 하나92510497, SHC140990276)
-# 우 = ambiguous (우리카드 vs 우XX 개인), 현 = ambiguous (현대카드 vs 현XX 개인) → 제외
+# 한국 카드사 매출 정산 표준 포맷 (예: 롯데9924419309, NH17831866, 하나92510497,
+# SHC140990276, 우602406580, 현850570073)
+# 사장님 확인 (2026-05-12): '우'/'현' 도 카드 정산이 맞음 — 6+ 자리 숫자 패턴에 한정
 CARD_PREFIX_MAP: dict = {
     "NH":   "NH카드",
     "KB":   "KB국민카드",
-    "하나":  "하나카드",      # 하나은행 송금도 '하나' 시작하지만 그땐 한글 이름 옴 (digits 패턴 아님)
+    "하나":  "하나카드",       # 하나은행 송금은 한글 이름이라 digits 패턴 아님 → 안전
     "롯데":  "롯데카드",
-    "SHC":  "신한카드",       # Shinhan Card 표준 정산 코드
+    "SHC":  "신한카드",        # Shinhan Card 표준 정산 코드
     "신한":  "신한카드",
     "삼성":  "삼성카드",
     "비씨":  "BC카드",
     "BC":   "BC카드",
+    "우":   "우리카드",        # 우602406580 패턴 (사장님 확인)
+    "현":   "현대카드",        # 현850570073 패턴 (사장님 확인)
 }
 
 # remark1 끝에 카드사 약자 붙는 패턴 (예: "743149798BC")
@@ -1268,16 +1271,15 @@ def _resolve_settlement(remark1: Optional[str], remark2: Optional[str]) -> Optio
     for kw, name in CARD_CHANNEL_MAP:
         if kw in text:
             return ("card", name)
-    # 4) remark1 prefix + digits
+    # 4) remark1 prefix + digits — exact prefix match 만 (false positive 방지)
+    #    예: '우영민123456' → prefix '우영민' 으로 추출돼 매칭 안 됨 (개인송금 가능성)
     if remark1:
         r1 = remark1.strip()
         m = _CARD_PREFIX_RE.match(r1)
         if m:
             prefix = m.group(1)
-            # 긴 prefix 먼저 매칭 (롯데/하나/SHC 등 2글자 이상이 NH/KB/BC 보다 우선)
-            for p in sorted(CARD_PREFIX_MAP.keys(), key=lambda x: -len(x)):
-                if prefix == p or prefix.startswith(p):
-                    return ("card", CARD_PREFIX_MAP[p])
+            if prefix in CARD_PREFIX_MAP:
+                return ("card", CARD_PREFIX_MAP[prefix])
         # 5) suffix pattern (예: 743149798BC)
         m2 = _CARD_SUFFIX_RE.match(r1)
         if m2:
