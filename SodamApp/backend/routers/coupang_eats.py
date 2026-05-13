@@ -47,6 +47,7 @@ from services.coupang_eats_login import (
     login_and_get_cookies,
     CoupangEatsLoginError,
 )
+from utils.datetime_utils import utc_iso
 
 
 log = logging.getLogger("coupang_eats.router")
@@ -75,13 +76,13 @@ def _cred_dto(row: CoupangEatsCredential) -> dict:
         "status": row.status,
         "login_method": row.login_method,
         "cookies_present": bool(row.cookies_encrypted),
-        "cookies_obtained_at": row.cookies_obtained_at.isoformat() if row.cookies_obtained_at else None,
-        "cookies_expires_at": row.cookies_expires_at.isoformat() if row.cookies_expires_at else None,
-        "last_verified_at": row.last_verified_at.isoformat() if row.last_verified_at else None,
-        "last_failed_at": row.last_failed_at.isoformat() if row.last_failed_at else None,
+        "cookies_obtained_at": utc_iso(row.cookies_obtained_at),
+        "cookies_expires_at": utc_iso(row.cookies_expires_at),
+        "last_verified_at": utc_iso(row.last_verified_at),
+        "last_failed_at": utc_iso(row.last_failed_at),
         "last_error_message": row.last_error_message,
         "consecutive_failures": row.consecutive_failures,
-        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "updated_at": utc_iso(row.updated_at),
     }
 
 
@@ -89,10 +90,10 @@ def _log_dto(row: CoupangEatsSyncLog) -> dict:
     return {
         "id": row.id,
         "sync_mode": row.sync_mode,
-        "target_start": row.target_start.isoformat() if row.target_start else None,
-        "target_end": row.target_end.isoformat() if row.target_end else None,
-        "started_at": row.started_at.isoformat() if row.started_at else None,
-        "finished_at": row.finished_at.isoformat() if row.finished_at else None,
+        "target_start": utc_iso(row.target_start),
+        "target_end": utc_iso(row.target_end),
+        "started_at": utc_iso(row.started_at),
+        "finished_at": utc_iso(row.finished_at),
         "status": row.status,
         "orders_fetched": row.orders_fetched,
         "orders_inserted": row.orders_inserted,

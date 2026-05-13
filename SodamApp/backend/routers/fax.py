@@ -27,6 +27,7 @@ from services.fax_service import (
     get_provider,
     normalize_fax_number,
 )
+from utils.datetime_utils import utc_iso
 
 router = APIRouter(prefix="/fax", tags=["fax"])
 
@@ -39,20 +40,6 @@ ALLOWED_MIMES = {
     "application/octet-stream",  # allow when content-type is unknown
 }
 MAX_SIZE_MB = 10
-
-
-def _utc_iso(dt):
-    """naive datetime 을 UTC-tagged ISO 로 변환. 컨테이너 TZ=UTC 가정.
-
-    프론트 new Date(isoString) 이 UTC 로 정확히 해석 → 사용자 브라우저 TZ(KST 등) 로 자동 변환.
-    timezone 정보 없는 naive ISO 를 그대로 보내면 브라우저가 local time 으로 오해석 → 9시간 어긋남.
-    """
-    if not dt:
-        return None
-    from datetime import timezone
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat()
 
 
 def _serialize(tx: FaxTransmission) -> dict:
@@ -81,9 +68,9 @@ def _serialize(tx: FaxTransmission) -> dict:
         "provider_tx_id": tx.provider_tx_id,
         "error_message": tx.error_message,
         "attachment_files": attachments,
-        "created_at": _utc_iso(tx.created_at),
-        "sent_at": _utc_iso(tx.sent_at),
-        "completed_at": _utc_iso(tx.completed_at),
+        "created_at": utc_iso(tx.created_at),
+        "sent_at": utc_iso(tx.sent_at),
+        "completed_at": utc_iso(tx.completed_at),
     }
 
 
