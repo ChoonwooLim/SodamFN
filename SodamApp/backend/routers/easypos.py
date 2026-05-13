@@ -33,6 +33,7 @@ from services.crypto_util import encrypt_text, decrypt_text
 from services.easypos_service import (
     EasyPosClient,
     EasyPosError,
+    upsert_card_sales,
     upsert_daily_receipts,
     upsert_revenue_aggregate,
 )
@@ -381,6 +382,31 @@ def _run_sync(business_id: int, dates: list[datetime.date],
                     sl.total_sales = sales_total
                     s.add(sl)
                     s.commit()
+
+                # 카드사별 매출 — 영수증 sync 와 별개로 try/except 보호.
+                # 카드 endpoint 실패해도 영수증 sync 결과는 그대로 유지.
+                # EasyPosSyncLog 모델에 card_sales_* 필드 없음 → log.info 로만 추적.
+                try:
+                    card_result = c.fetch_card_sales(
+                        easypos_id=easypos_id,
+                        start_date=d,
+                        end_date=d,
+                    )
+                    with Session(engine) as s:
+                        card_summary = upsert_card_sales(s, business_id, card_result)
+                    log.info(
+                        "EasyPOS card sales sync %s bid=%s: fetched=%d inserted=%d updated=%d skipped=%d",
+                        d, business_id,
+                        card_result["row_count"],
+                        card_summary["inserted"],
+                        card_summary["updated"],
+                        card_summary["skipped"],
+                    )
+                except Exception as e:
+                    log.warning(
+                        "EasyPOS card sales sync failed (영수증 sync 는 성공) %s bid=%s: %s",
+                        d, business_id, e,
+                    )
 
                 summary["success_dates"] += 1
                 summary["total_inserted"] += up["inserted"]
