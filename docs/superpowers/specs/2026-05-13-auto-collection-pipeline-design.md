@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |------|------|
-| **문서 상태** | 사장님 승인 대기 (5개 섹션 구두 승인 완료) |
+| **문서 상태** | 사장님 승인 대기 (6개 섹션 구두 승인 완료 — 입금 모니터링 포함) |
 | **작성일** | 2026-05-13 |
 | **대상 시스템** | 셈하나(SEMHANA) — `c:\WORK\SodamFN` |
 | **다음 단계** | writing-plans 스킬로 단계별 구현 계획 생성 |
@@ -690,22 +690,23 @@ def migrate_business(business_id: int, period_start: date, period_end: date) -> 
 
 ---
 
-## 8. 설계 섹션 E — 운영 / 모니터링
+## 8. 설계 섹션 E — 운영 / 모니터링 / 입금 감시
 
 ### 8.1 Cron 일정
 
 Orbitron 환경에서는 cron 워커 컨테이너가 backend API를 HTTP로 트리거하는 패턴(메모리상 기존 자동수집들이 그렇게 작동 중).
 
 ```
-03:00 KST  POST /api/auto-collection/cron/easypos       (모든 사업장)
-03:10 KST  POST /api/auto-collection/cron/coupang-eats  (모든 사업장)
-03:20 KST  POST /api/auto-collection/cron/bank-sync     (모든 사업장)
-03:30 KST  POST /api/auto-collection/cron/orchestrator  (분류·동기화 fan-out)
-03:40 KST  POST /api/auto-collection/cron/profit-loss   (손익 재계산)
-03:45 KST  POST /api/auto-collection/cron/notify        (사장님 알림)
+03:00 KST  POST /api/auto-collection/cron/easypos            (모든 사업장)
+03:10 KST  POST /api/auto-collection/cron/coupang-eats       (모든 사업장)
+03:20 KST  POST /api/auto-collection/cron/bank-sync          (모든 사업장)
+03:30 KST  POST /api/auto-collection/cron/orchestrator       (분류·동기화 fan-out)
+03:40 KST  POST /api/auto-collection/cron/profit-loss        (손익 재계산)
+03:45 KST  POST /api/auto-collection/cron/notify             (사장님 일일 알림)
+04:00 KST  POST /api/auto-collection/cron/settlement-watch   (입금 모니터링 — 섹션 8.13)
 
-일요일 04:00 KST
-           POST /api/auto-collection/cron/learn-fee-rates  (수수료율 학습 갱신)
+일요일 04:30 KST
+           POST /api/auto-collection/cron/learn-fee-rates    (수수료율 학습 갱신)
 ```
 
 각 endpoint는 superadmin 토큰 + 사업장 화이트리스트 보호. 등급 체크는 orchestrator 단일 지점.
@@ -829,6 +830,233 @@ def cron_orchestrator():
 
 cron이 늦게 끝났을 때 다음 cron이 겹쳐 실행되어 데이터가 두 번 들어가는 사고 방지.
 
+### 8.8 입금 모니터링 (Settlement Watch) — 개요
+
+카드사·배달앱이 정상적으로 입금했는지 자동 감시한다. 손익 정확도와는 별개의 기능으로, 입금 누락(시스템 오류·정정 분쟁·영업일 차이 등)을 사장님이 빠르게 인지하고 카드사/채널에 문의할 수 있게 한다.
+
+**기본 흐름**:
+```
+[카드 승인 발생]    ─→ 예상 입금일 = approval_date + 카드사별 D+N (영업일)
+[은행 매칭 시도]    ─→ 예상 입금일 + grace_days 까지 매칭 안 됨
+                    ─→ SettlementWatchAlert(status='open') 생성
+                    ─→ 텔레그램 알림
+[늦은 입금 도착]    ─→ 자동 close (status='received')
+[사장님 처리]       ─→ 'acknowledged' / 'resolved' / 'false_positive'
+                       (false_positive 는 학습값에 반영, 다음부터 같은 케이스 alert 안 뜸)
+```
+
+### 8.9 카드 입금 모니터링 로직
+
+```python
+@dataclass
+class CardSettlementExpectation:
+    business_id: int
+    card_corp: str
+    approval_dates: tuple[date, date]      # 승인 구간
+    sales_amount: int
+    expected_deposit_amount: int           # sales × (1 - rate)
+    expected_deposit_date: date
+    grace_days: int                        # 사업장 × 카드사별 학습값, default 3
+    deadline: date                         # expected_deposit_date + grace_days
+    status: Literal["pending", "received", "overdue", "partial"]
+
+
+def watch_card_settlements(business_id: int) -> list[CardSettlementExpectation]:
+    """최근 30일 승인 중 미매칭 + 예상 입금일+grace 지난 묶음을 overdue 로 식별."""
+    unmatched_groups = CardSalesApproval.find_unmatched_groups(
+        business_id=business_id, period=last_n_days(30)
+    )
+    overdue = []
+    for group in unmatched_groups:
+        n_days = settlement_days_for_corp(business_id, group.card_corp)
+        expected = add_business_days(group.approval_dates[1], n_days)
+        deadline = expected + timedelta(days=grace_days_for_corp(business_id, group.card_corp))
+        if date.today() > deadline:
+            est_rate = fee_estimator.get_rate(business_id, group.card_corp)
+            overdue.append(CardSettlementExpectation(
+                business_id=business_id,
+                card_corp=group.card_corp,
+                approval_dates=group.approval_dates,
+                sales_amount=group.sales_amount,
+                expected_deposit_amount=int(group.sales_amount * (1 - est_rate)),
+                expected_deposit_date=expected,
+                grace_days=grace_days_for_corp(business_id, group.card_corp),
+                deadline=deadline,
+                status="overdue",
+            ))
+    return overdue
+```
+
+**카드사별 D+N 기본값** (사업장별 학습으로 갱신됨):
+```python
+CARD_CORP_SETTLEMENT_DAYS_DEFAULT = {
+    "BC": 3, "삼성": 2, "신한": 2, "롯데": 3, "현대": 2,
+    "하나": 3, "우리": 3, "KB": 2, "NH농협": 3, "기타": 4,
+}
+# 영업일 계산은 한국 공휴일 캘린더(별도 라이브러리 또는 간이 룰) 사용.
+```
+
+학습: `CardFeeMatchLog` 의 (approval_date, deposit_date) 차이를 카드사별 누적 → 사업장별 실측 D+N 으로 갱신 (섹션 6.3 학습 알고리즘과 동일 패턴).
+
+### 8.10 배달앱 정산 모니터링 로직
+
+**쿠팡이츠** — 정산 명세에 입금일이 명시되어 옴:
+```python
+def watch_coupang_settlements(business_id: int):
+    settlements = CoupangEatsSettlement.find_recent(
+        business_id=business_id, days=30,
+        settlement_type="SETTLEMENT",
+    )
+    overdue = []
+    for st in settlements:
+        expected = st.settlement_date  # 쿠팡이츠는 settlement_date 가 곧 입금 예정일
+        deadline = expected + timedelta(days=3)  # 채널별 grace
+        matched = BankTransaction.find_one(
+            business_id=business_id,
+            trans_date_range=(expected - timedelta(1), deadline),
+            in_amount=st.amount,
+            remark_contains="쿠팡이츠",
+        )
+        if not matched and date.today() > deadline:
+            overdue.append(DeliverySettlementExpectation(
+                business_id=business_id, channel="쿠팡이츠",
+                settlement_date=st.settlement_date,
+                expected_amount=st.amount,
+                deadline=deadline, status="overdue",
+                settlement_id=st.id,
+            ))
+    return overdue
+```
+
+**배민 / 요기요 / 땡겨요** (API 통합 전) — 정산 명세 자체가 없어 모니터링 불가. UI에 명시: "API 통합 후 활성화 예정". API 통합 후에는 쿠팡이츠와 동일 로직 자동 적용.
+
+### 8.11 `SettlementWatchAlert` 모델
+
+미입금 alert 의 중복 발송 방지 + 사장님 처리 워크플로우.
+
+```python
+class SettlementWatchAlert(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    alert_type: str = Field(index=True)      # 'card_overdue' / 'delivery_overdue'
+    channel_or_corp: str                      # '삼성카드' / '쿠팡이츠'
+    expected_date: datetime.date
+    expected_amount: int
+    deadline: datetime.date
+    status: str = Field(default="open", index=True)
+    # values: 'open' / 'received' / 'acknowledged' / 'resolved' / 'false_positive'
+    notified_at: Optional[datetime.datetime] = None
+    received_amount: Optional[int] = None
+    received_date: Optional[datetime.date] = None
+    acknowledged_at: Optional[datetime.datetime] = None
+    acknowledged_by: Optional[int] = Field(default=None, foreign_key="user.id")
+    notes: Optional[str] = None
+    raw_ref: Optional[str] = None             # 'card_approval_group:...' 또는 'coupang_settle:...'
+
+    __table_args__ = (
+        UniqueConstraint("business_id", "alert_type", "channel_or_corp",
+                         "expected_date", name="uq_settle_watch_natural"),
+    )
+```
+
+같은 입금건에 대해 매일 새 alert 를 만들지 않고, 한 번 만들어진 row 의 상태로 추적.
+
+### 8.12 자동 close + 학습형 false-positive 감소
+
+```python
+def auto_close_received_alerts(business_id):
+    """미입금 alert 발생 후 늦게라도 입금되면 자동 close."""
+    open_alerts = SettlementWatchAlert.find_all(business_id=business_id, status="open")
+    for alert in open_alerts:
+        matched = match_late_deposit(alert)
+        if matched:
+            alert.status = "received"
+            alert.received_amount = matched.in_amount
+            alert.received_date = matched.trans_date
+            # 늦은 입금이면 텔레그램에 "✅ 늦게 입금 확인됨" 보강 알림
+
+
+def handle_false_positive(alert_id, user_id):
+    """사장님이 '입금 안된 것 아님' 표시 시.
+
+    그 카드사의 grace_days 를 +1 학습 (영업일 계산 보수화).
+    같은 케이스의 alert 가 다음부터 안 뜨도록 함.
+    """
+    alert = SettlementWatchAlert.get(alert_id)
+    alert.status = 'false_positive'
+    alert.acknowledged_at = now()
+    alert.acknowledged_by = user_id
+
+    # 학습 — 사업장 × 카드사 grace_days 갱신
+    if alert.alert_type == 'card_overdue':
+        bump_grace_days(alert.business_id, alert.channel_or_corp, +1)
+```
+
+운영하면서 자동으로 false positive 가 줄어드는 구조.
+
+### 8.13 입금 모니터링 cron 일정
+
+기존 orchestrator(03:30) 직후 04:00 에 추가:
+
+```
+04:00 KST  POST /api/auto-collection/cron/settlement-watch
+            ├ watch_card_settlements (전 사업장)
+            ├ watch_coupang_settlements (전 사업장)
+            ├ auto_close_received_alerts
+            └ 신규 overdue 알림 텔레그램 발송 (배치)
+```
+
+### 8.14 사장님 화면 — 자동수집 대시보드에 입금 모니터 섹션 추가
+
+기존 자동수집 대시보드(섹션 8.4)에 추가 카드:
+
+```
+┌─ 입금 모니터 ──────────────────────────────────────┐
+│                                                     │
+│  미입금 의심 건  ⚠️ 3건                             │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 삼성카드  5/6~5/8 매출 1,240,000원           │   │
+│  │ 예상 입금일: 5/10  (현재 5/13, 3일 경과)      │   │
+│  │ [카드사에 문의함] [확인 완료] [입금 안된 것 아님]│  │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │ 쿠팡이츠  5/10 정산 245,000원                │   │
+│  │ 예상 입금일: 5/10  (현재 5/13, 3일 경과)      │   │
+│  │ [채널에 문의함] [확인 완료] [입금 안된 것 아님]│  │
+│  └─────────────────────────────────────────────┘   │
+│                                                     │
+│  ─────────────────────────                          │
+│  최근 30일 입금 통계                                │
+│  카드:    142건 / 142건 정상 입금                  │
+│  쿠팡이츠: 31건 / 30건 정상 입금 (1건 미입금)      │
+│  배민:    API 통합 후 활성화                       │
+└─────────────────────────────────────────────────────┘
+```
+
+### 8.15 텔레그램 알림 통합
+
+기존 일일 자동수집 알림(03:45)에 입금 모니터 결과 한 줄 추가. 미입금이 있으면 04:00 cron 직후 별도 강조 메시지:
+
+미입금 있음:
+```
+[소담 자동수집] 2026-05-13 04:00 — ⚠️ 미입금 의심
+
+⚠️ 카드 미입금: 1건
+  • 삼성카드 5/6~5/8 1,240,000원 (예상 입금일 5/10, 3일 경과)
+
+⚠️ 배달 미입금: 1건
+  • 쿠팡이츠 5/10 정산 245,000원 (3일 경과)
+
+→ 자세히 확인: [링크]
+```
+
+미입금 없음 (일일 알림 한 줄):
+```
+입금 모니터:  ✅ 미입금 의심 0건 / 최근 30일 정상 입금률 99.5%
+```
+
 ---
 
 ## 9. 비범위 (Out of Scope) — 명시적으로 안 다룸
@@ -845,6 +1073,9 @@ cron이 늦게 끝났을 때 다음 cron이 겹쳐 실행되어 데이터가 두
 | 카드 입금 ↔ 승인 다중 카드사 동시 묶음 매칭 (예: 한 입금이 여러 카드사 매출의 합) | 실제로 발생 빈도 낮음. 1차에서는 단일 카드사 묶음만. |
 | 텔레그램 외 알림 채널 (메일/카카오톡) | 텔레그램으로 시작. 사장님 요구 시 추가. |
 | **Revenue 테이블 사용 라우트 통일 (profitloss.py:329-358 등)** | Phase 2 정리 작업. 1차에서는 fan-out이 DailyExpense + Revenue 양쪽을 채워 기존 라우트가 깨지지 않도록 한다 (섹션 11 참조). |
+| **배민/요기요/땡겨요 입금 모니터링** | 정산 명세 자체가 없어 추정 불가. API 통합 후 자동 활성화. 1차에서는 쿠팡이츠만 모니터링. |
+| **카드사 영업일 캘린더의 정밀한 학습** | 1차에서는 사업장 × 카드사 단위 grace_days 가산 (단순 학습). 카드사별 휴일/연휴 패턴 정밀 모델링은 추후. |
+| **자동 카드사 클레임/문의 발송** | 사장님이 [카드사에 문의함] 버튼만 누르면 alert 상태 기록. 실제 문의는 사장님이 수동 (카카오톡/전화). 자동 문의 발송은 추후. |
 
 ---
 
@@ -923,6 +1154,41 @@ CREATE TABLE deliveryfeerate (
     UNIQUE (business_id, channel, effective_from)
 );
 CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, channel);
+
+-- 7) SettlementWatchAlert 테이블 (입금 모니터링)
+CREATE TABLE settlementwatchalert (
+    id SERIAL PRIMARY KEY,
+    business_id INTEGER NOT NULL REFERENCES business(id),
+    alert_type VARCHAR(32) NOT NULL,           -- 'card_overdue' / 'delivery_overdue'
+    channel_or_corp VARCHAR(32) NOT NULL,      -- '삼성카드' / '쿠팡이츠' 등
+    expected_date DATE NOT NULL,
+    expected_amount BIGINT NOT NULL,
+    deadline DATE NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'open',
+    -- 'open' / 'received' / 'acknowledged' / 'resolved' / 'false_positive'
+    notified_at TIMESTAMP,
+    received_amount BIGINT,
+    received_date DATE,
+    acknowledged_at TIMESTAMP,
+    acknowledged_by INTEGER REFERENCES "user"(id),
+    notes TEXT,
+    raw_ref TEXT,
+    UNIQUE (business_id, alert_type, channel_or_corp, expected_date)
+);
+CREATE INDEX ix_settle_watch_biz_status ON settlementwatchalert (business_id, status);
+CREATE INDEX ix_settle_watch_alert_type ON settlementwatchalert (alert_type);
+
+-- 8) CardCorpSettlementProfile 테이블 (사업장 × 카드사 입금 주기 + grace_days 학습값)
+CREATE TABLE cardcorpsettlementprofile (
+    id SERIAL PRIMARY KEY,
+    business_id INTEGER NOT NULL REFERENCES business(id),
+    card_corp VARCHAR(32) NOT NULL,
+    settlement_days_learned INTEGER NOT NULL DEFAULT 3,  -- 실측 D+N (영업일)
+    grace_days INTEGER NOT NULL DEFAULT 3,                -- false-positive 가중치
+    sample_size INTEGER NOT NULL DEFAULT 0,
+    last_updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE (business_id, card_corp)
+);
 ```
 
 ---
@@ -940,10 +1206,12 @@ CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, cha
 | `routers/revenue.py` | 수정 | `auto_*` source 행도 표시 (이미 DailyExpense 보므로 자동 포함, source 필터 추가 정도) |
 | `routers/profitloss.py` | 수정 | 수수료 자동 추정 결과 반영 (source/confidence 표시) |
 | `services/profit_loss_service.py` | 수정 | `expense_card_fee`/`expense_delivery_fee` 산출 로직을 fee_estimator 호출로 교체 |
-| `frontend/src/pages/AutoCollection.jsx` (신규) | 신규 | 자동수집 대시보드 화면 |
+| `frontend/src/pages/AutoCollection.jsx` (신규) | 신규 | 자동수집 대시보드 화면 + 입금 모니터 카드 |
 | `frontend/src/pages/RevenueManagement/` | 수정 | 백업 토글, source 뱃지 |
 | `frontend/src/pages/ProfitLoss/` | 수정 | 신뢰도 뱃지 |
-| `Orbitron.yaml` | 수정 | 신규 cron 7개 등록 |
+| `services/auto_collection_sync/settlement_watch.py` (신규) | 신규 | 카드/배달 입금 모니터링 로직 (`watch_card_settlements`, `watch_coupang_settlements`, `auto_close_received_alerts`) |
+| `services/auto_collection_sync/calendar.py` (신규) | 신규 | 한국 영업일 캘린더 (휴일/주말 보정) |
+| `Orbitron.yaml` | 수정 | 신규 cron 8개 등록 (입금 모니터링 04:00 포함) |
 
 ---
 
@@ -958,6 +1226,9 @@ CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, cha
 | 동시 실행으로 데이터 중복 | 매출 두 번 카운트 | pg_advisory_lock + Unique constraint (source 포함) 이중 방어 |
 | 분류 룰 변경 시 과거 손익 영향 | 사장님 혼란 | 재처리는 명시적 트리거만 (자동 X), 변경 시 알림 |
 | Orbitron 배포 환경에서 cron 7개 추가로 인한 부하 | 새벽 일시 부하 | 시각 분산 (00분, 10분, 20분...), 실패 격리 |
+| 입금 모니터링 false positive 폭발 (영업일 계산 미정밀로 정상 입금까지 alert) | 사장님 알림 피로 | 카드사별 grace_days 학습 + 사장님 [입금 안된 것 아님] 버튼이 학습값에 즉시 반영 |
+| 입금 모니터링 false negative (실제 미입금인데 매칭 알고리즘이 잘못 매칭) | 입금 누락 인지 지연 | CardFeeMatchLog 에 매칭 신뢰도 기록, 신뢰도 낮은 매칭은 입금 모니터에서 보조 표시 |
+| 한국 공휴일 캘린더 정확성 | 입금 예상일 오산정 | 1차에서는 간이 룰 (주말 + 공휴일 하드코딩 리스트), 2차에서 holiday-kr 같은 라이브러리 도입 |
 
 ---
 
@@ -970,6 +1241,9 @@ CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, cha
 | 사장님이 카드사 계약서를 입력하지 않는다 | `CardFeeRateLearned`에 카드사별 표본이 ≥ 20건 누적 후 신뢰도 ≥ 0.7 도달 |
 | 자동수집 cron 1회 실패해도 다음날 자동 복구 | 의도 실패 테스트 후 누락 일자가 다음날 백필됨 |
 | 사장님이 수동 등급으로 다운그레이드 시 자동 행 멈춤 | 등급 변경 다음날 cron이 해당 사업장 skip 로그 |
+| 입금 모니터링이 실제 입금 누락을 잡아낸다 | 6개월 운영 중 입금 누락 alert 1건 이상 발견 + 카드사/채널 확인 후 정상 입금 받음 |
+| 입금 모니터링 false positive 율이 학습 후 감소 | 1개월 후 false_positive 비율 < 10%, 3개월 후 < 5% |
+| 사장님이 매일 아침 텔레그램 알림으로 입금 상황 파악 | 미입금 발생 후 평균 인지 시점이 deadline + 1일 이내 |
 
 ---
 
@@ -978,7 +1252,7 @@ CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, cha
 이 설계 문서가 사장님 검토 통과되면:
 1. **writing-plans 스킬** 호출 → 단계별 구현 계획 작성
 2. 구현 단계는 다음 순서 추천 (각 단계 후 검증 → 다음):
-   - 1단계: 데이터 모델 변경 + 마이그레이션 SQL
+   - 1단계: 데이터 모델 변경 + 마이그레이션 SQL (DailyExpense.source, CardFeeRateLearned, CardFeeMatchLog, CoupangEatsSettlement 분해 컬럼, SubscriptionPlan 플래그, DeliveryFeeRate, SettlementWatchAlert, CardCorpSettlementProfile)
    - 2단계: SyncEvent / fan_out / vendor_resolver 기반 인프라
    - 3단계: EasyPOS normalizer + 사장님 화면 1개 사업장 검증
    - 4단계: 쿠팡이츠 normalizer + 수수료 분해 추출
@@ -986,7 +1260,8 @@ CREATE INDEX ix_deliveryfeerate_biz_channel ON deliveryfeerate (business_id, cha
    - 6단계: 수수료 자동 추정 (3경로) + 학습 알고리즘
    - 7단계: 마이그레이션 B 정책 + 백업 UI
    - 8단계: 자동수집 대시보드 + 텔레그램 알림
-   - 9단계: cron 7개 등록 + Orbitron.yaml 반영
-   - 10단계: 운영 검증 + 사장님 1주 사용
+   - 9단계: **입금 모니터링** (Settlement Watch) — 카드/배달 모니터링 로직 + alert 모델 + 대시보드 카드 + 학습형 grace_days
+   - 10단계: cron 8개 등록 + Orbitron.yaml 반영
+   - 11단계: 운영 검증 + 사장님 1주 사용
 
 각 단계는 별도 PR + 검증 후 다음 단계 진행.
