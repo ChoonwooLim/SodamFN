@@ -1317,3 +1317,93 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 
 ---
 
+## 2026-05-13 (저녁 — 데이터 정합성 sweep + 채널 매핑 보강)
+
+### 작업 요약
+
+| 카테고리 | 작업 | 상태 |
+|----------|------|------|
+| data | BankTransaction popbill+codef 양쪽 적재 dedup (1,701건 삭제 — 첫 dedup 714 + 두 번째 dedup 987) | 완료 |
+| data | CardPayment dedup (중복 0건 — 영향 없음 확인) | 완료 |
+| data | DeliveryRevenue.settlement_amount 20행 linked BT 기준 재계산 (모두 절반으로 조정) | 완료 |
+| fix  | PR #12 LEGACY_CHANNEL_MAP 에 한국어 alias (쿠팡이츠/쿠팡잇츠/배달의민족/위대한상상) 추가 | 완료 |
+| fix  | PR #13 "음식배달" 키워드 → "배달의민족" (was 기타배달). DeliveryRevenue 기타배달 5건 → 배달의민족 reassign | 완료 |
+| diag | 쿠팡이츠 자동수집 수수료 breakdown 누락 진단 (CoupangEatsSettlement 167건 모두 fee=0) | 완료 |
+
+### 세부 내용
+
+**1) BankTransaction 중복 적재 — 2가지 패턴**
+
+첫 번째 (인건비 진단 중 발견): tid 콜론 끝 (구) vs 콜론뒤 이름 (신) 형식 714건 → 콜론 끝 행 삭제, vendor_id 79건 마이그레이션
+
+두 번째 (배달앱 정산 진단 중 발견): popbill 형식 (`02605121300000000320260512000017`) + codef 형식 (`codef:20260512133021:...`) 양쪽에서 적재 987건
+  - 키: (account_id, trans_date, trans_time, in_amount, out_amount, remark1) 동일하지만 remark2/3 순서 다름 + tid 패턴 완전 다름 → UNIQUE 제약 (account_id, tid) 회피
+  - popbill 행 삭제, codef 유지. linked_card_payment_id / vendor_id / user_memo 자동 마이그레이션
+  - 백업: prod `/home/stevenlim/sodam_backups/bt_popbill_backup_20260513_174508.json`
+
+**2) DeliveryRevenue settlement_amount 재계산**
+
+- 이전 누적된 settlement (이중 적용된 BT 기준) 을 linked BT 합으로 다시 채움
+- 결과 (1~5월 누적): 쿠팡이츠 43.81M → 21.91M / 배민 20.50M → 10.25M / 요기요 4.18M → 2.09M / 땡겨요 0.41M → 0.20M
+
+**3) PR #12: 쿠팡이츠 0원 표시 버그**
+
+- `revenue.py` LEGACY_CHANNEL_MAP 이 영문만 매핑 ("Coupang" → "쿠팡"). DeliveryRevenue.channel 이 한국어 "쿠팡이츠" 로 저장된 행은 그대로 통과 → 화면 lookup ('쿠팡') 과 불일치
+- 한국어 alias 추가: 쿠팡이츠/쿠팡잇츠/쿠팡페이 → 쿠팡, 배달의민족/우아한형제들/음식배달 → 배민, 위대한상상 → 요기요
+
+**4) PR #13: "음식배달" 키워드 → "배달의민족"**
+
+- DELIVERY_CHANNEL_MAP 의 "음식배달" → "기타배달" 잘못된 매핑 발견 (output_log.txt 의 "음식배달 배민포장주문" / "음식배달 알뜰·한집배달" 행으로 확인)
+- "음식배달" → "배달의민족" 으로 수정
+- prod 데이터: DeliveryRevenue.channel='기타배달' 5건 (1~5월 20.5M) 을 '배달의민족' 으로 reassign
+
+### 다음 세션 작업 (사장님 명시 — 내일 작업)
+
+**🎯 1. 쿠팡이츠 정산 수수료 자동수집 추가** (높은 우선순위)
+
+현재 `/api/v1/merchant/transactions/{store_id}/settlement-management-data` 응답에 `amount`/`balance` 만 옴.
+사장님이 매월 받는 엑셀 (`c:/WORK/SodamFN/2026소득분석/매출/{1,2,3}월/coupang_eats_2026-{01,02,03}.xlsx`) 에는 43컬럼 상세 정보 포함:
+  - 매출액: 총금액 / 주문금액(gross) / 결제금액
+  - 쿠폰: 쿠팡부담 / 상점부담
+  - 중개이용료: 산정전 / 산정후 (기본+프로모션)
+  - 결제대행사 수수료: 기본요금 / 프로모션
+  - 배달비: 산정전 / 산정후 / 배달전용 / 음식전용 / 고객부담배달비
+  - 즉시할인 / 기타
+  - 서비스이용료(멤버십): 산정전 / 산정후
+  - 광고비: 공급가액 / 부가세액 / 총액
+  - 정산금액 / 프로모션 혜택 / 환급액
+
+**작업 방향**: 엑셀 수동 import 가 아닌 **자동 API 호출** (사장님 명시 — 자동수집 취지).
+
+추정 endpoint URL 후보 (HAR 캡처 없이 시도 필요):
+- `/api/v1/merchant/transactions/{store_id}/settlement-management-data/{sellerTransferId}` (가장 가능성 ↑)
+- `/api/v1/merchant/transactions/{store_id}/settlement-management-data/detail/{sellerTransferId}`
+- `/api/v1/merchant/transactions/{store_id}/settlement-detail/{sellerTransferId}`
+
+각 SETTLEMENT 행은 이미 `seller_transfer_id` 저장 중. detail endpoint 호출 → fee breakdown 추출 → `CoupangEatsSettlement.fee_*` 컬럼 채움 → DeliveryRevenue 까지 전파.
+
+작업 진단 스크립트는 폐기됨. 내일 prod 환경에서 probe 부터 시작 (cookie 만료 시 사장님 갱신 필요).
+
+**⚠️ 2. CODEF + popbill 양쪽 적재 root cause 코드 fix** (중간 우선순위)
+
+데이터는 정리됐지만 다음 sync 시 또 중복 적재 가능성. 두 방안:
+- (a) popbill cron disable (사장님 메모 "popbill 백업용" 정책)
+- (b) BankTransaction UNIQUE 제약을 `(account, trans_date, trans_time, in_amount, out_amount, remark1)` 강화
+
+**📌 3. 4월 PDF 5명 + 5월 급여 입력** (사장님 작업)
+
+Payroll.transfer_status='완료' 마킹 시 P/L 자동 반영. 1~3월 옛 데이터의 transfer_status 미마킹은 사장님이 화면에서 직접 정리 (옵션 A 정확도 영향).
+
+**📌 4. 배민 / 요기요 / 땡겨요 자동수집 확장** (중간 우선순위)
+
+쿠팡이츠 패턴 그대로 (HAR 캡처 → DB 모델 → Router → 페이지). 각 ~1일 작업.
+
+### 흥미로운 진단 데이터
+
+- BankTransaction popbill+codef 합쳤더니 in_amount 합 303M → 152M (정확히 절반). out_amount 290M → 145M.
+- 채널별 정산 1~5월 누적: 쿠팡이츠 21.91M / 배민 10.25M / 요기요 2.09M / 땡겨요 0.20M / 기타배달 0M
+- CoupangEatsSettlement raw_json sample: `{"settlementDate":"2026.05.13","settlementManageType":"SETTLEMENT","amount":"120863.0","balance":"120863.00","sellerTransferId":238179828}` — fee 정보 0
+- 쿠팡이츠 엑셀 컬럼 43개 spec 확보 (`docs/coupang_eats_excel_columns.md` 참고용 — 미생성, 다음 세션에 spec 정리)
+
+---
+
