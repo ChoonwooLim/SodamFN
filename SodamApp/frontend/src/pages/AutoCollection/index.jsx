@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
+import SettlementWatch from "./SettlementWatch";
 
 export default function AutoCollection() {
     const [status, setStatus] = useState(null);
@@ -36,9 +37,7 @@ export default function AutoCollection() {
 
             <section className="mb-6 p-4 bg-white rounded-lg border border-slate-200">
                 <h3 className="text-lg font-semibold mb-2">입금 모니터</h3>
-                <p className="text-sm text-slate-700">
-                    미입금 의심 건: <b>{status.settlement_watch.open_alert_count}</b>건
-                </p>
+                <SettlementWatch />
             </section>
         </div>
     );
