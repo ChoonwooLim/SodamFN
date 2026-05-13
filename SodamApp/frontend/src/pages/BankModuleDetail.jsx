@@ -1,11 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
     ArrowLeft, Plus, Download, RefreshCw, Building2,
     X as XIcon, Loader2, AlertCircle, CheckCircle2, Sparkles,
+    Power, Clock,
 } from 'lucide-react';
 import api from '../api';
 import { CLASSIFIED_LABELS, fmtWon, fmtDate } from './BankSync';
+
+const AUTO_REFRESH_KEY = 'codef-bank-auto-refresh';
+const DEFAULT_INTERVAL_MIN = 21;
 
 /**
  * 계좌 거래내역 자동수집 (CODEF 전용 — popbill 미사용)
@@ -35,6 +39,22 @@ export default function BankModuleDetail() {
     const [pullModal, setPullModal] = useState(null);
     const [msg, setMsg] = useState('');
     const [err, setErr] = useState('');
+
+    // 자동 갱신 상태 — Popbill BankSync.jsx 와 동일 패턴
+    // 페이지 열려있는 동안 N분마다 /bank-sync/refresh-all 호출
+    // backend 에 BANK_SYNC_PROVIDER=codef 설정되어야 CODEF 계좌가 자동 갱신됨
+    const [autoRefresh, setAutoRefresh] = useState(() => {
+        try {
+            const saved = localStorage.getItem(AUTO_REFRESH_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch { /* ignore */ }
+        return { enabled: false, intervalMinutes: DEFAULT_INTERVAL_MIN };
+    });
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastRefresh, setLastRefresh] = useState(null);
+    const [nextRefreshAt, setNextRefreshAt] = useState(null);
+    const [countdown, setCountdown] = useState(0);
+    const refreshIdRef = useRef(0);
     // 월별 필터: 이번 달 기본
     const [filter, setFilter] = useState({
         start_date: _monthStart(curM),
@@ -67,6 +87,67 @@ export default function BankModuleDetail() {
     }
 
     useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, []);
+
+    // localStorage 저장
+    useEffect(() => {
+        try {
+            localStorage.setItem(AUTO_REFRESH_KEY, JSON.stringify(autoRefresh));
+        } catch { /* ignore */ }
+    }, [autoRefresh]);
+
+    // 자동 갱신 setInterval (페이지 열려있는 동안 N분마다 /bank-sync/refresh-all 호출)
+    useEffect(() => {
+        if (!autoRefresh.enabled) {
+            setNextRefreshAt(null);
+            return;
+        }
+        const intervalMs = Math.max(1, autoRefresh.intervalMinutes) * 60 * 1000;
+        const myId = ++refreshIdRef.current;
+
+        const tick = async () => {
+            if (refreshIdRef.current !== myId) return;
+            setRefreshing(true);
+            try {
+                const res = await api.post('/bank-sync/refresh-all', null, {
+                    params: { days: 7, skip_recent_minutes: Math.max(0, autoRefresh.intervalMinutes - 1) }
+                });
+                if (refreshIdRef.current !== myId) return;
+                setLastRefresh({ at: new Date(), data: res.data });
+                fetchAll();
+            } catch (e) {
+                if (refreshIdRef.current !== myId) return;
+                setLastRefresh({ at: new Date(), error: e.response?.data?.detail || e.message });
+            } finally {
+                if (refreshIdRef.current === myId) {
+                    setRefreshing(false);
+                    setNextRefreshAt(Date.now() + intervalMs);
+                }
+            }
+        };
+
+        // 토글 ON 직후 한 번 즉시 실행
+        tick();
+        const id = setInterval(tick, intervalMs);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoRefresh.enabled, autoRefresh.intervalMinutes]);
+
+    // 카운트다운 타이머
+    useEffect(() => {
+        if (!nextRefreshAt) { setCountdown(0); return; }
+        const id = setInterval(() => {
+            const left = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+            setCountdown(left);
+        }, 1000);
+        return () => clearInterval(id);
+    }, [nextRefreshAt]);
+
+    function fmtCountdown(secs) {
+        if (!secs) return '-';
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${String(s).padStart(2, '0')}`;
+    }
 
     function applyMonth(m) {
         const newF = { start_date: _monthStart(m), end_date: _monthEnd(m) };
@@ -111,7 +192,7 @@ export default function BankModuleDetail() {
                             CODEF 마이데이터 — 20+ 은행 입출금 내역 자동수집 + 분류
                         </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-start">
                         <button
                             onClick={() => setRegisterOpen(true)}
                             className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold"
@@ -128,6 +209,81 @@ export default function BankModuleDetail() {
                         </button>
                     </div>
                 </header>
+
+                {/* 자동 갱신 컨트롤 — Popbill BankSync.jsx 와 동일 패턴 */}
+                <section className="mb-6 bg-white border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                                autoRefresh.enabled
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                    : 'bg-slate-50 border-slate-200 text-slate-500'
+                            }`}>
+                                <button
+                                    onClick={() => setAutoRefresh(s => ({ ...s, enabled: !s.enabled }))}
+                                    className={`flex items-center gap-1.5 ${autoRefresh.enabled ? 'text-emerald-700' : 'text-slate-500'}`}
+                                    title={autoRefresh.enabled ? '자동 갱신 끄기' : '자동 갱신 켜기'}
+                                >
+                                    <Power size={13} className={autoRefresh.enabled ? 'text-emerald-600' : 'text-slate-400'} />
+                                    자동 갱신
+                                </button>
+                                <span className="text-slate-300">·</span>
+                                <label className="flex items-center gap-1">
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={60}
+                                        value={autoRefresh.intervalMinutes}
+                                        onChange={e => setAutoRefresh(s => ({ ...s, intervalMinutes: Math.max(1, Math.min(60, parseInt(e.target.value) || DEFAULT_INTERVAL_MIN)) }))}
+                                        className="w-12 px-1.5 py-0.5 bg-white/60 border border-slate-200 rounded text-center text-xs"
+                                    />
+                                    분 마다
+                                </label>
+                                {autoRefresh.enabled && nextRefreshAt && (
+                                    <>
+                                        <span className="text-slate-300">·</span>
+                                        <span className="text-slate-500 flex items-center gap-1">
+                                            <Clock size={11} />
+                                            다음 {fmtCountdown(countdown)}
+                                        </span>
+                                    </>
+                                )}
+                                {refreshing && (
+                                    <>
+                                        <span className="text-slate-300">·</span>
+                                        <span className="text-emerald-600 flex items-center gap-1">
+                                            <Loader2 size={11} className="animate-spin" />
+                                            갱신 중
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                            {lastRefresh && (
+                                <div className="text-xs text-slate-500">
+                                    {lastRefresh.error ? (
+                                        <span className="text-red-600">
+                                            마지막 시도 실패: {lastRefresh.error}
+                                        </span>
+                                    ) : (
+                                        <>
+                                            마지막 갱신: {fmtDate(lastRefresh.at.toISOString())} {String(lastRefresh.at.getHours()).padStart(2,'0')}:{String(lastRefresh.at.getMinutes()).padStart(2,'0')}
+                                            {lastRefresh.data?.total_inserted !== undefined && (
+                                                <> · 신규 {lastRefresh.data.total_inserted}건</>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                            <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 mr-2">primary</span>
+                            CODEF 마이데이터 (Popbill 백업)
+                        </div>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                        ⓘ 자동 갱신은 본 페이지가 열려있는 동안만 작동합니다. 백엔드 환경변수 <code className="bg-slate-100 px-1 rounded">BANK_SYNC_PROVIDER=codef</code> 가 설정되어야 CODEF 계좌 자동 호출됩니다.
+                    </p>
+                </section>
 
                 {msg && (
                     <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
