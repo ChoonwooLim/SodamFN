@@ -2,6 +2,148 @@
     --summary-header-height: 145px;
 }
 
+/* ═══════════════════════════════════════════════════════
+   손익계산서 — KPI Hero + 모던 테이블 컨테이너
+   ═══════════════════════════════════════════════════════ */
+.pl-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+}
+@media (max-width: 1024px) {
+    .pl-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.pl-kpi-card {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: white;
+    border-radius: 18px;
+    padding: 18px 22px;
+    box-shadow: 0 10px 32px -12px rgba(15, 23, 42, 0.35);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.04);
+}
+.pl-kpi-card::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 70%;
+    height: 140%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 60%);
+    pointer-events: none;
+}
+.pl-kpi-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.pl-kpi-value {
+    font-size: 28px;
+    font-weight: 900;
+    margin-top: 6px;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    font-family: 'Pretendard', system-ui, sans-serif;
+    line-height: 1.1;
+}
+.pl-kpi-unit {
+    font-size: 14px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-left: 4px;
+}
+.pl-kpi-sub {
+    font-size: 11px;
+    color: #cbd5e1;
+    margin-top: 6px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+.pl-kpi-rev .pl-kpi-value     { color: #60a5fa; }
+.pl-kpi-exp .pl-kpi-value     { color: #fb7185; }
+.pl-kpi-profit .pl-kpi-value  { color: #34d399; }
+.pl-kpi-loss .pl-kpi-value    { color: #f87171; }
+.pl-kpi-margin .pl-kpi-value  { color: #fbbf24; }
+.pl-kpi-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 999px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+.pl-kpi-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b);
+    border-radius: 999px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
+}
+
+/* ── Table Wrapper (다크 헤더 + 카드) ── */
+.pl-table-wrapper {
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 12px 32px -16px rgba(15, 23, 42, 0.18);
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+.pl-table-header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: white;
+    padding: 14px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.pl-table-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pl-table-badge {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #422006;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.1em;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.4);
+}
+.pl-table-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+.pl-table-year {
+    color: #fbbf24;
+    font-weight: 900;
+}
+.pl-table-meta {
+    font-size: 11px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+.pl-table-scroll {
+    overflow-x: auto;
+    overflow-y: visible;
+}
+.pl-table-tip {
+    margin-top: 14px;
+    padding: 12px 18px;
+    background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%);
+    color: #1e40af;
+    border-radius: 12px;
+    border-left: 4px solid #3b82f6;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px -6px rgba(59, 130, 246, 0.2);
+}
+
 .profitloss-page {
     min-height: 100vh;
     background: #f8fafc;
@@ -161,16 +303,31 @@
 
 /* ── Header ── */
 .pl-table th {
-    background: #1e293b;
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
     color: #f8fafc;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 12px;
     position: sticky;
     top: 0;
     z-index: 10;
-    border-color: #334155;
+    border-color: #1e293b;
     text-align: center;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.04em;
+    padding: 12px 10px;
+}
+.pl-table thead tr:first-child th:first-child {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    text-align: left;
+    padding-left: 22px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+}
+
+/* ── Row hover ── */
+.pl-table tbody tr:hover .pl-data {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+    transition: background 0.15s ease;
 }
 
 /* ── Section Label (수입 / 지출 / 영업이익) ── */
@@ -208,13 +365,14 @@
 
 /* ── Revenue Section — Blue Theme ── */
 .section-header .pl-section-label {
-    background: #1d4ed8 !important;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
     color: white !important;
-    font-weight: 800;
-    font-size: 14px;
+    font-weight: 900;
+    font-size: 15px;
     vertical-align: middle;
     border: 1px solid #1e40af;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.15em;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.12);
 }
 
 .section-header .pl-item-label {
@@ -241,13 +399,14 @@
 
 /* ── Expense Section — Rose Theme ── */
 .expense-section-header .pl-section-label {
-    background: #be123c !important;
+    background: linear-gradient(135deg, #9f1239 0%, #be123c 100%) !important;
     color: white !important;
-    font-weight: 800;
-    font-size: 14px;
+    font-weight: 900;
+    font-size: 15px;
     vertical-align: middle;
     border: 1px solid #9f1239;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.15em;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.12);
 }
 
 .expense-section-header .pl-item-label {
@@ -312,16 +471,19 @@
 }
 
 .profit-row .pl-section-label {
-    background: #d1fae5 !important;
-    color: #047857 !important;
-    font-weight: 800;
-    font-size: 14px;
+    background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+    color: white !important;
+    font-weight: 900;
+    font-size: 16px !important;
+    letter-spacing: 0.15em;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,0.15);
 }
 
 .profit-row .pl-data {
-    background: #ecfdf5 !important;
-    font-weight: 700;
-    font-size: 13px;
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%) !important;
+    font-weight: 800 !important;
+    font-size: 14px !important;
+    padding: 14px 10px !important;
     border-color: #6ee7b7;
 }
 
@@ -335,15 +497,15 @@
 
 /* ── Total / Average Columns — subtle emphasis ── */
 .pl-data.total {
-    background: #f0fdf4 !important;
-    font-weight: 600;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%) !important;
+    font-weight: 700;
     color: #15803d;
     border-left: 2px solid #86efac !important;
 }
 
 .pl-data.average {
-    background: #fefce8 !important;
-    font-weight: 600;
+    background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%) !important;
+    font-weight: 700;
     color: #a16207;
     border-left: 1px solid #fde68a !important;
 }
