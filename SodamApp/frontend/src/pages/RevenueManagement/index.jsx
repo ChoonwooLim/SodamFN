@@ -41,6 +41,10 @@ export default function RevenueManagement() {
     const [editingCell, setEditingCell] = useState(null);
     const [editValue, setEditValue] = useState('');
 
+    // ── 자동수집 백업 토글 (마이그레이션 B 정책) ──
+    // manual_overwritten 행 표시 여부. 기본 OFF — 일반 사용자에겐 깔끔한 화면 유지
+    const [showBackup, setShowBackup] = useState(false);
+
     // ── 수입상세 (Annual PL Revenue) ──
     const [plYear, setPlYear] = useState(now.getFullYear());
     const [plData, setPlData] = useState([]);
@@ -131,8 +135,23 @@ export default function RevenueManagement() {
         else setMonth(m => m + 1);
     };
 
-    // ─── Filter by Tab ───
-    const filteredData = tab === 'all' ? data : data.filter(d => d.ui_category === tab);
+    // ─── Filter by Tab + 백업 토글 ───
+    // 백업 토글 OFF (기본) → manual_overwritten 행 숨김. 자동수집된 새 행만 표시.
+    // 백업 토글 ON → 모든 행 표시 + 백업 행에 [복구] 버튼 노출.
+    const tabFiltered = tab === 'all' ? data : data.filter(d => d.ui_category === tab);
+    const filteredData = tabFiltered.filter(d => d.source !== 'manual_overwritten' || showBackup);
+
+    // ─── 백업 행 복구 핸들러 ───
+    const handleRestore = async (id) => {
+        if (!window.confirm('이 백업 행을 수동 데이터로 복구하시겠습니까?\n(자동수집 행과 중복될 수 있으니 확인 후 진행)')) return;
+        try {
+            await api.post(`/auto-collection/dailyexpense/${id}/restore`);
+            fetchData();
+        } catch (err) {
+            console.error('Restore error:', err);
+            alert('복구 실패: ' + (err.response?.data?.detail || err.message));
+        }
+    };
 
     // ─── Group by Date ───
     const groupedByDate = {};
@@ -419,6 +438,7 @@ export default function RevenueManagement() {
                     filteredData={filteredData} sortedDates={sortedDates} groupedByDate={groupedByDate}
                     openAddModal={openAddModal} openEditModal={openEditModal} handleDelete={handleDelete}
                     getDisplayName={getDisplayName} getStoreName={getStoreName}
+                    showBackup={showBackup} setShowBackup={setShowBackup} handleRestore={handleRestore}
                 />
             )}
 

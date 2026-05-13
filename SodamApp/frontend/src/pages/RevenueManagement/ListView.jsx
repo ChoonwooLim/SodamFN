@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Plus, Edit3, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Edit3, Trash2, RotateCcw, Archive } from 'lucide-react';
 import { formatNumber, getWeekday } from '../../utils/format';
 
 // 채널별 색상 및 메타데이터
@@ -33,6 +33,7 @@ const CHANNEL_META = {
 export function ListView({
     year, month, loading, filteredData, sortedDates, groupedByDate,
     openAddModal, openEditModal, handleDelete, getDisplayName, getStoreName,
+    showBackup = false, setShowBackup = () => {}, handleRestore = () => {},
 }) {
     const [collapsedDates, setCollapsedDates] = useState(new Set());
     const [expandedChannels, setExpandedChannels] = useState({}); // key: `${channel}-${dateStr}` → bool
@@ -86,11 +87,21 @@ export function ListView({
                 {/* 확장 시 아이템 리스트 */}
                 {isExpanded && (
                     <div className="divide-y divide-slate-50 bg-slate-50/30">
-                        {items.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 px-6 py-2.5 hover:bg-white transition-colors">
+                        {items.map(item => {
+                            const isBackup = item.source === 'manual_overwritten';
+                            return (
+                            <div
+                                key={item.id}
+                                className={`flex items-center gap-3 px-6 py-2.5 hover:bg-white transition-colors ${isBackup ? 'opacity-70 bg-amber-50/40' : ''}`}
+                            >
                                 <div className="flex-1 min-w-0">
-                                    <div className="text-[13px] font-semibold text-slate-700 truncate">
+                                    <div className="text-[13px] font-semibold text-slate-700 truncate flex items-center gap-1.5">
                                         {getDisplayName(item.vendor_name, item.item)}
+                                        {isBackup && (
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 inline-flex items-center gap-0.5">
+                                                <Archive size={9} /> 백업
+                                            </span>
+                                        )}
                                     </div>
                                     {(getStoreName(item.item) || item.note) && (
                                         <div className="text-[11px] text-slate-400 mt-0.5 truncate">
@@ -101,28 +112,41 @@ export function ListView({
                                     )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <div className="text-[13px] font-bold tabular-nums" style={{ color: meta.amountColor }}>
+                                    <div className={`text-[13px] font-bold tabular-nums ${isBackup ? 'line-through text-slate-400' : ''}`} style={isBackup ? {} : { color: meta.amountColor }}>
                                         {formatNumber(item.amount)}원
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
-                                    <button
-                                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors"
-                                        onClick={() => openEditModal(item)}
-                                        title="수정"
-                                    >
-                                        <Edit3 size={13} />
-                                    </button>
-                                    <button
-                                        className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 border-none cursor-pointer flex items-center justify-center transition-colors"
-                                        onClick={() => handleDelete(item.id)}
-                                        title="삭제"
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
+                                    {isBackup ? (
+                                        <button
+                                            className="h-7 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-700 border-none cursor-pointer flex items-center gap-1 text-[11px] font-bold transition-colors"
+                                            onClick={() => handleRestore(item.id)}
+                                            title="이 백업 행을 수동 데이터로 복구"
+                                        >
+                                            <RotateCcw size={11} /> 복구
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button
+                                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors"
+                                                onClick={() => openEditModal(item)}
+                                                title="수정"
+                                            >
+                                                <Edit3 size={13} />
+                                            </button>
+                                            <button
+                                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 border-none cursor-pointer flex items-center justify-center transition-colors"
+                                                onClick={() => handleDelete(item.id)}
+                                                title="삭제"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -131,11 +155,27 @@ export function ListView({
 
     return (
         <div className="max-w-6xl mx-auto px-6">
-            {/* 상단 바 — 카운트 + 추가 버튼 */}
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
-                    총 {filteredData.length}건
-                </span>
+            {/* 상단 바 — 카운트 + 백업 토글 + 추가 버튼 */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-animate flex items-center justify-between mb-4 flex-wrap gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg">
+                        총 {filteredData.length}건
+                    </span>
+                    {/* 자동수집 마이그레이션 백업 토글 */}
+                    <label
+                        className="flex items-center gap-2 text-[11px] font-semibold text-slate-500 cursor-pointer select-none hover:text-slate-700 transition-colors"
+                        title="자동수집으로 덮어쓰여진 수동 입력 백업 행을 표시합니다"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={showBackup}
+                            onChange={e => setShowBackup(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded accent-amber-500 cursor-pointer"
+                        />
+                        <Archive size={12} className="text-amber-500" />
+                        백업 표시
+                    </label>
+                </div>
                 <button
                     className="flex items-center gap-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs font-bold px-4 py-2 rounded-xl border-none cursor-pointer shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30 transition-all"
                     onClick={openAddModal}
