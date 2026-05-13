@@ -250,19 +250,24 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
     # ── Override delivery revenue with total_sales from DeliveryRevenue ──
     # DeliveryRevenue stores both total_sales (주문금액) and settlement (정산금).
     # P/L should show total_sales as revenue, with fees as separate expense.
+    #
+    # 단, total_sales=0 인 placeholder 행은 DailyExpense 의 자동수집 매출을
+    # 0 으로 덮어쓰지 않도록 무시. (사장님이 정산서 직접 업로드한 경우만 override.)
     from models import DeliveryRevenue
     dr_stmt = select(DeliveryRevenue).where(DeliveryRevenue.year == year, DeliveryRevenue.month == month)
+    if business_id is not None:
+        dr_stmt = dr_stmt.where(DeliveryRevenue.business_id == business_id)
     dr_records = session.exec(dr_stmt).all()
-    
-    if dr_records:
-        # Use total_sales (gross revenue) instead of settlement for P/L revenue
-        for dr in dr_records:
-            pl_field = CHANNEL_TO_PL_FIELD.get(dr.channel)
-            if pl_field:
-                delivery_totals[pl_field] = dr.total_sales  # 총매출 (수수료 차감 전)
-    
-    # Also recalculate delivery fee from DeliveryRevenue
-    total_delivery_fees = sum(dr.total_fees for dr in dr_records) if dr_records else 0
+
+    # total_sales > 0 인 행만 override 대상. 나머지 (placeholder) 는 무시.
+    dr_active = [dr for dr in dr_records if (dr.total_sales or 0) > 0]
+    for dr in dr_active:
+        pl_field = CHANNEL_TO_PL_FIELD.get(dr.channel)
+        if pl_field:
+            delivery_totals[pl_field] = dr.total_sales  # 총매출 (수수료 차감 전)
+
+    # Also recalculate delivery fee from DeliveryRevenue (active rows only)
+    total_delivery_fees = sum(dr.total_fees or 0 for dr in dr_active)
 
     # Find or create P/L record
     pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
