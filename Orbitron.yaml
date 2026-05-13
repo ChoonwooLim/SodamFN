@@ -201,35 +201,36 @@ services:
 
 # ─────────────────────────────────────────────
 # Cron jobs (Task 10 — 자동수집 파이프라인)
-# 모두 superadmin Bearer 토큰으로 백엔드 cron endpoint 호출.
-# $SUPERADMIN_TOKEN / $BACKEND_URL 은 Orbitron 환경에서 주입.
+# 인증: 기존 CRON_SHARED_SECRET 헤더 방식 (X-Cron-Secret).
+# JWT(24h 만료) 회전 부담 없이 영구 작동. easypos/coupang_eats 기존 cron 과 동일 패턴.
+# $CRON_SHARED_SECRET / $BACKEND_URL 은 Orbitron 환경에서 주입.
 # 시간대: KST (Asia/Seoul) 기준 새벽 03:00 ~ 04:30 슬롯.
 # ─────────────────────────────────────────────
 crons:
   - name: auto-collection-easypos
     schedule: "0 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/easypos'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/easypos'
   - name: auto-collection-coupang
     schedule: "10 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/coupang-eats'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/coupang-eats'
   - name: auto-collection-bank
     schedule: "20 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/bank-sync'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/bank-sync'
   - name: auto-collection-orchestrator
     schedule: "30 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/orchestrator'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/orchestrator'
   - name: auto-collection-pl
     schedule: "40 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/profit-loss'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/profit-loss'
   - name: auto-collection-notify
     schedule: "45 3 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/notify'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/notify'
   - name: auto-collection-settlement-watch
     schedule: "0 4 * * *"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/settlement-watch'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/settlement-watch'
   - name: auto-collection-learn-fee-rates
     schedule: "30 4 * * 0"
-    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/learn-fee-rates'
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/learn-fee-rates'
 
 # ─────────────────────────────────────────────
 # Post-deploy: Staff App → Cloudflare Pages

@@ -256,8 +256,23 @@ def _superadmin_only(admin: User = Depends(get_admin_user)) -> User:
     return admin
 
 
+def _verify_cron_secret(
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+) -> None:
+    """Orbitron cron 워커 인증 — CRON_SHARED_SECRET 헤더 일치.
+
+    JWT 만료(24h) 회전 부담을 제거. 기존 easypos/coupang_eats cron 과 동일 패턴.
+    """
+    import os
+    expected = os.getenv("CRON_SHARED_SECRET", "").strip()
+    if not expected:
+        raise HTTPException(503, "CRON_SHARED_SECRET 미설정 — cron 차단")
+    if x_cron_secret != expected:
+        raise HTTPException(401, "invalid cron secret")
+
+
 @router.post("/cron/easypos")
-def cron_easypos(admin: User = Depends(_superadmin_only)):
+def cron_easypos(_: None = Depends(_verify_cron_secret)):
     """03:00 — EasyPOS 채널 수집 (전 사업장).
 
     services.easypos_service.sync_all_businesses 가 존재하지 않으므로
@@ -292,7 +307,7 @@ def cron_easypos(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/coupang-eats")
-def cron_coupang(admin: User = Depends(_superadmin_only)):
+def cron_coupang(_: None = Depends(_verify_cron_secret)):
     """03:10 — 쿠팡이츠 채널 수집.
 
     services.coupang_eats_service.sync_all_businesses 가 존재하지 않으므로
@@ -329,7 +344,7 @@ def cron_coupang(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/bank-sync")
-def cron_bank(admin: User = Depends(_superadmin_only)):
+def cron_bank(_: None = Depends(_verify_cron_secret)):
     """03:20 — 은행 거래 수집.
 
     routers.bank_sync.cron_pull_all 이 존재하지 않으므로 활성 BankAccount 별
@@ -371,7 +386,7 @@ def cron_bank(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/orchestrator")
-def cron_orchestrator(admin: User = Depends(_superadmin_only)):
+def cron_orchestrator(_: None = Depends(_verify_cron_secret)):
     """03:30 — 분류·동기화 fan-out (모든 사업장)."""
     with Session(engine) as s:
         from services.auto_collection_sync.orchestrator import run_all_businesses
@@ -384,7 +399,7 @@ def cron_orchestrator(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/profit-loss")
-def cron_profit_loss(admin: User = Depends(_superadmin_only)):
+def cron_profit_loss(_: None = Depends(_verify_cron_secret)):
     """03:40 — 손익 재계산 (이번달 + 지난달). 현재 stub."""
     with Session(engine) as s:
         from services.profit_loss_service import recalc_all_businesses
@@ -392,7 +407,7 @@ def cron_profit_loss(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/notify")
-def cron_notify(admin: User = Depends(_superadmin_only)):
+def cron_notify(_: None = Depends(_verify_cron_secret)):
     """03:45 — 사장님 일일 알림."""
     with Session(engine) as s:
         from services.auto_collection_sync.orchestrator import (
@@ -406,7 +421,7 @@ def cron_notify(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/settlement-watch")
-def cron_settlement_watch(admin: User = Depends(_superadmin_only)):
+def cron_settlement_watch(_: None = Depends(_verify_cron_secret)):
     """04:00 — 입금 모니터링 + 자동 close + 알림."""
     with Session(engine) as s:
         from services.auto_collection_sync import settlement_watch
@@ -421,7 +436,7 @@ def cron_settlement_watch(admin: User = Depends(_superadmin_only)):
 
 
 @router.post("/cron/learn-fee-rates")
-def cron_learn_fee_rates(admin: User = Depends(_superadmin_only)):
+def cron_learn_fee_rates(_: None = Depends(_verify_cron_secret)):
     """일요일 04:30 — 카드사별 수수료율 학습 갱신."""
     with Session(engine) as s:
         from services.auto_collection_sync.fee_estimator import update_learned_rate
