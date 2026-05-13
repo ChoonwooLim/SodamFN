@@ -1224,3 +1224,96 @@ Stage 6 (bdcc8310): DevelopmentRoadmap UI — Phase 1 "연말정산 지원" stat
 
 ---
 
+## 2026-05-13 (오후 — 자동수집 파이프라인 통합 + 카드매출 카드사별 분해 + 손익 정확도 + UI 리디자인)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | PR #1 자동수집→손익반영 파이프라인 + 입금 모니터링 (11 Task TDD) | 완료 |
+| feat | PR #2/#3 CODEF 은행 어댑터 + 21분 자동 갱신 UI | 완료 |
+| feat | PR #4 카드대금 납부를 매입에서 분리 (rule 5a + 학습) | 완료 |
+| feat | PR #5 EasyPOS 카드사별 매출 (sle205) 자동수집 | 완료 |
+| fix  | PR #6 `/stats/payment` 가 CardSalesApproval 매출도 합산 | 완료 |
+| fix  | PR #7 `/stats/payment` 양쪽 card_corp 정규화 (같은 카드사 별개 row 합쳐짐) | 완료 |
+| feat | PR #8 fan_out 단에서 카드 매출을 카드사별 vendor 행으로 분해 | 완료 |
+| fix  | PR #9 DeliveryRevenue placeholder(total_sales=0) 가 자동수집 매출 0 으로 덮어쓰던 버그 | 완료 |
+| feat | PR #10 인건비 = 직원 통장 실제 송금액 (옵션 A) + 임차료 발생주의 귀속 | 완료 |
+| style | PR #11 손익계산서 페이지 프리미엄 리디자인 (KPI Hero + 다크 헤더 + 그라디언트 표) | 완료 |
+
+### 세부 내용
+
+**1) 자동수집 파이프라인 완성 (PR #1~#3)**
+
+- spec/plan 브레인스토밍 (1283 라인 spec / 2967 라인 plan, 11 Task TDD)
+- 모듈 구조: `services/auto_collection_sync/` 로 단일 진입점화
+  - sync_event.py (DTO) / vendor_resolver.py / fan_out.py / fee_estimator.py
+  - migration.py / settlement_watch.py / calendar.py / orchestrator.py
+  - normalizers/{easypos,coupang_eats,bank}.py
+- 채널별 normalizer → SyncEvent → fan_out → DailyExpense upsert
+- 03:40 cron `/cron/profit-loss` recalc_all_businesses 진입점 추가
+- PR #1 머지 시 migration 미실행으로 전 사이트 500 → revert + manual psql + Reapply 패턴 정립
+- CODEF: BankConnectionService 자동 sync 21분 cron + BankModuleDetail.jsx 자동 갱신 토글
+
+**2) 카드대금 분류 + EasyPOS 카드별 매출 (PR #4, #5)**
+
+- bank_sync `_classify_one_tx` 에 카드대금 keyword 12종 + rule 5a (out_amount>0 + keyword → "card_payment")
+- card_payment 는 DailyExpense 생성 X (매입 이중계산 방지). purchase.py EXCLUDED_PURCHASE_CATEGORIES 도 추가
+- EasyPOS `/sle205/selectCardSaleList.do` 호출 → CardSalesApproval 에 카드사별 승인 행 저장
+- `_normalize_card_corp` 매핑 — KB국민/신한/BC/롯데/NH농협/현대/하나/우리/...
+- 발급사(카드사) ≠ 매입사 케이스: 매입사 우선 (CODEF 카드 정산 명세와 동일 식별자 유지)
+
+**3) 카드매출 카드사별 표시 (PR #6~#8)**
+
+- `/stats/payment` 가 CardPayment 뿐 아니라 CardSalesApproval 도 카드사별 매출 합산
+- 양쪽 card_corp 동일 normalize 적용 → "신한" + "신한카드" 동일 row 로 합쳐짐
+- fan_out 단계: vendor_resolver 에 `store_card:{corp}` 동적 키 + easypos normalizer 가 CardSalesApproval 기준으로 카드사별 net (승인-취소) 분해 emit
+- prod cleanup: 기존 "매장 (소담김밥)" 단일 vendor Card 행 109개 삭제 → 카드사 10개 vendor 1,041행 재생성
+  - 신한 40.08M / KB국민 37.03M / BC 27.76M / 현대 20.13M / 하나 18.67M / 삼성 15.75M / NH농협 13.52M / 롯데 11.45M / 우리 11.02M / 카카오페이 0.64M
+
+**4) 손익계산서 정확도 (PR #9, #10)**
+
+- DeliveryRevenue placeholder(`total_sales=0`) 행 20개가 sync_delivery_revenue_to_pl 에서 자동수집 합계를 0 으로 override 하던 버그 — `if dr_records:` → `dr_active = [r for r if total_sales>0]` 로 수정 + business_id 필터 추가
+- 백필 결과 쿠팡 매출 1~5월 정상 반영 (10.6M / 9.7M / 8.7M / 5.9M / 2.9M)
+- 사장님 정책 반영 (옵션 A):
+  - 인건비 = "직원 통장에 실제 송금된 금액". `transfer_status='완료'` 만 카운트.
+    세금대납 직원은 gross (공제 안 함), 일반 직원은 gross - 공제.
+    `bonus_tax_support` 를 expense_labor 에 더하던 기존 로직 제거 (이미 expense_insurance / expense_tax_employee 로 분리되어 표시되므로 이중 계산 방지)
+  - 발생주의: 임차료 등 ACCRUAL_CATEGORIES + 익월 1~4일 + 전월 말일이 비영업일이면 전월 귀속
+  - sync_all_expenses: 이번달 + 다음달 1~4일 룩어헤드 조회 후 `_accrual_year_month` 로 귀속월 판정
+
+**5) UI 프리미엄 리디자인 (PR #11)**
+
+- 손익계산서 데스크탑 화면 무미건조 → KPI Hero + 다크 헤더 + 그라디언트 표
+- KPI 4카드: 연간 매출 / 비용 / 영업이익 / 영업이익률 (Slate 다크 그라디언트 + 마진율 progress bar)
+- 테이블 컨테이너: "P/L" 골드 뱃지 + 활성월 메타. thead 그라디언트. 수입/지출/영업이익 라벨 그라디언트 + inset shadow. 영업이익 행 16px + 패딩 ↑
+- summary 탭만 max-w-screen-2xl (12개월+합계+평균 14컬럼 가독성)
+
+### 운영 검증 결과
+
+| 항목 | 결과 |
+|------|------|
+| biz=1 손익 (1~5월) | 매장 209.6M / 쿠팡 38.1M / 인건비 30.4M (옵션A) / 임차료 29.5M (발생주의) |
+| 4월 인건비 | 1.49M (PDF 5명 대기) |
+| 5월 인건비 | 0 (월말 산정 시점에 입력 예정) |
+| 카드매출 카드사 분해 | 10개 카드사로 분리 표시 (매출관리 + 카드관리 화면) |
+| 회귀 테스트 | 65 PASS (auto_collection_sync + easypos_card_sales 포함) |
+
+### 다음 세션 인계
+
+1. **4월 PDF 5명 + 5월 급여 입력** — 사장님 작업. Payroll.transfer_status='완료' 마킹 시 손익 자동 반영
+2. **배민 / 요기요 / 땡겨요 자동수집 확장** — 쿠팡이츠 패턴 그대로 (HAR 캡처 → DB 모델 → Router → 페이지). 각 ~1일 작업
+3. **5월 임차료 발생주의 검증** — 5/31(일) → 6/1~6/4 임차료 이체 시 5월 P/L 임차료에 자동 잡히는지 확인
+4. **expense_delivery_fee 자동수집 반영** — 쿠팡 수수료 DailyExpense (vendor=쿠팡이츠 *수수료) 가 P/L expense_delivery_fee 에 잡히도록 sync_delivery_revenue_to_pl 추가 로직 필요 (현재는 DeliveryRevenue.total_fees 기준만)
+5. **DeliveryRevenue placeholder 정리** — 20개 행이 의미 없는 상태. 정리 또는 자동수집 시점에 채우는 로직 추가
+6. **세금대납 직원 4대보험 출처 확인** — expense_insurance_employee + expense_tax_employee 가 사장님이 실제 공단/세무서 납부한 cash 와 일치하는지 한 번 검증
+
+### 흥미로운 디버깅 데이터
+
+- DeliveryRevenue 가 채널×월×사업장 조합으로 placeholder 미리 깔려있던 패턴 → "데이터 존재 ≠ 데이터 유효" 명심
+- CardSalesApproval 발급사/매입사 분리: 신롯데카드(발급) 매입은 롯데카드. CODEF 정산 명세와 동일 식별자 유지하려면 매입사 우선
+- prod backfill 패턴 정착: PR 머지 → Orbitron 재배포 (~4분) → ssh docker cp → docker exec 스크립트 → 결과 확인
+- 옵션 A 검증식: 사장님 통장 cash-out = expense_labor + expense_insurance + expense_insurance_employee + expense_tax_employee = gross 합 (세금대납 = 사업주가 모두 부담)
+
+---
+
