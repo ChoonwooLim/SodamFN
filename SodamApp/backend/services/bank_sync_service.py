@@ -156,6 +156,7 @@ class BaseBankProvider:
         order: str = "D",          # 'D' 내림차순 / 'A' 오름차순
         page: int = 1,
         per_page: int = 500,
+        business_id: Optional[int] = None,  # tenant routing (CODEF connectedId 등 사업장 컨텍스트 필요시)
     ) -> BankSearchResult:
         raise NotImplementedError
 
@@ -200,6 +201,7 @@ class DevStubProvider(BaseBankProvider):
         order: str = "D",
         page: int = 1,
         per_page: int = 500,
+        business_id: Optional[int] = None,  # ignored by stub
     ) -> BankSearchResult:
         s = _ymd(start_date)
         rows: List[BankTxRow] = [
@@ -466,6 +468,7 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
         order: str = "A",
         page: int = 1,
         per_page: int = 500,
+        business_id: Optional[int] = None,  # ignored — Popbill 은 단일 corp_num 기반
     ) -> BankSearchResult:
         """requestJob → poll → search 를 한번에 수행. 모든 페이지 결과 누적 반환.
 
@@ -565,11 +568,20 @@ class PopbillEasyFinBankProvider(BaseBankProvider):
 _PROVIDERS = {
     "stub": DevStubProvider,
     "popbill": PopbillEasyFinBankProvider,
+    # "codef" 는 lazy import — services.codef 패키지가 services.bank_sync_service 를
+    # import 하므로 import 시점 순환을 피하기 위해 _codef_provider() 헬퍼로 분리.
 }
+
+
+def _codef_provider() -> "BaseBankProvider":
+    from services.codef.bank_provider import CodefBankProvider
+    return CodefBankProvider()
 
 
 def get_provider() -> BaseBankProvider:
     override = (os.getenv("BANK_SYNC_PROVIDER") or "").strip().lower()
+    if override == "codef":
+        return _codef_provider()
     if override:
         cls = _PROVIDERS.get(override, DevStubProvider)
         return cls()
