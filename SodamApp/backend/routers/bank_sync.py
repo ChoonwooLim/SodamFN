@@ -981,14 +981,16 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
             sess.delete(old_dr)
         tx.linked_delivery_revenue_id = None
 
-    # 2) 분류가 transfer/excluded/unclassified/owner_deposit/loan_in/other_income 면
+    # 2) 분류가 transfer/excluded/unclassified/owner_deposit/loan_in/other_income/card_payment 면
     #    링크만 제거하고 종료 (DailyExpense 미생성 — 매출 집계에 안 잡힘)
     #    owner_deposit: 사장님 자금 보충
     #    loan_in:       차입금/대출 (부채)
     #    other_income:  영업외수익 (이자/환급 등)
+    #    card_payment:  카드대금 납부 (실제 매입은 카드 사용 시점에 잡힘 — 이중 계상 방지)
     if tx.classified_as in (
         "transfer", "excluded", "unclassified",
         "owner_deposit", "loan_in", "other_income",
+        "card_payment",
     ):
         return
 
@@ -1374,6 +1376,15 @@ def _get_mobile_commission_rate(pay_corp: str) -> float:
 
 TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
 
+# 카드대금 납부 키워드 — 출금 시 이 키워드가 remark 에 있으면 매입 아님
+# (실제 매입은 카드 사용 시점에 잡힘; 이 출금은 그 정산)
+CARD_PAYMENT_KEYWORDS = [
+    "현대카드", "삼성카드", "신한카드", "BC카드", "비씨카드",
+    "롯데카드", "KB국민", "국민카드", "농협카드", "NH카드",
+    "하나카드", "우리카드", "씨티카드",
+    "현대(주)", "삼성(주)", "롯데(주)",
+]
+
 
 # remark1 = "{카드사 약자}{6+ digits}" 형태의 정산 입금 패턴
 # 한국 카드사 매출 정산 표준 포맷 (예: 롯데9924419309, NH17831866, 하나92510497,
@@ -1577,6 +1588,10 @@ def _classify_one_tx(
 
     # 5) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
     if tx.out_amount > 0:
+        # 5a) 카드대금 납부 — 매입 아님 (실제 매입은 카드 사용 시점에 잡힘)
+        if any(k in remark for k in CARD_PAYMENT_KEYWORDS):
+            return "card_payment"
+
         for name, v in vendor_by_name.items():
             if name and name in remark:
                 tx.vendor_id = v.id
@@ -1601,6 +1616,7 @@ def _classify_txs(
     """
     counts = {
         "revenue": 0, "expense": 0, "purchase": 0, "transfer": 0,
+        "card_payment": 0,
         "card_settlement": 0, "pay_settlement": 0, "delivery_settlement": 0,
         "mobile_settlement": 0,
         "learned": 0, "skip": 0,

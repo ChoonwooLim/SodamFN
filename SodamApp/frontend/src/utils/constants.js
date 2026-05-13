@@ -11,6 +11,7 @@ export const EXPENSE_CATEGORIES = [
     { id: '카드수수료', label: '카드수수료', icon: '💳', color: '#ef4444' },
     { id: '배달앱수수료', label: '배달앱 수수료', icon: '🛵', color: '#f43f5e' },
     { id: '기타경비', label: '기타경비', icon: '📋', color: '#64748b' },
+    { id: '카드대금', label: '카드대금', icon: '💳', color: '#64748b' },
     { id: '개인가계부', label: '개인가계부', icon: '👤', color: '#f59e0b' },
 ];
 

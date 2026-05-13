@@ -16,6 +16,11 @@ from services.excluded_vendors import should_skip_expense
 router = APIRouter()
 
 
+# 매입관리에서 제외할 카테고리 — 카드대금 납부는 매입 아님
+# (실제 매입은 카드 사용 시점에 잡힘; 카드대금 출금은 정산이므로 이중 계상 방지)
+EXCLUDED_PURCHASE_CATEGORIES = ("카드대금", "card_payment")
+
+
 # ─── Schemas ───
 
 class PurchaseCreate(BaseModel):
@@ -66,6 +71,9 @@ def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_
 
     records = []
     for exp in expenses:
+        # 카드대금/card_payment 카테고리는 매입 아님 — 제외
+        if exp.category in EXCLUDED_PURCHASE_CATEGORIES:
+            continue
         # Include if vendor is expense type, or if no vendor linked
         if exp.vendor_id and exp.vendor_id not in expense_vendor_ids:
             continue
@@ -112,8 +120,12 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
         )
     ).all()
 
-    # Filter
-    expenses = [e for e in expenses if not e.vendor_id or e.vendor_id in expense_vendor_ids]
+    # Filter (카드대금/card_payment 카테고리 제외 + expense vendor)
+    expenses = [
+        e for e in expenses
+        if e.category not in EXCLUDED_PURCHASE_CATEGORIES
+        and (not e.vendor_id or e.vendor_id in expense_vendor_ids)
+    ]
 
     # Totals
     total = sum(e.amount for e in expenses)
