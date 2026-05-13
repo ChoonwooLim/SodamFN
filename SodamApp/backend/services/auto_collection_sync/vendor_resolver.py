@@ -28,6 +28,15 @@ def get_or_create(session: Session, business_id: int, lookup_key: str) -> Vendor
             raise ValueError(f"vendor {vid} not found for business {business_id}")
         return v
 
+    # 카드사별 매장 매출 vendor — 'store_card:{corp}' (예: 'store_card:신한')
+    # 매출관리 화면에서 카드사별로 매출이 분리되어 표시되도록 EasyPOS normalizer 가 사용.
+    if lookup_key.startswith("store_card:"):
+        corp = lookup_key.split(":", 1)[1].strip() or "기타"
+        biz = session.get(Business, business_id)
+        biz_name = biz.name if biz else f"#{business_id}"
+        name = f"매장 ({biz_name}) - {corp}카드"
+        return _upsert_vendor(session, business_id, name, "store", "revenue")
+
     if lookup_key not in CHANNEL_VENDORS:
         raise ValueError(f"unknown channel vendor lookup_key: {lookup_key}")
 
@@ -39,6 +48,11 @@ def get_or_create(session: Session, business_id: int, lookup_key: str) -> Vendor
     else:
         name = name_tpl
 
+    return _upsert_vendor(session, business_id, name, category, vtype)
+
+
+def _upsert_vendor(session: Session, business_id: int, name: str,
+                   category: str, vtype: str) -> Vendor:
     vendor = session.exec(
         select(Vendor).where(
             Vendor.business_id == business_id,
@@ -48,7 +62,6 @@ def get_or_create(session: Session, business_id: int, lookup_key: str) -> Vendor
     ).first()
     if vendor:
         return vendor
-
     vendor = Vendor(
         business_id=business_id, name=name,
         category=category, vendor_type=vtype,
@@ -60,7 +73,11 @@ def get_or_create(session: Session, business_id: int, lookup_key: str) -> Vendor
 
 
 def list_auto_covered(session: Session, business_id: int) -> list[int]:
-    """마이그레이션 B 정책에서 덮어쓰기 대상이 되는 vendor_id 리스트."""
+    """마이그레이션 B 정책에서 덮어쓰기 대상이 되는 vendor_id 리스트.
+
+    카드사별 store_card:{corp} vendor 는 동적이라 여기서 열거 못함 —
+    호출자가 별도로 'store' 카테고리 + 'revenue' vendor 를 추가로 수집해야 함.
+    """
     vendor_ids = []
     for key in CHANNEL_VENDORS.keys():
         v = get_or_create(session, business_id, key)
