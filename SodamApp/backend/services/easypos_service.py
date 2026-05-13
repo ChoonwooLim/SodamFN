@@ -358,6 +358,57 @@ class EasyPosClient:
             receipt_count=len(rows),
         )
 
+    def fetch_card_sales(self, easypos_id: str,
+                         start_date: datetime.date, end_date: datetime.date,
+                         shop_no: str = "", pos_no: str = "") -> dict:
+        """카드사별 매출내역 조회 (sle205/selectCardSaleList.do).
+
+        영수증 단(/sle014/selectSalePerDayList.do) 은 카드매출을 단일 통합
+        합계로만 제공. 카드사별 분해를 위해 이 endpoint 호출 추가.
+
+        Args:
+            easypos_id: 가맹점 로그인 ID (보통 사업자번호)
+            start_date / end_date: 조회 기간 (영업일자 기준)
+            shop_no: 특정 매장 (멀티매장), 빈값=전체
+            pos_no: 특정 POS, 빈값=전체
+
+        Returns:
+            {"rows": [...], "total_amount": int, "row_count": int}
+
+        Request SSV params (사장님 실 호출 검증 2026-05-13):
+            easyposid / shopNo / fromDate / toDate / apprNo / cardNo
+            / srchFg / cardCode / CHK_ID
+
+        Response dataset: dsOutCardSaleList. 컬럼 (한글):
+            영업일자, 매장코드, 포스번호, 영수증번호, 거래일자, 거래시간,
+            승인구분 (항상 "POS승인"), 승인번호, 카드번호 (마스킹),
+            카드사 (발급사), 매입사 (acquirer/정산사), 승인금액, 할부개월수,
+            매출구분 (승인/취소), 유효기간, 사업자코드, 봉사료, 부가세,
+            보증금액, 메세지, 비고.
+        """
+        params = {
+            "easyposid": easypos_id,
+            "shopNo": shop_no,
+            "fromDate": start_date.strftime("%Y%m%d"),
+            "toDate": end_date.strftime("%Y%m%d"),
+            "apprNo": "",          # 승인번호 검색 (빈값=전체)
+            "cardNo": "",          # 카드번호 검색 (빈값=전체)
+            "srchFg": "",          # 검색구분 (빈값=전체)
+            "cardCode": "",        # 카드사 코드 (빈값=전체)
+            "CHK_ID": easypos_id,
+        }
+        resp = self._ssv_post("/sle205/selectCardSaleList.do", params)
+        rows = resp.datasets.get("dsOutCardSaleList") or []
+        total = sum(
+            _to_int(r.get("승인금액") or r.get("amount") or 0)
+            for r in rows
+        )
+        return {
+            "rows": rows,
+            "total_amount": total,
+            "row_count": len(rows),
+        }
+
     def fetch_dashboard(self, easypos_id: str) -> dict:
         """대시보드 — 월별/주간/항목별 매출 요약."""
         params = {
@@ -537,3 +588,135 @@ def upsert_revenue_aggregate(session, business_id: int, sale_date: datetime.date
         session.add(rev)
     session.commit()
     return total_net
+
+
+# ──────────────────────────────────────────────────────────────────
+# 카드사별 매출 — CardSalesApproval 적재
+# ──────────────────────────────────────────────────────────────────
+
+# 카드사명 표준화 — CODEF 카드 동기화와 동일 식별자 사용
+_CARD_CORP_NORMALIZE = {
+    "KB국민카드": "KB국민",
+    "국민카드": "KB국민",
+    "신한카드": "신한",
+    "삼성카드": "삼성",
+    "비씨카드": "BC",
+    "BC카드": "BC",
+    "롯데카드": "롯데",
+    "현대카드": "현대",
+    "하나카드": "하나",
+    "하나SK카드": "하나",
+    "하나구외환": "하나",
+    "우리카드": "우리",
+    "NH농협카드": "NH농협",
+    "농협카드": "NH농협",
+    "NH카드": "NH농협",        # EasyPOS 매입사 표기
+    "씨티카드": "씨티",
+    "한국씨티카드": "씨티",
+}
+
+
+def _normalize_card_corp(raw: str) -> str:
+    """카드사명 표준화 — 매칭 안 되면 원본 그대로.
+
+    매출/입금 양쪽에서 같은 식별자를 써야 정산 매칭이 가능.
+    """
+    if not raw:
+        return ""
+    s = raw.strip()
+    if s in _CARD_CORP_NORMALIZE:
+        return _CARD_CORP_NORMALIZE[s]
+    # 부분 매칭 — '카드' 접미사 제거 후 표준화된 값 중에 있으면 그걸 사용
+    if s.endswith("카드"):
+        base = s[:-2]
+        if base in _CARD_CORP_NORMALIZE.values():
+            return base
+    return s
+
+
+def upsert_card_sales(session, business_id: int, result: dict) -> dict:
+    """fetch_card_sales 결과를 CardSalesApproval 에 upsert.
+
+    중복 키: (business_id, approval_date, approval_number, card_corp).
+    source='easypos' 로 마킹 → 후일 CODEF/엑셀 출처와 구분 가능.
+
+    Returns:
+        {"inserted": N, "updated": N, "skipped": N, "total_processed": N}
+    """
+    from sqlmodel import select
+    from models import CardSalesApproval
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+
+    for row in result["rows"]:
+        # 영업일자 우선, 없으면 거래일자
+        biz_date_str = (row.get("영업일자") or row.get("거래일자") or "").strip()
+        approval_no = (row.get("승인번호") or "").strip()
+        # 카드사 = 발급사 (issuer), 매입사 = 정산사 (acquirer).
+        # 사장님 정산/P/L 은 매입사 기준 (CODEF 카드 명세도 매입사 기준)이라 매입사 우선.
+        # 매입사 비어있을 때만 카드사 fallback.
+        acquirer_raw = (row.get("매입사") or "").strip()
+        issuer_raw = (row.get("카드사") or "").strip()
+        card_corp_raw = acquirer_raw or issuer_raw
+        if not biz_date_str or not approval_no:
+            skipped += 1
+            continue
+        try:
+            approval_date = datetime.datetime.strptime(biz_date_str, "%Y%m%d").date()
+        except ValueError:
+            skipped += 1
+            continue
+
+        # 카드사명 표준화: "KB국민카드" → "KB국민", "비씨카드" → "BC" 등
+        card_corp = _normalize_card_corp(card_corp_raw)
+
+        existing = session.exec(
+            select(CardSalesApproval).where(
+                CardSalesApproval.business_id == business_id,
+                CardSalesApproval.approval_date == approval_date,
+                CardSalesApproval.approval_number == approval_no,
+                CardSalesApproval.card_corp == card_corp,
+            )
+        ).first()
+
+        amount = _to_int(row.get("승인금액"))
+        # 매출구분 = "승인" / "취소". 승인구분("POS승인") 은 채널이라 status 와 무관.
+        sale_type_raw = (row.get("매출구분") or "").strip()
+        status = "취소" if "취소" in sale_type_raw else "승인"
+
+        fields = dict(
+            business_id=business_id,
+            approval_date=approval_date,
+            approval_time=(row.get("거래시간") or None),
+            card_corp=card_corp,
+            card_number=(row.get("카드번호") or None),
+            approval_number=approval_no,
+            amount=amount,
+            installment=(row.get("할부개월수") or None),
+            status=status,
+            shop_name=(issuer_raw or None),  # 발급사명 (정산은 card_corp=매입사로)
+            source="easypos",
+            source_meta=None,
+            synced_at=datetime.datetime.utcnow(),
+        )
+
+        if existing:
+            for k, v in fields.items():
+                # None 값은 기존 데이터를 덮어쓰지 않음. amount/status 는 항상 갱신.
+                if v is not None or k in ("amount", "status"):
+                    setattr(existing, k, v)
+            session.add(existing)
+            updated += 1
+        else:
+            session.add(CardSalesApproval(**fields))
+            inserted += 1
+
+    session.commit()
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped,
+        "total_processed": inserted + updated,
+    }
