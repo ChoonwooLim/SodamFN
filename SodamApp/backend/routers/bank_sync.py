@@ -628,6 +628,7 @@ def _do_pull(
         order="A",
         page=1,
         per_page=per_page,
+        business_id=business_id,  # CODEF provider 의 connectedId routing 에 필요. Popbill 은 ignore.
     )
     if not res.ok:
         raise RuntimeError(res.error or "팝빌 조회 실패")
