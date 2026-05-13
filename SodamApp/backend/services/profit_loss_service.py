@@ -1,6 +1,30 @@
 from sqlmodel import Session, select, func
-from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, Revenue, DeliveryRevenue
+from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, DeliveryRevenue
 import datetime
+import calendar as _calendar
+from services.auto_collection_sync.calendar import is_business_day
+
+
+# 발생주의 귀속 — 임차료 등은 익월 1~4일에 휴일 사유로 미뤄 이체된 경우 전월로 귀속.
+# 사장님 정책 (2026-05-13): "휴일 문제로 익월 1~4일 중에 지급되는 경우 실제 지급된 이전달로 계상".
+ACCRUAL_CATEGORIES = {"임차료", "임대료", "임대관리비"}
+
+
+def _accrual_year_month(expense_date: datetime.date, category: str | None) -> tuple[int, int]:
+    """발생주의 카테고리는 휴일 미뤄짐 케이스에 한해 전월로 귀속.
+
+    조건: 카테고리가 ACCRUAL_CATEGORIES + expense_date 가 1~4일 + 전월 말일이 비영업일.
+    그 외는 expense_date.year / expense_date.month 그대로.
+    """
+    if category not in ACCRUAL_CATEGORIES or expense_date.day > 4:
+        return (expense_date.year, expense_date.month)
+    prev_year = expense_date.year - 1 if expense_date.month == 1 else expense_date.year
+    prev_month = 12 if expense_date.month == 1 else expense_date.month - 1
+    last_day = _calendar.monthrange(prev_year, prev_month)[1]
+    last_date = datetime.date(prev_year, prev_month, last_day)
+    if is_business_day(last_date):
+        return (expense_date.year, expense_date.month)
+    return (prev_year, prev_month)
 
 # 거래처 카테고리 → 손익계산서 필드 매핑
 # Note: 인건비(expense_labor)는 Payroll/수동입력에서 관리 → sync_labor_cost 전용
@@ -35,37 +59,37 @@ CATEGORY_TO_PL_FIELD = {
 }
 
 def sync_all_expenses(year: int, month: int, session: Session, business_id: int = None):
+    """Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
+
+    발생주의 (사장님 정책 2026-05-13): 임차료 등 ACCRUAL_CATEGORIES 는
+    익월 1~4일 + 전월 말일이 비영업일이면 전월로 귀속.
+    → 이번 달 sync 시 (a) 이번 달 expense 중 다른 달로 귀속될 것 제외 +
+        (b) 다음 달 1~4일 expense 중 이번 달로 귀속될 것 포함.
     """
-    Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
-    Uses vendor.category to determine which P/L field to update.
-    """
-    
     start_date = datetime.date(year, month, 1)
     if month == 12:
         end_date = datetime.date(year + 1, 1, 1)
     else:
         end_date = datetime.date(year, month + 1, 1)
-    
-    # Get all revenue vendor IDs to exclude from expense aggregation
+
+    # 다음 달 1~4일 (발생주의 캐리오버 후보)
+    accrual_lookahead_end = end_date + datetime.timedelta(days=4)
+
     rev_vendor_stmt = select(Vendor).where(Vendor.vendor_type == "revenue")
     if business_id is not None:
         rev_vendor_stmt = rev_vendor_stmt.where(Vendor.business_id == business_id)
-        
-    revenue_vendor_ids = set(
-        v.id for v in session.exec(rev_vendor_stmt).all()
-    )
+    revenue_vendor_ids = set(v.id for v in session.exec(rev_vendor_stmt).all())
 
-    # Get all daily expenses for the month with their vendor info
-    exp_stmt = select(DailyExpense).where(DailyExpense.date >= start_date, DailyExpense.date < end_date)
+    # 이번 달 + 다음 달 1~4일 expense 조회 (발생주의 룩어헤드 포함)
+    exp_stmt = select(DailyExpense).where(
+        DailyExpense.date >= start_date,
+        DailyExpense.date < accrual_lookahead_end,
+    )
     if business_id is not None:
         exp_stmt = exp_stmt.where(DailyExpense.business_id == business_id)
-
     expenses = session.exec(exp_stmt).all()
-    
-    # Filter out revenue vendor expenses
     expenses = [e for e in expenses if e.vendor_id not in revenue_vendor_ids]
 
-    # Build vendor_id → category map
     vendor_ids = [e.vendor_id for e in expenses if e.vendor_id]
     vendor_category_map = {}
     if vendor_ids:
@@ -74,22 +98,25 @@ def sync_all_expenses(year: int, month: int, session: Session, business_id: int 
             vend_stmt = vend_stmt.where(Vendor.business_id == business_id)
         vendors = session.exec(vend_stmt).all()
         vendor_category_map = {v.id: v.category for v in vendors}
-    
-    # Aggregate by category
+
     category_totals = {}
     for expense in expenses:
         category = None
-        # First try vendor category
         if expense.vendor_id and vendor_category_map.get(expense.vendor_id):
             category = vendor_category_map[expense.vendor_id]
-        # Fallback to expense's own category
         elif expense.category:
             category = expense.category
-        
-        if category:
-            pl_field = CATEGORY_TO_PL_FIELD.get(category)
-            if pl_field:
-                category_totals[pl_field] = category_totals.get(pl_field, 0) + expense.amount
+        if not category:
+            continue
+
+        # 발생주의 귀속 판정 — 이 expense 가 (year, month) 에 귀속되는지
+        ay, am = _accrual_year_month(expense.date, category)
+        if (ay, am) != (year, month):
+            continue
+
+        pl_field = CATEGORY_TO_PL_FIELD.get(category)
+        if pl_field:
+            category_totals[pl_field] = category_totals.get(pl_field, 0) + expense.amount
     
     # Find or create P/L record
     pl_stmt = select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
@@ -329,51 +356,55 @@ def sync_summary_material_cost(year: int, month: int, session: Session, business
     session.commit()
 
 def sync_labor_cost(year: int, month: int, session: Session, business_id: int = None):
+    """Aggregate Payroll into MonthlyProfitLoss — 옵션 A (사장님 정책 2026-05-13).
+
+    인건비 = "직원 통장에 실제 송금된 금액". 즉:
+      - 세금대납 직원 (bonus_tax_support > 0): gross (공제 안 함)
+      - 일반 직원: gross - 4대보험·세금 공제
+    transfer_status == "완료" 인 Payroll 만 카운트 (미지급 직원 미반영).
+
+    세금대납액 + 4대보험·세금 (사업주 대납분) 은 별도 expense_insurance / expense_tax_employee
+    행에 표시되므로 인건비에 중복 합산하지 않음.
     """
-    Aggregate all Payroll total_pay for a given month and update MonthlyProfitLoss.expense_labor
-    Also calculates:
-      - expense_retirement as 10% of labor cost
-      - expense_insurance as employer-side 4대보험 (matches employee deductions)
-    """
-    
     month_str = f"{year}-{month:02d}"
-    
-    # Fetch all payroll records for the month
-    pay_stmt = select(Payroll).where(Payroll.month == month_str)
+
+    pay_stmt = select(Payroll).where(
+        Payroll.month == month_str,
+        Payroll.transfer_status == "완료",
+    )
     if business_id is not None:
         pay_stmt = pay_stmt.where(Payroll.business_id == business_id)
-        
+
     payrolls = session.exec(pay_stmt).all()
-    
-    # Calculate employee-side 4대보험 deductions
+
     employee_insurance = sum(
-        (p.deduction_np or 0) + (p.deduction_hi or 0) + 
-        (p.deduction_lti or 0) + (p.deduction_ei or 0) 
+        (p.deduction_np or 0) + (p.deduction_hi or 0) +
+        (p.deduction_lti or 0) + (p.deduction_ei or 0)
         for p in payrolls
     )
-    
-    # Calculate employee-side withholding tax (소득세 + 지방소득세)
     employee_tax = sum(
-        (p.deduction_it or 0) + (p.deduction_lit or 0) 
+        (p.deduction_it or 0) + (p.deduction_lit or 0)
         for p in payrolls
     )
-    
-    # Calculate gross pay directly from base_pay and bonus_holiday
     gross_pay_sum = sum((p.base_pay or 0) + (p.bonus_holiday or 0) for p in payrolls)
 
-    # Calculate net pay (실수령액)
-    total_labor_net = gross_pay_sum - employee_insurance - employee_tax
-    
-    # 사업주 세금 대납 (bonus_tax_support): 정규직 등 사업주가 공제액을 대신 부담하는 경우
-    # 해당 직원의 인건비는 실수령액이 아니라 총지급액(gross) 기준으로 반영
-    tax_support_total = sum(p.bonus_tax_support or 0 for p in payrolls)
-    total_labor_net += tax_support_total
-    
-    # Calculate retirement fund as 10% of gross labor cost (세전 기준 유지)
-    total_labor_gross = gross_pay_sum
-    retirement_fund = int(total_labor_gross * 0.1)
-    
-    # Employer-side 4대보험료 = employee deductions (노사 반반)
+    # 옵션 A: 실제 직원 통장 송금액
+    # 세금대납 직원 (bonus_tax_support > 0) 은 공제 안 함 (CLAUDE.md 급여규칙).
+    transfer_total = 0
+    for p in payrolls:
+        p_gross = (p.base_pay or 0) + (p.bonus_holiday or 0)
+        p_deduct = (
+            (p.deduction_np or 0) + (p.deduction_hi or 0)
+            + (p.deduction_lti or 0) + (p.deduction_ei or 0)
+            + (p.deduction_it or 0) + (p.deduction_lit or 0)
+        )
+        if (p.bonus_tax_support or 0) > 0:
+            transfer_total += p_gross
+        else:
+            transfer_total += p_gross - p_deduct
+    total_labor_net = transfer_total
+
+    retirement_fund = int(gross_pay_sum * 0.1)
     employer_insurance = employee_insurance
     
     # Find or create MonthlyProfitLoss record
