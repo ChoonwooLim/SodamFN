@@ -238,3 +238,205 @@ def mark_false_positive(
         s.commit()
         s.refresh(a)
         return _alert_dto(a)
+
+
+# ========== Cron Endpoints (Task 10) ==========
+# superadmin 토큰으로 Orbitron cron 워커가 호출. 각 endpoint 는 사업장 화이트리스트가 아닌
+# 전사업장 처리 (active subscription 한정 / plan 체크는 orchestrator 가 담당).
+#
+# get_superadmin_user 가 auth.py 에 없으므로 inline 체크 헬퍼 사용.
+
+import logging as _logging
+_cron_log = _logging.getLogger("auto_collection.cron")
+
+
+def _superadmin_only(admin: User = Depends(get_admin_user)) -> User:
+    if admin.role != "superadmin":
+        raise HTTPException(403, "superadmin only")
+    return admin
+
+
+@router.post("/cron/easypos")
+def cron_easypos(admin: User = Depends(_superadmin_only)):
+    """03:00 — EasyPOS 채널 수집 (전 사업장).
+
+    services.easypos_service.sync_all_businesses 가 존재하지 않으므로
+    routers.easypos._run_sync 를 직접 호출하여 fan-out.
+    """
+    import datetime as _dt
+    from models import EasyPosCredential
+    from routers.easypos import _run_sync as _easypos_run_sync
+
+    yesterday = _dt.date.today() - _dt.timedelta(days=1)
+    with Session(engine) as s:
+        bids = [r for r in s.exec(
+            select(EasyPosCredential.business_id).where(
+                EasyPosCredential.status == "active"
+            )
+        )]
+
+    results = []
+    for bid in bids:
+        try:
+            r = _easypos_run_sync(bid, [yesterday], triggered_by="cron")
+            results.append({"business_id": bid, **r})
+        except Exception as e:  # noqa: BLE001
+            _cron_log.error("easypos cron failed bid=%s: %s", bid, e, exc_info=True)
+            results.append({"business_id": bid, "error": str(e)})
+    return {
+        "ok": True,
+        "target_date": yesterday.isoformat(),
+        "business_count": len(bids),
+        "results": results,
+    }
+
+
+@router.post("/cron/coupang-eats")
+def cron_coupang(admin: User = Depends(_superadmin_only)):
+    """03:10 — 쿠팡이츠 채널 수집.
+
+    services.coupang_eats_service.sync_all_businesses 가 존재하지 않으므로
+    routers.coupang_eats._run_sync 를 직접 호출하여 fan-out.
+    """
+    import datetime as _dt
+    from models import CoupangEatsCredential
+    from routers.coupang_eats import _run_sync as _coupang_run_sync
+
+    yesterday = _dt.date.today() - _dt.timedelta(days=1)
+    with Session(engine) as s:
+        bids = [r for r in s.exec(
+            select(CoupangEatsCredential.business_id).where(
+                CoupangEatsCredential.status.in_(["active"])
+            )
+        )]
+
+    results = []
+    for bid in bids:
+        try:
+            r = _coupang_run_sync(bid, yesterday, yesterday,
+                                   sync_orders=True, sync_settlements=True,
+                                   triggered_by="cron")
+            results.append({"business_id": bid, **r})
+        except Exception as e:  # noqa: BLE001
+            _cron_log.error("coupang cron failed bid=%s: %s", bid, e, exc_info=True)
+            results.append({"business_id": bid, "error": str(e)})
+    return {
+        "ok": True,
+        "target_date": yesterday.isoformat(),
+        "business_count": len(bids),
+        "results": results,
+    }
+
+
+@router.post("/cron/bank-sync")
+def cron_bank(admin: User = Depends(_superadmin_only)):
+    """03:20 — 은행 거래 수집.
+
+    routers.bank_sync.cron_pull_all 이 존재하지 않으므로 활성 BankAccount 별
+    routers.bank_sync._do_pull 을 직접 호출.
+    """
+    from datetime import date as _date, timedelta as _td
+    from models import BankAccount
+    from services.database_service import DatabaseService
+    from routers.bank_sync import _do_pull
+
+    end_d = _date.today()
+    start_d = end_d - _td(days=7)
+
+    service = DatabaseService()
+    results = []
+    try:
+        accs = service.session.exec(
+            select(BankAccount).where(BankAccount.is_active == True)  # noqa: E712
+        ).all()
+        for acc in accs:
+            try:
+                r = _do_pull(service, acc, acc.business_id, start_d, end_d, 500)
+                service.session.commit()
+                results.append({"account_id": acc.id, "business_id": acc.business_id,
+                                "status": "ok", **r})
+            except Exception as e:  # noqa: BLE001
+                service.session.rollback()
+                _cron_log.error("bank cron failed acc=%s: %s", acc.id, e, exc_info=True)
+                results.append({"account_id": acc.id, "business_id": acc.business_id,
+                                "status": "failed", "error": str(e)})
+        return {
+            "ok": True,
+            "account_count": len(accs),
+            "ok_count": sum(1 for r in results if r.get("status") == "ok"),
+            "failed_count": sum(1 for r in results if r.get("status") == "failed"),
+        }
+    finally:
+        service.close()
+
+
+@router.post("/cron/orchestrator")
+def cron_orchestrator(admin: User = Depends(_superadmin_only)):
+    """03:30 — 분류·동기화 fan-out (모든 사업장)."""
+    with Session(engine) as s:
+        from services.auto_collection_sync.orchestrator import run_all_businesses
+        reports = run_all_businesses(s)
+        return {
+            "business_count": len(reports),
+            "total_events": sum(r.total_events for r in reports),
+            "skipped_count": sum(1 for r in reports if r.skipped_reason),
+        }
+
+
+@router.post("/cron/profit-loss")
+def cron_profit_loss(admin: User = Depends(_superadmin_only)):
+    """03:40 — 손익 재계산 (이번달 + 지난달). 현재 stub."""
+    with Session(engine) as s:
+        from services.profit_loss_service import recalc_all_businesses
+        return recalc_all_businesses(s)
+
+
+@router.post("/cron/notify")
+def cron_notify(admin: User = Depends(_superadmin_only)):
+    """03:45 — 사장님 일일 알림."""
+    with Session(engine) as s:
+        from services.auto_collection_sync.orchestrator import (
+            notify_summary, run_all_businesses,
+        )
+        # 03:30 에서 동기화 끝났으니, 다시 한 번 dry summary 로 알림 보냄.
+        # 추후 별도 sync_log 기반 요약으로 정교화 가능.
+        reports = run_all_businesses(s)
+        notify_summary(s, reports)
+        return {"sent": True, "business_count": len(reports)}
+
+
+@router.post("/cron/settlement-watch")
+def cron_settlement_watch(admin: User = Depends(_superadmin_only)):
+    """04:00 — 입금 모니터링 + 자동 close + 알림."""
+    with Session(engine) as s:
+        from services.auto_collection_sync import settlement_watch
+        from models import Business
+        bizs = s.exec(
+            select(Business).where(Business.subscription_status == "active")
+        ).all()
+        for biz in bizs:
+            settlement_watch.run_for_business(s, biz.id)
+            settlement_watch.auto_close_received_alerts(s, biz.id)
+        return {"business_count": len(bizs)}
+
+
+@router.post("/cron/learn-fee-rates")
+def cron_learn_fee_rates(admin: User = Depends(_superadmin_only)):
+    """일요일 04:30 — 카드사별 수수료율 학습 갱신."""
+    with Session(engine) as s:
+        from services.auto_collection_sync.fee_estimator import update_learned_rate
+        from models import Business, CardSalesApproval
+        bizs = s.exec(
+            select(Business).where(Business.subscription_status == "active")
+        ).all()
+        total_updates = 0
+        for biz in bizs:
+            corps_rows = s.exec(
+                select(CardSalesApproval.card_corp).where(
+                    CardSalesApproval.business_id == biz.id
+                ).distinct()
+            ).all()
+            for corp in corps_rows:
+                update_learned_rate(s, biz.id, corp)
+                total_updates += 1
+        return {"business_count": len(bizs), "card_corp_updates": total_updates}

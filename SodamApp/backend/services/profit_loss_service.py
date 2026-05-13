@@ -397,6 +397,29 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
             expense_tax_employee=employee_tax,
         )
         session.add(pl_record)
-    
+
     session.commit()
     return total_labor_net
+
+
+# ========== Task 10: Cron 손익 재계산 진입점 ==========
+
+def recalc_all_businesses(session: Session) -> dict:
+    """모든 활성 사업장의 이번달+지난달 손익 재계산.
+
+    Task 10 의 cron `/cron/profit-loss` 진입점. 현재는 안전한 stub —
+    sync_all_expenses / sync_revenue_to_pl / sync_summary_material_cost /
+    sync_labor_cost 를 모든 사업장×2달에 호출하면 production 부하가 크므로
+    구체 구현은 후속 PR (Task 11+) 에서 다룬다.
+
+    TODO: 활성 사업장 enumerate → 각 사업장별로
+      - sync_revenue_to_pl(this_y, this_m, session, bid)
+      - sync_delivery_revenue_to_pl(...)
+      - sync_summary_material_cost(...)
+      - sync_labor_cost(...)
+      이번달 + 지난달 두 번씩 호출.
+    """
+    return {
+        "status": "stub",
+        "note": "recalc_all_businesses pending — Task 11 fan-out",
+    }

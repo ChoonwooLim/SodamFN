@@ -200,6 +200,38 @@ services:
             value: "public, max-age=31536000, immutable"
 
 # ─────────────────────────────────────────────
+# Cron jobs (Task 10 — 자동수집 파이프라인)
+# 모두 superadmin Bearer 토큰으로 백엔드 cron endpoint 호출.
+# $SUPERADMIN_TOKEN / $BACKEND_URL 은 Orbitron 환경에서 주입.
+# 시간대: KST (Asia/Seoul) 기준 새벽 03:00 ~ 04:30 슬롯.
+# ─────────────────────────────────────────────
+crons:
+  - name: auto-collection-easypos
+    schedule: "0 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/easypos'
+  - name: auto-collection-coupang
+    schedule: "10 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/coupang-eats'
+  - name: auto-collection-bank
+    schedule: "20 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/bank-sync'
+  - name: auto-collection-orchestrator
+    schedule: "30 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/orchestrator'
+  - name: auto-collection-pl
+    schedule: "40 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/profit-loss'
+  - name: auto-collection-notify
+    schedule: "45 3 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/notify'
+  - name: auto-collection-settlement-watch
+    schedule: "0 4 * * *"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/settlement-watch'
+  - name: auto-collection-learn-fee-rates
+    schedule: "30 4 * * 0"
+    command: 'curl -fsS -X POST -H "Authorization: Bearer $SUPERADMIN_TOKEN" $BACKEND_URL/api/auto-collection/cron/learn-fee-rates'
+
+# ─────────────────────────────────────────────
 # Post-deploy: Staff App → Cloudflare Pages
 # 재배포 시 자동으로 직원앱도 함께 빌드/배포
 # ─────────────────────────────────────────────
