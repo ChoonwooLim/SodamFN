@@ -97,7 +97,6 @@ def get_daily_revenue(year: int, month: int, _admin: AuthUser = Depends(get_admi
             "payment_method": e.payment_method or "Card",
             "ui_category": ui_category, # cash, card, delivery
             "item": v.item if v else None,
-            "source": e.source or "manual",  # 자동수집 출처: manual / card_sync / manual_overwritten 등
         })
 
     # Build vendor list for dropdowns

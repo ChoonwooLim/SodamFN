@@ -564,33 +564,6 @@ def _to_int(v) -> int:
             return 0
 
 
-def _extract_settlement_breakdown(raw: dict) -> dict:
-    """쿠팡이츠 정산 응답의 항목별 분해 추출.
-
-    실제 응답 key 이름은 API 변경에 대비해 fallback 다중 매핑.
-    """
-    def g(*keys, default=0):
-        for k in keys:
-            v = raw.get(k)
-            if v is not None:
-                try:
-                    return int(v)
-                except (TypeError, ValueError):
-                    continue
-        return default
-
-    return dict(
-        total_sales=g("totalSales", "totalSaleAmount", "grossSales"),
-        fee_brokerage=g("brokerageFee", "feeBrokerage", "commissionFee"),
-        fee_payment=g("paymentFee", "feePayment", "pgFee"),
-        fee_delivery=g("deliveryFee", "feeDelivery"),
-        fee_advertising=g("advertisingFee", "adFee", "feeAdvertising"),
-        fee_membership=g("membershipFee", "wowFee"),
-        fee_other=g("otherFee", "etcFee"),
-        deduction_etc=g("deductionEtc", "adjustment"),
-    )
-
-
 def _parse_kst_datetime(value) -> Optional[datetime.datetime]:
     """쿠팡이츠 응답의 다양한 일시 포맷 → naive datetime (KST 가정).
 
@@ -793,7 +766,6 @@ def upsert_settlements(session, business_id: int, store_id: int,
                 except ValueError:
                     pass
 
-        breakdown = _extract_settlement_breakdown(row)
         fields = dict(
             business_id=business_id,
             store_id=store_id,
@@ -806,7 +778,6 @@ def upsert_settlements(session, business_id: int, store_id: int,
             seller_transfer_id=seller_transfer_id,
             raw_json=raw_blob,
             synced_at=datetime.datetime.utcnow(),
-            **breakdown,
         )
         if existing:
             for k, v in fields.items():

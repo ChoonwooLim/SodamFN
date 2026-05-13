@@ -17,10 +17,6 @@ class SubscriptionPlan(SQLModel, table=True):
     features_json: Optional[str] = None  # 포함 기능 (급여, 재무, POS 등)
     is_active: bool = True
 
-    # 자동수집 파이프라인 — 요금제별 기능 플래그
-    feature_auto_collection: bool = Field(default=False)
-    feature_fee_auto_estimate: bool = Field(default=False)
-
 class Business(SQLModel, table=True):
     """사업장 (테넌트)"""
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -315,58 +311,6 @@ class CardPayment(SQLModel, table=True):
     source_meta: Optional[str] = None
     connection_id: Optional[int] = Field(default=None, foreign_key="codefconnection.id")
     synced_at: Optional[datetime.datetime] = None
-
-
-# --- Auto-Collection Pipeline: 카드 수수료 학습 / 매칭 로그 / 정산 프로파일 ---
-
-class CardFeeRateLearned(SQLModel, table=True):
-    """카드사별 학습된 실효 수수료율 (사업장 단위, 카드사 단위 단일 row)."""
-    __table_args__ = (
-        UniqueConstraint("business_id", "card_corp", name="uq_cardfee_business_corp"),
-    )
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="business.id", index=True)
-    card_corp: str = Field(index=True)
-    learned_rate: float
-    sample_size: int
-    sample_period_start: datetime.date
-    sample_period_end: datetime.date
-    confidence: float
-    last_updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
-    notes: Optional[str] = None
-
-
-class CardFeeMatchLog(SQLModel, table=True):
-    """카드사 입금-승인 매칭 로그 (수수료 역산의 원본 샘플)."""
-    __table_args__ = (
-        Index("ix_cardfeematchlog_biz_corp", "business_id", "card_corp"),
-    )
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="business.id", index=True)
-    card_corp: str = Field(index=True)
-    deposit_date: datetime.date
-    approval_dates_start: datetime.date
-    approval_dates_end: datetime.date
-    sales_amount: int
-    deposit_amount: int
-    effective_fee: int
-    effective_rate: float
-    matched_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
-
-
-class CardCorpSettlementProfile(SQLModel, table=True):
-    """카드사별 정산 주기 학습 프로파일 (영업일 단위)."""
-    __table_args__ = (
-        UniqueConstraint("business_id", "card_corp",
-                         name="uq_cardcorpsettle_business_corp"),
-    )
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="business.id", index=True)
-    card_corp: str = Field(index=True)
-    settlement_days_learned: int = 3  # spec § 8.9 default: D+3 영업일 (학습 전)
-    grace_days: int = 3                # spec § 8.9 default: false-positive 방지 3일 유예
-    sample_size: int = 0
-    last_updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 
 class PayPayment(SQLModel, table=True):
@@ -707,59 +651,10 @@ class DeliveryRevenue(SQLModel, table=True):
     source: str = Field(default="excel", index=True)  # 'excel' | 'bank_sync' | 'manual'
 
 
-class DeliveryFeeRate(SQLModel, table=True):
-    """배달 채널별 수수료율 (사업장 단위, effective_from 단위로 버저닝)."""
-    __table_args__ = (
-        UniqueConstraint(
-            "business_id", "channel", "effective_from",
-            name="uq_deliveryfeerate_business_channel_from",
-        ),
-    )
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="business.id", index=True)
-    channel: str = Field(index=True)
-    rate: float
-    effective_from: datetime.date
-    effective_to: Optional[datetime.date] = None
-    notes: Optional[str] = None
-    updated_by: Optional[int] = Field(default=None, foreign_key="user.id")
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
-
-
-class SettlementWatchAlert(SQLModel, table=True):
-    """정산 감시 알림 — 카드사/배달채널 미입금 또는 지연 감지."""
-    __table_args__ = (
-        UniqueConstraint(
-            "business_id", "alert_type", "channel_or_corp", "expected_date",
-            name="uq_settle_watch_natural",
-        ),
-        Index("ix_settle_watch_biz_status", "business_id", "status"),
-    )
-    id: Optional[int] = Field(default=None, primary_key=True)
-    business_id: int = Field(foreign_key="business.id", index=True)
-    alert_type: str = Field(index=True)
-    channel_or_corp: str
-    expected_date: datetime.date
-    expected_amount: int
-    deadline: datetime.date
-    status: str = Field(default="open", index=True)
-    notified_at: Optional[datetime.datetime] = None
-    received_amount: Optional[int] = None
-    received_date: Optional[datetime.date] = None
-    acknowledged_at: Optional[datetime.datetime] = None
-    acknowledged_by: Optional[int] = Field(default=None, foreign_key="user.id")
-    notes: Optional[str] = None
-    raw_ref: Optional[str] = None  # 원본 식별자 ('card_approval_group:{corp}:{date}' or 'coupang_settle:{id}')
-
-
 class DailyExpense(SQLModel, table=True):
     __table_args__ = (
         Index("ix_dailyexpense_business_date", "business_id", "date"),
         Index("ix_dailyexpense_business_vendor", "business_id", "vendor_id"),
-        UniqueConstraint(
-            "business_id", "date", "vendor_id", "payment_method", "source",
-            name="uq_dailyexpense_natural",
-        ),
     )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
@@ -769,15 +664,11 @@ class DailyExpense(SQLModel, table=True):
     category: Optional[str] = None  # 비용 카테고리 (재료비, 기타 등)
     payment_method: str = Field(default="Card") # Card, Cash
     note: Optional[str] = None    # 비고
-
+    
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
     vendor: Optional[Vendor] = Relationship(back_populates="daily_expenses")
-
+    
     upload_id: Optional[int] = Field(default=None, foreign_key="uploadhistory.id")
-
-    # 자동수집 파이프라인 — 출처 추적 (manual / card_sync / pay_sync / delivery_sync / ...)
-    source: str = Field(default="manual", index=True)
-    source_meta: Optional[str] = None  # JSON 문자열. 자동수집 시 raw row id/분류 룰 등
 
 class UploadHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -1628,16 +1519,6 @@ class CoupangEatsSettlement(SQLModel, table=True):
     end_date: Optional[datetime.date] = None
     seller_transfer_id: Optional[int] = Field(default=None, index=True,
                                               description="정산 식별자 (WITHDRAWAL은 NULL)")
-
-    # 자동수집 파이프라인 — 분해 컬럼 (총매출/수수료 항목별/공제)
-    total_sales: int = 0
-    fee_brokerage: int = 0       # 중개수수료
-    fee_payment: int = 0         # 결제수수료
-    fee_delivery: int = 0        # 배달비
-    fee_advertising: int = 0     # 광고비
-    fee_membership: int = 0      # 멤버십/구독료
-    fee_other: int = 0           # 기타 수수료
-    deduction_etc: int = 0       # 기타 공제
 
     raw_json: Optional[str] = None
     synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)

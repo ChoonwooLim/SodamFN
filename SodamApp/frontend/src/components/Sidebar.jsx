@@ -27,7 +27,7 @@ export default function Sidebar() {
         if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
         const hrPaths = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
-        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration', '/auto-collection'];
+        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
         const productPaths = ['/products/'];
         if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
@@ -146,7 +146,6 @@ export default function Sidebar() {
         { icon: Wallet, label: '현금영수증', path: '/finance/cashbill', color: 'text-emerald-400' },
         { icon: BookOpen, label: '홈택스 수집', path: '/finance/hometax', color: 'text-violet-400' },
         { icon: Link2, label: '외부 연동 (CODEF)', path: '/external-integration', color: 'text-blue-400' },
-        { icon: Gauge, label: '자동수집 상태', path: '/auto-collection', color: 'text-teal-400' },
     ];
 
     const superAdminMenuItems = [

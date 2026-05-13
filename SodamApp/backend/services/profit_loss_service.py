@@ -397,51 +397,6 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
             expense_tax_employee=employee_tax,
         )
         session.add(pl_record)
-
+    
     session.commit()
     return total_labor_net
-
-
-# ========== Task 10: Cron 손익 재계산 진입점 ==========
-
-def recalc_all_businesses(session: Session) -> dict:
-    """모든 활성 사업장의 이번달 + 지난달 P/L 재계산.
-
-    기존 per-business helper 들 (sync_revenue_to_pl + sync_all_expenses) 을
-    wrap. 자동수집 03:40 cron `/cron/profit-loss` 진입점.
-
-    Returns:
-        dict with keys:
-          - business_count: 활성 사업장 수
-          - months_recomputed: 정상 처리된 (business, month) 조합 수
-          - errors: 실패한 (business, month) 조합 수 (로그만 남기고 continue)
-    """
-    from models import Business
-
-    today = datetime.date.today()
-    this_year, this_month = today.year, today.month
-    if this_month == 1:
-        prev_year, prev_month = this_year - 1, 12
-    else:
-        prev_year, prev_month = this_year, this_month - 1
-
-    bizs = session.exec(
-        select(Business).where(Business.subscription_status == "active")
-    ).all()
-
-    counts = {"business_count": len(bizs), "months_recomputed": 0, "errors": 0}
-    for biz in bizs:
-        for (yr, mo) in [(prev_year, prev_month), (this_year, this_month)]:
-            try:
-                # 기존 sync 함수 호출 — 같은 패턴 (year, month, session, biz_id) 시그니처.
-                # sync_revenue_to_pl 은 내부에서 sync_delivery_revenue_to_pl 도 호출.
-                sync_revenue_to_pl(yr, mo, session, biz.id)
-                sync_all_expenses(yr, mo, session, biz.id)
-                counts["months_recomputed"] += 1
-            except Exception as e:  # noqa: BLE001
-                counts["errors"] += 1
-                import logging
-                logging.getLogger("profit_loss.recalc").warning(
-                    "recalc failed business=%s %d-%02d: %s", biz.id, yr, mo, e
-                )
-    return counts
