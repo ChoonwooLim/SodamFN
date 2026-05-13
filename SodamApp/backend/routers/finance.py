@@ -249,8 +249,10 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
     """
     from collections import defaultdict
     from models import CardSalesApproval
+    from services.easypos_service import _normalize_card_corp
 
     # 1) CardSalesApproval — 카드사별 매출 합계 (PR #5 EasyPOS + 기존 출처 모두)
+    # card_corp 는 PR #5 에서 이미 정규화돼 있지만 다른 출처(엑셀 등) 대비 한 번 더.
     approvals = session.exec(
         apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
             CardSalesApproval.approval_date >= start_date,
@@ -260,9 +262,13 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
     ).all()
     sales_by_corp: dict = defaultdict(int)
     for a in approvals:
-        sales_by_corp[a.card_corp or "기타"] += a.amount or 0
+        corp = _normalize_card_corp(a.card_corp or "") or "기타"
+        sales_by_corp[corp] += a.amount or 0
 
     # 2) CardPayment — 카드사별 실입금/수수료 합계
+    # CardPayment.card_corp 는 bank_sync 가 입금자명(예: '신한카드매입') 에서
+    # 추출한 값이라 정규화 안 됨 ('신한카드' vs CardSalesApproval 의 '신한').
+    # 양쪽 키를 동일 정규화 함수로 통일해야 corp 별 row 가 합쳐짐.
     payments = session.exec(
         apply_bid_filter(select(CardPayment), CardPayment, bid)
         .where(CardPayment.payment_date >= start_date)
@@ -272,9 +278,9 @@ def get_payment_stats(start_date: date, end_date: date, current_user = Depends(g
     deposit_by_corp: dict = defaultdict(int)
     fees_by_corp: dict = defaultdict(int)
     for p in payments:
-        c = p.card_corp or "기타"
-        deposit_by_corp[c] += p.net_deposit or 0
-        fees_by_corp[c] += p.fees or 0
+        corp = _normalize_card_corp(p.card_corp or "") or "기타"
+        deposit_by_corp[corp] += p.net_deposit or 0
+        fees_by_corp[corp] += p.fees or 0
 
     # 3) 카드사별 합산 — 매출/입금 양쪽 corp 모두 합집합
     all_corps = set(sales_by_corp.keys()) | set(deposit_by_corp.keys())

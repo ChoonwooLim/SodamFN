@@ -128,3 +128,39 @@ def test_payment_stats_corp_only_in_approval_appears(session):
     assert "우리" in all_corps
     assert sales["우리"] == 500_000
     assert deposits["우리"] == 0
+
+
+def test_payment_card_corp_normalization(session):
+    """CardPayment.card_corp 가 정규화 안 된 형태('신한카드') 라도 CardSalesApproval('신한') 과 같은 row 로 합쳐져야."""
+    from models import Business, CardSalesApproval, CardPayment
+    session.add(Business(id=1, name="X")); session.commit()
+
+    # CardSalesApproval — 정규화된 키
+    session.add(CardSalesApproval(
+        business_id=1, approval_date=datetime.date(2026, 5, 6),
+        card_corp="신한", amount=10_000_000, status="승인", source="easypos",
+        approval_number="N1",
+    ))
+    # CardPayment — bank_sync 가 만든 정규화 안 된 키
+    session.add(CardPayment(
+        business_id=1, payment_date=datetime.date(2026, 5, 10),
+        card_corp="신한카드", sales_amount=0, fees=0, net_deposit=9_800_000,
+        source="bank_sync",
+    ))
+    session.commit()
+
+    from services.easypos_service import _normalize_card_corp
+    from collections import defaultdict
+    from sqlmodel import select
+
+    sales = defaultdict(int)
+    deposits = defaultdict(int)
+    for a in session.exec(select(CardSalesApproval)).all():
+        sales[_normalize_card_corp(a.card_corp)] += a.amount
+    for p in session.exec(select(CardPayment)).all():
+        deposits[_normalize_card_corp(p.card_corp)] += p.net_deposit
+
+    # 두 출처가 '신한' 단일 키로 합쳐져야
+    assert set(sales) | set(deposits) == {"신한"}
+    assert sales["신한"] == 10_000_000
+    assert deposits["신한"] == 9_800_000
