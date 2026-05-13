@@ -400,8 +400,8 @@ def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_use
         # 화면 lookup ('쿠팡') 과 불일치하면 channel_totals 에 0 원으로 표시되는 버그 방지.
         LEGACY_CHANNEL_MAP = {
             "Coupang": "쿠팡", "Baemin": "배민", "Yogiyo": "요기요", "Ddangyo": "땡겨요",
-            "쿠팡이츠": "쿠팡", "쿠팡잇츠": "쿠팡",
-            "배달의민족": "배민", "우아한형제들": "배민",
+            "쿠팡이츠": "쿠팡", "쿠팡잇츠": "쿠팡", "쿠팡페이": "쿠팡",
+            "배달의민족": "배민", "우아한형제들": "배민", "음식배달": "배민",
             "위대한상상": "요기요",
         }
         ch_name = LEGACY_CHANNEL_MAP.get(r.channel, r.channel)
