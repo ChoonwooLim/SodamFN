@@ -176,6 +176,10 @@ app.include_router(easypos.router)
 from routers import coupang_eats
 app.include_router(coupang_eats.router)
 
+# 자동수집 파이프라인 — 마이그레이션 B 정책 + 백업 복구 (cron 은 Task 10)
+from routers import auto_collection
+app.include_router(auto_collection.router, prefix="/api")
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""
