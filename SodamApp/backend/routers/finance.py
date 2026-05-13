@@ -241,17 +241,67 @@ def get_sales_stats(start_date: date, end_date: date, current_user = Depends(get
 @router.get("/stats/payment")
 def get_payment_stats(start_date: date, end_date: date, current_user = Depends(get_current_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """
-    Get card payment stats. First tries CardPayment table,
-    then falls back to real card fee data from MonthlyProfitLoss (bank deposit analysis).
+    Get card payment stats. 카드사별 매출/수수료/실입금 통합.
+
+    - 매출액: CardSalesApproval 합산 (EasyPOS sle205 + CODEF 카드 명세 등 모든 출처)
+    - 실입금: CardPayment.net_deposit 합산 (은행 입금 또는 CODEF 정산)
+    - 수수료: CardPayment.fees 우선, 없으면 매출 - 실입금
     """
-    # Try CardPayment table first
+    from collections import defaultdict
+    from models import CardSalesApproval
+
+    # 1) CardSalesApproval — 카드사별 매출 합계 (PR #5 EasyPOS + 기존 출처 모두)
+    approvals = session.exec(
+        apply_bid_filter(select(CardSalesApproval), CardSalesApproval, bid).where(
+            CardSalesApproval.approval_date >= start_date,
+            CardSalesApproval.approval_date <= end_date,
+            CardSalesApproval.status != "취소",
+        )
+    ).all()
+    sales_by_corp: dict = defaultdict(int)
+    for a in approvals:
+        sales_by_corp[a.card_corp or "기타"] += a.amount or 0
+
+    # 2) CardPayment — 카드사별 실입금/수수료 합계
     payments = session.exec(
         apply_bid_filter(select(CardPayment), CardPayment, bid)
         .where(CardPayment.payment_date >= start_date)
         .where(CardPayment.payment_date <= end_date)
         .order_by(CardPayment.payment_date)
     ).all()
+    deposit_by_corp: dict = defaultdict(int)
+    fees_by_corp: dict = defaultdict(int)
+    for p in payments:
+        c = p.card_corp or "기타"
+        deposit_by_corp[c] += p.net_deposit or 0
+        fees_by_corp[c] += p.fees or 0
 
+    # 3) 카드사별 합산 — 매출/입금 양쪽 corp 모두 합집합
+    all_corps = set(sales_by_corp.keys()) | set(deposit_by_corp.keys())
+    merged = []
+    for corp in all_corps:
+        sales = sales_by_corp[corp]
+        net = deposit_by_corp[corp]
+        fees = fees_by_corp[corp]
+        # 수수료가 명세서에 없으면 (매출 - 실입금) 으로 역산. 음수면 0.
+        if fees == 0 and sales > 0 and net > 0 and sales > net:
+            fees = sales - net
+        merged.append({
+            "card_corp": corp,
+            "sales_amount": sales,
+            "fees": fees,
+            "net_deposit": net,
+            "vat_on_fees": 0,
+            "payment_date": None,
+            "bank": None,
+        })
+
+    if merged:
+        # 매출 기준 내림차순 정렬
+        merged.sort(key=lambda x: -x["sales_amount"])
+        return {"status": "success", "data": merged}
+
+    # Backward compat: 매출/입금 모두 없으면 빈 응답
     if payments:
         return {"status": "success", "data": payments}
 
