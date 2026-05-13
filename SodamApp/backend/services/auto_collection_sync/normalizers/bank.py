@@ -26,6 +26,11 @@ def normalize_bank(session: Session, business_id: int,
         )
     ).all()
     for tx in rows:
+        # CRITICAL: skip if 기존 bank_sync._materialize_link 가 이미 DailyExpense 를 만들어
+        # 이중 적재 방지. tx.linked_daily_id 가 set 되면 그 row 가 source='manual' 또는
+        # 다른 source 로 이미 존재. Task 5 의 점진 리팩토링 전략에 따라 기존 흐름 우선.
+        if tx.linked_daily_id is not None:
+            continue
         cls = (tx.classified_as or "").lower()
         if cls in ("revenue", "cash_revenue"):
             yield SyncEvent(

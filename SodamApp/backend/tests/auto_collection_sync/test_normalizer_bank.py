@@ -95,6 +95,37 @@ def test_classified_card_pay_delivery_not_emitted(session):
     assert len(events) == 0
 
 
+def test_normalizer_skips_already_linked_transaction(session):
+    """tx.linked_daily_id 가 있으면 (기존 bank_sync 가 처리됨) skip — 이중 적재 방지."""
+    from models import Vendor, DailyExpense
+    from sqlmodel import select
+    session.add(Business(id=1, name="X"))
+    acc = BankAccount(id=10, business_id=1, bank_code="088", bank_name="신한",
+                       account_number="x")
+    session.add(acc)
+    v = Vendor(id=99, business_id=1, name="농산물 매입", category="material", vendor_type="expense")
+    session.add(v); session.commit()
+    # 기존 _materialize_link 가 이미 만든 DailyExpense
+    de = DailyExpense(
+        business_id=1, date=datetime.date(2026, 5, 13),
+        vendor_id=v.id, vendor_name=v.name,
+        amount=-150_000, payment_method="Card", source="manual",
+    )
+    session.add(de); session.commit()
+    # linked_daily_id 가 채워진 BankTransaction
+    _seed_bank_tx(session, 1, 10, datetime.date(2026, 5, 13),
+                   out_amount=150_000, classified_as="expense",
+                   vendor_id=99)
+    tx = session.exec(select(BankTransaction)).first()
+    tx.linked_daily_id = de.id
+    session.add(tx); session.commit()
+
+    from services.auto_collection_sync.normalizers.bank import normalize_bank
+    events = list(normalize_bank(session, 1, datetime.date(2026, 5, 13), datetime.date(2026, 5, 13)))
+    # 이미 link 됐으므로 emit 안 됨
+    assert len(events) == 0
+
+
 def test_unclassified_tx_not_emitted(session):
     session.add(Business(id=1, name="X"))
     acc = BankAccount(id=10, business_id=1, bank_code="088", bank_name="신한",
