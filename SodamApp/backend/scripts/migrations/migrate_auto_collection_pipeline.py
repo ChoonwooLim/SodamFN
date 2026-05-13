@@ -12,8 +12,7 @@ DDL_STATEMENTS = [
        ADD COLUMN IF NOT EXISTS source_meta TEXT""",
     "CREATE INDEX IF NOT EXISTS ix_dailyexpense_source ON dailyexpense (source)",
     """CREATE UNIQUE INDEX IF NOT EXISTS uq_dailyexpense_natural
-       ON dailyexpense (business_id, date, vendor_id, payment_method, source)
-       WHERE vendor_id IS NOT NULL""",
+       ON dailyexpense (business_id, date, vendor_id, payment_method, source)""",
 
     # 2) CardFeeRateLearned
     """CREATE TABLE IF NOT EXISTS cardfeeratelearned (

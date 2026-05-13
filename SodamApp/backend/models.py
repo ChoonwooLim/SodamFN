@@ -363,8 +363,8 @@ class CardCorpSettlementProfile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: int = Field(foreign_key="business.id", index=True)
     card_corp: str = Field(index=True)
-    settlement_days_learned: int = 3
-    grace_days: int = 3
+    settlement_days_learned: int = 3  # spec § 8.9 default: D+3 영업일 (학습 전)
+    grace_days: int = 3                # spec § 8.9 default: false-positive 방지 3일 유예
     sample_size: int = 0
     last_updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
@@ -749,7 +749,7 @@ class SettlementWatchAlert(SQLModel, table=True):
     acknowledged_at: Optional[datetime.datetime] = None
     acknowledged_by: Optional[int] = Field(default=None, foreign_key="user.id")
     notes: Optional[str] = None
-    raw_ref: Optional[str] = None
+    raw_ref: Optional[str] = None  # 원본 식별자 ('card_approval_group:{corp}:{date}' or 'coupang_settle:{id}')
 
 
 class DailyExpense(SQLModel, table=True):
@@ -777,7 +777,7 @@ class DailyExpense(SQLModel, table=True):
 
     # 자동수집 파이프라인 — 출처 추적 (manual / card_sync / pay_sync / delivery_sync / ...)
     source: str = Field(default="manual", index=True)
-    source_meta: Optional[str] = None
+    source_meta: Optional[str] = None  # JSON 문자열. 자동수집 시 raw row id/분류 룰 등
 
 class UploadHistory(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
