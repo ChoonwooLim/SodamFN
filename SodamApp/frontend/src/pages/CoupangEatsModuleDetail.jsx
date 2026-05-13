@@ -408,10 +408,10 @@ export default function CoupangEatsModuleDetail() {
             {/* 실시간 대시보드 */}
             {cred?.registered && cred?.cookies_present && cred?.store_id && (
                 <section className="mb-6 bg-white border border-slate-200 rounded-xl p-5">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-1">
                         <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
                             <Wallet className="w-5 h-5 text-slate-600" />
-                            실시간 정산 현황
+                            정산 현황 (야간 자동수집 결과)
                         </h2>
                         <button
                             onClick={handleRefreshDashboard}
@@ -422,6 +422,14 @@ export default function CoupangEatsModuleDetail() {
                             <RefreshCw className={`w-4 h-4 text-slate-500 ${dashLoading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
+                    {dashboard?.note && (
+                        <div className="text-xs text-slate-500 mb-3">
+                            {dashboard.note}
+                            {dashboard.last_sync?.started_at && (
+                                <> · 마지막 동기화: {new Date(dashboard.last_sync.started_at).toLocaleString('ko-KR')}</>
+                            )}
+                        </div>
+                    )}
                     {dashLoading && !dashboard ? (
                         <div className="text-sm text-slate-500 flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" /> 쿠팡이츠에서 가져오는 중…

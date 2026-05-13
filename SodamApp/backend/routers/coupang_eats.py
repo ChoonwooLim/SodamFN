@@ -757,8 +757,15 @@ def fetch_dashboard(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """실시간 대시보드 — 잔액 + 예상정산 + 최근 7일 주문 합계."""
+    """대시보드 — DB 기반 (실시간 호출 제거).
+
+    쿠팡이츠 Akamai 봇 검증이 낮시간 즉시 호출(whoami/balance)을 일관되게
+    HTTP 403 으로 차단함. 야간 cron(23:10)은 트래픽 패턴이 다른지 통과.
+    따라서 화면은 야간 cron 마지막 결과를 표시 — 사장님이 실시간 데이터가
+    필요하면 쿠팡이츠 사장님 포털을 직접 열어 확인.
+    """
     bid = _resolve_bid(admin, x_view_as_business)
+
     with Session(engine) as s:
         cred = s.exec(
             select(CoupangEatsCredential).where(
@@ -767,28 +774,26 @@ def fetch_dashboard(
         ).first()
         if not cred:
             raise HTTPException(404, "자격증명 미등록")
-        store_id = cred.store_id
 
-    if not store_id:
-        raise HTTPException(422, "매장 ID 가 없습니다. /test-login 으로 매장 정보를 먼저 동기화하세요.")
+        # 마지막 정산 명세 (SETTLEMENT type) → 잔액/예상정산 대체 표시
+        from models import CoupangEatsSettlement
+        last_settle = s.exec(
+            select(CoupangEatsSettlement).where(
+                CoupangEatsSettlement.business_id == bid,
+                CoupangEatsSettlement.settlement_type == "SETTLEMENT",
+            ).order_by(CoupangEatsSettlement.settlement_date.desc()).limit(1)
+        ).first()
 
-    def _action(client: CoupangEatsClient):
-        try:
-            balance = client.fetch_balance(store_id)
-        except CoupangEatsError as e:
-            balance = {"error": str(e)}
-        try:
-            expected = client.fetch_expected_settlement(store_id)
-        except CoupangEatsError as e:
-            expected = {"error": str(e)}
-        return {"balance": balance, "expected_settlement": expected}
+        # 마지막 sync log
+        last_sync = s.exec(
+            select(CoupangEatsSyncLog).where(
+                CoupangEatsSyncLog.business_id == bid
+            ).order_by(CoupangEatsSyncLog.started_at.desc()).limit(1)
+        ).first()
 
-    (data, refreshed) = _execute_with_refresh(bid, _action)
-
-    # DB 집계 — 최근 7일 주문 합계
-    today = datetime.date.today()
-    week_start = today - datetime.timedelta(days=6)
-    with Session(engine) as s:
+        # DB 집계 — 최근 7일 주문
+        today = datetime.date.today()
+        week_start = today - datetime.timedelta(days=6)
         from sqlalchemy import func
         weekly = s.exec(
             select(
@@ -803,16 +808,41 @@ def fetch_dashboard(
         order_count_7d = int(weekly[0] or 0) if weekly else 0
         total_7d = int(weekly[1] or 0) if weekly else 0
 
+    # 잔액/예상정산 응답 — frontend 가 .data.balance / .data.amount 구조 기대.
+    balance_resp = None
+    expected_resp = None
+    if last_settle:
+        balance_resp = {
+            "data": {
+                "balance": last_settle.balance or 0,
+                "_source": "db_last_settlement",
+                "settlement_date": last_settle.settlement_date.isoformat(),
+            },
+        }
+        expected_resp = {
+            "data": {
+                "amount": last_settle.amount or 0,
+                "settlement_date": last_settle.settlement_date.isoformat(),
+                "_source": "db_last_settlement",
+            },
+        }
+
     return {
-        "balance": data.get("balance"),
-        "expected_settlement": data.get("expected_settlement"),
+        "balance": balance_resp,
+        "expected_settlement": expected_resp,
         "weekly_summary": {
             "from": week_start.isoformat(),
             "to": today.isoformat(),
             "order_count": order_count_7d,
             "total_sales": total_7d,
         },
-        "auth_refreshed": refreshed,
+        "last_sync": {
+            "started_at": last_sync.started_at.isoformat() if (last_sync and last_sync.started_at) else None,
+            "status": last_sync.status if last_sync else None,
+        } if last_sync else None,
+        "realtime_mode": "db_only",
+        "note": "야간 cron(23:10) 결과 표시 — 실시간 조회는 Akamai 봇 차단으로 비활성",
+        "auth_refreshed": False,
     }
 
 
