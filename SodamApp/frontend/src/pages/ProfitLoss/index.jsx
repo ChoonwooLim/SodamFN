@@ -952,9 +952,53 @@ export default function ProfitLoss() {
     };
 
     // Render the summary table (existing)
-    const renderSummaryTable = () => (
+    const renderSummaryTable = () => {
+        const yearRev = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
+        const yearExp = data.reduce((s, d) => s + calcTotalExpense(d), 0);
+        const yearProfit = yearRev - yearExp;
+        const yearMargin = yearRev > 0 ? ((yearProfit / yearRev) * 100) : 0;
+        const fmtShort = (v) => {
+            if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
+            if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(0)}만`;
+            return formatNumber(v);
+        };
+        return (
         <>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-x-auto card-animate">
+            {/* KPI Hero — 4 cards */}
+            <div className="pl-kpi-grid">
+                <div className="pl-kpi-card pl-kpi-rev card-animate">
+                    <div className="pl-kpi-label">연간 매출</div>
+                    <div className="pl-kpi-value">{fmtShort(yearRev)}<span className="pl-kpi-unit">원</span></div>
+                    <div className="pl-kpi-sub">{formatNumber(yearRev)}원</div>
+                </div>
+                <div className="pl-kpi-card pl-kpi-exp card-animate" style={{ animationDelay: '0.05s' }}>
+                    <div className="pl-kpi-label">연간 비용</div>
+                    <div className="pl-kpi-value">{fmtShort(yearExp)}<span className="pl-kpi-unit">원</span></div>
+                    <div className="pl-kpi-sub">{formatNumber(yearExp)}원</div>
+                </div>
+                <div className={`pl-kpi-card ${yearProfit >= 0 ? 'pl-kpi-profit' : 'pl-kpi-loss'} card-animate`} style={{ animationDelay: '0.1s' }}>
+                    <div className="pl-kpi-label">영업이익</div>
+                    <div className="pl-kpi-value">{fmtShort(yearProfit)}<span className="pl-kpi-unit">원</span></div>
+                    <div className="pl-kpi-sub">{formatNumber(yearProfit)}원</div>
+                </div>
+                <div className="pl-kpi-card pl-kpi-margin card-animate" style={{ animationDelay: '0.15s' }}>
+                    <div className="pl-kpi-label">영업이익률</div>
+                    <div className="pl-kpi-value">{yearMargin.toFixed(1)}<span className="pl-kpi-unit">%</span></div>
+                    <div className="pl-kpi-bar">
+                        <div className="pl-kpi-bar-fill" style={{ width: `${Math.max(0, Math.min(100, yearMargin))}%` }} />
+                    </div>
+                </div>
+            </div>
+
+            <div className="pl-table-wrapper card-animate" style={{ animationDelay: '0.2s' }}>
+                <div className="pl-table-header">
+                    <div className="pl-table-title-group">
+                        <span className="pl-table-badge">P/L</span>
+                        <span className="pl-table-title">{businessName} <span className="pl-table-year">{year}년</span> 월별 손익계산서</span>
+                    </div>
+                    <span className="pl-table-meta">활성 {activeMonthCount}개월 · 자동 업데이트</span>
+                </div>
+                <div className="pl-table-scroll">
                 <table className="pl-table">
                     <colgroup>
                         <col style={{ width: '52px' }} />
@@ -1047,12 +1091,14 @@ export default function ProfitLoss() {
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
-            <div className="mt-4 px-4 py-3 bg-blue-50 rounded-xl border-l-4 border-blue-500">
-                <p className="text-sm text-blue-700 m-0">💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소</p>
+            <div className="pl-table-tip">
+                💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소
             </div>
         </>
-    );
+        );
+    };
 
     // ═══════════════════════════════════════════
     // MOBILE: Single-scroll P/L (no tabs)
@@ -1377,9 +1423,10 @@ export default function ProfitLoss() {
     // ═══════════════════════════════════════════
     // DESKTOP LAYOUT
     // ═══════════════════════════════════════════
+    const wideTab = activeTab === 'summary';
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-6xl mx-auto px-6 pt-8 pb-32">
+            <div className={`${wideTab ? 'max-w-screen-2xl' : 'max-w-6xl'} mx-auto px-6 pt-8 pb-32`}>
                 {/* Page Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
