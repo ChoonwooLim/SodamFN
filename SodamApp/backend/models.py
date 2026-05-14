@@ -1674,3 +1674,116 @@ class CoupangEatsSyncLog(SQLModel, table=True):
                               description="cron / manual / superadmin / auth-failure")
     auth_refreshed: bool = Field(default=False,
                                  description="이 동기화 중 자동 재로그인 발생 여부")
+
+
+# ─────────────────────────────────────────────────────────────
+# 배민(배달의민족) 자동수집 — ceo.baemin.com 스크래핑
+# spec: docs/superpowers/specs/2026-05-14-baemin-auto-collection-design.md
+# ─────────────────────────────────────────────────────────────
+
+class BaeminCredential(SQLModel, table=True):
+    """배민 사장님사이트 자격증명 + 쿠키 (business 당 1건, 수동 쿠키 only)."""
+    __table_args__ = (Index("ix_baemin_cred_business", "business_id"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", unique=True, index=True)
+
+    login_id: Optional[str] = Field(default=None, description="표시용 — 인증엔 미사용")
+    store_id: Optional[str] = Field(default=None, index=True,
+                                    description="배민 가맹점 ID")
+    shop_name: Optional[str] = None
+
+    cookies_encrypted: Optional[str] = Field(default=None,
+                                             description="Fernet(json.dumps(cookies))")
+    cookies_obtained_at: Optional[datetime.datetime] = None
+    cookies_expires_at: Optional[datetime.datetime] = None
+    last_verified_at: Optional[datetime.datetime] = None
+
+    status: str = Field(default="active")
+    last_failed_at: Optional[datetime.datetime] = None
+    last_error_message: Optional[str] = None
+    consecutive_failures: int = 0
+
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class BaeminOrder(SQLModel, table=True):
+    """배민 주문 단위 raw."""
+    __table_args__ = (
+        UniqueConstraint("business_id", "order_id", name="uq_baemin_order"),
+        Index("ix_baemin_order_biz_date", "business_id", "ordered_at"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    store_id: str = Field(index=True)
+    order_id: str = Field(max_length=64)
+
+    ordered_at: Optional[datetime.datetime] = Field(default=None, index=True)
+    delivered_at: Optional[datetime.datetime] = None
+
+    total_sale_price: int = 0
+    discount_amount: int = 0
+    cancelled: bool = Field(default=False)
+
+    payment_method: Optional[str] = Field(default=None, max_length=32)
+    order_status: Optional[str] = Field(default=None, max_length=32)
+    delivery_type: Optional[str] = Field(default=None, max_length=32)
+
+    raw_json: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class BaeminSettlement(SQLModel, table=True):
+    """배민 일별 정산 + 수수료 분해."""
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id", "settlement_date", "settlement_type", "seller_transfer_id",
+            name="uq_baemin_settlement",
+        ),
+        Index("ix_baemin_settle_biz_date", "business_id", "settlement_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    store_id: str = Field(index=True)
+
+    settlement_date: datetime.date = Field(index=True)
+    settlement_type: str = Field(max_length=16)
+    amount: int = 0
+    balance: int = 0
+    seller_transfer_id: Optional[str] = Field(default=None, max_length=64, index=True)
+
+    total_sales: int = 0
+    fee_brokerage: int = 0
+    fee_payment: int = 0
+    fee_delivery: int = 0
+    fee_advertising: int = 0
+    fee_coupon_owner: int = 0
+
+    raw_json: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class BaeminSyncLog(SQLModel, table=True):
+    """배민 동기화 이력."""
+    __table_args__ = (Index("ix_baemin_synclog_biz_date", "business_id", "started_at"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    sync_mode: str = Field(default="full")
+
+    target_start: Optional[datetime.date] = None
+    target_end: Optional[datetime.date] = None
+    started_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    finished_at: Optional[datetime.datetime] = None
+    status: str = Field(default="running")
+
+    orders_fetched: int = 0
+    orders_inserted: int = 0
+    orders_updated: int = 0
+    settlements_fetched: int = 0
+    settlements_inserted: int = 0
+    settlements_updated: int = 0
+    total_sales: int = 0
+
+    error_message: Optional[str] = None
+    triggered_by: str = Field(default="cron")
+    auth_refreshed: bool = Field(default=False)
