@@ -615,3 +615,166 @@ def upsert_revenue_from_orders(session: "Session", business_id: int,
         ))
     session.commit()
     return day_total
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Phase 2a — 정산명세서 엑셀 수동 import upsert
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def upsert_excel_settlement(session: "Session", business_id: int,
+                            year: int, month: int,
+                            parsed) -> dict:
+    """배민 정산명세서 엑셀 1개월치 → DB 적재.
+
+    1) BaeminSettlementDetail (business_id, year, month) 전체 truncate → 재삽입
+    2) BaeminMonthlySummary upsert
+    3) DeliveryRevenue(channel="배달의민족", year, month) 갱신 (source="excel")
+
+    Args:
+        parsed: ParsedBaeminMonth — services.baemin_excel_parser.parse_xlsx 결과
+
+    Returns:
+        {
+          "detail_rows_inserted": int,
+          "summary_upserted": bool,
+          "delivery_revenue_total_sales": int,
+          "delivery_revenue_settlement": int,
+        }
+    """
+    from models import (
+        BaeminSettlementDetail, BaeminMonthlySummary, DeliveryRevenue,
+    )
+    from services.baemin_excel_parser import (
+        aggregate_completed, row_to_raw_json,
+    )
+
+    # 1) 기존 상세 row truncate
+    existing = session.exec(
+        select(BaeminSettlementDetail).where(
+            BaeminSettlementDetail.business_id == business_id,
+            BaeminSettlementDetail.year == year,
+            BaeminSettlementDetail.month == month,
+        )
+    ).all()
+    for r in existing:
+        session.delete(r)
+    session.flush()
+
+    # 2) 신규 상세 row 삽입
+    inserted = 0
+    for r in parsed.detail_rows:
+        session.add(BaeminSettlementDetail(
+            business_id=business_id,
+            year=year, month=month,
+            deposit_date=r.deposit_date,
+            settlement_period=r.settlement_period,
+            deposit_amount=r.deposit_amount,
+            service_type=r.service_type,
+            order_type=r.order_type,
+            order_amount=r.order_amount,
+            refund_amount=r.refund_amount,
+            brokerage_baemin1=r.brokerage_baemin1,
+            brokerage_smart=r.brokerage_smart,
+            brokerage_pickup=r.brokerage_pickup,
+            customer_discount=r.customer_discount,
+            tip_discount_single=r.tip_discount_single,
+            tip_discount_smart=r.tip_discount_smart,
+            club_single_discount=r.club_single_discount,
+            club_single_subsidy=r.club_single_subsidy,
+            club_smart_discount=r.club_smart_discount,
+            club_smart_subsidy=r.club_smart_subsidy,
+            delivery_fee_single=r.delivery_fee_single,
+            delivery_fee_smart=r.delivery_fee_smart,
+            payment_fee_base=r.payment_fee_base,
+            payment_fee_preferred=r.payment_fee_preferred,
+            etc_amount=r.etc_amount,
+            adjustment_amount=r.adjustment_amount,
+            vat=r.vat,
+            ad_amount=r.ad_amount,
+            ad_vat=r.ad_vat,
+            baemin_order_amount=r.baemin_order_amount,
+            deposit_final=r.deposit_final,
+            status=r.status,
+            raw_row_json=row_to_raw_json(r),
+        ))
+        inserted += 1
+
+    # 3) [요약] upsert
+    summary_dict = parsed.summary
+    existing_summary = session.exec(
+        select(BaeminMonthlySummary).where(
+            BaeminMonthlySummary.business_id == business_id,
+            BaeminMonthlySummary.year == year,
+            BaeminMonthlySummary.month == month,
+        )
+    ).first()
+    if existing_summary:
+        existing_summary.order_brokerage_total = summary_dict["order_brokerage_total"]
+        existing_summary.delivery_total = summary_dict["delivery_total"]
+        existing_summary.etc_total = summary_dict["etc_total"]
+        existing_summary.misc_total = summary_dict["misc_total"]
+        existing_summary.vat_total = summary_dict["vat_total"]
+        existing_summary.ad_total = summary_dict["ad_total"]
+        existing_summary.baemin_order_total = summary_dict["baemin_order_total"]
+        existing_summary.deposit_total = summary_dict["deposit_total"]
+        existing_summary.source = "excel"
+        existing_summary.file_name = parsed.file_name
+        existing_summary.uploaded_at = datetime.datetime.utcnow()
+        existing_summary.detail_rows = inserted
+        session.add(existing_summary)
+    else:
+        session.add(BaeminMonthlySummary(
+            business_id=business_id, year=year, month=month,
+            order_brokerage_total=summary_dict["order_brokerage_total"],
+            delivery_total=summary_dict["delivery_total"],
+            etc_total=summary_dict["etc_total"],
+            misc_total=summary_dict["misc_total"],
+            vat_total=summary_dict["vat_total"],
+            ad_total=summary_dict["ad_total"],
+            baemin_order_total=summary_dict["baemin_order_total"],
+            deposit_total=summary_dict["deposit_total"],
+            source="excel",
+            file_name=parsed.file_name,
+            detail_rows=inserted,
+        ))
+
+    # 4) DeliveryRevenue 갱신 (입금완료 row 만 합산)
+    agg = aggregate_completed(parsed.detail_rows)
+    total_sales = agg.total_order_amount        # 바로결제주문금액 합 = 총매출
+    settlement_amount = summary_dict["deposit_total"]   # (H) 입금금액 = 실수령
+    total_fees = total_sales - settlement_amount         # 총 차감액 (수수료+배달비+VAT+광고 등)
+
+    dr = session.exec(
+        select(DeliveryRevenue).where(
+            DeliveryRevenue.business_id == business_id,
+            DeliveryRevenue.year == year,
+            DeliveryRevenue.month == month,
+            DeliveryRevenue.channel == "배달의민족",
+        )
+    ).first()
+    if dr:
+        dr.total_sales = total_sales
+        dr.total_fees = total_fees
+        dr.settlement_amount = settlement_amount
+        dr.order_count = agg.row_count
+        dr.source = "excel"
+    else:
+        session.add(DeliveryRevenue(
+            business_id=business_id, channel="배달의민족",
+            year=year, month=month,
+            total_sales=total_sales,
+            total_fees=total_fees,
+            settlement_amount=settlement_amount,
+            order_count=agg.row_count,
+            source="excel",
+        ))
+
+    session.commit()
+
+    return {
+        "detail_rows_inserted": inserted,
+        "summary_upserted": True,
+        "delivery_revenue_total_sales": total_sales,
+        "delivery_revenue_settlement": settlement_amount,
+    }

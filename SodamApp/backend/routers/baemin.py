@@ -23,7 +23,7 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -625,3 +625,133 @@ def debug_raw_orders(
         }
     finally:
         client.close()
+
+
+# ─── 10) 정산명세서 엑셀 수동 import (Phase 2a) ───
+@router.post("/sync/monthly-excel/upload")
+def upload_monthly_excel(
+    year: int = Form(...),
+    month: int = Form(...),
+    password: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """배민 월별 정산명세서 xlsx 수동 업로드.
+
+    사장님이 self.baemin.com 에서 다운로드한 정산명세서를 업로드.
+    비번 입력 시 복호화 시도, 실패 시 평문 시도.
+    [요약] + [상세] 시트 파싱 → DB 적재 + DeliveryRevenue 갱신.
+
+    password 미입력 시 기본 '630730' 사용.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    if year < 2020 or year > 2030:
+        raise HTTPException(400, "year 범위 오류")
+    if month < 1 or month > 12:
+        raise HTTPException(400, "month 범위 오류")
+    pw = (password or "630730").strip() or None
+    try:
+        contents = file.file.read()
+    except Exception as e:
+        raise HTTPException(400, f"파일 읽기 실패: {e}") from e
+    finally:
+        try:
+            file.file.close()
+        except Exception:
+            pass
+    if not contents:
+        raise HTTPException(400, "업로드 파일이 비어있습니다.")
+
+    from services.baemin_excel_parser import parse_xlsx, BaeminExcelError
+    try:
+        parsed = parse_xlsx(contents, password=pw, file_name=file.filename)
+    except BaeminExcelError as e:
+        raise HTTPException(422, f"엑셀 파싱 실패: {e}") from e
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(422, f"엑셀 파싱 실패 (예외): {type(e).__name__}: {e}") from e
+
+    from services.baemin_service import upsert_excel_settlement
+    with Session(database.engine) as s:
+        result = upsert_excel_settlement(s, bid, year, month, parsed)
+
+    # P/L sync
+    from services.profit_loss_service import sync_delivery_revenue_to_pl
+    with Session(database.engine) as s:
+        sync_delivery_revenue_to_pl(year, month, s, bid)
+
+    return {
+        "ok": True,
+        "year": year,
+        "month": month,
+        "file_name": file.filename,
+        **result,
+    }
+
+
+@router.get("/monthly-excel/list")
+def list_monthly_excel(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """업로드된 모든 월 list."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    from models import BaeminMonthlySummary
+    with Session(database.engine) as s:
+        rows = s.exec(
+            select(BaeminMonthlySummary)
+            .where(BaeminMonthlySummary.business_id == bid)
+            .order_by(
+                BaeminMonthlySummary.year.desc(),
+                BaeminMonthlySummary.month.desc(),
+            )
+        ).all()
+        return [
+            {
+                "year": r.year, "month": r.month,
+                "deposit_total": r.deposit_total,
+                "order_brokerage_total": r.order_brokerage_total,
+                "ad_total": r.ad_total,
+                "detail_rows": r.detail_rows,
+                "uploaded_at": utc_iso(r.uploaded_at),
+                "file_name": r.file_name,
+            }
+            for r in rows
+        ]
+
+
+@router.get("/monthly-excel/{year}/{month}")
+def get_monthly_excel_summary(
+    year: int, month: int,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """업로드된 월별 요약 + 상세 row 수 조회."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    from models import BaeminMonthlySummary
+    with Session(database.engine) as s:
+        row = s.exec(
+            select(BaeminMonthlySummary).where(
+                BaeminMonthlySummary.business_id == bid,
+                BaeminMonthlySummary.year == year,
+                BaeminMonthlySummary.month == month,
+            )
+        ).first()
+        if not row:
+            return {"registered": False}
+        return {
+            "registered": True,
+            "summary": {
+                "order_brokerage_total": row.order_brokerage_total,
+                "delivery_total": row.delivery_total,
+                "etc_total": row.etc_total,
+                "misc_total": row.misc_total,
+                "vat_total": row.vat_total,
+                "ad_total": row.ad_total,
+                "baemin_order_total": row.baemin_order_total,
+                "deposit_total": row.deposit_total,
+            },
+            "detail_rows": row.detail_rows,
+            "file_name": row.file_name,
+            "uploaded_at": utc_iso(row.uploaded_at),
+        }

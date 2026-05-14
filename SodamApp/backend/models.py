@@ -1898,3 +1898,96 @@ class BaeminSyncLog(SQLModel, table=True):
     error_message: Optional[str] = None
     triggered_by: str = Field(default="cron")
     auth_refreshed: bool = Field(default=False, description="이 동기화 중 쿠키 갱신 발생 여부 (수동 only — 항상 False, 일관성용)")
+
+
+# ─────────────────────────────────────────────────────────────────
+# 배민 정산명세서 엑셀 수동 import (Phase 2a)
+# self-api.baemin.com 자동수집이 signature 차단으로 무용 → 사장님 수동 다운로드 + UI 업로드 방식
+# ─────────────────────────────────────────────────────────────────
+
+
+class BaeminSettlementDetail(SQLModel, table=True):
+    """배민 정산명세서 [상세] 시트 — 입금 단위 raw 1행 = 1 DB row.
+
+    재import 시 (business_id, year, month) 기준 전체 truncate 후 재삽입.
+    """
+    __table_args__ = (
+        Index("ix_baemin_sdetail_biz_ym", "business_id", "year", "month"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    year: int = Field(index=True)
+    month: int = Field(index=True)
+
+    deposit_date: Optional[datetime.date] = None           # 입금일
+    settlement_period: Optional[str] = None                # 정산대상기간 (raw text — 2026-02-25 등)
+    deposit_amount: int = 0                                # 입금 금액
+    service_type: Optional[str] = Field(default=None, max_length=32)  # 음식배달 등
+    order_type: Optional[str] = Field(default=None, max_length=64)    # 알뜰·한집배달 / 배민포장주문
+
+    # (A) 주문중개
+    order_amount: int = 0                  # 바로결제주문금액
+    refund_amount: int = 0                  # 부분환불금액
+    brokerage_baemin1: int = 0              # 배민1중개이용료
+    brokerage_smart: int = 0                # 알뜰배달 중개이용료
+    brokerage_pickup: int = 0               # 픽업중개이용료
+    customer_discount: int = 0              # 주문금액 즉시할인
+
+    # (B) 배달
+    tip_discount_single: int = 0            # 한집배달 배달팁 즉시할인
+    tip_discount_smart: int = 0             # 알뜰배달 배달팁 즉시할인
+    club_single_discount: int = 0           # 배민클럽(한집배달) 배달팁 할인
+    club_single_subsidy: int = 0            # 배민클럽(한집배달) 배달팁 할인 지원
+    club_smart_discount: int = 0            # 배민클럽(알뜰배달) 배달팁 할인
+    club_smart_subsidy: int = 0             # 배민클럽(알뜰배달) 배달팁 할인 지원
+    delivery_fee_single: int = 0            # 배민1 한집배달 배달비
+    delivery_fee_smart: int = 0             # 알뜰배달 배달비
+
+    # (C) 그외 (결제정산수수료)
+    payment_fee_base: int = 0               # 기본수수료(정률)
+    payment_fee_preferred: int = 0          # 우대수수료
+
+    # (D) 기타 / 조정금액
+    etc_amount: int = 0                     # (D) 기타
+    adjustment_amount: int = 0              # 조정금액 / 보정금액
+
+    # (E)~(H)
+    vat: int = 0                            # (E) 부가세
+    ad_amount: int = 0                      # (F) 우리가게클릭 / 우리가게클릭 이용요금
+    ad_vat: int = 0                         # 우리가게클릭 부가세 (3월~ 분리)
+    baemin_order_amount: int = 0            # (G) 배민오더
+    deposit_final: int = 0                  # (H) 입금금액
+    status: Optional[str] = Field(default=None, max_length=16)  # 입금완료 / 입금요청
+
+    raw_row_json: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class BaeminMonthlySummary(SQLModel, table=True):
+    """배민 정산명세서 [요약] 시트 + 합계 — 월 단위 1 row.
+
+    UniqueConstraint (business_id, year, month) — 매 업로드 시 update.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "year", "month", name="uq_baemin_summary"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    year: int = Field(index=True)
+    month: int = Field(index=True)
+
+    # [요약] 8 컬럼 (입금 완료건만 더한 값)
+    order_brokerage_total: int = 0      # (A) 주문중개
+    delivery_total: int = 0             # (B) 배달 (보통 음수)
+    etc_total: int = 0                  # (C) 그외 (보통 음수)
+    misc_total: int = 0                 # (D) 기타
+    vat_total: int = 0                  # (E) 부가세 (보통 음수)
+    ad_total: int = 0                   # (F) 우리가게클릭 (보통 음수)
+    baemin_order_total: int = 0         # (G) 배민오더
+    deposit_total: int = 0              # (H) 입금금액
+
+    # 메타
+    source: str = Field(default="excel", max_length=16)  # 'excel' / 'manual'
+    file_name: Optional[str] = None
+    uploaded_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    detail_rows: int = 0                # 상세 시트 row count
