@@ -335,18 +335,14 @@ def list_sync_logs(
         return [_log_dto(r) for r in rows]
 
 
-# ─── 6) 핵심 sync 로직 (Task 6 에서 fetch 호출 채움) ───
+# ─── 6) 핵심 sync 로직 ───
 def _run_sync(business_id: int,
               start_date: datetime.date,
               end_date: datetime.date,
               *, sync_orders: bool = True,
               sync_settlements: bool = True,
               triggered_by: str = "manual") -> dict:
-    """기간 내 주문 + 정산 수집 → DB upsert + Revenue 일자집계.
-
-    HAR 캡처 전엔 BaeminClient.fetch_* 가 NotImplementedError 던지므로
-    이 함수는 Task 6 에서 실제 구현됨. 지금은 SyncLog 만 기록 + NotImplementedError 전파.
-    """
+    """기간 내 주문 + 정산 수집 → DB upsert + DeliveryRevenue 일자집계 + P/L sync."""
     summary = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
@@ -356,28 +352,151 @@ def _run_sync(business_id: int,
         "errors": [],
     }
     log_id: Optional[int] = None
+    sync_mode = ("full" if (sync_orders and sync_settlements)
+                 else "orders" if sync_orders
+                 else "settlements")
     with Session(database.engine) as s:
         sl = BaeminSyncLog(business_id=business_id,
-                           sync_mode="full",
+                           sync_mode=sync_mode,
                            target_start=start_date,
                            target_end=end_date,
                            triggered_by=triggered_by,
                            status="running")
         s.add(sl); s.commit(); s.refresh(sl)
         log_id = sl.id
+
     try:
-        # Task 6: 이 raise 를 실제 fetch_orders/settlements 호출로 교체하고,
-        # summary["orders"]["fetched"], summary["settlements"]["fetched"],
-        # summary["total_sales"] 등을 populate 한 뒤 아래 `return summary` 로 빠진다.
-        raise NotImplementedError("HAR 캡처 후 Task 6 에서 fetch_orders/settlements 채움")
-    except Exception as e:
-        with Session(database.engine) as s:
-            sl = s.get(BaeminSyncLog, log_id)
+        client, cred = _make_client(business_id)
+        shop_owner_number = cred.store_id  # BaeminCredential.store_id = shopOwnerNumber
+        if not shop_owner_number:
+            raise HTTPException(
+                422,
+                "shopOwnerNumber 가 없습니다. 자격증명에 store_id (배민 점주번호) 를 입력해주세요.",
+            )
+
+        try:
+            # 매장 정보 자동 보강 (shop_name 비어있으면 list_stores 로 채움)
+            if not cred.shop_name:
+                try:
+                    stores = client.list_stores(shop_owner_number)
+                    if stores:
+                        first_shop = stores[0]
+                        with Session(database.engine) as ss:
+                            cred2 = ss.exec(
+                                select(BaeminCredential).where(
+                                    BaeminCredential.business_id == business_id
+                                )
+                            ).first()
+                            if cred2:
+                                cred2.shop_name = first_shop.get("name") or cred2.shop_name
+                                cred2.updated_at = datetime.datetime.utcnow()
+                                ss.add(cred2); ss.commit()
+                except BaeminError as e:
+                    log.warning("list_stores 실패 (계속 진행): %s", e)
+
+            # shop_number 첫 매장 ID — orders/settlements upsert 시 store_id 컬럼에 저장.
+            # 1차 구현: cred.store_id (= shopOwnerNumber) fallback. 추후 별도 컬럼 분리 시 보강.
+            shop_number = str(cred.store_id)
+
+            from services.baemin_service import (
+                upsert_orders, upsert_settlements, upsert_revenue_from_orders,
+            )
+
+            # 1) 주문
+            if sync_orders:
+                orders_contents = client.fetch_all_orders(
+                    shop_owner_number, start_date, end_date
+                )
+                with Session(database.engine) as s2:
+                    up = upsert_orders(s2, business_id, shop_number, orders_contents)
+                summary["orders"]["fetched"] = len(orders_contents)
+                summary["orders"]["inserted"] = up["inserted"]
+                summary["orders"]["updated"] = up["updated"]
+                # Revenue 일자집계
+                for offset in range((end_date - start_date).days + 1):
+                    d = start_date + datetime.timedelta(days=offset)
+                    with Session(database.engine) as s3:
+                        total = upsert_revenue_from_orders(s3, business_id, d)
+                    summary["total_sales"] += total
+
+            # 2) 정산
+            if sync_settlements:
+                settlements = client.fetch_all_settlements(
+                    shop_owner_number, start_date, end_date
+                )
+                with Session(database.engine) as s4:
+                    up = upsert_settlements(s4, business_id, shop_number, settlements)
+                summary["settlements"]["fetched"] = len(settlements)
+                summary["settlements"]["inserted"] = up["inserted"]
+                summary["settlements"]["updated"] = up["updated"]
+
+            # 3) P/L 동기화 (시작/종료 월 모두)
+            from services.profit_loss_service import sync_delivery_revenue_to_pl
+            with Session(database.engine) as s5:
+                sync_delivery_revenue_to_pl(
+                    start_date.year, start_date.month, s5, business_id
+                )
+                if (start_date.year, start_date.month) != (end_date.year, end_date.month):
+                    sync_delivery_revenue_to_pl(
+                        end_date.year, end_date.month, s5, business_id
+                    )
+        finally:
+            client.close()
+
+        # 완료
+        with Session(database.engine) as s6:
+            sl = s6.get(BaeminSyncLog, log_id)
+            if sl:
+                sl.finished_at = datetime.datetime.utcnow()
+                sl.status = "success"
+                sl.orders_fetched = summary["orders"]["fetched"]
+                sl.orders_inserted = summary["orders"]["inserted"]
+                sl.orders_updated = summary["orders"]["updated"]
+                sl.settlements_fetched = summary["settlements"]["fetched"]
+                sl.settlements_inserted = summary["settlements"]["inserted"]
+                sl.settlements_updated = summary["settlements"]["updated"]
+                sl.total_sales = summary["total_sales"]
+                s6.add(sl); s6.commit()
+
+    except CookieInvalidError as e:
+        with Session(database.engine) as s_err:
+            cred_row = s_err.exec(
+                select(BaeminCredential).where(
+                    BaeminCredential.business_id == business_id
+                )
+            ).first()
+            if cred_row:
+                _record_failure(s_err, cred_row, str(e), status="cookie_invalid")
+            sl = s_err.get(BaeminSyncLog, log_id)
             if sl:
                 sl.finished_at = datetime.datetime.utcnow()
                 sl.status = "failed"
                 sl.error_message = str(e)[:500]
-                s.add(sl); s.commit()
-        summary["errors"].append({"error": str(e)})
+                s_err.add(sl); s_err.commit()
+        summary["errors"].append({"error": str(e), "kind": "cookie_invalid"})
+        raise HTTPException(422, f"쿠키 만료: {e}") from e
+
+    except HTTPException:
+        # HTTPException 은 그대로 전파 (위 _make_client / shop_owner_number 검증 등)
+        with Session(database.engine) as s_err:
+            sl = s_err.get(BaeminSyncLog, log_id)
+            if sl:
+                sl.finished_at = datetime.datetime.utcnow()
+                sl.status = "failed"
+                sl.error_message = "config error"
+                s_err.add(sl); s_err.commit()
         raise
+
+    except Exception as e:
+        with Session(database.engine) as s_err:
+            sl = s_err.get(BaeminSyncLog, log_id)
+            if sl:
+                sl.finished_at = datetime.datetime.utcnow()
+                sl.status = "failed"
+                sl.error_message = str(e)[:500]
+                s_err.add(sl); s_err.commit()
+        summary["errors"].append({"error": str(e)})
+        log.error("baemin sync failed bid=%s: %s", business_id, e, exc_info=True)
+        raise
+
     return summary

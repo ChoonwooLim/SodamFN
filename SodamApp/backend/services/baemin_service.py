@@ -390,3 +390,210 @@ class BaeminClient:
             if total_target > 0 and len(all_rows) >= total_target:
                 break
         return all_rows
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# DB upsert 헬퍼 — HAR 응답 구조 매핑
+# ──────────────────────────────────────────────────────────────────────────
+
+from sqlmodel import Session, select  # noqa: E402
+
+
+def _parse_order_dt(value: Optional[str]) -> Optional[datetime.datetime]:
+    """배민 orderDateTime → datetime. 포맷: 'YYYY-MM-DDTHH:MM:SS' (KST naive)."""
+    if not value:
+        return None
+    s = str(value)
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.datetime.strptime(s[:26 if "%f" in fmt else 19], fmt)
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
+def _is_cancelled_status(status: str) -> bool:
+    """배민 order.status — CLOSED 가 정상 완료. CANCELED/CANCELLED 계열은 취소."""
+    if not status:
+        return False
+    s = status.upper()
+    if "CANCEL" in s or "REJECT" in s or "FAILED" in s:
+        return True
+    return False
+
+
+def upsert_orders(session: "Session", business_id: int,
+                  shop_number: str,
+                  orders_contents: list[dict]) -> dict:
+    """배민 /v4/orders 응답 contents[] → BaeminOrder upsert.
+
+    응답 구조: [{"order": {orderNumber, orderDateTime, payAmount, status, shopNumber, payType, ...},
+                "settle": {orderBrokerageItems, deliveryItems, etcItems, ...}}, ...]
+
+    BaeminOrder.raw_json 에 entry 전체 (order+settle) 보존 — normalizer 가 수수료 분해 시 참조.
+    """
+    from models import BaeminOrder
+    inserted = 0
+    updated = 0
+    for entry in orders_contents:
+        order = entry.get("order") if isinstance(entry, dict) else None
+        if not isinstance(order, dict):
+            continue
+        order_id = str(order.get("orderNumber") or "").strip()
+        if not order_id:
+            continue
+        existing = session.exec(
+            select(BaeminOrder).where(
+                BaeminOrder.business_id == business_id,
+                BaeminOrder.order_id == order_id,
+            )
+        ).first()
+        ordered_at = _parse_order_dt(order.get("orderDateTime"))
+        pay_amount = int(float(order.get("payAmount") or 0))
+        status_val = str(order.get("status") or "").strip()
+        cancelled_flag = _is_cancelled_status(status_val)
+        payment_method = str(order.get("payType") or "")[:32] or None
+        delivery_type = str(order.get("deliveryType") or "")[:32] or None
+        store_id_resp = str(order.get("shopNumber") or shop_number)
+        raw_blob = json.dumps(entry, ensure_ascii=False)
+
+        if existing:
+            existing.ordered_at = ordered_at or existing.ordered_at
+            existing.total_sale_price = pay_amount
+            existing.cancelled = cancelled_flag
+            existing.order_status = status_val[:32] or existing.order_status
+            existing.payment_method = payment_method or existing.payment_method
+            existing.delivery_type = delivery_type or existing.delivery_type
+            existing.raw_json = raw_blob
+            session.add(existing)
+            updated += 1
+        else:
+            session.add(BaeminOrder(
+                business_id=business_id, store_id=store_id_resp,
+                order_id=order_id, ordered_at=ordered_at,
+                total_sale_price=pay_amount, cancelled=cancelled_flag,
+                order_status=status_val[:32] or None,
+                payment_method=payment_method,
+                delivery_type=delivery_type,
+                raw_json=raw_blob,
+            ))
+            inserted += 1
+    session.commit()
+    return {"inserted": inserted, "updated": updated}
+
+
+def upsert_settlements(session: "Session", business_id: int,
+                       shop_number: str,
+                       settlements_contents: list[dict]) -> dict:
+    """배민 /v3/settle/history/summary 응답 contents[] → BaeminSettlement upsert.
+
+    응답 구조: [{giveId, depositDueDate, giveStatus, giveAmount, settleCode, ...}, ...]
+    """
+    from models import BaeminSettlement
+    inserted = 0
+    updated = 0
+    for row in settlements_contents:
+        if not isinstance(row, dict):
+            continue
+        give_id_raw = row.get("giveId")
+        if give_id_raw in (None, ""):
+            continue
+        give_id = str(give_id_raw)
+        try:
+            st_date = datetime.date.fromisoformat(
+                str(row.get("depositDueDate"))[:10]
+            )
+        except (ValueError, TypeError):
+            continue
+        st_type = (str(row.get("giveStatus") or "SETTLEMENT"))[:16]
+        amount = int(float(row.get("giveAmount") or 0))
+        raw_blob = json.dumps(row, ensure_ascii=False)
+
+        existing = session.exec(
+            select(BaeminSettlement).where(
+                BaeminSettlement.business_id == business_id,
+                BaeminSettlement.settlement_date == st_date,
+                BaeminSettlement.settlement_type == st_type,
+                BaeminSettlement.seller_transfer_id == give_id,
+            )
+        ).first()
+        if existing:
+            existing.amount = amount
+            existing.raw_json = raw_blob
+            session.add(existing)
+            updated += 1
+        else:
+            session.add(BaeminSettlement(
+                business_id=business_id, store_id=shop_number,
+                settlement_date=st_date, settlement_type=st_type,
+                seller_transfer_id=give_id, amount=amount,
+                raw_json=raw_blob,
+            ))
+            inserted += 1
+    session.commit()
+    return {"inserted": inserted, "updated": updated}
+
+
+def upsert_revenue_from_orders(session: "Session", business_id: int,
+                                date: datetime.date) -> int:
+    """그 날짜 + 그 달 전체 BaeminOrder 합계 → DeliveryRevenue(channel='배달의민족') upsert.
+
+    Returns:
+        date 일자의 매출 합계 (취소 제외). DeliveryRevenue.total_sales 는 월 합계로 갱신.
+    """
+    from models import BaeminOrder, DeliveryRevenue
+    day_start = datetime.datetime.combine(date, datetime.time.min)
+    day_end = datetime.datetime.combine(
+        date + datetime.timedelta(days=1), datetime.time.min
+    )
+    day_rows = session.exec(
+        select(BaeminOrder).where(
+            BaeminOrder.business_id == business_id,
+            BaeminOrder.ordered_at >= day_start,
+            BaeminOrder.ordered_at < day_end,
+            BaeminOrder.cancelled == False,  # noqa: E712
+        )
+    ).all()
+    day_total = sum(o.total_sale_price or 0 for o in day_rows)
+
+    # 월 전체 합계 (DeliveryRevenue 는 월 단위)
+    month_start = datetime.date(date.year, date.month, 1)
+    if date.month == 12:
+        month_end = datetime.date(date.year + 1, 1, 1)
+    else:
+        month_end = datetime.date(date.year, date.month + 1, 1)
+    month_rows = session.exec(
+        select(BaeminOrder).where(
+            BaeminOrder.business_id == business_id,
+            BaeminOrder.ordered_at >= datetime.datetime.combine(month_start, datetime.time.min),
+            BaeminOrder.ordered_at < datetime.datetime.combine(month_end, datetime.time.min),
+            BaeminOrder.cancelled == False,  # noqa: E712
+        )
+    ).all()
+    month_total = sum(o.total_sale_price or 0 for o in month_rows)
+    month_count = len(month_rows)
+
+    dr = session.exec(
+        select(DeliveryRevenue).where(
+            DeliveryRevenue.business_id == business_id,
+            DeliveryRevenue.year == date.year,
+            DeliveryRevenue.month == date.month,
+            DeliveryRevenue.channel == "배달의민족",
+        )
+    ).first()
+    if dr:
+        dr.total_sales = month_total
+        dr.order_count = month_count
+        dr.source = "bank_sync"
+        session.add(dr)
+    else:
+        session.add(DeliveryRevenue(
+            business_id=business_id, channel="배달의민족",
+            year=date.year, month=date.month,
+            total_sales=month_total, order_count=month_count,
+            source="bank_sync",
+        ))
+    session.commit()
+    return day_total

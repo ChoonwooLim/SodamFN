@@ -117,3 +117,127 @@ def test_whoami_url_uses_session_user_profile():
     called_url = args[0] if args else kwargs.get("url")
     assert "/v1/session/user-profile" in called_url
     c.close()
+
+
+# ───── upsert 헬퍼 단위 테스트 (Task 6) ─────
+
+from sqlmodel import Session, SQLModel, create_engine, select
+from models import Business, BaeminOrder, BaeminSettlement, DeliveryRevenue
+
+
+def _seed_engine():
+    eng = create_engine("sqlite://")
+    SQLModel.metadata.create_all(eng)
+    with Session(eng) as s:
+        s.add(Business(id=1, name="test", subscription_status="active"))
+        s.commit()
+    return eng
+
+
+def test_upsert_orders_idempotent():
+    """HAR 응답 구조 — contents: [{order:{...}, settle:{...}}]"""
+    from services.baemin_service import upsert_orders
+    eng = _seed_engine()
+    contents = [
+        {"order": {"orderNumber": "T2CH0000A1",
+                   "orderDateTime": "2026-05-01T12:30:00",
+                   "payAmount": 25000, "status": "CLOSED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+        {"order": {"orderNumber": "T2CH0000A2",
+                   "orderDateTime": "2026-05-01T13:00:00",
+                   "payAmount": 18000, "status": "CLOSED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+    ]
+    with Session(eng) as s:
+        r1 = upsert_orders(s, business_id=1, shop_number="14746996",
+                           orders_contents=contents)
+        assert r1["inserted"] == 2
+        # 같은 응답 다시 → 0 inserted
+        r2 = upsert_orders(s, business_id=1, shop_number="14746996",
+                           orders_contents=contents)
+        assert r2["inserted"] == 0
+
+
+def test_upsert_orders_handles_cancelled_status():
+    from services.baemin_service import upsert_orders
+    eng = _seed_engine()
+    contents = [
+        {"order": {"orderNumber": "T2CH_DEL",
+                   "orderDateTime": "2026-05-01T10:00:00",
+                   "payAmount": 12000, "status": "DELIVERY_CANCELED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+        {"order": {"orderNumber": "T2CH_OK",
+                   "orderDateTime": "2026-05-01T11:00:00",
+                   "payAmount": 25000, "status": "CLOSED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+    ]
+    with Session(eng) as s:
+        upsert_orders(s, business_id=1, shop_number="14746996",
+                      orders_contents=contents)
+        rows = s.exec(select(BaeminOrder)).all()
+        cancelled = [o for o in rows if o.cancelled]
+        ok = [o for o in rows if not o.cancelled]
+        assert len(cancelled) == 1 and cancelled[0].order_id == "T2CH_DEL"
+        assert len(ok) == 1 and ok[0].order_id == "T2CH_OK"
+
+
+def test_upsert_settlements_idempotent():
+    """HAR 응답 — contents: [{giveId, depositDueDate, giveStatus, giveAmount, ...}]"""
+    from services.baemin_service import upsert_settlements
+    eng = _seed_engine()
+    rows = [
+        {"giveId": 518740754, "depositDueDate": "2026-05-15",
+         "settleCode": "FOOD", "settleCodeName": "음식배달",
+         "giveStatus": "REQUEST", "giveStatusName": "입금요청",
+         "giveAmount": 110000},
+        {"giveId": 518573009, "depositDueDate": "2026-05-14",
+         "settleCode": "FOOD", "settleCodeName": "음식배달",
+         "giveStatus": "COMPLETE", "giveStatusName": "입금완료",
+         "giveAmount": 4116},
+    ]
+    with Session(eng) as s:
+        r1 = upsert_settlements(s, business_id=1, shop_number="14746996",
+                                settlements_contents=rows)
+        assert r1["inserted"] == 2
+        r2 = upsert_settlements(s, business_id=1, shop_number="14746996",
+                                settlements_contents=rows)
+        assert r2["inserted"] == 0
+        st_rows = s.exec(select(BaeminSettlement)).all()
+        # giveId int → str 변환 확인
+        ids = {r.seller_transfer_id for r in st_rows}
+        assert "518740754" in ids
+
+
+def test_upsert_revenue_from_orders_daily_aggregate():
+    """주문 합계 → DeliveryRevenue(channel='배달의민족') upsert."""
+    from services.baemin_service import upsert_orders, upsert_revenue_from_orders
+    eng = _seed_engine()
+    contents = [
+        {"order": {"orderNumber": "X1", "orderDateTime": "2026-05-01T10:00:00",
+                   "payAmount": 25000, "status": "CLOSED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+        {"order": {"orderNumber": "X2", "orderDateTime": "2026-05-01T11:00:00",
+                   "payAmount": 18000, "status": "CLOSED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+        {"order": {"orderNumber": "X3", "orderDateTime": "2026-05-01T12:00:00",
+                   "payAmount": 12000, "status": "DELIVERY_CANCELED",
+                   "shopNumber": 14746996, "payType": "BARO"}},
+    ]
+    with Session(eng) as s:
+        upsert_orders(s, business_id=1, shop_number="14746996",
+                      orders_contents=contents)
+        total = upsert_revenue_from_orders(s, business_id=1,
+                                           date=datetime.date(2026, 5, 1))
+        # cancelled 제외 → 25000 + 18000 = 43000
+        assert total == 43000
+        dr = s.exec(
+            select(DeliveryRevenue).where(
+                DeliveryRevenue.business_id == 1,
+                DeliveryRevenue.year == 2026,
+                DeliveryRevenue.month == 5,
+                DeliveryRevenue.channel == "배달의민족",
+            )
+        ).first()
+        assert dr is not None
+        assert dr.total_sales == 43000
+        assert dr.order_count == 2
