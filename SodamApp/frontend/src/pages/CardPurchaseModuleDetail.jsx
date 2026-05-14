@@ -528,9 +528,9 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
         if (!orgCode) { setErr('카드사를 선택하세요.'); return; }
         if (!userId || !password) { setErr('ID 와 비밀번호를 입력하세요.'); return; }
 
-        // 카드비번 앞 2자리 — 입력 시 2자리 숫자만 허용
-        if (cardPasswordPrefix && !/^\d{2}$/.test(cardPasswordPrefix)) {
-            setErr('카드 비밀번호 앞 2자리는 숫자 2자리여야 합니다.');
+        // 카드비번 — 카드사별로 앞 2자리 또는 전체 4자리. 2자리 또는 4자리 숫자 허용.
+        if (cardPasswordPrefix && !/^\d{2}$|^\d{4}$/.test(cardPasswordPrefix)) {
+            setErr('카드 비밀번호는 숫자 2자리 (앞 2자리) 또는 4자리 (전체) 여야 합니다.');
             return;
         }
         // 생년월일 — 입력 시 6자리 (YYMMDD) 또는 8자리 (YYYYMMDD) 숫자만
@@ -637,15 +637,17 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                     </div>
                     <div>
                         <label className="block text-sm text-slate-700 mb-1.5">
-                            카드 비밀번호 앞 2자리
-                            <span className="ml-1 text-xs text-slate-500 font-normal">(현대·삼성 등 일부 카드사 필수)</span>
+                            카드 비밀번호
+                            <span className="ml-1 text-xs text-slate-500 font-normal">
+                                (카드사별 — 신한·삼성은 앞 2자리, 현대는 전체 4자리)
+                            </span>
                         </label>
                         <input
                             type="password"
                             value={cardPasswordPrefix}
-                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                            placeholder="숫자 2자리"
-                            maxLength={2}
+                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            placeholder="숫자 2자리 (앞 2자리) 또는 4자리 (전체)"
+                            maxLength={4}
                             inputMode="numeric"
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
                             autoComplete="off"
