@@ -547,6 +547,124 @@ class CoupangEatsClient:
         self._check_response(r)
         return r.json()
 
+    # ───── 월별 매출내역서 엑셀 (fee breakdown 의 유일한 소스) ─────
+
+    def fetch_downloadable_periods(self, store_id: int) -> dict:
+        """매출내역서(엑셀) 다운로드 가능 기간 조회.
+
+        URL: GET /api/v1/merchant/web/emails?type=salesOrder
+        응답 예:
+            {"data": {
+              "downloadablePeriods": [
+                {"periodUnitType": "MONTH", "start": "2020-01", "inclusiveEnd": "2026-04"},
+                {"periodUnitType": "QUARTER_OF_YEAR", "start": "2020-1Q", "inclusiveEnd": "2026-Q1"}
+              ],
+              "nextSubscribePeriods": [...],
+              "subscribers": []
+            }, "code": "SUCCESS"}
+
+        Returns: data dict (downloadablePeriods 만 사용 권장).
+        """
+        url = f"{BASE_URL}/api/v1/merchant/web/emails"
+        referer = f"{BASE_URL}/merchant/management/orders/{store_id}"
+        try:
+            r = self._session.get(
+                url,
+                params={"type": "salesOrder"},
+                headers=self._common_headers(referer),
+                timeout=self._timeout,
+            )
+        except Exception as e:  # noqa: BLE001
+            raise CoupangEatsError(f"통신 실패 [/emails list]: {e}") from e
+        self._check_response(r)
+        try:
+            raw = r.json()
+        except Exception as e:  # noqa: BLE001
+            raise CoupangEatsError(
+                f"emails list JSON 파싱 실패: {e} body={(r.text or '')[:200]}"
+            ) from e
+        if isinstance(raw, dict):
+            return raw.get("data") or raw
+        return {}
+
+    def download_sales_order_excel(self,
+                                   store_id: int,
+                                   year_month: str) -> bytes:
+        """월별 매출내역서 엑셀 raw bytes 다운로드.
+
+        URL: GET /api/v1/merchant/web/emails
+             ?type=salesOrder&action=download&downloadRequestDate=YYYY-MM&storeId=...
+
+        Args:
+            year_month: 'YYYY-MM' (fetch_downloadable_periods 의 start ~ inclusiveEnd 범위 내)
+
+        Returns: xlsx 바이너리 (보통 ~90KB).
+
+        Raises:
+            CookieInvalidError: 세션 만료/봇 차단
+            CoupangEatsError: 그 외 HTTP 4xx/5xx 또는 잘못된 mime
+        """
+        # 'YYYY-MM' 형식 검증
+        if (not year_month or len(year_month) != 7
+                or year_month[4] != '-' or not year_month[:4].isdigit()
+                or not year_month[5:].isdigit()):
+            raise CoupangEatsError(f"year_month 형식 오류 (YYYY-MM 필요): {year_month!r}")
+
+        url = f"{BASE_URL}/api/v1/merchant/web/emails"
+        referer = f"{BASE_URL}/merchant/management/orders/{store_id}"
+        headers = self._common_headers(referer)
+        # 다운로드는 binary 라 accept=*/* (JSON 엔드포인트와 구분)
+        headers["accept"] = "*/*"
+
+        params = {
+            "type": "salesOrder",
+            "action": "download",
+            "downloadRequestDate": year_month,
+            "storeId": store_id,
+        }
+        try:
+            r = self._session.get(url, params=params, headers=headers,
+                                   timeout=max(self._timeout, 60.0))
+        except Exception as e:  # noqa: BLE001
+            raise CoupangEatsError(f"통신 실패 [/emails download]: {e}") from e
+
+        # _check_response 는 JSON 만 통과시키므로 여기선 binary 친화 검증
+        body_preview = ""
+        try:
+            # binary 라도 text 시도시 일부 디코딩됨 (에러일 경우 HTML/JSON)
+            body_preview = (r.text or "")[:200].replace("\n", " ").replace("\r", " ")
+        except Exception:
+            pass
+
+        if r.status_code in (401, 403):
+            raise CookieInvalidError(
+                f"세션 쿠키 거부 (HTTP {r.status_code}): {body_preview}",
+                status_code=r.status_code,
+            )
+        if r.status_code >= 400:
+            raise CoupangEatsError(
+                f"엑셀 다운로드 실패 HTTP {r.status_code}: {body_preview}",
+                status_code=r.status_code,
+            )
+
+        ct = (r.headers.get("content-type") or "").lower()
+        is_xlsx_mime = (
+            "spreadsheet" in ct
+            or "officedocument" in ct
+            or "octet-stream" in ct
+        )
+        data = r.content
+        # xlsx 파일은 zip 컨테이너 — 매직 'PK\x03\x04' 로 시작
+        is_xlsx_magic = isinstance(data, (bytes, bytearray)) and data[:4] == b"PK\x03\x04"
+
+        if not (is_xlsx_mime or is_xlsx_magic):
+            raise CoupangEatsError(
+                f"엑셀이 아닌 응답 (content-type={ct}, len={len(data)}): {body_preview}"
+            )
+        if not data:
+            raise CoupangEatsError("엑셀 본문이 비어있음 (0바이트)")
+        return data
+
     # ───── 정산 detail probe (URL 미확정 — fee breakdown 발굴용) ──────
 
     # detail endpoint URL 후보군. 사장님 인계 노트 가설 3종 + 흔한 변형 2종.
@@ -955,3 +1073,278 @@ def upsert_revenue_from_orders(session, business_id: int,
         session.add(rev)
     session.commit()
     return total
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# 월별 매출내역서(엑셀) → CoupangEatsOrderFee 적재 + Settlement fee_* 보강
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def upsert_order_fees(session, business_id: int, store_id: int,
+                      year_month: str,
+                      parsed_orders: list) -> dict:
+    """ParsedOrderFee list → CoupangEatsOrderFee upsert.
+
+    중복 키: (business_id, order_id). 재실행 시 갱신만.
+    """
+    from sqlmodel import select
+    from models import CoupangEatsOrderFee
+
+    inserted = 0
+    updated = 0
+    skipped = 0
+
+    for p in parsed_orders:
+        if not p.order_id:
+            skipped += 1
+            continue
+        existing = session.exec(
+            select(CoupangEatsOrderFee).where(
+                CoupangEatsOrderFee.business_id == business_id,
+                CoupangEatsOrderFee.order_id == p.order_id,
+            )
+        ).first()
+
+        fields = dict(
+            business_id=business_id,
+            store_id=store_id,
+            order_date=p.order_date,
+            ordered_at=p.ordered_at,
+            order_id=p.order_id,
+            order_type=p.order_type,
+            items_summary=p.items_summary,
+            brand=p.brand,
+            shop_name=p.shop_name,
+            payment_method=p.payment_method,
+            transaction_type=p.transaction_type,
+            total_amount=p.total_amount,
+            order_amount=p.order_amount,
+            payment_amount=p.payment_amount,
+            coupon_coupang=p.coupon_coupang,
+            coupon_store=p.coupon_store,
+            brokerage_before_basic=p.brokerage_before_basic,
+            brokerage_before_promo=p.brokerage_before_promo,
+            brokerage_final=p.brokerage_final,
+            payment_fee_basic=p.payment_fee_basic,
+            payment_fee_promo=p.payment_fee_promo,
+            delivery_before_basic=p.delivery_before_basic,
+            delivery_before_promo=p.delivery_before_promo,
+            delivery_final=p.delivery_final,
+            delivery_only=p.delivery_only,
+            food_only=p.food_only,
+            customer_delivery_fee=p.customer_delivery_fee,
+            customer_delivery_fee_total=p.customer_delivery_fee_total,
+            service_before_disposable_cup=p.service_before_disposable_cup,
+            service_before_supply=p.service_before_supply,
+            service_before_vat=p.service_before_vat,
+            service_before_total=p.service_before_total,
+            service_after_disposable_cup=p.service_after_disposable_cup,
+            service_after_supply=p.service_after_supply,
+            service_after_vat=p.service_after_vat,
+            service_after_total=p.service_after_total,
+            ad_supply=p.ad_supply,
+            ad_vat=p.ad_vat,
+            ad_total=p.ad_total,
+            settle_before_basic=p.settle_before_basic,
+            settle_before_promo=p.settle_before_promo,
+            settle_final=p.settle_final,
+            extra_col_40=p.extra_col_40,
+            promotion_benefit=p.promotion_benefit,
+            refund_amount=p.refund_amount,
+            source_year_month=year_month,
+            synced_at=datetime.datetime.utcnow(),
+        )
+        if existing:
+            for k, v in fields.items():
+                setattr(existing, k, v)
+            session.add(existing)
+            updated += 1
+        else:
+            session.add(CoupangEatsOrderFee(**fields))
+            inserted += 1
+
+    session.commit()
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped,
+        "total_processed": inserted + updated,
+    }
+
+
+def update_settlements_from_fees(session, business_id: int,
+                                 year_month: str) -> dict:
+    """월별 OrderFee 일자별 집계 → CoupangEatsSettlement.fee_* 갱신.
+
+    `year_month` ('YYYY-MM') 범위 안의 모든 일자에 대해:
+      1) CoupangEatsOrderFee 를 일자별로 그룹핑 (취소 제외)
+      2) 각 일자의 SETTLEMENT row 를 찾아 fee_brokerage / fee_payment /
+         fee_delivery / fee_advertising / fee_membership / total_sales 업데이트
+      3) detail_synced_at + detail_source_year_month 마킹
+
+    Settlement row 가 없는 일자는 (정산이 아직 안 들어온 일자) skip.
+    동일 일자에 SETTLEMENT 가 여러 건이면 첫 번째 (settlement_date 동일 + sellerTransferId 있음) 에만 적재
+    — 쿠팡이츠 정상 케이스는 1일 1 SETTLEMENT.
+    """
+    from sqlmodel import select
+    from models import CoupangEatsOrderFee, CoupangEatsSettlement
+
+    # year_month 파싱
+    try:
+        year = int(year_month[:4])
+        month = int(year_month[5:7])
+        period_start = datetime.date(year, month, 1)
+        if month == 12:
+            period_end = datetime.date(year + 1, 1, 1) - datetime.timedelta(days=1)
+        else:
+            period_end = datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
+    except (ValueError, IndexError) as e:
+        raise CoupangEatsError(f"year_month 형식 오류: {year_month!r} ({e})") from e
+
+    # 1) OrderFee 일자별 집계
+    fees = session.exec(
+        select(CoupangEatsOrderFee).where(
+            CoupangEatsOrderFee.business_id == business_id,
+            CoupangEatsOrderFee.order_date >= period_start,
+            CoupangEatsOrderFee.order_date <= period_end,
+        )
+    ).all()
+
+    # 일자 → 집계
+    daily_agg: dict[datetime.date, dict] = {}
+    for f in fees:
+        if (f.transaction_type or "").strip() == "취소":
+            continue
+        agg = daily_agg.setdefault(f.order_date, {
+            "order_count": 0,
+            "total_amount": 0,
+            "fee_brokerage": 0,
+            "fee_payment": 0,
+            "fee_delivery": 0,
+            "fee_advertising": 0,
+            "fee_membership": 0,
+            "coupon_store": 0,
+            "settle_final": 0,
+        })
+        agg["order_count"] += 1
+        agg["total_amount"] += f.total_amount
+        agg["fee_brokerage"] += f.brokerage_final
+        agg["fee_payment"] += f.payment_fee_basic + f.payment_fee_promo
+        agg["fee_delivery"] += f.delivery_final
+        agg["fee_advertising"] += f.ad_total
+        agg["fee_membership"] += f.service_after_total
+        agg["coupon_store"] += f.coupon_store
+        agg["settle_final"] += f.settle_final
+
+    # 2) 각 일자의 SETTLEMENT row 업데이트
+    settlements_updated = 0
+    dates_without_settlement: list[str] = []
+    now = datetime.datetime.utcnow()
+
+    for d, agg in daily_agg.items():
+        settle = session.exec(
+            select(CoupangEatsSettlement).where(
+                CoupangEatsSettlement.business_id == business_id,
+                CoupangEatsSettlement.settlement_date == d,
+                CoupangEatsSettlement.settlement_type == "SETTLEMENT",
+            ).order_by(CoupangEatsSettlement.id.desc()).limit(1)
+        ).first()
+
+        if not settle:
+            dates_without_settlement.append(d.isoformat())
+            continue
+
+        settle.total_sales = agg["total_amount"]
+        settle.fee_brokerage = agg["fee_brokerage"]
+        settle.fee_payment = agg["fee_payment"]
+        settle.fee_delivery = agg["fee_delivery"]
+        settle.fee_advertising = agg["fee_advertising"]
+        settle.fee_membership = agg["fee_membership"]
+        settle.detail_synced_at = now
+        settle.detail_source_year_month = year_month
+        session.add(settle)
+        settlements_updated += 1
+
+    session.commit()
+
+    return {
+        "year_month": year_month,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "order_fees_count": len(fees),
+        "daily_aggregates_count": len(daily_agg),
+        "settlements_updated": settlements_updated,
+        "dates_without_settlement": dates_without_settlement,
+    }
+
+
+def sync_monthly_excel(session,
+                      business_id: int,
+                      store_id: int,
+                      year_month: str,
+                      excel_bytes: bytes,
+                      *,
+                      triggered_by: str = "manual") -> dict:
+    """월별 매출내역서 엑셀 1건 처리 — 파싱 → upsert → settlement 보강 → SyncLog.
+
+    Args:
+        excel_bytes: download_sales_order_excel() 결과 또는 사용자 업로드.
+    """
+    from services.coupang_eats_excel_parser import parse_sales_order_excel
+    from models import CoupangEatsSyncLog
+
+    # SyncLog 시작
+    sl = CoupangEatsSyncLog(
+        business_id=business_id,
+        sync_mode="monthly_excel",
+        excel_year_month=year_month,
+        triggered_by=triggered_by,
+        status="running",
+    )
+    session.add(sl)
+    session.commit()
+    session.refresh(sl)
+
+    try:
+        # 1) 파싱
+        report = parse_sales_order_excel(excel_bytes, expected_year_month=year_month)
+
+        # 2) upsert
+        up = upsert_order_fees(session, business_id, store_id, year_month, report.orders)
+
+        # 3) settlement.fee_* 갱신
+        settle_report = update_settlements_from_fees(session, business_id, year_month)
+
+        # 4) SyncLog 완료
+        sl.finished_at = datetime.datetime.utcnow()
+        sl.status = "success"
+        sl.excel_orders_parsed = report.parsed_count
+        sl.excel_orders_upserted = up["inserted"] + up["updated"]
+        sl.excel_orders_skipped = report.skipped_count + up["skipped"]
+        sl.excel_settlements_updated = settle_report["settlements_updated"]
+        session.add(sl)
+        session.commit()
+
+        return {
+            "ok": True,
+            "year_month": year_month,
+            "parsed": report.parsed_count,
+            "inserted": up["inserted"],
+            "updated": up["updated"],
+            "skipped": report.skipped_count + up["skipped"],
+            "period_start": report.period_start.isoformat() if report.period_start else None,
+            "period_end": report.period_end.isoformat() if report.period_end else None,
+            "settlements_updated": settle_report["settlements_updated"],
+            "dates_without_settlement": settle_report["dates_without_settlement"],
+            "sync_log_id": sl.id,
+        }
+
+    except Exception as e:
+        sl.finished_at = datetime.datetime.utcnow()
+        sl.status = "failed"
+        sl.error_message = str(e)[:500]
+        session.add(sl)
+        session.commit()
+        log.error("sync_monthly_excel failed bid=%s ym=%s: %s",
+                  business_id, year_month, e, exc_info=True)
+        raise

@@ -105,6 +105,15 @@ def _run_migrations():
         ("paypayment", "source", "VARCHAR DEFAULT 'bank_sync'"),
         ("paypayment", "source_meta", "TEXT"),
         ("paypayment", "synced_at", "TIMESTAMP"),
+        # 2026-05-14: 쿠팡이츠 월별 매출내역서(엑셀) → 정산 fee_* 보강 추적
+        ("coupangeatssettlement", "detail_synced_at", "TIMESTAMP"),
+        ("coupangeatssettlement", "detail_source_year_month", "VARCHAR(7)"),
+        # CoupangEatsSyncLog 에 monthly_excel 통계 컬럼
+        ("coupangeatssynclog", "excel_year_month", "VARCHAR(7)"),
+        ("coupangeatssynclog", "excel_orders_parsed", "INTEGER DEFAULT 0"),
+        ("coupangeatssynclog", "excel_orders_upserted", "INTEGER DEFAULT 0"),
+        ("coupangeatssynclog", "excel_orders_skipped", "INTEGER DEFAULT 0"),
+        ("coupangeatssynclog", "excel_settlements_updated", "INTEGER DEFAULT 0"),
     ]
     import os
     db_url = os.environ.get("DATABASE_URL", "")

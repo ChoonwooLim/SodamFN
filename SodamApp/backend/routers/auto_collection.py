@@ -343,6 +343,59 @@ def cron_coupang(_: None = Depends(_verify_cron_secret)):
     }
 
 
+@router.post("/cron/coupang-eats-monthly-excel")
+def cron_coupang_monthly_excel(_: None = Depends(_verify_cron_secret)):
+    """매월 6일 03:30 — 쿠팡이츠 전월 매출내역서(엑셀) 자동 다운로드.
+
+    fee breakdown 의 유일한 소스. 엑셀 = 43컬럼 (중개수수료/배달비/광고비/멤버십...).
+    routers.coupang_eats.sync_monthly_excel_cron 을 직접 호출 (시크릿은 동일).
+    """
+    import os, datetime as _dt
+    from sqlmodel import select as _select
+    from models import CoupangEatsCredential as _CEC
+    from services.coupang_eats_service import sync_monthly_excel as _sync_excel
+    from routers.coupang_eats import _execute_with_refresh as _exec
+    from services.coupang_eats_service import CoupangEatsClient as _Client
+
+    today = _dt.date.today()
+    first_of_this_month = today.replace(day=1)
+    prev_month_end = first_of_this_month - _dt.timedelta(days=1)
+    prev_prev_month_end = prev_month_end.replace(day=1) - _dt.timedelta(days=1)
+    targets = [
+        prev_month_end.strftime("%Y-%m"),
+        prev_prev_month_end.strftime("%Y-%m"),
+    ]
+
+    with Session(engine) as s:
+        creds_rows = s.exec(
+            _select(_CEC).where(_CEC.status.in_(["active"]))
+        ).all()
+        cred_map = {c.business_id: c.store_id for c in creds_rows if c.store_id}
+
+    results = []
+    for bid, store_id in cred_map.items():
+        for ym in targets:
+            try:
+                def _action(client: _Client, _sid=store_id, _ym=ym):
+                    return client.download_sales_order_excel(_sid, _ym)
+                (excel_bytes, refreshed) = _exec(bid, _action)
+                with Session(engine) as s:
+                    r = _sync_excel(s, bid, store_id, ym, excel_bytes,
+                                     triggered_by="cron")
+                results.append({"business_id": bid, "year_month": ym,
+                                "auth_refreshed": refreshed, **r})
+            except Exception as e:  # noqa: BLE001
+                _cron_log.error("coupang monthly excel cron failed bid=%s ym=%s: %s",
+                                bid, ym, e, exc_info=True)
+                results.append({"business_id": bid, "year_month": ym, "error": str(e)})
+
+    return {
+        "ok": True, "today": today.isoformat(),
+        "targets": targets, "business_count": len(cred_map),
+        "results": results,
+    }
+
+
 @router.post("/cron/bank-sync")
 def cron_bank(_: None = Depends(_verify_cron_secret)):
     """03:20 — 은행 거래 수집.

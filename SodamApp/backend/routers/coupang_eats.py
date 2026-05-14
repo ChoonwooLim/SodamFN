@@ -19,7 +19,7 @@ import datetime
 import logging
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
@@ -43,6 +43,7 @@ from services.coupang_eats_service import (
     upsert_orders,
     upsert_settlements,
     upsert_revenue_from_orders,
+    sync_monthly_excel,
 )
 from services.coupang_eats_login import (
     login_and_get_cookies,
@@ -592,6 +593,204 @@ def sync_cron_trigger(
 # ──────────────────────────────────────────────────────────────────────────
 # 6) 이력 / 대시보드
 # ──────────────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────────
+# 6) 월별 매출내역서(엑셀) — fee breakdown 의 유일한 소스
+# ──────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/downloadable-periods")
+def get_downloadable_periods(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """매출내역서 엑셀 다운로드 가능 기간 조회.
+
+    응답 예:
+      {"data": {"downloadablePeriods":[{"periodUnitType":"MONTH","start":"2020-01","inclusiveEnd":"2026-04"}]}}
+
+    inclusiveEnd 가 보통 전월. 당월은 마감 후 다운로드 가능.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred or not cred.store_id:
+            raise HTTPException(404, "자격증명/매장 ID 미등록")
+        store_id = cred.store_id
+
+    def _action(client: CoupangEatsClient):
+        return client.fetch_downloadable_periods(store_id)
+
+    (data, refreshed) = _execute_with_refresh(bid, _action)
+    return {"ok": True, "store_id": store_id, "data": data, "auth_refreshed": refreshed}
+
+
+class MonthlyExcelSyncIn(BaseModel):
+    year_month: str = Field(..., min_length=7, max_length=7,
+                            description="'YYYY-MM' (다운로드 가능 기간 내)")
+
+
+@router.post("/sync/monthly-excel")
+def sync_monthly_excel_endpoint(
+    body: MonthlyExcelSyncIn,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """월별 매출내역서 자동 다운로드 → 파싱 → CoupangEatsOrderFee 적재
+    → CoupangEatsSettlement.fee_* 일자별 갱신.
+
+    P/L 의 쿠팡이츠 수수료/배달비/광고비/멤버십 정확도를 위한 핵심 동기화.
+    멱등 (재실행 시 동일 데이터 갱신).
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred or not cred.store_id:
+            raise HTTPException(404, "자격증명/매장 ID 미등록")
+        store_id = cred.store_id
+
+    def _action(client: CoupangEatsClient):
+        return client.download_sales_order_excel(store_id, body.year_month)
+
+    (excel_bytes, refreshed) = _execute_with_refresh(bid, _action)
+
+    with Session(engine) as s:
+        try:
+            result = sync_monthly_excel(
+                s, bid, store_id, body.year_month, excel_bytes,
+                triggered_by="manual",
+            )
+        except CoupangEatsError as e:
+            raise HTTPException(422, f"엑셀 처리 실패: {e}") from e
+    result["auth_refreshed"] = refreshed
+    return result
+
+
+@router.post("/sync/monthly-excel/upload")
+def sync_monthly_excel_upload(
+    year_month: str,
+    file: UploadFile = File(...),
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """사장님이 직접 다운로드받은 엑셀 파일을 업로드해서 처리.
+
+    Akamai 차단 등으로 API 자동 다운로드 실패 시 폴백.
+    """
+    bid = _resolve_bid(admin, x_view_as_business)
+    if not year_month or len(year_month) != 7 or year_month[4] != "-":
+        raise HTTPException(400, "year_month 는 'YYYY-MM' 형식이어야 합니다.")
+
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred or not cred.store_id:
+            raise HTTPException(404, "자격증명/매장 ID 미등록")
+        store_id = cred.store_id
+
+    try:
+        excel_bytes = file.file.read()
+    finally:
+        try:
+            file.file.close()
+        except Exception:
+            pass
+    if not excel_bytes:
+        raise HTTPException(400, "업로드 파일이 비어있습니다.")
+    if excel_bytes[:4] != b"PK\x03\x04":
+        raise HTTPException(
+            400, f"엑셀(.xlsx) 파일이 아닙니다. (앞 4바이트={excel_bytes[:4]!r})"
+        )
+
+    with Session(engine) as s:
+        try:
+            result = sync_monthly_excel(
+                s, bid, store_id, year_month, excel_bytes,
+                triggered_by="manual_upload",
+            )
+        except CoupangEatsError as e:
+            raise HTTPException(422, f"엑셀 처리 실패: {e}") from e
+    return result
+
+
+@router.post("/sync/monthly-excel/cron-trigger")
+def sync_monthly_excel_cron(
+    year_month: Optional[str] = None,
+    x_cron_secret: Optional[str] = Header(None, alias="X-Cron-Secret"),
+):
+    """매월 6일 03:30 cron — 전월 + 전전월(누락 대비) 자동 다운로드.
+
+    `year_month` 미지정 시 (전월, 전전월) 두 달 처리. 인증 모두 실패한 사업장은 skip.
+    """
+    import os
+    expected = os.getenv("CRON_SHARED_SECRET", "").strip()
+    if not expected:
+        raise HTTPException(503, "CRON_SHARED_SECRET 미설정 — cron 차단")
+    if x_cron_secret != expected:
+        raise HTTPException(401, "invalid cron secret")
+
+    today = datetime.date.today()
+    if year_month:
+        targets = [year_month]
+    else:
+        # 전월 + 전전월 (재시도 안정성)
+        first_of_this_month = today.replace(day=1)
+        prev_month_end = first_of_this_month - datetime.timedelta(days=1)
+        prev_prev_month_end = prev_month_end.replace(day=1) - datetime.timedelta(days=1)
+        targets = [
+            prev_month_end.strftime("%Y-%m"),
+            prev_prev_month_end.strftime("%Y-%m"),
+        ]
+
+    with Session(engine) as s:
+        creds_rows = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.status.in_(["active"])
+            )
+        ).all()
+        cred_map = {c.business_id: c.store_id for c in creds_rows if c.store_id}
+
+    results = []
+    for bid, store_id in cred_map.items():
+        for ym in targets:
+            try:
+                def _action(client: CoupangEatsClient, _sid=store_id, _ym=ym):
+                    return client.download_sales_order_excel(_sid, _ym)
+                (excel_bytes, refreshed) = _execute_with_refresh(bid, _action)
+                with Session(engine) as s:
+                    r = sync_monthly_excel(
+                        s, bid, store_id, ym, excel_bytes,
+                        triggered_by="cron",
+                    )
+                results.append({"business_id": bid, "year_month": ym,
+                                "auth_refreshed": refreshed, **r})
+            except HTTPException as he:
+                results.append({"business_id": bid, "year_month": ym,
+                                "error": str(he.detail), "status_code": he.status_code})
+            except Exception as e:  # noqa: BLE001
+                log.error("monthly-excel cron failed bid=%s ym=%s: %s",
+                          bid, ym, e, exc_info=True)
+                results.append({"business_id": bid, "year_month": ym, "error": str(e)})
+
+    return {
+        "ok": True,
+        "today": today.isoformat(),
+        "targets": targets,
+        "business_count": len(cred_map),
+        "results": results,
+    }
+
 
 @router.get("/sync/logs")
 def list_sync_logs(

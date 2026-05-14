@@ -1642,6 +1642,107 @@ class CoupangEatsSettlement(SQLModel, table=True):
     raw_json: Optional[str] = None
     synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
 
+    # 월별 매출내역서(엑셀) 에서 detail 채워졌는지 추적
+    # 채워지면 fee_* 가 0 이 아닌 실제값 (취소 제외 일자별 합)
+    detail_synced_at: Optional[datetime.datetime] = Field(
+        default=None,
+        description="월별 엑셀로 fee_* 컬럼을 마지막으로 채운 시각"
+    )
+    detail_source_year_month: Optional[str] = Field(
+        default=None, max_length=7,
+        description="fee_* 를 채운 엑셀의 연-월 ('YYYY-MM')"
+    )
+
+
+class CoupangEatsOrderFee(SQLModel, table=True):
+    """쿠팡이츠 월별 매출내역서(엑셀, 43컬럼) 에서 추출한 주문별 fee breakdown.
+
+    소스: GET /api/v1/merchant/web/emails?type=salesOrder&action=download&...
+    주기: 매월 1회 (전월 마감 후) — 쿠팡이츠 시스템 제약.
+    중복 키: (business_id, order_id) — 동일 주문은 갱신.
+
+    CoupangEatsOrder (매일 수집) 와 별도 테이블인 이유:
+      - sync 주기 다름 (orders=일일, fee=월별)
+      - fee 데이터는 월 마감 후에야 확정 → orders 만 갖고 P/L 그려야 할 때 의존성 분리
+      - 컬럼 수가 많아 (43개) 분리 보관이 청결
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "order_id", name="uq_ce_order_fee"),
+        Index("ix_ce_order_fee_biz_date", "business_id", "order_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    store_id: int = Field(index=True)
+
+    # 주문정보 (col 0~8)
+    order_date: datetime.date = Field(index=True)
+    ordered_at: Optional[datetime.datetime] = None
+    order_id: str = Field(max_length=32, index=True)
+    order_type: Optional[str] = Field(default=None, max_length=16)   # 배달 / 포장
+    items_summary: Optional[str] = Field(default=None, max_length=500)
+    brand: Optional[str] = Field(default=None, max_length=64)
+    shop_name: Optional[str] = Field(default=None, max_length=128)
+    payment_method: Optional[str] = Field(default=None, max_length=32)
+    transaction_type: Optional[str] = Field(default=None, max_length=16,
+                                            description="결제 / 취소")
+
+    # 매출액 (9~11)
+    total_amount: int = 0
+    order_amount: int = 0
+    payment_amount: int = 0
+
+    # 쿠폰 (12~13)
+    coupon_coupang: int = 0
+    coupon_store: int = 0
+
+    # 중개수수료 (14~16)
+    brokerage_before_basic: int = 0
+    brokerage_before_promo: int = 0
+    brokerage_final: int = 0
+
+    # 결제수수료 (17~18)
+    payment_fee_basic: int = 0
+    payment_fee_promo: int = 0
+
+    # 배달비 (19~25)
+    delivery_before_basic: int = 0
+    delivery_before_promo: int = 0
+    delivery_final: int = 0
+    delivery_only: int = 0
+    food_only: int = 0
+    customer_delivery_fee: int = 0
+    customer_delivery_fee_total: int = 0
+
+    # 서비스이용료 (26~33)
+    service_before_disposable_cup: int = 0
+    service_before_supply: int = 0
+    service_before_vat: int = 0
+    service_before_total: int = 0
+    service_after_disposable_cup: int = 0
+    service_after_supply: int = 0
+    service_after_vat: int = 0
+    service_after_total: int = 0
+
+    # 광고비 (34~36)
+    ad_supply: int = 0
+    ad_vat: int = 0
+    ad_total: int = 0
+
+    # 정산금액 (37~39)
+    settle_before_basic: int = 0
+    settle_before_promo: int = 0
+    settle_final: int = 0
+
+    # 기타 (40~42)
+    extra_col_40: int = 0                # 미상 (헤더 비어있음)
+    promotion_benefit: int = 0
+    refund_amount: int = 0
+
+    # 메타
+    source_year_month: str = Field(max_length=7,
+                                   description="이 row 의 출처 엑셀 (YYYY-MM)")
+    synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
 
 class CoupangEatsSyncLog(SQLModel, table=True):
     """쿠팡이츠 동기화 이력. 운영/장애 추적용."""
@@ -1674,6 +1775,14 @@ class CoupangEatsSyncLog(SQLModel, table=True):
                               description="cron / manual / superadmin / auth-failure")
     auth_refreshed: bool = Field(default=False,
                                  description="이 동기화 중 자동 재로그인 발생 여부")
+
+    # 월별 매출내역서 sync 통계 (sync_mode='monthly_excel' 일 때만 채워짐)
+    excel_year_month: Optional[str] = Field(default=None, max_length=7,
+                                            description="처리한 엑셀의 연-월 (YYYY-MM)")
+    excel_orders_parsed: int = 0
+    excel_orders_upserted: int = 0
+    excel_orders_skipped: int = 0
+    excel_settlements_updated: int = 0    # fee_* 채워진 settlement row 수
 
 
 # ─────────────────────────────────────────────────────────────
