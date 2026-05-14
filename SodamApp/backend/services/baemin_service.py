@@ -133,6 +133,7 @@ class BaeminClient:
                     "path": c.path,
                     "expires": c.expires if c.expires else -1,
                     "secure": bool(c.secure),
+                    "httpOnly": bool(getattr(c, "_rest", {}).get("HttpOnly", False)),
                 })
         except Exception as e:  # noqa: BLE001
             log.warning("get_cookies failed: %s", e)
@@ -164,7 +165,7 @@ class BaeminClient:
     def _check_response(self, r) -> None:
         body_preview = ""
         try:
-            body_preview = (r.text or "")[:240].replace("\n", " ")
+            body_preview = (r.text or "")[:240].replace("\n", " ").replace("\r", " ")
         except Exception:
             pass
         if r.status_code in (401, 403):
@@ -190,10 +191,16 @@ class BaeminClient:
         """세션 검증. HAR 후 실제 endpoint 로 교체."""
         url = f"{BASE_URL}/api/whoami"  # TODO(HAR): 실제 URL 로 교체
         referer = f"{BASE_URL}/"
-        r = self._session.get(url, headers=self._common_headers(referer),
-                              timeout=self._timeout)
+        try:
+            r = self._session.get(url, headers=self._common_headers(referer),
+                                  timeout=self._timeout)
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"통신 실패 [/whoami]: {e}") from e
         self._check_response(r)
-        return r.json()
+        try:
+            return r.json()
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"JSON 파싱 실패 [/whoami]: {e}") from e
 
     # ───── 매출 / 정산 (Task 5 에서 HAR 기반 구현) ─────
     def fetch_orders(self, store_id: str,
