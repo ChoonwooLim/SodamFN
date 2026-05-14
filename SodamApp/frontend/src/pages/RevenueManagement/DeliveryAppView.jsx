@@ -196,8 +196,13 @@ export function DeliveryAppView({ isMobile, plYear, deliveryAppData }) {
             <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(sortedChannels.length, 4)}, 1fr)` }}>
                 {sortedChannels.map(ch => {
                     const ct = channelTotals[ch];
-                    const latestMonth = monthly.find(m => m.channels[ch]);
-                    const feeBreakdown = latestMonth?.channels[ch]?.fee_breakdown || {};
+                    // fee_breakdown 이 비어있지 않은 가장 최근 월 찾기 (쿠팡 5월은 정산명세서 미발행이라 빈 row).
+                    const latestMonthWithFees = monthly.find(m => {
+                        const bd = m.channels[ch]?.fee_breakdown;
+                        return bd && Object.keys(bd).length > 0;
+                    });
+                    const feeBreakdown = latestMonthWithFees?.channels[ch]?.fee_breakdown || {};
+                    const feeMonthLabel = latestMonthWithFees ? ` (${latestMonthWithFees.month}월)` : '';
                     return (
                         <div key={ch} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
                             <div className="text-lg font-extrabold text-slate-800 mb-3">{CHANNEL_ICONS[ch]} {ch} 수수료 분석</div>
@@ -209,7 +214,7 @@ export function DeliveryAppView({ isMobile, plYear, deliveryAppData }) {
                             </div>
                             {Object.keys(feeBreakdown).length > 0 && (
                                 <div className="border-t-2 border-dashed border-slate-200 pt-3 mt-3">
-                                    <div className="text-[13px] text-slate-600 font-semibold mb-2">최근 세부 수수료 내역:</div>
+                                    <div className="text-[13px] text-slate-600 font-semibold mb-2">최근 세부 수수료 내역{feeMonthLabel}:</div>
                                     {Object.entries(feeBreakdown).filter(([, v]) => v > 0).map(([k, v]) => (
                                         <div key={k} className="flex justify-between text-sm text-slate-500 py-1 border-b border-slate-50">
                                             <span>{k}</span>
