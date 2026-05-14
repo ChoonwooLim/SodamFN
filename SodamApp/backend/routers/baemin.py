@@ -2,7 +2,7 @@
 
 수동 쿠키 only — 자동 로그인 없음 (spec Q2). 쿠키 만료 시 사장님이 갱신.
 
-엔드포인트:
+엔드포인트 (현재 구현):
   POST   /api/baemin/credential        — 자격증명 (로그인 ID + 매장 ID) 등록/갱신
   GET    /api/baemin/credential        — 등록 상태 + 쿠키 만료 조회
   DELETE /api/baemin/credential        — 자격증명 + 쿠키 삭제
@@ -10,6 +10,8 @@
   POST   /api/baemin/sync/manual       — 기간 지정 동기화 (최대 91일)
   POST   /api/baemin/sync/cron-trigger — Orbitron cron 호출 (X-Cron-Secret)
   GET    /api/baemin/sync/logs         — 동기화 이력 (최대 200건)
+
+엔드포인트 (Task 7 에서 추가 예정):
   GET    /api/baemin/dashboard         — 잔액 / 예상정산 / 주간 합계
   GET    /api/baemin/debug/probe       — superadmin 쿠키 진단
   GET    /api/baemin/debug/raw-orders  — superadmin 응답 raw
@@ -19,7 +21,7 @@ from __future__ import annotations
 import datetime
 import logging
 import os
-from typing import Any, Callable, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -364,7 +366,9 @@ def _run_sync(business_id: int,
         s.add(sl); s.commit(); s.refresh(sl)
         log_id = sl.id
     try:
-        # 실제 fetch 는 Task 6 에서 — 지금은 NotImplementedError 전파
+        # Task 6: 이 raise 를 실제 fetch_orders/settlements 호출로 교체하고,
+        # summary["orders"]["fetched"], summary["settlements"]["fetched"],
+        # summary["total_sales"] 등을 populate 한 뒤 아래 `return summary` 로 빠진다.
         raise NotImplementedError("HAR 캡처 후 Task 6 에서 fetch_orders/settlements 채움")
     except Exception as e:
         with Session(database.engine) as s:

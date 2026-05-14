@@ -1,4 +1,6 @@
 """배민 라우터 통합 — credential CRUD + manual-cookies."""
+import asyncio
+
 import pytest
 import httpx
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -8,9 +10,6 @@ from models import Business, User
 from main import app
 from database import get_session
 import database
-
-
-import asyncio
 
 
 class _Client:
