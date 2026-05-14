@@ -4,7 +4,7 @@ import {
     ArrowLeft, Bike, KeyRound, RefreshCw, Loader2, CheckCircle2,
     AlertCircle, Calendar as CalIcon, History, X as XIcon, Trash2,
     PlayCircle, Info, Cookie, ShieldCheck, ExternalLink, Wallet,
-    TrendingUp, FileJson,
+    TrendingUp, FileJson, FileSpreadsheet, Upload, Download,
 } from 'lucide-react';
 import api from '../api';
 import { fmtWon } from './BankSync';
@@ -45,6 +45,14 @@ export default function CoupangEatsModuleDetail() {
     const [endDate, setEndDate] = useState(ymd(yesterday));
     const [syncOrders, setSyncOrders] = useState(true);
     const [syncSettlements, setSyncSettlements] = useState(true);
+
+    // 월별 매출내역서 백필
+    const [monthlyPeriods, setMonthlyPeriods] = useState(null);   // {downloadablePeriods:[...]}
+    const [monthlySelectedYM, setMonthlySelectedYM] = useState('');
+    const [monthlyBusy, setMonthlyBusy] = useState(false);
+    const [monthlyResult, setMonthlyResult] = useState(null);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadYM, setUploadYM] = useState('');
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
@@ -194,6 +202,84 @@ export default function CoupangEatsModuleDetail() {
     async function handleRefreshDashboard() {
         await fetchDashboard();
         showMsg('실시간 데이터를 새로 가져왔습니다.');
+    }
+
+    // ─── 월별 매출내역서: 가용 기간 조회 ───
+    async function fetchMonthlyPeriods() {
+        try {
+            const res = await api.get('/coupang-eats/downloadable-periods');
+            const monthList = (res.data?.data?.downloadablePeriods || [])
+                .filter(p => p.periodUnitType === 'MONTH');
+            setMonthlyPeriods({ months: monthList, raw: res.data });
+            // 디폴트 선택: 가장 최신 (inclusiveEnd)
+            if (monthList.length > 0 && !monthlySelectedYM) {
+                setMonthlySelectedYM(monthList[0].inclusiveEnd);
+            }
+        } catch (e) {
+            setMonthlyPeriods({ months: [], error: e.response?.data?.detail || e.message });
+        }
+    }
+
+    useEffect(() => {
+        if (cred?.registered && cred?.cookies_present && cred?.store_id) {
+            fetchMonthlyPeriods();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cred?.registered, cred?.cookies_present, cred?.store_id]);
+
+    // ─── 월별 자동 다운로드 ───
+    async function handleAutoDownloadMonthly() {
+        if (!monthlySelectedYM) {
+            showErr('연-월을 선택하세요.');
+            return;
+        }
+        setMonthlyBusy(true);
+        setMonthlyResult(null);
+        setErr('');
+        try {
+            const res = await api.post('/coupang-eats/sync/monthly-excel', {
+                year_month: monthlySelectedYM,
+            });
+            setMonthlyResult(res.data);
+            showMsg(`${monthlySelectedYM} 엑셀 적재 완료 — 주문 ${res.data.parsed}건, settlement ${res.data.settlements_updated}일 채움`);
+            await fetchAll();
+        } catch (e) {
+            showErr('엑셀 다운로드/적재 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setMonthlyBusy(false);
+        }
+    }
+
+    // ─── 월별 수동 업로드 (Akamai 차단 폴백 / 다운로드 가능 기간 이전 백필) ───
+    async function handleUploadMonthly() {
+        if (!uploadFile) {
+            showErr('엑셀 파일을 선택하세요.');
+            return;
+        }
+        if (!/^\d{4}-\d{2}$/.test(uploadYM)) {
+            showErr('연-월 형식이 잘못되었습니다. YYYY-MM 형식 (예: 2026-01)');
+            return;
+        }
+        setMonthlyBusy(true);
+        setMonthlyResult(null);
+        setErr('');
+        try {
+            const fd = new FormData();
+            fd.append('file', uploadFile);
+            const res = await api.post(
+                `/coupang-eats/sync/monthly-excel/upload?year_month=${encodeURIComponent(uploadYM)}`,
+                fd,
+                { headers: { 'Content-Type': 'multipart/form-data' } },
+            );
+            setMonthlyResult(res.data);
+            showMsg(`${uploadYM} 업로드 적재 완료 — 주문 ${res.data.parsed}건, settlement ${res.data.settlements_updated}일 채움`);
+            setUploadFile(null);
+            await fetchAll();
+        } catch (e) {
+            showErr('업로드 적재 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setMonthlyBusy(false);
+        }
     }
 
     const cookieAgeDays = cred?.cookies_obtained_at
@@ -524,6 +610,146 @@ export default function CoupangEatsModuleDetail() {
                             동기화
                         </button>
                     </div>
+                </section>
+            )}
+
+            {/* 월별 매출내역서 (fee breakdown) — 자동수집 핵심 보강 */}
+            {cred?.registered && cred?.cookies_present && (
+                <section className="mb-6 bg-white border border-slate-200 rounded-xl p-5">
+                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2 mb-2">
+                        <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                        월별 매출내역서 (수수료 breakdown)
+                    </h2>
+                    <p className="text-xs text-slate-500 mb-4">
+                        매월 1회 — 사장님이 받는 그 엑셀(43컬럼). 중개수수료·배달비·광고비·멤버십 등 정산 항목별 분해.
+                        손익계산서의 쿠팡이츠 비용 정확도가 여기서 확정됩니다. 매월 6일 새벽 cron 자동 실행되며, 백필이 필요할 때만 수동 실행.
+                    </p>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* 자동 다운로드 */}
+                        <div className="border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Download className="w-4 h-4 text-emerald-600" />
+                                <h3 className="text-sm font-semibold text-slate-800">자동 다운로드 (권장)</h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-3">
+                                쿠팡이츠에서 직접 엑셀을 받아 적재. 전월까지만 가능 (당월은 마감 후).
+                            </p>
+
+                            {!monthlyPeriods ? (
+                                <p className="text-xs text-slate-400">가용 기간 조회 중…</p>
+                            ) : monthlyPeriods.error ? (
+                                <p className="text-xs text-red-600">{monthlyPeriods.error}</p>
+                            ) : monthlyPeriods.months?.length === 0 ? (
+                                <p className="text-xs text-slate-500">다운로드 가능한 월이 없습니다.</p>
+                            ) : (
+                                <>
+                                    <label className="block mb-3">
+                                        <span className="text-xs text-slate-600">연-월 선택</span>
+                                        <select
+                                            value={monthlySelectedYM}
+                                            onChange={(e) => setMonthlySelectedYM(e.target.value)}
+                                            className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        >
+                                            {/* inclusiveEnd 기준 최신 → 과거 12개월까지 */}
+                                            {monthlyPeriods.months.map(p => {
+                                                const opts = [];
+                                                const [sy, sm] = p.start.split('-').map(Number);
+                                                const [ey, em] = p.inclusiveEnd.split('-').map(Number);
+                                                let y = ey, m = em;
+                                                let count = 0;
+                                                while ((y > sy || (y === sy && m >= sm)) && count < 12) {
+                                                    const ym = `${y}-${String(m).padStart(2, '0')}`;
+                                                    opts.push(<option key={ym} value={ym}>{ym}</option>);
+                                                    if (m === 1) { y--; m = 12; } else m--;
+                                                    count++;
+                                                }
+                                                return opts;
+                                            })}
+                                        </select>
+                                    </label>
+                                    <button
+                                        onClick={handleAutoDownloadMonthly}
+                                        disabled={monthlyBusy || !monthlySelectedYM}
+                                        className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+                                    >
+                                        {monthlyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                                        {monthlySelectedYM} 다운로드 + 적재
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* 수동 업로드 (백필) */}
+                        <div className="border border-slate-200 rounded-lg p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Upload className="w-4 h-4 text-blue-600" />
+                                <h3 className="text-sm font-semibold text-slate-800">수동 업로드 (과거 백필)</h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-3">
+                                다운로드 가능 기간 이전 (1~3월 등) 또는 Akamai 차단 시. 로컬에 받아둔 xlsx 그대로 업로드.
+                            </p>
+
+                            <label className="block mb-3">
+                                <span className="text-xs text-slate-600">연-월</span>
+                                <input
+                                    type="text"
+                                    value={uploadYM}
+                                    onChange={(e) => setUploadYM(e.target.value)}
+                                    placeholder="2026-01"
+                                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono"
+                                />
+                            </label>
+
+                            <label className="block mb-3">
+                                <span className="text-xs text-slate-600">엑셀 파일 (.xlsx)</span>
+                                <input
+                                    type="file"
+                                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                                    className="mt-1 w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                                />
+                                {uploadFile && (
+                                    <span className="text-xs text-slate-600 block mt-1">
+                                        {uploadFile.name} ({Math.round(uploadFile.size / 1024)} KB)
+                                    </span>
+                                )}
+                            </label>
+
+                            <button
+                                onClick={handleUploadMonthly}
+                                disabled={monthlyBusy || !uploadFile || !/^\d{4}-\d{2}$/.test(uploadYM)}
+                                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+                            >
+                                {monthlyBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                업로드 + 적재
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 결과 표시 */}
+                    {monthlyResult && (
+                        <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900">
+                            <div className="font-semibold mb-1">
+                                ✓ {monthlyResult.year_month} 적재 완료
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div>파싱: <strong>{monthlyResult.parsed}</strong>건</div>
+                                <div>신규: <strong>{monthlyResult.inserted}</strong></div>
+                                <div>갱신: <strong>{monthlyResult.updated}</strong></div>
+                                <div>Settlement 채움: <strong>{monthlyResult.settlements_updated}</strong>일</div>
+                            </div>
+                            {monthlyResult.dates_without_settlement?.length > 0 && (
+                                <div className="mt-2 text-amber-800">
+                                    ⚠ 정산 매칭 안 됨 ({monthlyResult.dates_without_settlement.length}일):{' '}
+                                    {monthlyResult.dates_without_settlement.join(', ')}
+                                    <span className="block mt-0.5 text-amber-700">
+                                        (대부분 토요일 — 일·월 정산에 합쳐져 매칭 안 됨)
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </section>
             )}
 
