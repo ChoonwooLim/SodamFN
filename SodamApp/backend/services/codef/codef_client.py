@@ -122,6 +122,29 @@ class CodefClient:
         self._maybe_raise(data)
         return data  # 이론상 도달 안 함
 
+    def request_certification_raw(self, path: str, payload: dict) -> dict:
+        """간편인증 2단계 호출 — ``twoWayInfo`` + ``is2Way=True`` 필수.
+
+        SDK ``request_certification`` 은 ``_has_two_way_keyword`` 검사를 통과해야 함:
+          * ``payload['is2Way']`` 가 Python bool (True)
+          * ``payload['twoWayInfo']`` 가 dict 이고
+            ``jobIndex / threadIndex / jti / twoWayTimestamp`` 4개 키 모두 존재
+
+        반환은 raw response dict — 예외 변환을 호출자가 직접 처리.
+        """
+        raw_response = self._sdk.request_certification(path, self.service_type, payload)
+        data = self._parse(raw_response)
+        if self.env in {"demo", "sandbox"}:
+            import logging
+            logging.getLogger("codef.client").info(
+                "request_certification_raw response: env=%s path=%s payload_keys=%s response=%s",
+                self.env,
+                path,
+                list(payload.keys()),
+                str(data)[:1500],
+            )
+        return data
+
     def request_product(self, url: str, params: dict) -> RequestProductResult:
         raw_response = self._sdk.request_product(url, self.service_type, params)
         data = self._parse(raw_response)

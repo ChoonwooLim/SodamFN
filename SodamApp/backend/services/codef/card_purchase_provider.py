@@ -207,6 +207,9 @@ class CodefCardPurchaseProvider:
         """billing-list 용 기간 파라미터.
 
         startDate/endDate = YYYYMM (월 단위). months_back=3 이면 이번 달 포함 4개월치.
+
+        ``cardPassword`` 는 connection 등록 시 RSA 암호화 상태로 저장된 값을 그대로
+        첨부 (현대카드 등 25.10.30~ 인증여부 필수 카드사 대응). 평문/재암호화 X.
         """
         today = datetime.date.today()
         months: list[tuple[int, int]] = []
@@ -221,12 +224,16 @@ class CodefCardPurchaseProvider:
         end = max(months)
         start_str = f"{start[0]}{start[1]:02d}"
         end_str = f"{end[0]}{end[1]:02d}"
-        return {
+        params = {
             "connectedId": conn.connected_id,
             "organization": conn.organization_code,
             "startDate": start_str,
             "endDate": end_str,
         }
+        # 카드비번이 저장돼 있으면 첨부 (이미 RSA 암호화된 상태 — 재암호화 금지).
+        if getattr(conn, "card_password_encrypted", None):
+            params["cardPassword"] = conn.card_password_encrypted
+        return params
 
     @staticmethod
     def _parse_date(value) -> Optional[datetime.date]:

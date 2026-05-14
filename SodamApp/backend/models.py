@@ -1365,6 +1365,12 @@ class CodefConnection(SQLModel, table=True):
     # 신규 row 가 매출이면 'card_sales', 매입이면 'card_purchase', 은행이면 'bank'.
     connection_type: str = Field(default="card_sales", max_length=32, index=True,
                                   description="card_sales / card_purchase / bank")
+    # 카드비번 RSA 암호화 (조회 API 호출 시 cardPassword 로 사용 — 현대카드 등 필수).
+    # connectedId 등록 페이로드와 분리 보관 (등록 단계엔 ID/PW 만 전송).
+    card_password_encrypted: Optional[str] = Field(
+        default=None,
+        description="카드비번 RSA 암호화 (조회 API 호출 시 사용 — 현대카드 등 필수)",
+    )
     status: str = Field(default="active", index=True)
     last_verified_at: Optional[datetime.datetime] = None
     last_failed_at: Optional[datetime.datetime] = None

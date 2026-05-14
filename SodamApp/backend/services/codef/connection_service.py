@@ -53,12 +53,22 @@ class CodefConnectionService:
         biz_reg_no = self._get_business_reg_no(business_id)
         sdk_payload, auth_method = self._build_account_payload(org, auth_payload, biz_reg_no)
         result = self._client.create_account(sdk_payload)
+
+        # 카드비번은 connectedId 등록 페이로드와 분리 보관 —
+        # 매뉴얼상 등록 단계에는 ID/PW 만 전송. 카드비번은 조회 API 호출 시
+        # ``cardPassword`` 파라미터로 전달 (현대카드 등 일부 카드사 필수).
+        card_pw_encrypted = None
+        raw_card_pw = auth_payload.get("cardPassword")
+        if raw_card_pw:
+            card_pw_encrypted = self._client.encrypt_password(str(raw_card_pw))
+
         return self._upsert_connection(
             business_id=business_id,
             organization=org,
             connected_id=result.connected_id,
             auth_method=auth_method,
             connection_type=connection_type,
+            card_password_encrypted=card_pw_encrypted,
         )
 
     # ─── 간편인증 2-step 흐름 ────────────────────────
@@ -130,10 +140,33 @@ class CodefConnectionService:
                 raw=response,
             )
 
-        extra_info = (response.get("data") or {}).get("extraInfo") or {}
-        # extraInfo 가 비어있는 일부 케이스 — data 자체를 그대로 사용
+        # SDK 표준 — data 최상단에 twoWayInfo 필수 4 키가 들어옴.
+        # extraInfo 는 사장님 모바일 안내용 (인증요청 메시지 등) — 분리 보관.
+        data = response.get("data") or {}
+        required_two_way_keys = ("jobIndex", "threadIndex", "jti", "twoWayTimestamp")
+        if not all(k in data for k in required_two_way_keys):
+            from .exceptions import CodefAPIError
+            raise CodefAPIError(
+                code=code,
+                message=(
+                    f"간편인증 응답에 twoWayInfo 필수 필드 누락 "
+                    f"(jobIndex/threadIndex/jti/twoWayTimestamp). "
+                    f"받은 키: {list(data.keys())}"
+                ),
+                raw=response,
+            )
+
+        two_way_info = {
+            "jobIndex": int(data["jobIndex"]),
+            "threadIndex": int(data["threadIndex"]),
+            "twoWayTimestamp": int(data["twoWayTimestamp"]),
+            "jti": data["jti"],
+        }
+
+        # 사장님 모바일 안내용 부가 정보 (인증요청 메시지 등)
+        extra_info = data.get("extraInfo") or {}
         if not extra_info:
-            extra_info = response.get("data") or {}
+            extra_info = data
 
         now = datetime.datetime.utcnow()
         expires_at = now + datetime.timedelta(minutes=2)
@@ -145,7 +178,11 @@ class CodefConnectionService:
                 connection_type=connection_type,
                 auth_method=auth_method,
                 payload_json=json.dumps(sdk_payload, ensure_ascii=False),
-                extra_info_json=json.dumps(extra_info, ensure_ascii=False),
+                # extra_info_json 에 SDK 호출용 twoWayInfo 4 키 + UI 안내용 extraInfo 분리 보관.
+                extra_info_json=json.dumps(
+                    {"twoWayInfo": two_way_info, "extraInfo": extra_info},
+                    ensure_ascii=False,
+                ),
                 created_at=now,
                 expires_at=expires_at,
             )
@@ -165,8 +202,14 @@ class CodefConnectionService:
     def complete_simple_auth(self, auth_pending_id: int) -> CodefConnection:
         """간편인증 2단계 — 사장님 모바일 본인인증 완료 후 호출.
 
-        1단계에서 저장한 payload + extraInfo 를 그대로 재전송하되 ``is2Way=true`` +
-        ``twoWayInfo`` 를 첨부. CODEF 가 본인인증 완료 사실을 확인하면 connectedId 발급.
+        SDK 표준 (``easycodefpy.py`` line 50-72, 152-166):
+          * ``is2Way`` 는 Python ``bool`` 타입 (string "true" 금지 — SDK
+            ``_has_two_way_keyword`` 에서 line 63 ``type(is_2way) != bool`` 체크).
+          * ``twoWayInfo`` 는 ``dict`` 이며 ``jobIndex / threadIndex / jti /
+            twoWayTimestamp`` 4 키 모두 존재 (line 50-57 검증).
+          * 둘 다 SDK 페이로드 최상단(param level) 에 첨부 — accountList[0] 내부 X.
+          * SDK ``create_account`` 가 아닌 ``request_certification`` 으로 호출
+            (PATH = ``/v1/account/create``).
         """
         with Session(self.engine) as s:
             pending = s.get(PendingCodefAuth, auth_pending_id)
@@ -178,24 +221,69 @@ class CodefConnectionService:
                 s.commit()
                 raise ValueError("간편인증 만료. 처음부터 다시 시도해주세요.")
             sdk_payload = json.loads(pending.payload_json)
-            extra_info = json.loads(pending.extra_info_json or "{}")
+            extra_info_blob = json.loads(pending.extra_info_json or "{}")
             business_id = pending.business_id
             card_corp_code = pending.organization_code
             connection_type = pending.connection_type
             auth_method = pending.auth_method
 
-        # 2단계 — is2Way + twoWayInfo 첨부
-        account = sdk_payload["accountList"][0]
-        account["is2Way"] = "true"
-        account["twoWayInfo"] = extra_info
+        # extra_info_json 에는 1단계에서 추출한 twoWayInfo 4 키가 보관돼 있어야 함.
+        # (구 포맷 호환: 최상단에 jobIndex 등이 직접 있는 경우 그대로 사용.)
+        two_way_info = extra_info_blob.get("twoWayInfo")
+        if not two_way_info or not isinstance(two_way_info, dict):
+            # 구 포맷 fallback — 자체가 twoWayInfo 일 수도 (저장 직전 호환)
+            if all(k in extra_info_blob for k in
+                   ("jobIndex", "threadIndex", "jti", "twoWayTimestamp")):
+                two_way_info = {
+                    "jobIndex": int(extra_info_blob["jobIndex"]),
+                    "threadIndex": int(extra_info_blob["threadIndex"]),
+                    "twoWayTimestamp": int(extra_info_blob["twoWayTimestamp"]),
+                    "jti": extra_info_blob["jti"],
+                }
+            else:
+                from .exceptions import CodefAPIError
+                raise CodefAPIError(
+                    code="missing_two_way_info",
+                    message="pending 에 twoWayInfo 4 키가 없음 — 1단계부터 다시 시도",
+                    raw=extra_info_blob,
+                )
 
-        result = self._client.create_account(sdk_payload)
+        # ⚠ SDK 표준: param level (accountList[0] 내부 X). bool (string X).
+        sdk_payload["twoWayInfo"] = two_way_info
+        sdk_payload["is2Way"] = True
+
+        # ⚠ create_account 가 아닌 request_certification — PATH 는 /v1/account/create.
+        PATH_CREATE_ACCOUNT = "/v1/account/create"
+        result = self._client.request_certification_raw(PATH_CREATE_ACCOUNT, sdk_payload)
+
+        response_result = result.get("result", {}) or {}
+        response_code = response_result.get("code", "")
+        if response_code != "CF-00000":
+            from .exceptions import CodefAPIError
+            full_msg = (
+                f"{response_result.get('message', '')} "
+                f"{response_result.get('extraMessage', '')}"
+            ).strip()
+            raise CodefAPIError(
+                code=response_code or "unknown",
+                message=f"간편인증 2단계 실패: {full_msg}",
+                raw=result,
+            )
+
+        connected_id = (result.get("data") or {}).get("connectedId", "")
+        if not connected_id:
+            from .exceptions import CodefAPIError
+            raise CodefAPIError(
+                code="missing_connected_id",
+                message=f"간편인증 2단계 응답에 connectedId 없음 — raw: {str(result)[:500]}",
+                raw=result,
+            )
 
         org = get_organization(card_corp_code)
         conn = self._upsert_connection(
             business_id=business_id,
             organization=org,
-            connected_id=result.connected_id,
+            connected_id=connected_id,
             auth_method=auth_method,
             connection_type=connection_type,
         )
@@ -407,6 +495,9 @@ class CodefConnectionService:
             client_type = "P"
 
         if "password" in auth_payload:
+            # CODEF 매뉴얼: connectedId 등록 단계에는 ID + PW 만 전송.
+            # 카드비번/생년월일/CVC 는 등록 페이로드에 포함하지 말 것 (CF-04000 reject).
+            # 카드비번이 필요한 카드사(현대 등)는 조회 API 호출 시 cardPassword 파라미터로 전달.
             encrypted = self._client.encrypt_password(auth_payload["password"])
             account = {
                 "countryCode": "KR",
@@ -417,21 +508,6 @@ class CodefConnectionService:
                 "id": auth_payload["id"],
                 "password": encrypted,
             }
-            # 카드 비밀번호 (현대카드 등 일부 카드사 필수 — 2단계 인증).
-            # CODEF 표준: password2 (RSA 암호화). 평문 cardPassword 도 함께 전송 —
-            # 카드사별로 인식 키가 다를 수 있어 안전 차원에서 둘 다 포함.
-            card_pw = auth_payload.get("cardPassword")
-            if card_pw:
-                account["password2"] = self._client.encrypt_password(str(card_pw))
-                account["cardPassword"] = str(card_pw)
-            # 생년월일 (일부 카드사 필수, YYMMDD 또는 YYYYMMDD 평문)
-            birth = auth_payload.get("birthDate")
-            if birth:
-                account["birthDate"] = str(birth)
-            # CVC (드물게 필요)
-            cvc = auth_payload.get("cvc")
-            if cvc:
-                account["cvc"] = str(cvc)
             if client_type == "B" and biz_reg_no:
                 account["businessRegNo"] = biz_reg_no
             return {"accountList": [account]}, "id_pw"
@@ -459,11 +535,17 @@ class CodefConnectionService:
 
     def _upsert_connection(self, business_id, organization, connected_id,
                            auth_method,
-                           connection_type: str = "card_sales") -> CodefConnection:
+                           connection_type: str = "card_sales",
+                           card_password_encrypted: Optional[str] = None) -> CodefConnection:
         """connection_type 까지 포함해 unique 키로 upsert.
 
         같은 사업자·같은 카드사라도 매출(card_sales)·매입(card_purchase) connection 은
         별도 row 로 관리 — 서로 다른 connectedId 가 발급되기 때문.
+
+        Args:
+            card_password_encrypted: 이미 RSA 암호화된 카드비번. 조회 API 호출 시
+                ``cardPassword`` 파라미터로 그대로 사용 (현대카드 등 필수).
+                None 이면 row 의 기존 값을 변경하지 않음 (재인증 시 카드비번 미입력 보존).
         """
         with Session(self.engine) as s:
             stmt = select(CodefConnection).where(
@@ -483,6 +565,8 @@ class CodefConnectionService:
                 existing.last_error_code = None
                 existing.last_error_message = None
                 existing.deactivated_at = None
+                if card_password_encrypted is not None:
+                    existing.card_password_encrypted = card_password_encrypted
                 s.add(existing)
                 s.commit()
                 s.refresh(existing)
@@ -497,6 +581,7 @@ class CodefConnectionService:
                 connection_type=connection_type,
                 status="active",
                 last_verified_at=now,
+                card_password_encrypted=card_password_encrypted,
             )
             s.add(conn)
             s.commit()

@@ -190,17 +190,43 @@ def test_list_all_excludes_deactivated_only(db_engine, biz_id, fake_client):
 
 
 def _make_simple_auth_client(extra_info=None, code="CF-03002",
-                              second_step_connected_id="conn-simple-1"):
-    """간편인증 2-step 흐름 SDK 모의."""
+                              second_step_connected_id="conn-simple-1",
+                              omit_two_way_keys=False):
+    """간편인증 2-step 흐름 SDK 모의.
+
+    SDK 표준: 1단계 응답의 ``data`` 최상단에 twoWayInfo 4 키
+    (jobIndex / threadIndex / jti / twoWayTimestamp) 가 포함됨.
+    ``omit_two_way_keys=True`` 면 4 키 누락 시나리오 (실패 케이스 테스트).
+    """
     c = MagicMock()
     c.encrypt_password = MagicMock(return_value="encrypted-pw")
+
+    data_payload: dict = {
+        "extraInfo": extra_info or {"reqSeqNo": "seq-xyz",
+                                     "message": "카카오톡에서 인증해주세요"},
+    }
+    if not omit_two_way_keys:
+        data_payload.update({
+            "jobIndex": 0,
+            "threadIndex": 0,
+            "jti": "jti-xyz",
+            "twoWayTimestamp": 1700000000,
+        })
+
     c.create_account_raw = MagicMock(
         return_value={
             "result": {"code": code, "message": "추가인증요청"},
-            "data": {"extraInfo": extra_info or {"reqSeqNo": "seq-xyz",
-                                                  "message": "카카오톡에서 인증해주세요"}},
+            "data": data_payload,
         }
     )
+    # 2단계 — request_certification_raw 가 호출됨 (NOT create_account)
+    c.request_certification_raw = MagicMock(
+        return_value={
+            "result": {"code": "CF-00000", "message": "성공"},
+            "data": {"connectedId": second_step_connected_id},
+        }
+    )
+    # 등록(register_card) 흐름용 fallback
     c.create_account = MagicMock(
         return_value=CreateAccountResult(
             connected_id=second_step_connected_id, raw={}
@@ -294,11 +320,27 @@ def test_complete_simple_auth_creates_connection(db_engine, biz_id):
     assert conn.connection_type == "card_purchase"
     assert conn.status == "active"
 
-    # 2단계 SDK 호출 시 is2Way + twoWayInfo 가 첨부되어야 함
-    sent_payload = fake.create_account.call_args.args[0]
+    # 2단계는 request_certification_raw 로 호출됨 (NOT create_account).
+    fake.request_certification_raw.assert_called_once()
+    call_args = fake.request_certification_raw.call_args
+    # 첫 인자 = path, 두 번째 = payload
+    sent_path = call_args.args[0]
+    sent_payload = call_args.args[1]
+    assert sent_path == "/v1/account/create"
+
+    # SDK 표준: is2Way + twoWayInfo 는 sdk_payload TOP-LEVEL (NOT accountList[0] 안).
+    assert sent_payload.get("is2Way") is True  # Python bool, NOT string "true"
+    assert isinstance(sent_payload.get("twoWayInfo"), dict)
+    two_way = sent_payload["twoWayInfo"]
+    # 필수 4 키 모두 존재 + 타입 검증
+    assert "jobIndex" in two_way and isinstance(two_way["jobIndex"], int)
+    assert "threadIndex" in two_way and isinstance(two_way["threadIndex"], int)
+    assert "jti" in two_way and isinstance(two_way["jti"], str)
+    assert "twoWayTimestamp" in two_way and isinstance(two_way["twoWayTimestamp"], int)
+    # accountList[0] 내부에는 is2Way/twoWayInfo 가 없어야 함
     account = sent_payload["accountList"][0]
-    assert account.get("is2Way") == "true"
-    assert "twoWayInfo" in account
+    assert "is2Way" not in account
+    assert "twoWayInfo" not in account
 
     # pending row 가 삭제되었는지
     with Session(db_engine) as s:
@@ -310,6 +352,161 @@ def test_complete_simple_auth_rejects_unknown_id(db_engine, biz_id):
     svc = CodefConnectionService(engine=db_engine, client=fake)
     with pytest.raises(ValueError, match="pending auth .* 없음"):
         svc.complete_simple_auth(auth_pending_id=99999)
+
+
+def test_card_register_no_cardpassword_in_payload(db_engine, biz_id, fake_client):
+    """CODEF 매뉴얼: connectedId 등록 페이로드에는 ID + PW 만 — cardPassword/
+    password2/birthDate/cvc 절대 X (CF-04000 회피)."""
+    svc = CodefConnectionService(engine=db_engine, client=fake_client)
+    svc.register_card(
+        business_id=biz_id,
+        card_corp_code="0307",  # 현대카드
+        auth_payload={
+            "id": "myuser", "password": "mypass",
+            "cardPassword": "1234",  # 같이 들어와도 SDK 로 전송하면 안 됨
+            "birthDate": "19800101",
+            "cvc": "123",
+        },
+    )
+    sent_payload = fake_client.create_account.call_args.args[0]
+    account = sent_payload["accountList"][0]
+    # 매뉴얼 준수: 등록 단계엔 ID/PW + 식별값만
+    assert "cardPassword" not in account
+    assert "password2" not in account
+    assert "birthDate" not in account
+    assert "cvc" not in account
+    # 필수 필드는 그대로
+    assert account["id"] == "myuser"
+    assert account["loginType"] == "1"
+    assert account["organization"] == "0307"
+
+
+def test_card_register_stores_cardpassword_encrypted(db_engine, biz_id, fake_client):
+    """cardPassword 가 auth 에 포함되면 RSA 암호화 후 connection 컬럼에 저장."""
+    fake_client.encrypt_password.side_effect = lambda p: f"ENC({p})"
+    svc = CodefConnectionService(engine=db_engine, client=fake_client)
+    conn = svc.register_card(
+        business_id=biz_id,
+        card_corp_code="0307",
+        auth_payload={"id": "u", "password": "pw", "cardPassword": "9876"},
+    )
+    # row 의 card_password_encrypted 가 채워졌는지 확인
+    with Session(db_engine) as s:
+        row = s.get(CodefConnection, conn.id)
+    assert row.card_password_encrypted == "ENC(9876)"
+    # 평문 X
+    assert "9876" not in (row.card_password_encrypted or "")[:-2] or "ENC(" in row.card_password_encrypted
+
+
+def test_card_register_without_cardpassword_leaves_column_null(db_engine, biz_id, fake_client):
+    """cardPassword 없이 등록하면 card_password_encrypted 는 NULL 유지."""
+    svc = CodefConnectionService(engine=db_engine, client=fake_client)
+    conn = svc.register_card(
+        business_id=biz_id,
+        card_corp_code="0306",  # 신한 — 카드비번 미필요
+        auth_payload={"id": "u", "password": "pw"},
+    )
+    with Session(db_engine) as s:
+        row = s.get(CodefConnection, conn.id)
+    assert row.card_password_encrypted is None
+
+
+def test_simple_auth_two_way_info_param_level(db_engine, biz_id):
+    """SDK 검증 (easycodefpy._has_two_way_keyword): twoWayInfo 는 payload TOP-LEVEL.
+
+    1단계 응답의 data 최상단에서 4 키를 추출 → 2단계 호출 시 payload['twoWayInfo'] 에 배치.
+    """
+    fake = _make_simple_auth_client(second_step_connected_id="conn-2way")
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    start_res = svc.start_simple_auth(
+        business_id=biz_id,
+        card_corp_code="0307",
+        auth_payload={
+            "loginType": "kakao",
+            "userName": "홍",
+            "phoneNo": "01000000000",
+            "birthDate": "19800101",
+            "telecom": "0",
+        },
+    )
+    svc.complete_simple_auth(auth_pending_id=start_res["auth_pending_id"])
+
+    sent_payload = fake.request_certification_raw.call_args.args[1]
+    # ⚠ TOP-LEVEL (NOT account level)
+    assert "twoWayInfo" in sent_payload
+    assert "is2Way" in sent_payload
+    account = sent_payload["accountList"][0]
+    assert "twoWayInfo" not in account
+    assert "is2Way" not in account
+
+
+def test_simple_auth_is2way_is_bool(db_engine, biz_id):
+    """SDK ``_has_two_way_keyword`` line 63: ``type(is_2way) != bool`` 체크 통과."""
+    fake = _make_simple_auth_client()
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    start_res = svc.start_simple_auth(
+        business_id=biz_id,
+        card_corp_code="0307",
+        auth_payload={
+            "loginType": "kakao",
+            "userName": "홍",
+            "phoneNo": "01000000000",
+            "birthDate": "19800101",
+            "telecom": "0",
+        },
+    )
+    svc.complete_simple_auth(auth_pending_id=start_res["auth_pending_id"])
+
+    sent_payload = fake.request_certification_raw.call_args.args[1]
+    is_2way = sent_payload["is2Way"]
+    # SDK 가 type(x) != bool 로 검사 — string "true" 면 SDK 가 거부
+    assert is_2way is True
+    assert type(is_2way) is bool
+    assert is_2way != "true"  # string 절대 X
+
+
+def test_complete_simple_auth_uses_request_certification(db_engine, biz_id):
+    """2단계는 SDK ``request_certification`` 으로 호출 — ``create_account`` 아님."""
+    fake = _make_simple_auth_client(second_step_connected_id="conn-via-cert")
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    start_res = svc.start_simple_auth(
+        business_id=biz_id,
+        card_corp_code="0307",
+        auth_payload={
+            "loginType": "kakao",
+            "userName": "홍",
+            "phoneNo": "01000000000",
+            "birthDate": "19800101",
+            "telecom": "0",
+        },
+    )
+    conn = svc.complete_simple_auth(auth_pending_id=start_res["auth_pending_id"])
+
+    fake.request_certification_raw.assert_called_once()
+    # path 가 /v1/account/create
+    path_arg = fake.request_certification_raw.call_args.args[0]
+    assert path_arg == "/v1/account/create"
+    # 2단계는 create_account 가 호출되지 않아야 함 (1단계의 create_account_raw 와 구분)
+    assert fake.create_account.call_count == 0
+    assert conn.connected_id == "conn-via-cert"
+
+
+def test_start_simple_auth_rejects_missing_two_way_keys(db_engine, biz_id):
+    """1단계 응답 data 에 4 키 (jobIndex/threadIndex/jti/twoWayTimestamp) 누락이면 fail."""
+    fake = _make_simple_auth_client(omit_two_way_keys=True)
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    with pytest.raises(CodefAPIError, match="twoWayInfo 필수 필드 누락"):
+        svc.start_simple_auth(
+            business_id=biz_id,
+            card_corp_code="0307",
+            auth_payload={
+                "loginType": "kakao",
+                "userName": "홍",
+                "phoneNo": "01000000000",
+                "birthDate": "19800101",
+                "telecom": "0",
+            },
+        )
 
 
 def test_complete_simple_auth_rejects_expired(db_engine, biz_id):
