@@ -102,7 +102,7 @@ def get_status(
     bid = _resolve_bid(admin, x_view_as_business)
     with Session(engine) as s:
         from models import (
-            EasyPosSyncLog, CoupangEatsSyncLog,
+            EasyPosSyncLog, CoupangEatsSyncLog, BaeminSyncLog,
             CardFeeRateLearned, SettlementWatchAlert,
         )
         easypos_last = s.exec(
@@ -112,6 +112,10 @@ def get_status(
         coupang_last = s.exec(
             select(CoupangEatsSyncLog).where(CoupangEatsSyncLog.business_id == bid)
             .order_by(CoupangEatsSyncLog.started_at.desc()).limit(1)
+        ).first()
+        baemin_last = s.exec(
+            select(BaeminSyncLog).where(BaeminSyncLog.business_id == bid)
+            .order_by(BaeminSyncLog.started_at.desc()).limit(1)
         ).first()
         learned = s.exec(
             select(CardFeeRateLearned).where(CardFeeRateLearned.business_id == bid)
@@ -129,6 +133,7 @@ def get_status(
             "channels": {
                 "easypos": _log_dto(easypos_last),
                 "coupang_eats": _log_dto(coupang_last),
+                "baemin": _log_dto(baemin_last),
             },
             "fee_estimator": {
                 "card_corps_learned": len(learned),
@@ -334,6 +339,42 @@ def cron_coupang(_: None = Depends(_verify_cron_secret)):
             results.append({"business_id": bid, **r})
         except Exception as e:  # noqa: BLE001
             _cron_log.error("coupang cron failed bid=%s: %s", bid, e, exc_info=True)
+            results.append({"business_id": bid, "error": str(e)})
+    return {
+        "ok": True,
+        "target_date": yesterday.isoformat(),
+        "business_count": len(bids),
+        "results": results,
+    }
+
+
+@router.post("/cron/baemin")
+def cron_baemin(_: None = Depends(_verify_cron_secret)):
+    """04:30 — 배민 채널 수집 (전 사업장).
+
+    routers.baemin._run_sync 를 직접 호출하여 fan-out.
+    """
+    import datetime as _dt
+    from models import BaeminCredential
+    from routers.baemin import _run_sync as _baemin_run_sync
+
+    yesterday = _dt.date.today() - _dt.timedelta(days=1)
+    with Session(engine) as s:
+        bids = [r for r in s.exec(
+            select(BaeminCredential.business_id).where(
+                BaeminCredential.status.in_(["active"])
+            )
+        )]
+
+    results = []
+    for bid in bids:
+        try:
+            r = _baemin_run_sync(bid, yesterday, yesterday,
+                                 sync_orders=True, sync_settlements=True,
+                                 triggered_by="cron")
+            results.append({"business_id": bid, **r})
+        except Exception as e:  # noqa: BLE001
+            _cron_log.error("baemin cron failed bid=%s: %s", bid, e, exc_info=True)
             results.append({"business_id": bid, "error": str(e)})
     return {
         "ok": True,

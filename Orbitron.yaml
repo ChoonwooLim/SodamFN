@@ -228,6 +228,9 @@ crons:
   - name: auto-collection-settlement-watch
     schedule: "0 4 * * *"
     command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/settlement-watch'
+  - name: auto-collection-baemin
+    schedule: "30 4 * * *"
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/baemin'
   - name: auto-collection-learn-fee-rates
     schedule: "30 4 * * 0"
     command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/learn-fee-rates'
