@@ -516,6 +516,7 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
     // ID/PW 흐름 필드
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
+    const [cardNo, setCardNo] = useState('');                          // 카드번호 (현대 필수, KB 옵션)
     const [cardPasswordPrefix, setCardPasswordPrefix] = useState('');  // 카드비번 앞 2자리
     const [birthDate, setBirthDate] = useState('');                    // 생년월일 6자리 YYMMDD
     const [extraJson, setExtraJson] = useState('');
@@ -584,6 +585,22 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
         if (!isSimpleAuth) {
             // ── ID/PW 흐름 ──
             if (!userId || !password) { setErr('ID 와 비밀번호를 입력하세요.'); return; }
+            const cardNoDigits = cardNo.replace(/\D/g, '');
+            // 현대카드(0302) 는 cardNo + cardPassword 둘 다 필수 (CODEF API spec 2025-11-11)
+            if (orgCode === '0302') {
+                if (!cardNoDigits || cardNoDigits.length !== 16) {
+                    setErr('현대카드는 카드번호 16자리가 필수입니다.');
+                    return;
+                }
+                if (!cardPasswordPrefix || cardPasswordPrefix.length !== 4) {
+                    setErr('현대카드는 카드 비밀번호 전체 4자리가 필수입니다.');
+                    return;
+                }
+            }
+            if (cardNoDigits && cardNoDigits.length !== 16) {
+                setErr('카드번호는 숫자 16자리여야 합니다.');
+                return;
+            }
             if (cardPasswordPrefix && !/^\d{2}$|^\d{4}$/.test(cardPasswordPrefix)) {
                 setErr('카드 비밀번호는 숫자 2자리 (앞 2자리) 또는 4자리 (전체) 여야 합니다.');
                 return;
@@ -607,6 +624,7 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
             auth = {
                 id: userId,
                 password,
+                ...(cardNoDigits ? { cardNo: cardNoDigits } : {}),
                 ...(cardPasswordPrefix ? { cardPassword: cardPasswordPrefix } : {}),
                 ...(birthDate ? { birthDate } : {}),
                 ...(extra || {}),
@@ -786,6 +804,31 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                                             autoComplete="new-password"
                                         />
                                     </div>
+                                    {(orgCode === '0302' || orgCode === '0301') && (
+                                        <div>
+                                            <label className="block text-sm text-slate-700 mb-1.5">
+                                                카드번호
+                                                <span className="ml-1 text-xs text-slate-500 font-normal">
+                                                    {orgCode === '0302'
+                                                        ? '(현대카드 필수 — 16자리, - 없이)'
+                                                        : '(KB카드 카드소지확인 시 필요, 16자리)'}
+                                                </span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={cardNo}
+                                                onChange={(e) => setCardNo(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                                                placeholder="1234567812345678"
+                                                maxLength={16}
+                                                inputMode="numeric"
+                                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                autoComplete="off"
+                                            />
+                                            <p className="text-[11px] text-slate-500 mt-1">
+                                                ※ 카드 앞면 16자리. 마스킹(*) 처리된 자리도 실제 값과 달라도 인증됩니다.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div>
                                         <label className="block text-sm text-slate-700 mb-1.5">
                                             카드 비밀번호

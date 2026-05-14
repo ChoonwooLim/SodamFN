@@ -495,9 +495,12 @@ class CodefConnectionService:
             client_type = "P"
 
         if "password" in auth_payload:
-            # CODEF 매뉴얼: connectedId 등록 단계에는 ID + PW 만 전송.
-            # 카드비번/생년월일/CVC 는 등록 페이로드에 포함하지 말 것 (CF-04000 reject).
-            # 카드비번이 필요한 카드사(현대 등)는 조회 API 호출 시 cardPassword 파라미터로 전달.
+            # CODEF 매뉴얼 (API.xlsx page 5 — INPUT login Information 필수여부 상세):
+            # ID 로그인 시 카드사별 필수 필드 다름.
+            #   - 현대카드(0302): cardNo(O), cardPassword(O) — 둘 다 등록 페이로드 필수
+            #   - KB카드(0301):   cardNo(△), cardPassword(△) — 옵션 (사이트가 카드소지확인 요구 시)
+            #   - 그 외 카드사:   id + password 만으로 충분
+            # auth_payload 에 들어온 값만 포함 (없으면 빈 dict → 페이로드에 키 없음).
             encrypted = self._client.encrypt_password(auth_payload["password"])
             account = {
                 "countryCode": "KR",
@@ -508,6 +511,15 @@ class CodefConnectionService:
                 "id": auth_payload["id"],
                 "password": encrypted,
             }
+            card_no = auth_payload.get("cardNo")
+            if card_no:
+                # 평문 전송 (CODEF 페이로드 컨벤션: 숫자형 식별자는 평문)
+                account["cardNo"] = re.sub(r"[^0-9]", "", str(card_no))
+            card_password = auth_payload.get("cardPassword")
+            if card_password:
+                # RSA 암호화 (CODEF password 필드 컨벤션 — 조회 API 의
+                # cardPassword 파라미터와 동일한 암호화 값을 사용)
+                account["cardPassword"] = self._client.encrypt_password(str(card_password))
             if client_type == "B" and biz_reg_no:
                 account["businessRegNo"] = biz_reg_no
             return {"accountList": [account]}, "id_pw"

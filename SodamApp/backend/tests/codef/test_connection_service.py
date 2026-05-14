@@ -354,31 +354,51 @@ def test_complete_simple_auth_rejects_unknown_id(db_engine, biz_id):
         svc.complete_simple_auth(auth_pending_id=99999)
 
 
-def test_card_register_no_cardpassword_in_payload(db_engine, biz_id, fake_client):
-    """CODEF 매뉴얼: connectedId 등록 페이로드에는 ID + PW 만 — cardPassword/
-    password2/birthDate/cvc 절대 X (CF-04000 회피)."""
+def test_card_register_includes_cardno_and_cardpassword_when_provided(
+    db_engine, biz_id, fake_client
+):
+    """CODEF 매뉴얼 (API.xlsx page 5): 현대카드 ID 로그인 시 cardNo + cardPassword
+    가 등록 페이로드에 필수. 둘 다 누락 시 CF-04000 발생.
+
+    cardNo: 평문 (숫자만)
+    cardPassword: RSA 암호화 (CODEF password 필드 컨벤션)
+    """
+    fake_client.encrypt_password.side_effect = lambda p: f"ENC({p})"
     svc = CodefConnectionService(engine=db_engine, client=fake_client)
     svc.register_card(
         business_id=biz_id,
-        card_corp_code="0307",  # 현대카드
+        card_corp_code="0302",  # 현대카드
         auth_payload={
             "id": "myuser", "password": "mypass",
-            "cardPassword": "1234",  # 같이 들어와도 SDK 로 전송하면 안 됨
-            "birthDate": "19800101",
-            "cvc": "123",
+            "cardNo": "1234-5678-1234-5678",  # 하이픈 포함 → 숫자만 추출
+            "cardPassword": "1234",
         },
     )
     sent_payload = fake_client.create_account.call_args.args[0]
     account = sent_payload["accountList"][0]
-    # 매뉴얼 준수: 등록 단계엔 ID/PW + 식별값만
-    assert "cardPassword" not in account
-    assert "password2" not in account
+    assert account["id"] == "myuser"
+    assert account["password"] == "ENC(mypass)"
+    assert account["loginType"] == "1"
+    assert account["organization"] == "0302"
+    assert account["cardNo"] == "1234567812345678"          # 평문 (하이픈 제거)
+    assert account["cardPassword"] == "ENC(1234)"           # RSA 암호화
+    # birthDate/cvc 는 매뉴얼상 현대카드 등록 페이로드에 들어가지 않음
     assert "birthDate" not in account
     assert "cvc" not in account
-    # 필수 필드는 그대로
-    assert account["id"] == "myuser"
-    assert account["loginType"] == "1"
-    assert account["organization"] == "0307"
+
+
+def test_card_register_omits_optional_cardno_cardpassword(db_engine, biz_id, fake_client):
+    """cardNo/cardPassword 미제공 시 페이로드에 키 자체가 없음 — 신한·삼성 등은
+    ID/PW 만으로 충분."""
+    svc = CodefConnectionService(engine=db_engine, client=fake_client)
+    svc.register_card(
+        business_id=biz_id,
+        card_corp_code="0306",  # 신한카드 — cardNo/cardPassword 미필요
+        auth_payload={"id": "u", "password": "pw"},
+    )
+    account = fake_client.create_account.call_args.args[0]["accountList"][0]
+    assert "cardNo" not in account
+    assert "cardPassword" not in account
 
 
 def test_card_register_stores_cardpassword_encrypted(db_engine, biz_id, fake_client):
