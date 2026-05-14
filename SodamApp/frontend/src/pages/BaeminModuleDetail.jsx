@@ -4,6 +4,7 @@ import {
     ArrowLeft, Bike, KeyRound, RefreshCw, Loader2, CheckCircle2,
     AlertCircle, Calendar as CalIcon, History, X as XIcon, Trash2,
     Cookie, ShieldCheck, ExternalLink, TrendingUp, FileJson,
+    FileSpreadsheet, Upload, Eye,
 } from 'lucide-react';
 import api from '../api';
 import { fmtWon } from './BankSync';
@@ -41,6 +42,19 @@ export default function BaeminModuleDetail() {
     const [endDate, setEndDate] = useState(ymd(yesterday));
     const [syncOrders, setSyncOrders] = useState(true);
     const [syncSettlements, setSyncSettlements] = useState(true);
+
+    // ─── 월별 정산명세서 (xlsx 수동 업로드) ───
+    // 기본값: 전월 (현재 5월이면 4월). 사장님이 가장 자주 올리는 월.
+    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const [excelYear, setExcelYear] = useState(prevMonthDate.getFullYear());
+    const [excelMonth, setExcelMonth] = useState(prevMonthDate.getMonth() + 1);
+    const [excelPassword, setExcelPassword] = useState('630730');
+    const [excelFile, setExcelFile] = useState(null);
+    const [excelUploading, setExcelUploading] = useState(false);
+    const [excelUploadResult, setExcelUploadResult] = useState(null);
+    const [excelMonthList, setExcelMonthList] = useState([]);
+    const [excelDetailLoading, setExcelDetailLoading] = useState(false);
+    const [excelDetail, setExcelDetail] = useState(null);  // 선택된 월 요약
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
@@ -166,6 +180,72 @@ export default function BaeminModuleDetail() {
     async function handleRefreshDashboard() {
         await fetchDashboard();
         showMsg('최근 7일 데이터를 새로 가져왔습니다.');
+    }
+
+    // ─── 월별 정산명세서: 업로드된 월 list 조회 ───
+    const fetchExcelMonthList = useCallback(async () => {
+        try {
+            const res = await api.get('/baemin/monthly-excel/list');
+            setExcelMonthList(res.data || []);
+        } catch {
+            // silent — 권한 없거나 아직 업로드 없을 때
+        }
+    }, []);
+
+    useEffect(() => {
+        if (cred?.registered) {
+            fetchExcelMonthList();
+        }
+    }, [cred?.registered, fetchExcelMonthList]);
+
+    // ─── 월별 정산명세서: xlsx 업로드 ───
+    async function handleExcelUpload() {
+        if (!excelFile) {
+            showErr('업로드할 xlsx 파일을 선택해주세요.');
+            return;
+        }
+        setExcelUploading(true);
+        setExcelUploadResult(null);
+        setErr('');
+        try {
+            const form = new FormData();
+            form.append('year', String(excelYear));
+            form.append('month', String(excelMonth));
+            if (excelPassword) form.append('password', excelPassword);
+            form.append('file', excelFile);
+            const res = await api.post('/baemin/sync/monthly-excel/upload', form, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            setExcelUploadResult(res.data);
+            showMsg(
+                `${excelYear}년 ${excelMonth}월 정산명세서 업로드 완료 — `
+                + `상세 ${res.data.detail_rows_inserted ?? 0}행, `
+                + `입금금액 ${fmtWon(res.data.delivery_revenue_settlement || 0)}원`
+            );
+            setExcelFile(null);
+            // file input reset (uncontrolled)
+            const fileInput = document.getElementById('baemin-excel-file');
+            if (fileInput) fileInput.value = '';
+            await fetchExcelMonthList();
+        } catch (e) {
+            showErr('업로드 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setExcelUploading(false);
+        }
+    }
+
+    // ─── 월별 정산명세서: 선택 월 요약 조회 ───
+    async function loadExcelDetail(year, month) {
+        setExcelDetailLoading(true);
+        setExcelDetail(null);
+        try {
+            const res = await api.get(`/baemin/monthly-excel/${year}/${month}`);
+            setExcelDetail({ year, month, ...res.data });
+        } catch (e) {
+            showErr('요약 조회 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setExcelDetailLoading(false);
+        }
     }
 
     const cookieAgeDays = cred?.cookies_obtained_at
@@ -467,6 +547,200 @@ export default function BaeminModuleDetail() {
                 </section>
             )}
 
+            {/* 월별 정산명세서 (수수료 breakdown) — 사장님 수동 업로드 */}
+            {cred?.registered && (
+                <section className="mb-6 bg-white border border-slate-200 rounded-xl p-5">
+                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2 mb-2">
+                        <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                        월별 정산명세서 (수수료 breakdown)
+                    </h2>
+                    <p className="text-xs text-slate-500 mb-4">
+                        배민 사장님사이트(self.baemin.com)에서 다운로드한 월별 정산명세서 xlsx 를 업로드하세요.
+                        매월 1회 수동 작업 — 중개수수료·배달비·광고비·VAT 등 정산 항목별 분해로 손익 정확도가 확정됩니다.
+                    </p>
+
+                    {/* 업로드 폼 */}
+                    <div className="border border-slate-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Upload className="w-4 h-4 text-blue-600" />
+                            <h3 className="text-sm font-semibold text-slate-800">엑셀 업로드</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                            <label className="block">
+                                <span className="text-xs text-slate-600">연도</span>
+                                <select
+                                    value={excelYear}
+                                    onChange={(e) => setExcelYear(parseInt(e.target.value, 10))}
+                                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                >
+                                    {(() => {
+                                        const opts = [];
+                                        const startYear = 2024;
+                                        const endYear = today.getFullYear();
+                                        for (let y = endYear; y >= startYear; y--) {
+                                            opts.push(<option key={y} value={y}>{y}년</option>);
+                                        }
+                                        return opts;
+                                    })()}
+                                </select>
+                            </label>
+
+                            <label className="block">
+                                <span className="text-xs text-slate-600">월</span>
+                                <select
+                                    value={excelMonth}
+                                    onChange={(e) => setExcelMonth(parseInt(e.target.value, 10))}
+                                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                >
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                        <option key={m} value={m}>{m}월</option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="block">
+                                <span className="text-xs text-slate-600">엑셀 비밀번호</span>
+                                <input
+                                    type="password"
+                                    value={excelPassword}
+                                    onChange={(e) => setExcelPassword(e.target.value)}
+                                    placeholder="630730"
+                                    className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono"
+                                />
+                            </label>
+                        </div>
+
+                        <label className="block mb-3">
+                            <span className="text-xs text-slate-600">엑셀 파일 (.xlsx)</span>
+                            <input
+                                id="baemin-excel-file"
+                                type="file"
+                                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
+                                className="mt-1 w-full text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200"
+                            />
+                            {excelFile && (
+                                <span className="text-xs text-slate-600 block mt-1">
+                                    {excelFile.name} ({Math.round(excelFile.size / 1024)} KB)
+                                </span>
+                            )}
+                        </label>
+
+                        <button
+                            onClick={handleExcelUpload}
+                            disabled={excelUploading || !excelFile}
+                            className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+                        >
+                            {excelUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            {excelYear}년 {excelMonth}월 업로드 + 적재
+                        </button>
+
+                        {excelUploadResult && (
+                            <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900">
+                                <div className="font-semibold mb-1">
+                                    ✓ {excelUploadResult.year}년 {excelUploadResult.month}월 적재 완료
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    <div>상세 행: <strong>{excelUploadResult.detail_rows_inserted ?? 0}</strong>건</div>
+                                    <div>총 매출: <strong>{fmtWon(excelUploadResult.delivery_revenue_total_sales || 0)}원</strong></div>
+                                    <div>입금금액: <strong>{fmtWon(excelUploadResult.delivery_revenue_settlement || 0)}원</strong></div>
+                                </div>
+                                <div className="mt-1 text-emerald-700">파일: {excelUploadResult.file_name}</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 업로드된 월 list */}
+                    <div>
+                        <h3 className="text-sm font-semibold text-slate-800 mb-2">업로드 이력</h3>
+                        {excelMonthList.length === 0 ? (
+                            <p className="text-xs text-slate-500 py-4 text-center bg-slate-50 rounded-lg">
+                                아직 업로드된 월별 정산명세서가 없습니다.
+                            </p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                    <thead className="text-xs text-slate-500 border-b border-slate-200">
+                                        <tr>
+                                            <th className="text-left py-2 px-2">월</th>
+                                            <th className="text-right py-2 px-2">입금금액 (H)</th>
+                                            <th className="text-right py-2 px-2">상세 행수</th>
+                                            <th className="text-left py-2 px-2">업로드 일시</th>
+                                            <th className="text-center py-2 px-2">상세보기</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {excelMonthList.map((m) => (
+                                            <tr key={`${m.year}-${m.month}`} className="border-b border-slate-100 last:border-0">
+                                                <td className="py-2 px-2 text-slate-800 whitespace-nowrap font-medium">
+                                                    {m.year}년 {m.month}월
+                                                </td>
+                                                <td className="py-2 px-2 text-slate-800 text-right whitespace-nowrap">
+                                                    {fmtWon(m.deposit_total || 0)}원
+                                                </td>
+                                                <td className="py-2 px-2 text-slate-700 text-right">
+                                                    {m.detail_rows || 0}건
+                                                </td>
+                                                <td className="py-2 px-2 text-slate-500 text-xs whitespace-nowrap">
+                                                    {m.uploaded_at ? new Date(m.uploaded_at).toLocaleString('ko-KR') : '-'}
+                                                </td>
+                                                <td className="py-2 px-2 text-center">
+                                                    <button
+                                                        onClick={() => loadExcelDetail(m.year, m.month)}
+                                                        disabled={excelDetailLoading}
+                                                        className="px-2 py-1 text-xs border border-slate-300 rounded-md hover:bg-slate-50 disabled:opacity-50 inline-flex items-center gap-1"
+                                                    >
+                                                        <Eye className="w-3 h-3" />
+                                                        요약
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 선택 월 요약 카드 (A~H 8개) */}
+                    {excelDetailLoading && (
+                        <div className="mt-4 text-sm text-slate-500 flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" /> 요약 가져오는 중…
+                        </div>
+                    )}
+                    {excelDetail?.registered && excelDetail.summary && (
+                        <div className="mt-4 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-sm font-semibold text-slate-800">
+                                    {excelDetail.year}년 {excelDetail.month}월 정산 요약
+                                </h3>
+                                <button
+                                    onClick={() => setExcelDetail(null)}
+                                    className="p-1 hover:bg-slate-200 rounded-md"
+                                    title="닫기"
+                                >
+                                    <XIcon className="w-4 h-4 text-slate-500" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <SummaryCard label="(A) 주문중개" value={excelDetail.summary.order_brokerage_total} />
+                                <SummaryCard label="(B) 배달" value={excelDetail.summary.delivery_total} negative />
+                                <SummaryCard label="(C) 그외" value={excelDetail.summary.etc_total} negative />
+                                <SummaryCard label="(D) 기타" value={excelDetail.summary.misc_total} />
+                                <SummaryCard label="(E) 부가세" value={excelDetail.summary.vat_total} negative />
+                                <SummaryCard label="(F) 우리가게클릭" value={excelDetail.summary.ad_total} negative />
+                                <SummaryCard label="(G) 배민오더" value={excelDetail.summary.baemin_order_total} />
+                                <SummaryCard label="(H) 입금금액" value={excelDetail.summary.deposit_total} highlight />
+                            </div>
+                            <div className="mt-3 text-xs text-slate-500">
+                                상세 {excelDetail.detail_rows}건 · 파일 {excelDetail.file_name} · 업로드 {excelDetail.uploaded_at ? new Date(excelDetail.uploaded_at).toLocaleString('ko-KR') : '-'}
+                            </div>
+                        </div>
+                    )}
+                </section>
+            )}
+
             {/* 동기화 이력 */}
             <section className="bg-white border border-slate-200 rounded-xl p-5">
                 <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2 mb-3">
@@ -575,6 +849,32 @@ export default function BaeminModuleDetail() {
                     onClose={() => setCookieModalOpen(false)}
                 />
             )}
+        </div>
+    );
+}
+
+
+// ─── 월별 정산명세서 요약 카드 ───────────────────────────
+
+function SummaryCard({ label, value, negative = false, highlight = false }) {
+    const v = value || 0;
+    const display = (negative && v > 0) ? `-${fmtWon(v)}원` : `${fmtWon(v)}원`;
+    return (
+        <div className={
+            highlight
+                ? 'bg-emerald-50 border border-emerald-200 rounded-lg p-3'
+                : 'bg-white border border-slate-200 rounded-lg p-3'
+        }>
+            <div className={highlight ? 'text-xs text-emerald-700 mb-1' : 'text-xs text-slate-500 mb-1'}>
+                {label}
+            </div>
+            <div className={
+                highlight
+                    ? 'text-base font-bold text-emerald-800'
+                    : (negative ? 'text-sm font-semibold text-rose-700' : 'text-sm font-semibold text-slate-800')
+            }>
+                {display}
+            </div>
         </div>
     );
 }
