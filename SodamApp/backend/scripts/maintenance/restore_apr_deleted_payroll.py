@@ -55,9 +55,14 @@ with Session(engine) as session:
             print(f"  [SKIP] {nm} (id={sid}): 이미 4월 Payroll 존재 — 건드리지 않음")
             continue
 
+        # business_id 필수 — staff.business_id 우선, 없으면 소담김밥(=1) 기본값.
+        # Why: 멀티테넌트 P/L sync 시 business_id=NULL 인 Payroll 은 사업장 화면에서
+        #      bid 필터에 걸려 인건비가 누락되는 버그가 있었음 (2026-04 사고).
+        biz_id = (staff.business_id if staff and getattr(staff, 'business_id', None) else 1)
         p = Payroll(
             staff_id=sid,
             month='2026-04',
+            business_id=biz_id,
             base_pay=base,
             bonus_holiday=hol,
             bonus_special=0,
