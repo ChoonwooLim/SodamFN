@@ -81,7 +81,7 @@ def earliest_cookie_expiry(cookies: list[dict]) -> Optional[datetime.datetime]:
     if not candidates:
         return None
     try:
-        return datetime.datetime.utcfromtimestamp(min(candidates))
+        return datetime.datetime.fromtimestamp(min(candidates), tz=datetime.timezone.utc)
     except (OSError, OverflowError, ValueError):
         return None
 
@@ -162,7 +162,10 @@ class BaeminClient:
             "x-requested-with": "XMLHttpRequest",
             # HAR 캡처 시 사용된 값들. 향후 timestamp 부분 갱신 로직 추가 가능.
             "x-pathname-trace-key": pathname_trace,
-            "x-web-version": "v20260513082427",  # TODO: 주기적 갱신 필요할 수 있음
+            # x-web-version: 배민 사장님사이트 빌드 버전. 사이트 재배포 시 갱신 필요.
+            # 만료되면 401/403 또는 HTML response → CookieInvalidError. 갱신 절차는
+            # _build_x_e_request docstring 의 절차와 동일 (Network 탭에서 x-web-version 추출).
+            "x-web-version": "v20260513082427",
         }
         # x-e-request 는 호출별 timestamp 가 바뀜. 일단 placeholder — 실제 운영 시 갱신 로직 추가 검토.
         h["x-e-request"] = self._build_x_e_request()
@@ -174,7 +177,13 @@ class BaeminClient:
         """x-e-request 헤더 — 형식: {terminalId}|{epoch_ms}|{fingerprint}.
 
         HAR 캡처에서 추출한 terminalId/fingerprint 를 재사용. timestamp 는 매 호출 갱신.
-        TODO(추후): 운영 중 만료되면 사장님이 다시 캡처하거나, 헤더 검증 우회 패턴 발견.
+
+        ⚠ 만료 처리: terminalId 또는 fingerprint 가 만료되면 배민이 401/403 또는
+        HTML 차단 페이지 반환 → CookieInvalidError. 운영자 대처:
+          1) 사장님이 ceo.baemin.com 또는 self.baemin.com 에 로그인 후 F12 → Network
+          2) /v3/settle/history/summary 같은 API 호출의 x-e-request 헤더 값 복사
+          3) 이 함수의 terminal_id / fingerprint 상수를 갱신 → 재배포
+          4) 또는 baemin_har_notes.md 에 적힌 캡처 절차 재수행
         """
         terminal_id = "72im16"
         fingerprint = "79e94e65cee5a0fd6b67748ef1056cc86eee6872d3bf6eee9241f9dff8f"
@@ -276,6 +285,8 @@ class BaeminClient:
         except Exception as e:  # noqa: BLE001
             raise BaeminError(f"JSON 파싱 실패 [/v4/orders]: {e}") from e
         if not isinstance(raw, dict):
+            log.warning("baemin /v4/orders: unexpected response type %s — returning empty",
+                        type(raw).__name__)
             return OrderFetchResult(0, 0, [], {})
         return OrderFetchResult(
             total_sale_price=int(raw.get("totalPayAmount") or 0),
@@ -292,9 +303,9 @@ class BaeminClient:
                          limit: int = 10,
                          order_status: str = "CLOSED",
                          max_pages: int = 200) -> list[dict]:
-        """모든 페이지 순회. HAR 패턴: offset += limit 까지 totalSize 도달."""
+        """모든 페이지 순회. totalSize 는 page 0 에서만 캡처 (mid-pagination 서버 변경 대비)."""
         all_orders: list[dict] = []
-        total_target = 0
+        total_target: Optional[int] = None
         for page in range(max_pages):
             offset = page * limit
             res = self.fetch_orders(shop_owner_number, start_date, end_date,
@@ -305,7 +316,8 @@ class BaeminClient:
                 page, offset, len(res.orders), res.total_order_count,
             )
             all_orders.extend(res.orders)
-            total_target = res.total_order_count
+            if total_target is None:
+                total_target = res.total_order_count
             if not res.orders:
                 break
             if total_target > 0 and len(all_orders) >= total_target:
@@ -343,6 +355,8 @@ class BaeminClient:
         except Exception as e:  # noqa: BLE001
             raise BaeminError(f"JSON 파싱 실패 [/v3/settle/history/summary]: {e}") from e
         if not isinstance(raw, dict):
+            log.warning("baemin /v3/settle/history/summary: unexpected response type %s — returning empty",
+                        type(raw).__name__)
             return SettlementFetchResult(0, 0, [], {})
         total_elements = int(raw.get("totalSize") or 0)
         # /v3/settle 은 total_pages 직접 안 줌 — size 로 계산
@@ -362,13 +376,17 @@ class BaeminClient:
                               size: int = 10,
                               settle_type: str = "ALL",
                               max_pages: int = 100) -> list[dict]:
+        """모든 정산 페이지 순회. totalElements 는 page 0 에서만 캡처 (mid-pagination 서버 변경 대비)."""
         all_rows: list[dict] = []
+        total_target: Optional[int] = None
         for page in range(max_pages):
             res = self.fetch_settlements(shop_owner_number, start_date, end_date,
                                          page=page, size=size, settle_type=settle_type)
             all_rows.extend(res.contents)
+            if total_target is None:
+                total_target = res.total_elements
             if not res.contents:
                 break
-            if res.total_elements > 0 and len(all_rows) >= res.total_elements:
+            if total_target > 0 and len(all_rows) >= total_target:
                 break
         return all_rows

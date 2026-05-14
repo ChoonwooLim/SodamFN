@@ -1,10 +1,17 @@
 """BaeminClient 기본 동작 — HAR 없이 검증 가능한 부분."""
+import datetime
 import json
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
 import pytest
 from services.baemin_service import (
     BaeminClient, BaeminError, CookieInvalidError,
+    OrderFetchResult, SettlementFetchResult,
     serialize_cookies, deserialize_cookies, earliest_cookie_expiry,
 )
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 def test_serialize_roundtrip():
@@ -19,14 +26,13 @@ def test_deserialize_invalid_returns_empty():
 
 
 def test_earliest_expiry_skips_session_cookies():
-    import datetime
     cookies = [
         {"name": "A", "value": "1", "expires": -1},
         {"name": "B", "value": "2", "expires": 1750000000.0},
         {"name": "C", "value": "3", "expires": 1700000000.0},
     ]
     earliest = earliest_cookie_expiry(cookies)
-    assert earliest == datetime.datetime.utcfromtimestamp(1700000000.0)
+    assert earliest == datetime.datetime.fromtimestamp(1700000000.0, tz=datetime.timezone.utc)
 
 
 def test_client_can_be_constructed_with_no_cookies():
@@ -44,15 +50,6 @@ def test_client_loads_cookies_without_error():
 
 
 # ───── HAR fixture 기반 단위 테스트 ─────
-import json
-import datetime
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-from services.baemin_service import (
-    OrderFetchResult, SettlementFetchResult,
-)
-
-FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
 def _mock_json_response(data: dict):
