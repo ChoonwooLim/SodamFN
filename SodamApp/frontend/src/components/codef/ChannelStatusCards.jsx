@@ -154,6 +154,7 @@ export default function ChannelStatusCards() {
                                         <div className={`text-xs font-medium ${meta.text}`}>
                                             {meta.label}
                                             {hoursLabel ? ` · ${hoursLabel}` : ''}
+                                            {ch.expires_estimated && hoursLabel ? ' (추정)' : ''}
                                         </div>
                                     </div>
                                 </div>

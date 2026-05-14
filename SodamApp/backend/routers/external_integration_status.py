@@ -35,6 +35,12 @@ router = APIRouter(prefix="/api/external-integration", tags=["external-integrati
 EXPIRING_SOON_HOURS = 12.0
 FAILED_THRESHOLD = 3   # consecutive_failures ≥ 3 → failed
 
+# 휴리스틱: 쿠팡이츠/배민의 manual 쿠키 중 일부가 session cookie (expires=-1)
+# 라 cookies_expires_at 가 NULL 인 경우가 흔함. 그러면 만료를 추적 못해
+# 사전 알림이 안 됨. cookies_obtained_at 기준 보수적 TTL 로 추정.
+# 관찰: 쿠팡이츠 unify-token 은 통상 24~36시간, 배민도 비슷. 보수적 30h.
+ESTIMATED_COOKIE_TTL_HOURS = 30.0
+
 
 def _resolve_bid(admin: User, x_view_as_business: Optional[int]) -> int:
     bid = admin.business_id
@@ -50,26 +56,41 @@ def _classify_status(*,
                      expires_at: Optional[datetime.datetime],
                      consecutive_failures: int,
                      cred_status: Optional[str],
-                     now: datetime.datetime) -> tuple[str, Optional[float]]:
-    """채널 상태 분류 + 만료까지 남은 시간(h) 반환."""
+                     now: datetime.datetime,
+                     cookies_obtained_at: Optional[datetime.datetime] = None,
+                     ) -> tuple[str, Optional[float], bool]:
+    """채널 상태 분류 + 만료까지 남은 시간(h) + 만료시간이 추정값인지 반환.
+
+    expires_at 가 NULL 인 경우 (쿠팡이츠/배민의 session 쿠키 다수) →
+    cookies_obtained_at + ESTIMATED_COOKIE_TTL_HOURS 로 추정.
+    추정이라도 사장님이 갱신 타이밍 알 수 있도록 ESTIMATED 마커 함께 반환.
+    """
     if not configured:
-        return "not_configured", None
+        return "not_configured", None, False
 
     # 명시적 실패 상태 우선
     if cred_status in ("cookie_invalid", "failed", "expired"):
-        return "failed", None
+        return "failed", None, False
     if consecutive_failures and consecutive_failures >= FAILED_THRESHOLD:
-        return "failed", None
+        return "failed", None, False
 
-    if expires_at is None:
-        return "unknown", None
+    effective_expires = expires_at
+    is_estimated = False
+    if effective_expires is None and cookies_obtained_at is not None:
+        effective_expires = cookies_obtained_at + datetime.timedelta(
+            hours=ESTIMATED_COOKIE_TTL_HOURS
+        )
+        is_estimated = True
 
-    delta = (expires_at - now).total_seconds() / 3600.0
+    if effective_expires is None:
+        return "unknown", None, False
+
+    delta = (effective_expires - now).total_seconds() / 3600.0
     if delta <= 0:
-        return "expired", delta
+        return "expired", delta, is_estimated
     if delta <= EXPIRING_SOON_HOURS:
-        return "expiring_soon", delta
-    return "healthy", delta
+        return "expiring_soon", delta, is_estimated
+    return "healthy", delta, is_estimated
 
 
 def _build_coupang_eats_status(session: Session,
@@ -82,9 +103,10 @@ def _build_coupang_eats_status(session: Session,
     ).first()
     configured = cred is not None
 
-    status, hours_left = _classify_status(
+    status, hours_left, is_estimated = _classify_status(
         configured=configured,
         expires_at=cred.cookies_expires_at if cred else None,
+        cookies_obtained_at=cred.cookies_obtained_at if cred else None,
         consecutive_failures=cred.consecutive_failures if cred else 0,
         cred_status=cred.status if cred else None,
         now=now,
@@ -97,6 +119,8 @@ def _build_coupang_eats_status(session: Session,
         "status": status,
         "expires_at": utc_iso(cred.cookies_expires_at) if cred else None,
         "expires_in_hours": round(hours_left, 1) if hours_left is not None else None,
+        "expires_estimated": is_estimated,
+        "cookies_obtained_at": utc_iso(cred.cookies_obtained_at) if cred else None,
         "last_verified_at": utc_iso(cred.last_verified_at) if cred else None,
         "last_failed_at": utc_iso(cred.last_failed_at) if cred else None,
         "last_error_message": (cred.last_error_message if cred else None),
@@ -120,9 +144,10 @@ def _build_baemin_status(session: Session,
     ).first()
     configured = cred is not None
 
-    status, hours_left = _classify_status(
+    status, hours_left, is_estimated = _classify_status(
         configured=configured,
         expires_at=cred.cookies_expires_at if cred else None,
+        cookies_obtained_at=cred.cookies_obtained_at if cred else None,
         consecutive_failures=cred.consecutive_failures if cred else 0,
         cred_status=cred.status if cred else None,
         now=now,
@@ -135,6 +160,8 @@ def _build_baemin_status(session: Session,
         "status": status,
         "expires_at": utc_iso(cred.cookies_expires_at) if cred else None,
         "expires_in_hours": round(hours_left, 1) if hours_left is not None else None,
+        "expires_estimated": is_estimated,
+        "cookies_obtained_at": utc_iso(cred.cookies_obtained_at) if cred else None,
         "last_verified_at": utc_iso(cred.last_verified_at) if cred else None,
         "last_failed_at": utc_iso(cred.last_failed_at) if cred else None,
         "last_error_message": (cred.last_error_message if cred else None),
