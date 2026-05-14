@@ -66,7 +66,7 @@ export default function Sidebar() {
             return;
         }
         const fetchAlerts = () => {
-            api.get('/api/external-integration/status')
+            api.get('/external-integration/status')
                 .then(res => setExtIntegrationAlerts(res.data.alert_count || 0))
                 .catch(() => setExtIntegrationAlerts(0));
         };

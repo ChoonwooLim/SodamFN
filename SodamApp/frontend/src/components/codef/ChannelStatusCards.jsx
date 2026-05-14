@@ -96,7 +96,7 @@ export default function ChannelStatusCards() {
     useEffect(() => {
         let cancelled = false;
         const fetchStatus = () => {
-            api.get('/api/external-integration/status')
+            api.get('/external-integration/status')
                 .then(res => { if (!cancelled) { setData(res.data); setErr(''); } })
                 .catch(e => { if (!cancelled) setErr(e.response?.data?.detail || '상태 조회 실패'); })
                 .finally(() => { if (!cancelled) setLoading(false); });
