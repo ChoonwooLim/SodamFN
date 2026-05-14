@@ -41,3 +41,82 @@ def test_client_loads_cookies_without_error():
     out = c.get_cookies()
     assert any(x["name"] == "AUTH" for x in out)
     c.close()
+
+
+# ───── HAR fixture 기반 단위 테스트 ─────
+import json
+import datetime
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+from services.baemin_service import (
+    OrderFetchResult, SettlementFetchResult,
+)
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+
+def _mock_json_response(data: dict):
+    """200 JSON response stub."""
+    m = MagicMock()
+    m.status_code = 200
+    m.headers = {"content-type": "application/json"}
+    m.json.return_value = data
+    m.text = json.dumps(data)
+    return m
+
+
+def test_fetch_orders_parses_har_sample():
+    sample = json.loads((FIXTURE_DIR / "orders_sample.json").read_text(encoding="utf-8"))
+    c = BaeminClient(cookies=[])
+    with patch.object(c._session, "get", return_value=_mock_json_response(sample)):
+        result = c.fetch_orders(
+            shop_owner_number="202504230008",
+            start_date=datetime.date(2026, 4, 1),
+            end_date=datetime.date(2026, 4, 30),
+        )
+    assert isinstance(result, OrderFetchResult)
+    assert result.total_order_count == sample.get("totalSize")
+    assert result.total_sale_price == sample.get("totalPayAmount")
+    assert result.orders == sample.get("contents")
+    # 첫 주문 구조 검증
+    if result.orders:
+        first = result.orders[0]
+        assert "order" in first
+        assert "orderNumber" in first["order"]
+        assert "payAmount" in first["order"]
+        assert "orderDateTime" in first["order"]
+    c.close()
+
+
+def test_fetch_settlements_parses_har_sample():
+    sample = json.loads((FIXTURE_DIR / "settlements_sample.json").read_text(encoding="utf-8"))
+    c = BaeminClient(cookies=[])
+    with patch.object(c._session, "get", return_value=_mock_json_response(sample)):
+        result = c.fetch_settlements(
+            shop_owner_number="202504230008",
+            start_date=datetime.date(2026, 5, 14),
+            end_date=datetime.date(2026, 5, 17),
+        )
+    assert isinstance(result, SettlementFetchResult)
+    assert result.total_elements == sample.get("totalSize")
+    assert isinstance(result.contents, list)
+    if result.contents:
+        first = result.contents[0]
+        assert "giveId" in first
+        assert "giveAmount" in first
+        assert "depositDueDate" in first
+    c.close()
+
+
+def test_whoami_url_uses_session_user_profile():
+    """whoami 가 /v1/session/user-profile 호출하는지 + 응답 그대로 반환."""
+    c = BaeminClient(cookies=[])
+    sample = {"memNo": "x", "memName": "Test", "shopOwnerNumber": "202504230008"}
+    with patch.object(c._session, "get", return_value=_mock_json_response(sample)) as mg:
+        result = c.whoami()
+    assert result == sample
+    # 호출 URL 검증
+    args, kwargs = mg.call_args
+    called_url = args[0] if args else kwargs.get("url")
+    assert "/v1/session/user-profile" in called_url
+    c.close()

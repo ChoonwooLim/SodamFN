@@ -1,0 +1,35 @@
+{
+  "foodSuccess": true,
+  "commerceSuccess": true,
+  "contents": [
+    {
+      "giveId": 518740754,
+      "depositDueDate": "2026-05-15",
+      "settleCode": "FOOD",
+      "settleCodeName": "음식배달",
+      "giveStatus": "REQUEST",
+      "giveStatusName": "입금요청",
+      "giveTarget": "SHOP_OWNER",
+      "giveCycleCode": "DAY_1",
+      "giveStartDate": "2026-05-12",
+      "giveEndDate": "2026-05-12",
+      "giveAmount": 110000,
+      "giveSettleOneDay": true
+    },
+    {
+      "giveId": 518573009,
+      "depositDueDate": "2026-05-14",
+      "settleCode": "FOOD",
+      "settleCodeName": "음식배달",
+      "giveStatus": "COMPLETE",
+      "giveStatusName": "입금완료",
+      "giveTarget": "SHOP_OWNER",
+      "giveCycleCode": "DAY_1",
+      "giveStartDate": "2026-05-11",
+      "giveEndDate": "2026-05-11",
+      "giveAmount": 4116,
+      "giveSettleOneDay": true
+    }
+  ],
+  "totalSize": 2
+}

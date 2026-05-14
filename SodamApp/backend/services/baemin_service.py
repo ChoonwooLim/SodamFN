@@ -1,13 +1,14 @@
-"""배민 사장님사이트 (ceo.baemin.com) 자동수집 어댑터.
+"""배민 사장님사이트 (self.baemin.com / self-api.baemin.com) 자동수집 어댑터.
 
 쿠팡이츠와 동일 패턴 — curl_cffi (Chrome TLS) + 수동 쿠키 only.
-HAR 캡처 후 fetch_orders / fetch_settlements 의 실제 URL·파라미터·응답 파싱을 채운다.
+HAR (2026-05-14) 기반으로 fetch_orders / fetch_settlements 의 실제 URL·파라미터·응답 파싱 구현.
 """
 from __future__ import annotations
 
 import datetime
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -19,7 +20,8 @@ except ImportError:
     curl_requests = None  # type: ignore
 
 
-BASE_URL = "https://ceo.baemin.com"
+BASE_URL = "https://self-api.baemin.com"        # API 호스트
+WEB_ORIGIN = "https://self.baemin.com"           # 브라우저 페이지 origin/referer
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_IMPERSONATE = "chrome120"
 
@@ -85,7 +87,7 @@ def earliest_cookie_expiry(cookies: list[dict]) -> Optional[datetime.datetime]:
 
 
 class BaeminClient:
-    """ceo.baemin.com 세션 클라이언트. 인스턴스당 1매장 + 1세션."""
+    """self.baemin.com 세션 클라이언트. 인스턴스당 1매장 + 1세션."""
 
     def __init__(self,
                  cookies: Optional[list[dict]] = None,
@@ -115,7 +117,7 @@ class BaeminClient:
             value = c.get("value")
             if not name or value is None:
                 continue
-            domain = c.get("domain") or "ceo.baemin.com"
+            domain = c.get("domain") or "self.baemin.com"
             path = c.get("path") or "/"
             try:
                 self._session.cookies.set(name, value, domain=domain, path=path)
@@ -149,18 +151,35 @@ class BaeminClient:
     def __exit__(self, *exc): self.close()
 
     def _common_headers(self, referer: str,
-                        content_type: Optional[str] = None) -> dict:
+                        content_type: Optional[str] = None,
+                        pathname_trace: str = "/") -> dict:
         h = {
             "accept": "application/json",
             "accept-language": self._accept_language,
-            "origin": BASE_URL,
+            "origin": WEB_ORIGIN,
             "referer": referer,
             "user-agent": self._user_agent,
             "x-requested-with": "XMLHttpRequest",
+            # HAR 캡처 시 사용된 값들. 향후 timestamp 부분 갱신 로직 추가 가능.
+            "x-pathname-trace-key": pathname_trace,
+            "x-web-version": "v20260513082427",  # TODO: 주기적 갱신 필요할 수 있음
         }
+        # x-e-request 는 호출별 timestamp 가 바뀜. 일단 placeholder — 실제 운영 시 갱신 로직 추가 검토.
+        h["x-e-request"] = self._build_x_e_request()
         if content_type:
             h["content-type"] = content_type
         return h
+
+    def _build_x_e_request(self) -> str:
+        """x-e-request 헤더 — 형식: {terminalId}|{epoch_ms}|{fingerprint}.
+
+        HAR 캡처에서 추출한 terminalId/fingerprint 를 재사용. timestamp 는 매 호출 갱신.
+        TODO(추후): 운영 중 만료되면 사장님이 다시 캡처하거나, 헤더 검증 우회 패턴 발견.
+        """
+        terminal_id = "72im16"
+        fingerprint = "79e94e65cee5a0fd6b67748ef1056cc86eee6872d3bf6eee9241f9dff8f"
+        ts_ms = int(time.time() * 1000)
+        return f"{terminal_id}|{ts_ms}|{fingerprint}"
 
     def _check_response(self, r) -> None:
         body_preview = ""
@@ -186,43 +205,170 @@ class BaeminClient:
                 status_code=r.status_code,
             )
 
-    # ───── 인증 검증 (HAR 후 URL 확정) ─────
+    # ───── 인증 검증 ─────
     def whoami(self) -> dict:
-        """세션 검증. HAR 후 실제 endpoint 로 교체."""
-        url = f"{BASE_URL}/api/whoami"  # TODO(HAR): 실제 URL 로 교체
-        referer = f"{BASE_URL}/"
+        """세션 검증 — GET /v1/session/user-profile.
+
+        응답 핵심 필드: shopOwnerNumber, memName, decodedEmail, decodedMobileNo.
+        """
+        url = f"{BASE_URL}/v1/session/user-profile"
+        referer = f"{WEB_ORIGIN}/"
         try:
-            r = self._session.get(url, headers=self._common_headers(referer),
+            r = self._session.get(url, headers=self._common_headers(referer, pathname_trace="/"),
                                   timeout=self._timeout)
         except Exception as e:  # noqa: BLE001
-            raise BaeminError(f"통신 실패 [/whoami]: {e}") from e
+            raise BaeminError(f"통신 실패 [/session/user-profile]: {e}") from e
         self._check_response(r)
         try:
             return r.json()
         except Exception as e:  # noqa: BLE001
-            raise BaeminError(f"JSON 파싱 실패 [/whoami]: {e}") from e
+            raise BaeminError(f"JSON 파싱 실패 [/session/user-profile]: {e}") from e
 
-    # ───── 매출 / 정산 (Task 5 에서 HAR 기반 구현) ─────
-    def fetch_orders(self, store_id: str,
-                     start: datetime.datetime,
-                     end: datetime.datetime,
-                     *, page_number: int = 0,
-                     page_size: int = 50) -> OrderFetchResult:
-        raise NotImplementedError("HAR 캡처 후 Task 5 에서 구현")
+    # ───── 매장 list ─────
+    def list_stores(self, shop_owner_number: str) -> list[dict]:
+        """매장 list — GET /v4/store/shops/search."""
+        url = f"{BASE_URL}/v4/store/shops/search"
+        referer = f"{WEB_ORIGIN}/"
+        params = {"shopOwnerNo": shop_owner_number, "pageSize": 50, "desc": "true",
+                  "lastOffsetId": ""}
+        try:
+            r = self._session.get(url, params=params,
+                                  headers=self._common_headers(referer, pathname_trace="/"),
+                                  timeout=self._timeout)
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"통신 실패 [/store/shops/search]: {e}") from e
+        self._check_response(r)
+        data = r.json()
+        return data.get("contents", []) or []
 
-    def fetch_all_orders(self, store_id: str,
-                         start: datetime.datetime,
-                         end: datetime.datetime) -> list[dict]:
-        raise NotImplementedError("HAR 캡처 후 Task 5 에서 구현")
+    # ───── 매출 / 정산 (HAR 기반 실제 구현) ─────
+    def fetch_orders(self,
+                     shop_owner_number: str,
+                     start_date: datetime.date,
+                     end_date: datetime.date,
+                     *,
+                     offset: int = 0,
+                     limit: int = 10,
+                     order_status: str = "CLOSED") -> OrderFetchResult:
+        """주문 조회 — GET /v4/orders.
 
-    def fetch_settlements(self, store_id: str,
+        응답: {"totalSize", "totalPayAmount", "contents":[{"order":{...}, "settle":{...}}]}.
+        """
+        url = f"{BASE_URL}/v4/orders"
+        referer = f"{WEB_ORIGIN}/orders/history"
+        params = {
+            "offset": offset, "limit": limit,
+            "startDate": start_date.strftime("%Y-%m-%d"),
+            "endDate": end_date.strftime("%Y-%m-%d"),
+            "shopOwnerNumber": shop_owner_number,
+            "shopNumbers": "",
+            "orderStatus": order_status,
+        }
+        try:
+            r = self._session.get(url, params=params,
+                                  headers=self._common_headers(referer, pathname_trace="/orders/history"),
+                                  timeout=self._timeout)
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"통신 실패 [/v4/orders]: {e}") from e
+        self._check_response(r)
+        try:
+            raw = r.json()
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"JSON 파싱 실패 [/v4/orders]: {e}") from e
+        if not isinstance(raw, dict):
+            return OrderFetchResult(0, 0, [], {})
+        return OrderFetchResult(
+            total_sale_price=int(raw.get("totalPayAmount") or 0),
+            total_order_count=int(raw.get("totalSize") or 0),
+            orders=raw.get("contents") or [],
+            raw=raw,
+        )
+
+    def fetch_all_orders(self,
+                         shop_owner_number: str,
+                         start_date: datetime.date,
+                         end_date: datetime.date,
+                         *,
+                         limit: int = 10,
+                         order_status: str = "CLOSED",
+                         max_pages: int = 200) -> list[dict]:
+        """모든 페이지 순회. HAR 패턴: offset += limit 까지 totalSize 도달."""
+        all_orders: list[dict] = []
+        total_target = 0
+        for page in range(max_pages):
+            offset = page * limit
+            res = self.fetch_orders(shop_owner_number, start_date, end_date,
+                                    offset=offset, limit=limit,
+                                    order_status=order_status)
+            log.info(
+                "fetch_all_orders page=%d offset=%d got=%d total=%d",
+                page, offset, len(res.orders), res.total_order_count,
+            )
+            all_orders.extend(res.orders)
+            total_target = res.total_order_count
+            if not res.orders:
+                break
+            if total_target > 0 and len(all_orders) >= total_target:
+                break
+        return all_orders
+
+    def fetch_settlements(self,
+                          shop_owner_number: str,
                           start_date: datetime.date,
                           end_date: datetime.date,
-                          *, page_num: int = 0,
-                          page_size: int = 100) -> SettlementFetchResult:
-        raise NotImplementedError("HAR 캡처 후 Task 5 에서 구현")
+                          *,
+                          page: int = 0,
+                          size: int = 10,
+                          settle_type: str = "ALL") -> SettlementFetchResult:
+        """정산 조회 — GET /v3/settle/history/summary."""
+        url = f"{BASE_URL}/v3/settle/history/summary"
+        referer = f"{WEB_ORIGIN}/orders/billing"
+        params = {
+            "settleType": settle_type,
+            "startDate": start_date.strftime("%Y-%m-%d"),
+            "endDate": end_date.strftime("%Y-%m-%d"),
+            "shopOwnerNumber": shop_owner_number,
+            "page": page,
+            "size": size,
+        }
+        try:
+            r = self._session.get(url, params=params,
+                                  headers=self._common_headers(referer, pathname_trace="/orders/billing"),
+                                  timeout=self._timeout)
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"통신 실패 [/v3/settle/history/summary]: {e}") from e
+        self._check_response(r)
+        try:
+            raw = r.json()
+        except Exception as e:  # noqa: BLE001
+            raise BaeminError(f"JSON 파싱 실패 [/v3/settle/history/summary]: {e}") from e
+        if not isinstance(raw, dict):
+            return SettlementFetchResult(0, 0, [], {})
+        total_elements = int(raw.get("totalSize") or 0)
+        # /v3/settle 은 total_pages 직접 안 줌 — size 로 계산
+        total_pages = (total_elements + size - 1) // size if size > 0 else 1
+        return SettlementFetchResult(
+            total_elements=total_elements,
+            total_pages=total_pages,
+            contents=raw.get("contents") or [],
+            raw=raw,
+        )
 
-    def fetch_all_settlements(self, store_id: str,
+    def fetch_all_settlements(self,
+                              shop_owner_number: str,
                               start_date: datetime.date,
-                              end_date: datetime.date) -> list[dict]:
-        raise NotImplementedError("HAR 캡처 후 Task 5 에서 구현")
+                              end_date: datetime.date,
+                              *,
+                              size: int = 10,
+                              settle_type: str = "ALL",
+                              max_pages: int = 100) -> list[dict]:
+        all_rows: list[dict] = []
+        for page in range(max_pages):
+            res = self.fetch_settlements(shop_owner_number, start_date, end_date,
+                                         page=page, size=size, settle_type=settle_type)
+            all_rows.extend(res.contents)
+            if not res.contents:
+                break
+            if res.total_elements > 0 and len(all_rows) >= res.total_elements:
+                break
+        return all_rows
