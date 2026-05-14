@@ -219,3 +219,97 @@ def test_build_period_params_yyyymm_format(engine_with_conn):
     assert params["endDate"] >= params["startDate"]
     assert params["connectedId"] == conn.connected_id
     assert params["organization"] == conn.organization_code
+
+
+def test_billing_params_no_cardpassword_regression(engine_with_conn):
+    """버그 회귀 방지 — billing-list 파라미터에 cardPassword 가 절대 들어가지 않아야 함.
+
+    PDF page 10 (INPUT param Information) 에 cardPassword 가 없음. 과거 코드에서
+    card_password_encrypted 첨부 시 현대카드 0건 응답 발생 → 54f47646 회귀로 인한
+    버그였음. 본 테스트는 이를 영구적으로 방지.
+    """
+    eng, conn = engine_with_conn
+    # 카드비번 저장된 conn (현대카드 같은 케이스 시뮬레이션)
+    conn.card_password_encrypted = "ENC(1234)"
+    provider = _make_provider(eng, MagicMock())
+    params = provider._build_period_params(conn, months_back=3)
+    assert "cardPassword" not in params
+    assert "password" not in params
+
+
+def test_sync_calls_approval_then_billing(engine_with_conn):
+    """sync_one_connection 이 approval-list 와 billing-list 둘 다 호출하는지 확인."""
+    from services.codef.card_purchase_provider import APPROVAL_LIST_URL, BILLING_LIST_URL
+    eng, conn = engine_with_conn
+    client_mock = MagicMock()
+    # 빈 응답 (두 endpoint 다 0건)
+    empty_response = RequestProductResult(rows=[], raw={}, result_code="CF-00000", rows_count=0)
+    client_mock.request_product.return_value = empty_response
+    provider = _make_provider(eng, client_mock)
+
+    provider.sync_one_connection(conn, months_back=3)
+
+    # 두 endpoint 모두 호출되었는지 확인
+    called_urls = [call.args[0] for call in client_mock.request_product.call_args_list]
+    assert APPROVAL_LIST_URL in called_urls
+    assert BILLING_LIST_URL in called_urls
+
+
+def test_approval_params_yyyymmdd_format(engine_with_conn):
+    """approval-list 는 startDate/endDate 가 YYYYMMDD 일단위 포맷."""
+    from services.codef.card_purchase_provider import APPROVAL_LIST_URL
+    eng, conn = engine_with_conn
+    client_mock = MagicMock()
+    client_mock.request_product.return_value = RequestProductResult(
+        rows=[], raw={}, result_code="CF-00000", rows_count=0
+    )
+    provider = _make_provider(eng, client_mock)
+    provider.sync_one_connection(conn, months_back=3)
+
+    # approval-list 호출 시 사용된 params 추출
+    approval_call = next(
+        c for c in client_mock.request_product.call_args_list
+        if c.args[0] == APPROVAL_LIST_URL
+    )
+    params = approval_call.args[1]
+    assert len(params["startDate"]) == 8   # YYYYMMDD
+    assert len(params["endDate"]) == 8     # YYYYMMDD
+    assert params["startDate"].isdigit()
+    assert params["endDate"].isdigit()
+    assert params["inquiryType"] == "1"    # 전체조회 (cardNo 불필요)
+    assert params["orderBy"] == "0"        # 최신순
+    assert "cardPassword" not in params    # 조회 input 에 cardPassword 없음
+
+
+def test_approval_upserts_with_cancellation_status(engine_with_conn):
+    """approval rows 의 resCancelYN 으로 status 분기 — '0'/'1'/'2'/'3' → 승인/취소/부분취소/거절."""
+    eng, conn = engine_with_conn
+    approval_rows = [
+        {"resUsedDate": "20260513", "resMemberStoreName": "정상가맹",
+         "resUsedAmount": "10000", "resInstallmentMonth": "0",
+         "resApprovalNo": "APP001", "resCancelYN": "0", "resCardNo": "1234"},
+        {"resUsedDate": "20260513", "resMemberStoreName": "취소가맹",
+         "resUsedAmount": "5000", "resInstallmentMonth": "0",
+         "resApprovalNo": "APP002", "resCancelYN": "1", "resCardNo": "1234"},
+    ]
+    client_mock = MagicMock()
+    # approval-list 응답: 직접 list (resChargeHistoryList 풀기 없이)
+    client_mock.request_product.side_effect = [
+        RequestProductResult(rows=approval_rows, raw={}, result_code="CF-00000",
+                             rows_count=len(approval_rows)),
+        # billing-list 빈 응답
+        RequestProductResult(rows=[], raw={}, result_code="CF-00000", rows_count=0),
+    ]
+    provider = _make_provider(eng, client_mock)
+    result = provider.sync_one_connection(conn, months_back=3)
+
+    assert result.error is None
+    assert result.new_purchases == 2
+
+    with Session(eng) as s:
+        purchases = list(s.exec(select(CardPurchase).order_by(CardPurchase.approval_number)))
+    assert len(purchases) == 2
+    assert purchases[0].approval_number == "APP001"
+    assert purchases[0].status == "승인"
+    assert purchases[1].approval_number == "APP002"
+    assert purchases[1].status == "취소"
