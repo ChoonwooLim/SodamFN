@@ -108,7 +108,7 @@ def test_check_cooldown_different_org_passes(svc_demo, biz_id):
                           api_path="/v1/kr/card/common/b/approval",
                           organization_code="0306", status="success",
                           rows=1, result_code="CF-00000", triggered_by="user_button")
-    svc_demo.check_cooldown(business_id=biz_id, organization_code="0364",
+    svc_demo.check_cooldown(business_id=biz_id, organization_code="0303",
                              api_path="/v1/kr/card/common/b/approval")
 
 

@@ -10,11 +10,11 @@ def test_list_14_card_corps():
     cards = list_card_corps()
     assert len(cards) == 14
     codes = {c.code for c in cards}
-    # 셈하나 실제 운영 카드사 핵심 4종
+    # CODEF 공식 매뉴얼 (API.xlsx page 3, 2025-11-11) 핵심 4종
     assert "0306" in codes  # 신한
     assert "0301" in codes  # KB국민
-    assert "0364" in codes  # 삼성
-    assert "0307" in codes  # 현대
+    assert "0303" in codes  # 삼성
+    assert "0302" in codes  # 현대
 
 
 def test_get_organization_returns_label_and_policy():
@@ -32,7 +32,7 @@ def test_get_organization_unknown_returns_none():
 
 def test_card_corp_id_pw_only():
     """일부 카드사는 ID/PW only — 간편인증 미지원"""
-    bc = get_organization("0361")  # BC
+    bc = get_organization("0305")  # BC카드 (CODEF 공식 코드)
     assert bc is not None
     assert AuthPolicy.ID_PW in bc.auth_methods
     assert AuthPolicy.SIMPLE_AUTH not in bc.auth_methods

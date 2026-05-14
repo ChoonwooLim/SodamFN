@@ -170,10 +170,10 @@ def test_list_all_excludes_deactivated_only(db_engine, biz_id, fake_client):
                               organization_code="0306", organization_label="신한",
                               connected_id="a", auth_method="id_pw", status="active"))
         s.add(CodefConnection(business_id=biz_id, organization_type="card",
-                              organization_code="0307", organization_label="현대",
+                              organization_code="0302", organization_label="현대",
                               connected_id="b", auth_method="id_pw", status="expired"))
         s.add(CodefConnection(business_id=biz_id, organization_type="card",
-                              organization_code="0364", organization_label="삼성",
+                              organization_code="0303", organization_label="삼성",
                               connected_id="c", auth_method="id_pw", status="deactivated"))
         s.commit()
 

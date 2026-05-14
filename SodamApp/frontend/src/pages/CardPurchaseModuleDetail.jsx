@@ -543,9 +543,9 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
             .then((res) => {
                 const all = res.data.organizations || [];
                 setOrgs(all);
-                // 사장님이 자주 쓰시는 카드사 3개를 우선 노출 (신한=0306, 삼성=0364, 현대=0307)
+                // 사장님이 자주 쓰시는 카드사 3개를 우선 노출 (신한=0306, 삼성=0303, 현대=0302)
                 if (all.length > 0 && !orgCode) {
-                    const priority = ['0306', '0364', '0307'];
+                    const priority = ['0306', '0303', '0302'];
                     const found = priority.find((p) => all.some((o) => o.code === p));
                     setOrgCode(found || all[0].code);
                 }
@@ -556,7 +556,7 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
 
     // 우선 카드사 → 기타 순으로 정렬
     const sortedOrgs = useMemo(() => {
-        const priority = ['0306', '0364', '0307']; // 신한·삼성·현대
+        const priority = ['0306', '0303', '0302']; // 신한·삼성·현대 (CODEF 공식 코드)
         const top = priority.map((p) => orgs.find((o) => o.code === p)).filter(Boolean);
         const rest = orgs.filter((o) => !priority.includes(o.code));
         return [...top, ...rest];

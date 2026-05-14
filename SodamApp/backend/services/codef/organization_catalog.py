@@ -27,22 +27,24 @@ class Organization:
     auth_methods: tuple[AuthPolicy, ...] = field(default_factory=tuple)
 
 
-# 14개 카드사 — CODEF 카탈로그 기준
+# 14개 카드사 — CODEF 공식 매뉴얼 (API.xlsx page 3, 2025-11-11 기준) 정정.
+# 기존 코드(0361~0368)는 placeholder 였음 — 실제 CODEF organization 코드는 0301~0321.
+# 0306 신한 만 우연히 일치. 나머지는 잘못된 매핑이라 현대·삼성 등 등록 시 CF-04000 발생.
 _CARDS: tuple[Organization, ...] = (
     Organization("0301", "KB국민카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0302", "NH농협카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0303", "롯데카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0304", "씨티카드", "card", (AuthPolicy.ID_PW,)),
-    Organization("0305", "하나카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0306", "신한카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0307", "현대카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0309", "우리카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0361", "BC카드", "card", (AuthPolicy.ID_PW,)),
-    Organization("0364", "삼성카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
-    Organization("0365", "광주카드", "card", (AuthPolicy.ID_PW,)),
-    Organization("0366", "수협카드", "card", (AuthPolicy.ID_PW,)),
-    Organization("0367", "제주카드", "card", (AuthPolicy.ID_PW,)),
-    Organization("0368", "IBK기업카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0302", "현대카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0303", "삼성카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0304", "NH농협카드", "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0305", "BC카드",     "card", (AuthPolicy.ID_PW,)),
+    Organization("0306", "신한카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0307", "씨티카드",   "card", (AuthPolicy.ID_PW,)),
+    Organization("0309", "우리카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0311", "롯데카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0313", "하나카드",   "card", (AuthPolicy.SIMPLE_AUTH, AuthPolicy.ID_PW)),
+    Organization("0315", "전북카드",   "card", (AuthPolicy.ID_PW,)),
+    Organization("0316", "광주카드",   "card", (AuthPolicy.ID_PW,)),
+    Organization("0320", "수협카드",   "card", (AuthPolicy.ID_PW,)),
+    Organization("0321", "제주카드",   "card", (AuthPolicy.ID_PW,)),
 )
 
 # 주요 은행 — CODEF 카탈로그 기준 (2026-05-13 Phase 2 확장)
@@ -94,7 +96,12 @@ def get_organization(code: str) -> Optional[Organization]:
 
 
 def list_card_corps() -> list[Organization]:
-    return [o for o in _ALL.values() if o.type == "card"]
+    """카드사 14종만 (PG 4종은 _PAYMENTS 로 분리 — list_payments() 사용)."""
+    return list(_CARDS)
+
+
+def list_payments() -> list[Organization]:
+    return list(_PAYMENTS)
 
 
 def list_banks() -> list[Organization]:
