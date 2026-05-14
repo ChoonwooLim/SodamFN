@@ -113,18 +113,37 @@ class ParsedOrderFee:
         return (self.transaction_type or "").strip() == "취소"
 
     @classmethod
-    def from_row(cls, row: tuple, *, line_no: Optional[int] = None) -> "ParsedOrderFee":
-        if len(row) < 43:
-            raise ExcelParseError(
-                f"row 길이 {len(row)} (43 필요) — 포맷 변경 가능성. line={line_no}"
-            )
+    def from_row(cls, row: tuple, idx_map: dict, *,
+                 line_no: Optional[int] = None) -> "ParsedOrderFee":
+        """헤더 매핑 dict 를 사용해 row 에서 ParsedOrderFee 생성.
 
-        order_date = _to_date(row[0])
+        idx_map: build_column_index_map(ws) 의 결과 — 필드명 → 컬럼 인덱스.
+        쿠팡이츠 엑셀 포맷이 시간 따라 변해도 (43→49컬럼) 헤더 기반이라 안정.
+        """
+        def _get_int(field: str) -> int:
+            idx = idx_map.get(field)
+            if idx is None or idx >= len(row):
+                return 0
+            return _to_int(row[idx])
+
+        def _get_str(field: str) -> Optional[str]:
+            idx = idx_map.get(field)
+            if idx is None or idx >= len(row):
+                return None
+            return _to_str(row[idx])
+
+        date_idx = idx_map.get('order_date')
+        if date_idx is None or date_idx >= len(row):
+            raise ExcelParseError(f"order_date 컬럼 매핑 실패 line={line_no}")
+        order_date = _to_date(row[date_idx])
         if not order_date:
-            raise ExcelParseError(f"order_date 파싱 실패: {row[0]!r} line={line_no}")
+            raise ExcelParseError(f"order_date 파싱 실패: {row[date_idx]!r} line={line_no}")
 
-        ordered_at = _to_datetime(row[1])
-        order_id = str(row[2] or "").strip()
+        time_idx = idx_map.get('ordered_at')
+        ordered_at = _to_datetime(row[time_idx]) if time_idx is not None and time_idx < len(row) else None
+
+        order_id_idx = idx_map.get('order_id')
+        order_id = str(row[order_id_idx] or "").strip() if order_id_idx is not None and order_id_idx < len(row) else ""
         if not order_id:
             raise ExcelParseError(f"order_id 비어있음 line={line_no}")
 
@@ -132,46 +151,46 @@ class ParsedOrderFee:
             order_date=order_date,
             ordered_at=ordered_at,
             order_id=order_id,
-            order_type=_to_str(row[3]),
-            items_summary=_to_str(row[4]),
-            brand=_to_str(row[5]),
-            shop_name=_to_str(row[6]),
-            payment_method=_to_str(row[7]),
-            transaction_type=_to_str(row[8]),
-            total_amount=_to_int(row[9]),
-            order_amount=_to_int(row[10]),
-            payment_amount=_to_int(row[11]),
-            coupon_coupang=_to_int(row[12]),
-            coupon_store=_to_int(row[13]),
-            brokerage_before_basic=_to_int(row[14]),
-            brokerage_before_promo=_to_int(row[15]),
-            brokerage_final=_to_int(row[16]),
-            payment_fee_basic=_to_int(row[17]),
-            payment_fee_promo=_to_int(row[18]),
-            delivery_before_basic=_to_int(row[19]),
-            delivery_before_promo=_to_int(row[20]),
-            delivery_final=_to_int(row[21]),
-            delivery_only=_to_int(row[22]),
-            food_only=_to_int(row[23]),
-            customer_delivery_fee=_to_int(row[24]),
-            customer_delivery_fee_total=_to_int(row[25]),
-            service_before_disposable_cup=_to_int(row[26]),
-            service_before_supply=_to_int(row[27]),
-            service_before_vat=_to_int(row[28]),
-            service_before_total=_to_int(row[29]),
-            service_after_disposable_cup=_to_int(row[30]),
-            service_after_supply=_to_int(row[31]),
-            service_after_vat=_to_int(row[32]),
-            service_after_total=_to_int(row[33]),
-            ad_supply=_to_int(row[34]),
-            ad_vat=_to_int(row[35]),
-            ad_total=_to_int(row[36]),
-            settle_before_basic=_to_int(row[37]),
-            settle_before_promo=_to_int(row[38]),
-            settle_final=_to_int(row[39]),
-            extra_col_40=_to_int(row[40]),
-            promotion_benefit=_to_int(row[41]),
-            refund_amount=_to_int(row[42]),
+            order_type=_get_str('order_type'),
+            items_summary=_get_str('items_summary'),
+            brand=_get_str('brand'),
+            shop_name=_get_str('shop_name'),
+            payment_method=_get_str('payment_method'),
+            transaction_type=_get_str('transaction_type'),
+            total_amount=_get_int('total_amount'),
+            order_amount=_get_int('order_amount'),
+            payment_amount=_get_int('payment_amount'),
+            coupon_coupang=_get_int('coupon_coupang'),
+            coupon_store=_get_int('coupon_store'),
+            brokerage_before_basic=_get_int('brokerage_before_basic'),
+            brokerage_before_promo=_get_int('brokerage_before_promo'),
+            brokerage_final=_get_int('brokerage_final'),
+            payment_fee_basic=_get_int('payment_fee_basic'),
+            payment_fee_promo=_get_int('payment_fee_promo'),
+            delivery_before_basic=_get_int('delivery_before_basic'),
+            delivery_before_promo=_get_int('delivery_before_promo'),
+            delivery_final=_get_int('delivery_final'),
+            delivery_only=_get_int('delivery_only'),
+            food_only=_get_int('food_only'),
+            customer_delivery_fee=_get_int('customer_delivery_fee'),
+            customer_delivery_fee_total=_get_int('customer_delivery_fee_total'),
+            service_before_disposable_cup=_get_int('service_before_disposable_cup'),
+            service_before_supply=_get_int('service_before_supply'),
+            service_before_vat=_get_int('service_before_vat'),
+            service_before_total=_get_int('service_before_total'),
+            service_after_disposable_cup=_get_int('service_after_disposable_cup'),
+            service_after_supply=_get_int('service_after_supply'),
+            service_after_vat=_get_int('service_after_vat'),
+            service_after_total=_get_int('service_after_total'),
+            ad_supply=_get_int('ad_supply'),
+            ad_vat=_get_int('ad_vat'),
+            ad_total=_get_int('ad_total'),
+            settle_before_basic=_get_int('settle_before_basic'),
+            settle_before_promo=_get_int('settle_before_promo'),
+            settle_final=_get_int('settle_final'),
+            extra_col_40=0,        # legacy — 더 이상 사용 안 함
+            promotion_benefit=_get_int('promotion_benefit'),
+            refund_amount=_get_int('refund_amount'),
             raw_row=tuple(row),
         )
 
@@ -268,6 +287,124 @@ def _to_int(value) -> int:
 _SHEET_NAME_RE = re.compile(r"^(\d{4})-(\d{2})(?:_\d+)?$")
 
 
+# 필드명 → 헤더 path tuple(s). 여러 path 면 첫 매칭 우선.
+# 쿠팡이츠가 새 컬럼 추가하더라도 헤더 텍스트 매핑이라 안정.
+# 2026-04 부터 "광고 프로모션" + "최종 광고비" 컬럼 그룹이 추가됨 (43→49컬럼).
+_FIELD_LABEL_PATHS: dict[str, tuple] = {
+    'order_date':           (('주문정보', '일자'),),
+    'ordered_at':           (('주문정보', '시간'),),
+    'order_id':             (('주문정보', '주문번호'),),
+    'order_type':           (('주문정보', '유형'),),
+    'items_summary':        (('주문정보', '상세내역'),),
+    'brand':                (('주문정보', '브랜드명'),),
+    'shop_name':            (('주문정보', '상점명'),),
+    'payment_method':       (('주문정보', '결제방식'),),
+    'transaction_type':     (('주문정보', '거래유형'),),
+
+    'total_amount':         (('매출액', '총금액'),),
+    'order_amount':         (('매출액', '주문금액'),),
+    'payment_amount':       (('매출액', '결제금액'),),
+
+    'coupon_coupang':       (('쿠폰', '쿠팡부담'),),
+    'coupon_store':         (('쿠폰', '상점부담'),),
+
+    'brokerage_before_basic': (('중개이용료', '산정전', '기본요금'),),
+    'brokerage_before_promo': (('중개이용료', '산정전', '프로모션'),),
+    'brokerage_final':        (('중개이용료', '산정후'),),
+
+    'payment_fee_basic':    (('결제대행사 수수료', '기본요금'),),
+    'payment_fee_promo':    (('결제대행사 수수료', '프로모션'),),
+
+    'delivery_before_basic': (('배달비', '산정전', '기본요금'),),
+    'delivery_before_promo': (('배달비', '산정전', '프로모션'),),
+    'delivery_final':        (('배달비', '산정후'),),
+
+    'delivery_only':         (('즉시할인', '배달전용'),),
+    'food_only':             (('즉시할인', '음식전용'),),
+
+    'customer_delivery_fee':       (('기타', '고객부담배달비'),),
+    'customer_delivery_fee_total': (('기타', '고객부담배달비(총액)'),),
+
+    'service_before_disposable_cup': (('서비스이용료', '산정전', '일회용컵'),),
+    'service_before_supply':         (('서비스이용료', '산정전', '공급가액'),),
+    'service_before_vat':            (('서비스이용료', '산정전', '부가세액'),),
+    'service_before_total':          (('서비스이용료', '산정전', '총액'),),
+    'service_after_disposable_cup':  (('서비스이용료', '산정후', '일회용컵'),),
+    'service_after_supply':          (('서비스이용료', '산정후', '공급가액'),),
+    'service_after_vat':             (('서비스이용료', '산정후', '부가세액'),),
+    'service_after_total':           (('서비스이용료', '산정후', '총액'),),
+
+    # 광고비: 4월 이후 '최종 광고비' (광고비 + 광고 프로모션 합) 우선, 없으면 (1월) '광고비'
+    'ad_supply': (('최종 광고비', '공급가액'), ('광고비', '공급가액')),
+    'ad_vat':    (('최종 광고비', '부가세액'), ('광고비', '부가세액')),
+    'ad_total':  (('최종 광고비', '총액'),     ('광고비', '총액')),
+
+    'settle_before_basic':  (('정산금액', '산정전', '기본요금'),),
+    'settle_before_promo':  (('정산금액', '산정전', '프로모션'),),
+    'settle_final':         (('정산금액', '산정후'),),
+
+    'promotion_benefit':    (('프로모션 혜택',),),
+    'refund_amount':        (('환급액',),),
+}
+
+
+def _build_column_index_map(ws) -> tuple[dict[str, int], list[tuple]]:
+    """row 1+2+3 헤더 → 필드명 → 컬럼 인덱스 매핑.
+
+    헤더 셀의 None 은 직전 non-None 값으로 forward-fill (병합 셀 처리).
+    단 row 3 의 None 은 그대로 유지 (산정후 같은 단일 컬럼).
+
+    Returns:
+        (idx_map, paths) — idx_map: 필드 → 컬럼 인덱스
+                          paths:   디버그용 각 컬럼의 path tuple
+    """
+    def _cell_str(c):
+        if c is None or c == "":
+            return None
+        s = str(c).strip()
+        return s or None
+
+    r1 = [_cell_str(c.value) for c in ws[1]]
+    r2 = [_cell_str(c.value) for c in ws[2]]
+    r3 = [_cell_str(c.value) for c in ws[3]]
+
+    def _ffill(arr):
+        out = []
+        last = None
+        for v in arr:
+            if v is not None:
+                last = v
+            out.append(last)
+        return out
+
+    # r1, r2 는 그룹 헤더라 병합 → ffill
+    # r3 는 detail 헤더 — None 이면 진짜 없음 (ffill 안 함)
+    r1_ff = _ffill(r1)
+    r2_ff = _ffill(r2)
+
+    # 컬럼별 path tuple 생성
+    paths: list[tuple] = []
+    for i in range(ws.max_column):
+        parts = []
+        if r1_ff[i]: parts.append(r1_ff[i])
+        if r2_ff[i]: parts.append(r2_ff[i])
+        if r3[i]:    parts.append(r3[i])
+        paths.append(tuple(parts))
+
+    # 필드명 → 컬럼 인덱스 매핑
+    idx_map: dict[str, int] = {}
+    for field, candidate_paths in _FIELD_LABEL_PATHS.items():
+        for target in candidate_paths:
+            for i, p in enumerate(paths):
+                if p == target:
+                    idx_map[field] = i
+                    break
+            if field in idx_map:
+                break
+
+    return idx_map, paths
+
+
 def parse_sales_order_excel(source: Union[str, bytes, io.BytesIO],
                             *,
                             expected_year_month: Optional[str] = None
@@ -298,10 +435,32 @@ def parse_sales_order_excel(source: Union[str, bytes, io.BytesIO],
     ws = wb[wb.sheetnames[0]]
     sheet_name = ws.title
 
-    if ws.max_column < 43:
+    # 컬럼 수 sanity (43=1월 포맷 / 49=2026-04 이후 포맷 / 추후 더 늘어날 수 있음)
+    if ws.max_column < 30:
         raise ExcelParseError(
-            f"컬럼 수 {ws.max_column} (43 필요) — 포맷 변경 가능성. sheet={sheet_name}"
+            f"컬럼 수 {ws.max_column} 너무 적음 — 포맷 깨짐 의심. sheet={sheet_name}"
         )
+
+    # 헤더 → 필드 인덱스 매핑 (포맷 변경에도 안정)
+    idx_map, paths = _build_column_index_map(ws)
+
+    # 필수 필드 확인
+    required = ('order_date', 'order_id', 'total_amount', 'brokerage_final',
+                'delivery_final', 'ad_total', 'settle_final')
+    missing = [f for f in required if f not in idx_map]
+    if missing:
+        # 디버그: 처음 60개 path 출력
+        path_dump = "\n".join(f"  col[{i:2d}]: {' / '.join(p) if p else '(empty)'}"
+                              for i, p in enumerate(paths[:60]))
+        raise ExcelParseError(
+            f"필수 컬럼 매핑 실패 {missing} — sheet={sheet_name} max_col={ws.max_column}\n"
+            f"감지된 헤더:\n{path_dump}"
+        )
+
+    log.info(
+        "excel column map sheet=%s max_col=%d mapped=%d/%d",
+        sheet_name, ws.max_column, len(idx_map), len(_FIELD_LABEL_PATHS),
+    )
 
     # 시트명에서 연-월 추출 (정합성 검증용)
     m = _SHEET_NAME_RE.match(sheet_name)
@@ -320,7 +479,7 @@ def parse_sales_order_excel(source: Union[str, bytes, io.BytesIO],
         if all(c is None or c == "" for c in row[:9]):
             continue
         try:
-            order = ParsedOrderFee.from_row(row, line_no=idx)
+            order = ParsedOrderFee.from_row(row, idx_map, line_no=idx)
         except ExcelParseError as e:
             report.skipped_count += 1
             reason = f"line={idx} {e}"
