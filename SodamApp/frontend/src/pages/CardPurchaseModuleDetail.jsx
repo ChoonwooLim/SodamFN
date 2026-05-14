@@ -493,6 +493,8 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
     const [orgCode, setOrgCode] = useState('');
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
+    const [cardPasswordPrefix, setCardPasswordPrefix] = useState('');  // 카드비번 앞 2자리
+    const [birthDate, setBirthDate] = useState('');                    // 생년월일 6자리 YYMMDD
     const [extraJson, setExtraJson] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [err, setErr] = useState('');
@@ -525,6 +527,18 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
         setErr('');
         if (!orgCode) { setErr('카드사를 선택하세요.'); return; }
         if (!userId || !password) { setErr('ID 와 비밀번호를 입력하세요.'); return; }
+
+        // 카드비번 앞 2자리 — 입력 시 2자리 숫자만 허용
+        if (cardPasswordPrefix && !/^\d{2}$/.test(cardPasswordPrefix)) {
+            setErr('카드 비밀번호 앞 2자리는 숫자 2자리여야 합니다.');
+            return;
+        }
+        // 생년월일 — 입력 시 6자리 (YYMMDD) 또는 8자리 (YYYYMMDD) 숫자만
+        if (birthDate && !/^(\d{6}|\d{8})$/.test(birthDate)) {
+            setErr('생년월일은 6자리(YYMMDD) 또는 8자리(YYYYMMDD) 숫자여야 합니다.');
+            return;
+        }
+
         let extra = null;
         if (extraJson.trim()) {
             try {
@@ -533,13 +547,19 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                     throw new Error('객체 형식이어야 합니다.');
                 }
             } catch {
-                setErr('추가 정보는 유효한 JSON 객체여야 합니다.');
+                setErr('추가 정보 JSON 이 유효한 객체가 아닙니다.');
                 return;
             }
         }
         setSubmitting(true);
         try {
-            const auth = { id: userId, password, ...(extra || {}) };
+            const auth = {
+                id: userId,
+                password,
+                ...(cardPasswordPrefix ? { cardPassword: cardPasswordPrefix } : {}),
+                ...(birthDate ? { birthDate } : {}),
+                ...(extra || {}),
+            };
             const res = await api.post('/codef/connections/register', {
                 organization_type: 'card',
                 organization_code: orgCode,
@@ -615,20 +635,52 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                             autoComplete="new-password"
                         />
                     </div>
+                    <div>
+                        <label className="block text-sm text-slate-700 mb-1.5">
+                            카드 비밀번호 앞 2자리
+                            <span className="ml-1 text-xs text-slate-500 font-normal">(현대·삼성 등 일부 카드사 필수)</span>
+                        </label>
+                        <input
+                            type="password"
+                            value={cardPasswordPrefix}
+                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                            placeholder="숫자 2자리"
+                            maxLength={2}
+                            inputMode="numeric"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            autoComplete="off"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm text-slate-700 mb-1.5">
+                            생년월일
+                            <span className="ml-1 text-xs text-slate-500 font-normal">(일부 카드사 필수, YYMMDD 또는 YYYYMMDD)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={birthDate}
+                            onChange={(e) => setBirthDate(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                            placeholder="예: 800101 또는 19800101"
+                            maxLength={8}
+                            inputMode="numeric"
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            autoComplete="off"
+                        />
+                    </div>
                     <details className="text-sm">
                         <summary className="cursor-pointer text-slate-600 hover:text-violet-700">
-                            추가 정보 (선택) — 카드사별 필요 시
+                            기타 추가 정보 (JSON) — 고급
                         </summary>
                         <div className="mt-2">
                             <textarea
                                 value={extraJson}
                                 onChange={(e) => setExtraJson(e.target.value)}
-                                rows={4}
-                                placeholder='예: {"birthDate": "19800101"} 또는 {"cardPassword": "12"}'
+                                rows={3}
+                                placeholder='예: {"cvc": "123"}'
                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono"
                             />
                             <p className="text-[11px] text-slate-500 mt-1">
-                                카드사별로 추가 인증 필드 (생년월일, 카드비밀번호 앞 2자리 등) 가 필요한 경우 JSON 객체로 입력.
+                                위 입력 필드 외 추가 필드가 필요한 카드사 대응용.
                             </p>
                         </div>
                     </details>
