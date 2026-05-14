@@ -1350,7 +1350,9 @@ class TaxinvoiceRecord(SQLModel, table=True):
 class CodefConnection(SQLModel, table=True):
     __table_args__ = (
         Index("ix_codef_conn_business_org", "business_id", "organization_code"),
-        UniqueConstraint("business_id", "organization_code", "organization_type"),
+        UniqueConstraint("business_id", "organization_code", "organization_type",
+                         "connection_type",
+                         name="uq_codef_conn_biz_org_type_conntype"),
     )
     id: Optional[int] = Field(default=None, primary_key=True)
     business_id: int = Field(foreign_key="business.id", index=True)
@@ -1359,6 +1361,10 @@ class CodefConnection(SQLModel, table=True):
     organization_label: str
     connected_id: str
     auth_method: str
+    # 같은 카드사라도 매출(가맹점)과 매입(사용카드)는 서로 다른 connectedId.
+    # 신규 row 가 매출이면 'card_sales', 매입이면 'card_purchase', 은행이면 'bank'.
+    connection_type: str = Field(default="card_sales", max_length=32, index=True,
+                                  description="card_sales / card_purchase / bank")
     status: str = Field(default="active", index=True)
     last_verified_at: Optional[datetime.datetime] = None
     last_failed_at: Optional[datetime.datetime] = None
@@ -1991,3 +1997,69 @@ class BaeminMonthlySummary(SQLModel, table=True):
     file_name: Optional[str] = None
     uploaded_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     detail_rows: int = 0                # 상세 시트 row count
+
+
+# ──────────────────────────────────────────────────────────────────
+# CODEF Card Purchase (카드 매입) — 사장님 결제용 카드 사용내역
+# 소스: CODEF /v1/kr/card/common/p/approval (개인 카드 승인내역)
+# 의미: 사장님이 결제용으로 쓰는 카드의 사용내역 = 매입(지출).
+# 중복 위험: BankTransaction 의 카드사 출금은 card_payment 로 분류되어
+# 매입(DailyExpense) 에서 제외되므로, 가맹점 단위 raw 만 별도 적재.
+# ──────────────────────────────────────────────────────────────────
+
+class CardPurchase(SQLModel, table=True):
+    """사장님 사용 카드 매입(지출) — CODEF 마이데이터 개인 카드 승인내역.
+
+    중복 처리: (business_id, card_corp, approval_date, approval_number) UNIQUE.
+    같은 카드사·날짜·승인번호 1건만 허용. 재호출 시 기존 row 갱신.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "card_corp", "approval_date", "approval_number",
+                         name="uq_card_purchase"),
+        Index("ix_card_purchase_biz_date", "business_id", "approval_date"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+
+    # 카드 식별
+    card_corp: str = Field(max_length=32, index=True,
+                            description="신한카드 / 삼성카드 / 현대카드 등")
+    card_number_masked: Optional[str] = Field(default=None, max_length=20,
+                                              description="카드번호 마지막 4자리 또는 마스킹")
+
+    # 승인 정보
+    approval_date: datetime.date = Field(index=True)
+    approval_time: Optional[str] = Field(default=None, max_length=8,
+                                          description="HHMMSS")
+    approval_number: str = Field(max_length=32)
+
+    # 가맹점 정보
+    merchant_name: Optional[str] = Field(default=None, max_length=128, index=True,
+                                          description="가맹점 이름 (예: GS25 화양점)")
+    merchant_no: Optional[str] = Field(default=None, max_length=32)
+    business_type: Optional[str] = Field(default=None, max_length=64,
+                                          description="가맹점 업종 (예: 편의점)")
+
+    # 금액
+    amount: int = 0
+    installment: Optional[int] = Field(default=None,
+                                        description="할부 개월 (0 또는 NULL=일시불)")
+    status: str = Field(default="승인", max_length=8,
+                        description="승인 / 취소")
+
+    # 추적
+    source: str = Field(default="codef", max_length=16,
+                        description="codef / manual / excel")
+    source_meta: Optional[str] = Field(default=None, max_length=2000,
+                                        description="CODEF 응답 raw JSON (debug)")
+    connection_id: Optional[int] = Field(default=None,
+                                          foreign_key="codefconnection.id")
+
+    # 매입 연결 (Phase 3 자동 import 에서 채움)
+    linked_daily_id: Optional[int] = Field(default=None,
+                                            foreign_key="dailyexpense.id", index=True)
+    pl_category: Optional[str] = Field(default=None, max_length=32,
+                                        description="손익 카테고리 (Phase 3 자동분류)")
+
+    synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)

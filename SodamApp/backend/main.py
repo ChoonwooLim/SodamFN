@@ -160,10 +160,12 @@ app.include_router(sales_guide.router, prefix="/api")
 # CODEF Phase 1 — 마이데이터 통합 (카드 매출 + 향후 계좌·4대보험·등)
 from routers.codef import connections as codef_connections
 from routers.codef import card_sync as codef_card_sync
+from routers.codef import card_purchase_sync as codef_card_purchase_sync
 from routers.codef import budget as codef_budget
 from routers.codef import card_merchants as codef_card_merchants
 app.include_router(codef_connections.router)
 app.include_router(codef_card_sync.router)
+app.include_router(codef_card_purchase_sync.router)
 app.include_router(codef_budget.router)
 app.include_router(codef_card_merchants.router)
 
