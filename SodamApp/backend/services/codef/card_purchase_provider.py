@@ -90,9 +90,23 @@ class CodefCardPurchaseProvider:
             organization_label=connection.organization_label,
         )
         try:
-            approval_count = self._sync_approval(
-                connection, months_back, triggered_by, triggered_user_id
-            )
+            # approval-list 는 격리 시도 — URL/SDK 호환성 문제로 실패해도 billing 흐름은 보존.
+            # CODEF 표준 예외(CodefAuthExpired 등)는 격리하지 않고 외부 핸들러로 전파.
+            approval_count = 0
+            try:
+                approval_count = self._sync_approval(
+                    connection, months_back, triggered_by, triggered_user_id
+                )
+            except (CodefAuthExpired, CodefAdditionalAuth, CodefRateLimited,
+                    CodefAPIError, CodefQuotaExceeded):
+                raise  # 표준 예외는 외부에서 처리
+            except Exception as approval_err:  # noqa: BLE001
+                # 알 수 없는 예외 (URL 미지원, SDK 호환성, 응답 형식 변경 등) — billing 으로 계속
+                import logging
+                logging.getLogger("codef.card_purchase").warning(
+                    "_sync_approval failed (continuing with billing-list only): %s",
+                    approval_err,
+                )
             billing_count = self._sync_billing(
                 connection, months_back, triggered_by, triggered_user_id
             )
