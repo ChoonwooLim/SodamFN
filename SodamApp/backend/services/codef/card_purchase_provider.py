@@ -1,6 +1,19 @@
 """CODEF 카드 매입(사용내역) 어댑터.
 
-CODEF /v1/kr/card/common/p/approval 응답을 CardPurchase 로 저장.
+엔드포인트 선택 (2026-05-14 결정):
+- 현재: /v1/kr/card/p/account/billing-list (청구내역 — DEMO 가능)
+  * 응답: 청구월별 묶음 (rows[]) + 각 row 의 resChargeHistoryList[] 가 개별 사용건
+  * 제약: 청구 확정된 사용건만 (실시간 X), resApprovalNo 가 빈 문자열
+    → 합성 key (날짜|가맹점|금액|할부) 로 UNIQUE 처리
+  * 파라미터: startDate/endDate 가 YYYYMM (월 단위)
+- PRODUCT 전환 후: /v1/kr/card/common/p/approval (실시간 승인내역)
+  * approvalNo 가 응답에 포함 — 합성 key 불필요
+  * 코드 변경 포인트:
+      BILLING_LIST_URL → APPROVAL_URL
+      _build_period_params 의 포맷 YYYYMM → YYYYMMDD (일 단위)
+      response.rows 가 직접 사용내역 list (resChargeHistoryList 풀기 불필요)
+
+CODEF 응답을 CardPurchase 로 저장.
 사장님 결제용 카드 사용내역 = 매입(지출).
 
 매출용 CodefCardProvider 와 분리: 같은 카드사라도 매출/매입은 별도 connectedId
@@ -26,7 +39,9 @@ from .exceptions import (
 )
 
 
-APPROVAL_URL = "/v1/kr/card/common/p/approval"
+# DEMO 환경에서 작동하는 청구내역 엔드포인트.
+# PRODUCT 전환 후 실시간 승인내역으로 바꾸려면 "/v1/kr/card/common/p/approval" 로 교체.
+BILLING_LIST_URL = "/v1/kr/card/p/account/billing-list"
 
 
 @dataclass
@@ -39,7 +54,7 @@ class PurchaseSyncResult:
 
 
 class CodefCardPurchaseProvider:
-    """카드 매입(사용내역) Provider — CODEF MyData 개인 카드 승인내역."""
+    """카드 매입(사용내역) Provider — CODEF MyData 개인 카드 청구내역."""
 
     def __init__(self, engine, client: Optional[CodefClient] = None,
                  quota: Optional[CodefQuotaService] = None,
@@ -50,17 +65,20 @@ class CodefCardPurchaseProvider:
         self._connections = connections or CodefConnectionService(engine, client=self._client)
 
     def sync_one_connection(self, connection: CodefConnection,
-                            days_back: int = 7,
+                            months_back: int = 3,
                             triggered_by: str = "cron",
                             triggered_user_id: Optional[int] = None) -> PurchaseSyncResult:
-        """카드사 1 connection 풀 동기화."""
+        """카드사 1 connection 풀 동기화.
+
+        billing-list 는 청구월 단위 조회 → months_back 는 "이번 달 포함 N개월 전까지".
+        """
         result = PurchaseSyncResult(
             organization_code=connection.organization_code,
             organization_label=connection.organization_label,
         )
         try:
-            result.new_purchases = self._sync_approval(
-                connection, days_back, triggered_by, triggered_user_id
+            result.new_purchases = self._sync_billing(
+                connection, months_back, triggered_by, triggered_user_id
             )
         except CodefAuthExpired as e:
             self._connections.mark_failed(connection.id, "expired", e.code, e.message)
@@ -81,31 +99,51 @@ class CodefCardPurchaseProvider:
             result.error_code = f"quota_{e.scope}"
         return result
 
-    # ─── /p/approval ───────────────────────────────
+    # ─── /p/account/billing-list ──────────────────────
 
-    def _sync_approval(self, conn: CodefConnection, days_back: int,
-                       triggered_by: str,
-                       triggered_user_id: Optional[int]) -> int:
-        self._quota.check_before_call(conn.business_id, APPROVAL_URL)
-        params = self._build_period_params(conn, days_back=days_back)
-        response = self._client.request_product(APPROVAL_URL, params)
+    def _sync_billing(self, conn: CodefConnection, months_back: int,
+                      triggered_by: str,
+                      triggered_user_id: Optional[int]) -> int:
+        self._quota.check_before_call(conn.business_id, BILLING_LIST_URL)
+        params = self._build_period_params(conn, months_back=months_back)
+        response = self._client.request_product(BILLING_LIST_URL, params)
         self._quota.record_call(
             business_id=conn.business_id, connection_id=conn.id,
-            api_path=APPROVAL_URL, organization_code=conn.organization_code,
+            api_path=BILLING_LIST_URL, organization_code=conn.organization_code,
             status="success", rows=response.rows_count,
             result_code=response.result_code,
             triggered_by=triggered_by, triggered_user_id=triggered_user_id,
         )
-        return self._upsert_purchases(conn, response.rows)
+
+        # response.rows = 청구월 list. 각 row 의 resChargeHistoryList[] 가 실 매입 raw.
+        purchases: list[dict] = []
+        for billing in response.rows:
+            charge_list = billing.get("resChargeHistoryList") or []
+            for ch in charge_list:
+                purchases.append(ch)
+        return self._upsert_purchases(conn, purchases)
 
     def _upsert_purchases(self, conn: CodefConnection, rows: list[dict]) -> int:
         new_count = 0
         with Session(self.engine) as s:
             for row in rows:
-                approval_date = self._parse_date(row.get("approvedDate"))
-                approval_number = (row.get("approvalNo") or "").strip()
-                if not approval_number or approval_date is None:
+                approval_date = self._parse_date(row.get("resUsedDate"))
+                if approval_date is None:
                     continue
+
+                merchant_name = (row.get("resMemberStoreName") or "").strip() or None
+                amount = self._parse_int(row.get("resUsedAmount", 0))
+                installment = self._parse_int(row.get("resInstallmentMonth", 0)) or None
+
+                # billing-list 는 승인번호가 비어있음 — 합성 key 생성 (32자 이내)
+                approval_number = (row.get("resApprovalNo") or "").strip()
+                if not approval_number:
+                    synthesized = (
+                        f"{approval_date.strftime('%Y%m%d')}|"
+                        f"{merchant_name or 'NA'}|"
+                        f"{amount}|{installment or 0}"
+                    )
+                    approval_number = synthesized[:32]
 
                 existing = s.exec(select(CardPurchase).where(
                     CardPurchase.business_id == conn.business_id,
@@ -117,15 +155,14 @@ class CodefCardPurchaseProvider:
                     # 이미 적재된 CODEF row — skip (재호출 idempotent)
                     continue
 
-                amount = self._parse_int(row.get("amount", 0))
-                installment = self._parse_int(row.get("installment", 0)) or None
-                merchant_name = row.get("merchantName") or row.get("memberStoreName")
-                merchant_no = row.get("merchantNo")
-                business_type = row.get("businessType") or row.get("merchantBizType")
-                card_number = row.get("cardNo")
-                status = "승인" if str(row.get("status", "1")) == "1" else "취소"
+                card_number = row.get("resUsedCard")  # 예: "본인072"
+                business_type = row.get("resMemberStoreType") or None
+                merchant_no = row.get("resMemberStoreNo") or None
                 source_meta = json.dumps(row, ensure_ascii=False)[:2000]
                 now = datetime.datetime.utcnow()
+
+                # billing-list 는 확정된 청구건만 반환 → 항상 승인 상태로 간주
+                status = "승인"
 
                 if existing:
                     # excel/manual 행이 있던 자리에 CODEF row 채움 (덮어쓰기)
@@ -147,7 +184,6 @@ class CodefCardPurchaseProvider:
                         card_corp=conn.organization_label,
                         card_number_masked=card_number,
                         approval_date=approval_date,
-                        approval_time=row.get("approvedTime"),
                         approval_number=approval_number,
                         merchant_name=merchant_name,
                         merchant_no=merchant_no,
@@ -167,15 +203,29 @@ class CodefCardPurchaseProvider:
 
     # ─── 헬퍼 ──────────────────────────────────────
 
-    def _build_period_params(self, conn: CodefConnection, days_back: int) -> dict:
+    def _build_period_params(self, conn: CodefConnection, months_back: int) -> dict:
+        """billing-list 용 기간 파라미터.
+
+        startDate/endDate = YYYYMM (월 단위). months_back=3 이면 이번 달 포함 4개월치.
+        """
         today = datetime.date.today()
-        start = today - datetime.timedelta(days=days_back)
+        months: list[tuple[int, int]] = []
+        year, month = today.year, today.month
+        for _ in range(months_back + 1):
+            months.append((year, month))
+            month -= 1
+            if month < 1:
+                month = 12
+                year -= 1
+        start = min(months)
+        end = max(months)
+        start_str = f"{start[0]}{start[1]:02d}"
+        end_str = f"{end[0]}{end[1]:02d}"
         return {
             "connectedId": conn.connected_id,
             "organization": conn.organization_code,
-            "startDate": start.strftime("%Y%m%d"),
-            "endDate": today.strftime("%Y%m%d"),
-            "inquiryType": "1",
+            "startDate": start_str,
+            "endDate": end_str,
         }
 
     @staticmethod

@@ -25,7 +25,9 @@ router = APIRouter(prefix="/api/codef/card-purchases", tags=["codef-card-purchas
 @router.post("/sync/{connection_id}")
 def sync_one(
     connection_id: int,
-    days_back: int = Query(7, ge=1, le=90),
+    months_back: int = Query(3, ge=1, le=12),
+    # backward compat: 기존 frontend 가 days_back 으로 호출하면 무시 (billing-list 는 월 단위)
+    days_back: Optional[int] = Query(None, deprecated=True),
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
@@ -36,7 +38,7 @@ def sync_one(
             raise HTTPException(404, "Connection not found")
     provider = CodefCardPurchaseProvider(engine)
     result = provider.sync_one_connection(
-        conn, days_back=days_back,
+        conn, months_back=months_back,
         triggered_by="manual",
         triggered_user_id=admin.id,
     )
@@ -51,7 +53,9 @@ def sync_one(
 
 @router.post("/sync-all")
 def sync_all(
-    days_back: int = Query(7, ge=1, le=90),
+    months_back: int = Query(3, ge=1, le=12),
+    # backward compat: 기존 frontend 가 days_back 으로 호출하면 무시
+    days_back: Optional[int] = Query(None, deprecated=True),
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
@@ -66,7 +70,7 @@ def sync_all(
     results = []
     for conn in conns:
         r = provider.sync_one_connection(
-            conn, days_back=days_back,
+            conn, months_back=months_back,
             triggered_by="manual",
             triggered_user_id=admin.id,
         )
