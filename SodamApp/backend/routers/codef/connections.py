@@ -27,6 +27,9 @@ class RegisterRequest(BaseModel):
     organization_type: str
     organization_code: str
     auth: dict  # {"id": ..., "password": ...} 또는 {"loginType": "kakao", ...}
+    # 신규: 같은 카드사도 매출(card_sales)·매입(card_purchase) 별도 connection 으로 관리.
+    # 기본값은 'card_sales' 로 기존 호출과 호환.
+    connection_type: Optional[str] = "card_sales"
 
 
 class ReverifyRequest(BaseModel):
@@ -46,6 +49,7 @@ def _connection_dto(c: CodefConnection) -> dict:
         "organization_type": c.organization_type,
         "organization_code": c.organization_code,
         "organization_label": c.organization_label,
+        "connection_type": c.connection_type,
         "auth_method": c.auth_method,
         "status": c.status,
         "last_verified_at": c.last_verified_at.isoformat() if c.last_verified_at else None,
@@ -82,12 +86,31 @@ def get_catalog(type: Optional[str] = None,
 @router.get("/connections")
 def list_connections(
     type: Optional[str] = None,
+    connection_type: Optional[str] = None,
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
+    """CODEF 연결 목록.
+
+    Query params:
+      - type            : organization_type 필터 ('card' / 'bank' 등)
+      - connection_type : connection_type 필터 ('card_sales' / 'card_purchase' / 'bank')
+
+    `type=card_purchase` 같은 단축 사용도 허용 — frontend 가 type 만 알고 있을 때 분기.
+    """
     bid = resolve_bid(admin, x_view_as_business)
+
+    # 단축 호환: type=card_purchase|card_sales → connection_type 으로 변환
+    if type in {"card_purchase", "card_sales", "bank"} and connection_type is None:
+        connection_type = type
+        type = None  # organization_type 필터 해제 (card_sales/card_purchase 모두 organization_type='card')
+
     svc = CodefConnectionService(engine=engine)
-    conns = svc.list_all(business_id=bid, organization_type=type)
+    conns = svc.list_all(
+        business_id=bid,
+        organization_type=type,
+        connection_type=connection_type,
+    )
     return {"connections": [_connection_dto(c) for c in conns]}
 
 
@@ -99,13 +122,17 @@ def register(
 ):
     bid = resolve_bid(admin, x_view_as_business)
     if body.organization_type != "card":
-        raise HTTPException(400, f"Phase 1 은 'card' 만 지원 (got {body.organization_type})")
+        raise HTTPException(400, f"카드 연결만 본 엔드포인트에서 처리 (got {body.organization_type})")
+    conn_type = body.connection_type or "card_sales"
+    if conn_type not in {"card_sales", "card_purchase"}:
+        raise HTTPException(400, f"잘못된 connection_type: {conn_type}")
     svc = CodefConnectionService(engine=engine)
     try:
         conn = svc.register_card(
             business_id=bid,
             card_corp_code=body.organization_code,
             auth_payload=body.auth,
+            connection_type=conn_type,
         )
     except CodefAdditionalAuth as e:
         return {

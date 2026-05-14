@@ -1,4 +1,4 @@
-import { CreditCard, Building2, Users, FileText, IdCard, Store, Bike } from 'lucide-react';
+import { CreditCard, Building2, Users, FileText, IdCard, Store, Bike, Wallet } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
@@ -27,6 +27,16 @@ const MODULES = [
         active: true,
         href: '/external-integration/banks',
         description: '20+ 은행 입출금 자동수집 (CODEF 마이데이터)',
+    },
+    {
+        id: 'card-purchase',
+        title: '카드 매입',
+        provider: 'CODEF',
+        icon: Wallet,
+        color: 'violet',
+        active: true,
+        href: '/external-integration/card-purchase',
+        description: '사장님 사용카드 매입내역 자동수집 (신한·삼성·현대 등)',
     },
     {
         id: 'easypos',
@@ -127,6 +137,12 @@ function ModuleCard({ module, stats }) {
             icon: 'text-blue-600',
             badge: 'bg-blue-50 text-blue-700',
             link: 'text-blue-600',
+        },
+        violet: {
+            border: 'border-violet-200 hover:border-violet-400',
+            icon: 'text-violet-600',
+            badge: 'bg-violet-50 text-violet-700',
+            link: 'text-violet-600',
         },
     };
     const c = colorMap[module.color] || colorMap.blue;
@@ -232,6 +248,27 @@ function ModuleCard({ module, stats }) {
                     )}
                 </div>
             )}
+            {stats && module.id === 'card-purchase' && (
+                <div className="text-sm space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                        <span>등록 카드사</span>
+                        <span className="font-semibold">
+                            {stats.activeCount}/{stats.totalCount}
+                        </span>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                        <span>이번 달 매입</span>
+                        <span className="font-semibold">
+                            {(stats.monthCount || 0).toLocaleString()}건
+                        </span>
+                    </div>
+                    {stats.failedCount > 0 && (
+                        <div className="mt-1 text-xs text-amber-700">
+                            ⚠ {stats.failedCount}개 재인증 필요
+                        </div>
+                    )}
+                </div>
+            )}
             {stats && module.id === 'baemin' && (
                 <div className="text-sm space-y-1">
                     <div className="flex justify-between text-slate-700">
@@ -267,7 +304,14 @@ function ModuleCard({ module, stats }) {
     );
 }
 
-export default function ModuleGrid({ cardStats, bankStats, easyposStats, coupangEatsStats, baeminStats }) {
+export default function ModuleGrid({
+    cardStats,
+    bankStats,
+    easyposStats,
+    coupangEatsStats,
+    baeminStats,
+    cardPurchaseStats,
+}) {
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {MODULES.map((m) => (
@@ -279,7 +323,8 @@ export default function ModuleGrid({ cardStats, bankStats, easyposStats, coupang
                         m.id === 'banks' ? bankStats :
                         m.id === 'easypos' ? easyposStats :
                         m.id === 'coupang-eats' ? coupangEatsStats :
-                        m.id === 'baemin' ? baeminStats : null
+                        m.id === 'baemin' ? baeminStats :
+                        m.id === 'card-purchase' ? cardPurchaseStats : null
                     }
                 />
             ))}

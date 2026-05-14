@@ -20,6 +20,7 @@ export default function ExternalIntegration() {
     const [easyposStats, setEasyposStats] = useState({ registered: false, lastVerifiedAt: null, status: null });
     const [coupangEatsStats, setCoupangEatsStats] = useState({ registered: false, cookiesPresent: false, lastVerifiedAt: null, status: null, loginMethod: null });
     const [baeminStats, setBaeminStats] = useState({ registered: false, cookiesPresent: false, lastVerifiedAt: null, status: null, shopName: null });
+    const [cardPurchaseStats, setCardPurchaseStats] = useState({ activeCount: 0, totalCount: 0, failedCount: 0, monthCount: 0 });
     const [budgetModalOpen, setBudgetModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
@@ -32,9 +33,13 @@ export default function ExternalIntegration() {
             const today = new Date();
             const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
 
-            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes, coupangEatsRes, baeminRes] = await Promise.all([
+            const [
+                budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes,
+                easyposRes, coupangEatsRes, baeminRes,
+                cardPurchaseConnRes, cardPurchaseListRes,
+            ] = await Promise.all([
                 api.get('/codef/budget/current'),
-                api.get('/codef/connections', { params: { type: 'card' } }),
+                api.get('/codef/connections', { params: { connection_type: 'card_sales' } }),
                 api.get('/bank-sync/accounts').catch(() => ({ data: [] })),
                 api.get('/bank-sync/transactions', {
                     params: { start_date: monthStart, limit: 1 },
@@ -43,6 +48,10 @@ export default function ExternalIntegration() {
                 api.get('/easypos/credential').catch(() => ({ data: { registered: false } })),
                 api.get('/coupang-eats/credential').catch(() => ({ data: { registered: false } })),
                 api.get('/baemin/credential').catch(() => ({ data: { registered: false } })),
+                api.get('/codef/connections', { params: { connection_type: 'card_purchase' } })
+                    .catch(() => ({ data: { connections: [] } })),
+                api.get('/codef/card-purchases', { params: { start_date: monthStart, limit: 500 } })
+                    .catch(() => ({ data: [] })),
             ]);
             setBudget(budgetRes.data);
             const cardConns = cardConnRes.data.connections || [];
@@ -79,6 +88,14 @@ export default function ExternalIntegration() {
                 lastVerifiedAt: bm.last_verified_at || null,
                 status: bm.status || null,
                 shopName: bm.shop_name || null,
+            });
+            const cpConns = cardPurchaseConnRes.data?.connections || [];
+            const cpList = Array.isArray(cardPurchaseListRes.data) ? cardPurchaseListRes.data : [];
+            setCardPurchaseStats({
+                activeCount: cpConns.filter((c) => c.status === 'active').length,
+                totalCount: cpConns.length,
+                failedCount: cpConns.filter((c) => c.status !== 'active' && c.status !== 'deactivated').length,
+                monthCount: cpList.length,
             });
         } catch (e) {
             setErr(e.response?.data?.detail || '데이터를 불러오지 못했습니다.');
@@ -122,7 +139,14 @@ export default function ExternalIntegration() {
                 </div>
 
                 <h2 className="text-lg font-semibold text-slate-800 mb-4">통합 모듈</h2>
-                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} coupangEatsStats={coupangEatsStats} baeminStats={baeminStats} />
+                <ModuleGrid
+                    cardStats={cardStats}
+                    bankStats={bankStats}
+                    easyposStats={easyposStats}
+                    coupangEatsStats={coupangEatsStats}
+                    baeminStats={baeminStats}
+                    cardPurchaseStats={cardPurchaseStats}
+                />
 
                 <BudgetSettingsModal
                     isOpen={budgetModalOpen}

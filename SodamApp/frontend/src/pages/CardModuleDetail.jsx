@@ -31,7 +31,7 @@ export default function CardModuleDetail() {
         setErr('');
         try {
             const [connRes, merchRes] = await Promise.all([
-                api.get('/codef/connections', { params: { type: 'card' } }),
+                api.get('/codef/connections', { params: { connection_type: 'card_sales' } }),
                 api.get('/codef/card-merchants').catch(() => ({ data: [] })),
             ]);
             setConns(connRes.data.connections || []);

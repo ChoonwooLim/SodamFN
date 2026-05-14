@@ -25,14 +25,22 @@ class CodefConnectionService:
     # ─── 등록 / 재인증 / 해제 ───────────────────────
 
     def register_card(self, business_id: int, card_corp_code: str,
-                      auth_payload: dict) -> CodefConnection:
+                      auth_payload: dict,
+                      connection_type: str = "card_sales") -> CodefConnection:
         """auth_payload 형식:
         - ID/PW:    {"id": "...", "password": "..."}
         - 간편인증: {"identity": "...", "loginType": "kakao", "birthDate": "...", ...}
 
         사업자 카드 인증은 사업자등록번호(businessRegNo)도 페이로드에 포함 —
         Business 모델에서 자동 추출.
+
+        connection_type:
+          - 'card_sales'   : 사업자 가맹점 매출 (사업자 카드사 사이트 ID/PW)
+          - 'card_purchase': 사장님 카드 사용내역(매입) — 개인 카드 사이트 ID/PW
         """
+        if connection_type not in {"card_sales", "card_purchase"}:
+            raise ValueError(f"잘못된 connection_type: {connection_type}")
+
         org = get_organization(card_corp_code)
         if not org or org.type != "card":
             raise ValueError(f"알 수 없는 카드사: {card_corp_code}")
@@ -45,6 +53,7 @@ class CodefConnectionService:
             organization=org,
             connected_id=result.connected_id,
             auth_method=auth_method,
+            connection_type=connection_type,
         )
 
     def register_bank(self, business_id: int, bank_code: str,
@@ -69,6 +78,7 @@ class CodefConnectionService:
             organization=org,
             connected_id=result.connected_id,
             auth_method=auth_method,
+            connection_type="bank",
         )
 
     def _build_bank_payload(self, org, auth_payload: dict, biz_reg_no: str) -> tuple[dict, str]:
@@ -208,8 +218,12 @@ class CodefConnectionService:
             return list(s.exec(stmt))
 
     def list_all(self, business_id: int,
-                 organization_type: Optional[str] = None) -> list[CodefConnection]:
-        """status 무관 (deactivated 제외) — UI 에서 expired/failed 표시용."""
+                 organization_type: Optional[str] = None,
+                 connection_type: Optional[str] = None) -> list[CodefConnection]:
+        """status 무관 (deactivated 제외) — UI 에서 expired/failed 표시용.
+
+        connection_type: 'card_sales' / 'card_purchase' / 'bank' 필터.
+        """
         with Session(self.engine) as s:
             stmt = select(CodefConnection).where(
                 CodefConnection.business_id == business_id,
@@ -217,6 +231,8 @@ class CodefConnectionService:
             )
             if organization_type:
                 stmt = stmt.where(CodefConnection.organization_type == organization_type)
+            if connection_type:
+                stmt = stmt.where(CodefConnection.connection_type == connection_type)
             return list(s.exec(stmt))
 
     # ─── 내부 헬퍼 ──────────────────────────────────
@@ -275,12 +291,19 @@ class CodefConnectionService:
         raise ValueError("auth_payload 가 ID/PW 또는 간편인증 형식이 아님")
 
     def _upsert_connection(self, business_id, organization, connected_id,
-                           auth_method) -> CodefConnection:
+                           auth_method,
+                           connection_type: str = "card_sales") -> CodefConnection:
+        """connection_type 까지 포함해 unique 키로 upsert.
+
+        같은 사업자·같은 카드사라도 매출(card_sales)·매입(card_purchase) connection 은
+        별도 row 로 관리 — 서로 다른 connectedId 가 발급되기 때문.
+        """
         with Session(self.engine) as s:
             stmt = select(CodefConnection).where(
                 CodefConnection.business_id == business_id,
                 CodefConnection.organization_code == organization.code,
                 CodefConnection.organization_type == organization.type,
+                CodefConnection.connection_type == connection_type,
             )
             existing = s.exec(stmt).first()
             now = datetime.datetime.utcnow()
@@ -304,6 +327,7 @@ class CodefConnectionService:
                 organization_label=organization.label,
                 connected_id=connected_id,
                 auth_method=auth_method,
+                connection_type=connection_type,
                 status="active",
                 last_verified_at=now,
             )
