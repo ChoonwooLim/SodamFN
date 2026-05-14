@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(*)",
       "Bash(python -c \"import sys; sys.path.insert\\(0,'.'\\); from datetime import date,timedelta; from sqlmodel import Session, select; from database import engine; from models import DevWorkLog; s=Session\\(engine\\); yesterday=date.today\\(\\)-timedelta\\(days=1\\); logs=s.exec\\(select\\(DevWorkLog\\).where\\(DevWorkLog.date>=yesterday, ~DevWorkLog.title.startswith\\('[HEAD]'\\)\\).order_by\\(DevWorkLog.date.desc\\(\\)\\)\\).all\\(\\); [print\\(f'[{l.date}] [{l.category}] {l.title}\\\\n{l.ai_summary or \\\\\"\\\\\"}\\\\n---'\\) for l in logs]; print\\(f'총 {len\\(logs\\)}건'\\); s.close\\(\\)\")",
       "Skill(update-config)",
       "Skill(update-config:*)",
@@ -35,7 +36,22 @@
       "Bash(ssh -o StrictHostKeyChecking=no stevenlim@192.168.219.101 \"kill \\\\$\\(pgrep -f 'python main.py'\\) 2>/dev/null; sleep 2; cd /home/stevenlim/WORK/ai-image-service && source venv/bin/activate && nohup python main.py > service.log 2>&1 & disown && echo RESTARTED\")",
       "Bash(ssh -o StrictHostKeyChecking=no stevenlim@192.168.219.101 \"ps aux | grep 'python main' | grep -v grep | awk '{print \\\\$2}'\")"
     ],
-    "defaultMode": "dontAsk",
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(rm -rf $HOME*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean -f*)",
+      "Bash(git branch -D *)",
+      "Bash(git checkout -- *)",
+      "Bash(sudo *)",
+      "Bash(* --no-verify*)",
+      "Bash(curl * | bash*)",
+      "Bash(wget * | sh*)"
+    ],
+    "defaultMode": "bypassPermissions",
     "additionalDirectories": [
       "D:\\GoogleDrive\\소담김밥\\배달관련서류\\업로드용이미지\\쿠팡이츠"
     ]
