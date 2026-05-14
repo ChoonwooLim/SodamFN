@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
     ArrowLeft, Plus, RefreshCw, Wallet, Trash2, Loader2,
     AlertCircle, CheckCircle2, X as XIcon, ShieldCheck, BarChart3,
-    Smartphone,
+    Smartphone, Eye, EyeOff,
 } from 'lucide-react';
 import api from '../api';
 
@@ -522,6 +522,8 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
     const [clientType, setClientType] = useState('P');                 // P=개인, B=사업자 (CODEF clientType)
     const [extraJson, setExtraJson] = useState('');
     const [errRaw, setErrRaw] = useState(null);                        // CODEF raw response (디버그)
+    const [showPassword, setShowPassword] = useState(false);           // 비번 평문 표시 토글
+    const [showCardPassword, setShowCardPassword] = useState(false);   // 카드비번 평문 표시 토글
 
     // 간편인증 흐름 필드
     const [userName, setUserName] = useState('');
@@ -839,14 +841,30 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm text-slate-700 mb-1.5">비밀번호</label>
-                                        <input
-                                            type="password"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                            autoComplete="new-password"
-                                        />
+                                        <label className="block text-sm text-slate-700 mb-1.5">
+                                            비밀번호
+                                            <span className="ml-1 text-xs text-slate-500 font-normal">
+                                                (👁 클릭해서 대소문자·오타 확인)
+                                            </span>
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={showPassword ? 'text' : 'password'}
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                autoComplete="new-password"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword((v) => !v)}
+                                                tabIndex={-1}
+                                                aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 표시'}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+                                            >
+                                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
                                     </div>
                                     {(orgCode === '0302' || orgCode === '0301') && (
                                         <div>
@@ -880,16 +898,27 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                                                 (카드사별 — 신한·삼성은 앞 2자리, 현대는 전체 4자리)
                                             </span>
                                         </label>
-                                        <input
-                                            type="password"
-                                            value={cardPasswordPrefix}
-                                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                            placeholder="숫자 2자리 (앞 2자리) 또는 4자리 (전체)"
-                                            maxLength={4}
-                                            inputMode="numeric"
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                                            autoComplete="off"
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type={showCardPassword ? 'text' : 'password'}
+                                                value={cardPasswordPrefix}
+                                                onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                                placeholder="숫자 2자리 (앞 2자리) 또는 4자리 (전체)"
+                                                maxLength={4}
+                                                inputMode="numeric"
+                                                className="w-full px-3 py-2 pr-10 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                autoComplete="off"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowCardPassword((v) => !v)}
+                                                tabIndex={-1}
+                                                aria-label={showCardPassword ? '카드비번 숨기기' : '카드비번 표시'}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
+                                            >
+                                                {showCardPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="block text-sm text-slate-700 mb-1.5">
