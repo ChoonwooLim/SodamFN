@@ -47,9 +47,13 @@ from .exceptions import (
 )
 
 
-# CODEF 카드 매입 엔드포인트 (개인 카드 /p/)
-APPROVAL_LIST_URL = "/v1/kr/card/p/account/approval-list"  # 승인내역 (실시간)
-BILLING_LIST_URL  = "/v1/kr/card/p/account/billing-list"    # 청구내역 (백필)
+# CODEF 카드 매입 엔드포인트.
+# 주의: CODEF 는 두 URL 패턴이 공존:
+#   - /v1/kr/card/common/{p|b}/{action} — common API (card_provider.py 도 사용)
+#   - /v1/kr/card/p/account/{action}-list — myData 마이데이터 API
+# 승인내역은 common 패턴, 청구내역은 myData 패턴이 검증됨 (각 모듈 회귀 테스트 통과).
+APPROVAL_LIST_URL = "/v1/kr/card/common/p/approval"          # 승인내역 (실시간) — card_provider.py 와 동일 URL
+BILLING_LIST_URL  = "/v1/kr/card/p/account/billing-list"     # 청구내역 (백필)
 
 
 @dataclass
@@ -149,8 +153,9 @@ class CodefCardPurchaseProvider:
             "organization": conn.organization_code,
             "startDate": start.strftime("%Y%m%d"),
             "endDate": today.strftime("%Y%m%d"),
-            "orderBy": "0",       # 0: 최신순
-            "inquiryType": "1",   # 1: 전체조회 (cardNo 불필요)
+            "orderBy": "0",              # 0: 최신순
+            "inquiryType": "1",          # 1: 전체조회 (cardNo 불필요)
+            "memberStoreInfoType": "1",  # 1: 가맹점정보 포함 — 업종/사업자번호/전화/주소
         }
         response = self._client.request_product(APPROVAL_LIST_URL, params)
         self._quota.record_call(
@@ -317,6 +322,7 @@ class CodefCardPurchaseProvider:
             "organization": conn.organization_code,
             "startDate": start_str,
             "endDate": end_str,
+            "memberStoreInfoYN": "1",  # 1: 가맹점정보 포함 — 업종/사업자번호/전화/주소
         }
 
     @staticmethod
