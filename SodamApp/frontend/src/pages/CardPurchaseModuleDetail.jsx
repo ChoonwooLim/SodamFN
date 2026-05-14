@@ -519,7 +519,9 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
     const [cardNo, setCardNo] = useState('');                          // 카드번호 (현대 필수, KB 옵션)
     const [cardPasswordPrefix, setCardPasswordPrefix] = useState('');  // 카드비번 앞 2자리
     const [birthDate, setBirthDate] = useState('');                    // 생년월일 6자리 YYMMDD
+    const [clientType, setClientType] = useState('P');                 // P=개인, B=사업자 (CODEF clientType)
     const [extraJson, setExtraJson] = useState('');
+    const [errRaw, setErrRaw] = useState(null);                        // CODEF raw response (디버그)
 
     // 간편인증 흐름 필드
     const [userName, setUserName] = useState('');
@@ -624,6 +626,7 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
             auth = {
                 id: userId,
                 password,
+                client_type: clientType,  // P=개인, B=사업자 — CF-04000 1차 원인 (회원 종류 mismatch)
                 ...(cardNoDigits ? { cardNo: cardNoDigits } : {}),
                 ...(cardPasswordPrefix ? { cardPassword: cardPasswordPrefix } : {}),
                 ...(birthDate ? { birthDate } : {}),
@@ -673,7 +676,13 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
             onRegistered?.(res.data.connection);
         } catch (e) {
             const detail = e.response?.data?.detail;
-            setErr(typeof detail === 'string' ? detail : (detail?.message || '등록 실패'));
+            if (typeof detail === 'string') {
+                setErr(detail);
+                setErrRaw(null);
+            } else {
+                setErr(detail?.message || '등록 실패');
+                setErrRaw(detail?.raw || null);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -784,6 +793,41 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
 
                             {!isSimpleAuth && (
                                 <>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">
+                                            카드사 사이트 회원 종류
+                                            <span className="ml-1 text-xs text-rose-600 font-normal">
+                                                ⚠ CF-04000 1차 원인 — 정확히 선택
+                                            </span>
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setClientType('P')}
+                                                className={`px-3 py-2 text-sm rounded-lg border font-medium transition ${
+                                                    clientType === 'P'
+                                                        ? 'bg-violet-600 text-white border-violet-600'
+                                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                개인 (P)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setClientType('B')}
+                                                className={`px-3 py-2 text-sm rounded-lg border font-medium transition ${
+                                                    clientType === 'B'
+                                                        ? 'bg-violet-600 text-white border-violet-600'
+                                                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                사업자 (B)
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-1">
+                                            ※ 카드사 홈페이지 가입 시 "<strong>개인회원</strong>" / "<strong>법인·사업자회원</strong>" 중 어느 쪽인지. 사이트 메뉴 상단에 표시됩니다.
+                                        </p>
+                                    </div>
                                     <div>
                                         <label className="block text-sm text-slate-700 mb-1.5">카드사 홈페이지 ID</label>
                                         <input
@@ -987,7 +1031,17 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
 
                     {err && (
                         <div className="text-sm p-2 rounded bg-red-50 text-red-700 border border-red-200">
-                            {err}
+                            <div>{err}</div>
+                            {errRaw && (
+                                <details className="mt-2">
+                                    <summary className="cursor-pointer text-[11px] text-red-600 hover:text-red-800">
+                                        CODEF 원응답 펼치기 (디버그용)
+                                    </summary>
+                                    <pre className="mt-1 p-2 bg-red-100/70 rounded text-[10px] font-mono whitespace-pre-wrap break-all max-h-48 overflow-auto">
+                                        {JSON.stringify(errRaw, null, 2)}
+                                    </pre>
+                                </details>
+                            )}
                         </div>
                     )}
                 </div>
