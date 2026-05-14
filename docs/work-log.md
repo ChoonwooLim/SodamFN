@@ -1407,3 +1407,112 @@ Payroll.transfer_status='완료' 마킹 시 P/L 자동 반영. 1~3월 옛 데이
 
 ---
 
+
+## 2026-05-14
+
+### 작업 요약 (두 갈래로 진행 — 본 세션: 쿠팡이츠 수수료 자동화 / 병행 세션: 배민 자동수집 골격)
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix  | naive UTC datetime → timezone-aware ISO 직렬화 (9시간 어긋남) | 완료 |
+| fix  | 인건비가 business_id=None Payroll 로 떨어져 화면 누락 | 완료 |
+| chore | .claude 사용 안 하는 디자인 스킬 제거 + 환경 파일 정리 | 완료 |
+| feat | 쿠팡이츠 정산 detail endpoint URL probe (Phase 1A) | 완료 |
+| feat | 쿠팡이츠 월별 매출내역서 Excel → fee breakdown (Phase 1B) | 완료 |
+| feat | 외부연동 채널 쿠키 만료/실패 통합 알림 (Sidebar + 카드) | 완료 |
+| fix  | external-integration /api 중복 호출 경로 수정 | 완료 |
+| feat | expires_at NULL 휴리스틱 + 추정값 표시 | 완료 |
+| feat | 쿠팡이츠 detail 페이지에 월별 엑셀 백필 UI | 완료 |
+| fix  | sync_monthly_excel 끝에 DeliveryRevenue 까지 전파 | 완료 |
+| fix  | DeliveryRevenue 채널명 '쿠팡이츠' 통일 + dedupe + settle 보존 | 완료 |
+| fix  | Excel 파서 헤더 텍스트 기반 동적 매핑 (4월 49컬럼 시프트 대응) | 완료 |
+| docs | 배민(배달의민족) 매출/정산 자동수집 디자인 스펙 + 구현 계획 | 완료 |
+| feat | 배민 모델 4개 (Credential/Order/Settlement/SyncLog) | 완료 |
+| feat | 배민 BaeminClient 스켈레톤 + 쿠키 유틸 (curl_cffi) | 완료 |
+| feat | 배민 자격증명 CRUD + 수동쿠키 + sync 골격 | 완료 |
+| feat | 배민 fetch_orders/settlements 실제 구현 (HAR 응답 기반) | 완료 |
+| feat | 배민 upsert + DeliveryRevenue 일자집계 + P/L sync | 완료 |
+| feat | 배민 SyncEvent normalizer (매출/수수료 fan-out) | 완료 |
+| feat | 배민 대시보드 + superadmin 디버그 엔드포인트 (probe/raw-orders) | 완료 |
+| feat | 배민 cron 04:30 KST + auto_collection 라우터 연동 | 완료 |
+
+### 세부 내용 — 쿠팡이츠 수수료 breakdown 자동화 (본 세션 주도)
+
+#### Phase 1A — detail endpoint URL probe (`ec578e4b`)
+- 어제(5/13) 인계 노트의 가설 5개 URL 후보 (`/settlement-management-data/{id}` 등) 를 prod 에서 한 번에 검증하는 `GET /api/coupang-eats/debug/settlement-detail-probe` 추가
+- 사장님 prod 실행 결과: **5개 후보 전부 404** (쿠팡이츠 HTML 에러 페이지) → JSON detail endpoint 가 아예 존재하지 않음을 확인
+
+#### Phase 1B — HAR 재분석 → 월별 Excel 다운로드 endpoint 발견 (`e909aba2`)
+- HAR 파일 (`C:\WORK\SodamFN\2026서류\store.coupangeats.com.har`) 분석
+- 핵심 발견: `GET /api/v1/merchant/web/emails?type=salesOrder&action=download&downloadRequestDate=YYYY-MM&storeId=...`
+  → 87KB xlsx (사장님이 매월 받으시는 그 43컬럼 엑셀)
+- 시스템 제약: `inclusiveEnd` 가 전월까지 — 당월 실시간 fee 불가 (월 마감 후 다운로드 가능)
+- 신규 파일/모델:
+  - `services/coupang_eats_excel_parser.py` — Excel 파서 (ParsedOrderFee 43컬럼 매핑 + aggregate_by_date)
+  - `CoupangEatsOrderFee` 신규 테이블 (per-order, 43컬럼) + UniqueConstraint(business_id, order_id)
+  - `CoupangEatsSettlement` 보강: `detail_synced_at` / `detail_source_year_month`
+  - `CoupangEatsSyncLog` 보강: `excel_year_month` / `excel_orders_*` / `excel_settlements_updated`
+- 서비스 레이어:
+  - `CoupangEatsClient.fetch_downloadable_periods()` + `download_sales_order_excel()` (xlsx 매직 검증)
+  - `upsert_order_fees()` / `update_settlements_from_fees()` / `sync_monthly_excel()` 오케스트레이터
+- 라우터:
+  - `GET /downloadable-periods` (가용 기간)
+  - `POST /sync/monthly-excel {year_month}` (자동 다운로드+적재)
+  - `POST /sync/monthly-excel/upload` (수동 업로드 폴백)
+  - `POST /sync/monthly-excel/cron-trigger` (Orbitron cron)
+- cron: 매월 6일 03:30 (전월 + 전전월 재시도) — `auto_collection.py` 통합
+
+#### 만료 알림 시스템 (`b2c75406`, `91448613`, `3346bf07`)
+- 사장님의 토큰 자동화 발상(매일 새벽 로그인+로그아웃) 에 대해 push back — Akamai sensor_data 검증이 핵심이라 로그아웃 행위로 우회 안 됨
+- HAR 재분석: **refresh endpoint 미존재** (`/auth/refresh`, `/oauth/token` 등 모두 없음)
+- 결론: manual 쿠키 + 만료 사전 알림이 안정. 사장님이 1번(어드민 배너) 선택
+- 백엔드: `GET /api/external-integration/status` — 쿠팡이츠 + 배민 cred 한 번에 조회
+  - 분류: healthy / expiring_soon(≤12h) / expired / failed(연속실패≥3) / unknown / not_configured
+  - `expires_estimated` 마커 + `cookies_obtained_at` 기반 30h 보수 TTL 휴리스틱
+- 프론트엔드:
+  - Sidebar 외부연동 메뉴 + 손익관리 그룹에 빨간 뱃지 (60s 폴링)
+  - ExternalIntegration 페이지 상단 채널별 상태 카드 (60s 자동 리프레시, "(추정)" 표시)
+  - "/api/external-integration" prefix 중복(/api/api/) 404 수정
+
+#### 백필 UI + DeliveryRevenue 전파 + 파서 시프트 대응 (`97615baf`, `8aa9ba13`, `35194957`, `cda0412d`)
+- CoupangEatsModuleDetail 에 "월별 매출내역서 (수수료 breakdown)" 섹션 추가
+  - 자동 다운로드 (가용 월 dropdown — 최신 12개월)
+  - 수동 업로드 (xlsx + 연-월) — 1~3월 백필 또는 Akamai 폴백
+- 매출관리 페이지에 수수료가 0% 로 표시되던 원인 → `sync_monthly_excel` 끝에 `update_delivery_revenue_from_fees()` 호출 추가
+- 채널명 충돌: 기존 bank_sync 가 "쿠팡이츠" 로 저장, 우리는 "쿠팡" 으로 별도 row → "쿠팡이츠" 통일 + 기존 row 업데이트 + 중복 dedupe
+- **결정적 버그**: 4월 엑셀이 **43→49컬럼으로 확장** ("광고 프로모션" + "최종 광고비" 그룹 6컬럼 추가) → 정산 컬럼이 시프트되어 인덱스 기반 파서가 `settle_final=0`, `ad_total=0` 잘못 읽음
+- 해결: **헤더 텍스트 기반 동적 매핑** 전면 리팩토링 (`_FIELD_LABEL_PATHS` + `_build_column_index_map`)
+  - 광고비는 "최종 광고비" 우선, 없으면 "광고비" (1월 호환)
+  - 미래 컬럼 변경에도 안정
+
+### 검증 결과 (prod)
+
+| 월 | 매출 | 수수료 | 수수료율 | 정산 | 중개 | 결제 | 배달 | 광고 | 멤버십 |
+|----|------|--------|----------|------|------|------|------|------|--------|
+| 1월 | 15.1M | 9.5M | **62.7%** | 5.58M | 975K | 653K | 2.57M | 1.04M | 4.25M |
+| 2월 | 13.7M | 8.6M | **63.2%** | 4.98M | 882K | 590K | 2.32M | 1.00M | 3.85M |
+| 3월 | 11.6M | 6.8M | **58.6%** | 5.25M | 755K | 532K | 1.90M | 402K  | 3.21M |
+| 4월 | 7.8M  | 4.5M | **57.2%** | 3.95M | 503K | 372K | 1.35M | 0     | 2.25M |
+
+사장님 확인: 4월 광고 안 함 (ad_total=0 정상). 토요일 4건은 일·월 정산에 합쳐져 매칭 안 됨 (다음 사이클 보강).
+
+### 세부 내용 — 배민 자동수집 골격 (병행 세션)
+
+- HAR 분석 (`docs/baemin-har-analysis.md`) → `self-api.baemin.com` API 구조 파악
+- 모델 4개: `BaeminCredential` / `BaeminOrder` / `BaeminSettlement` / `BaeminSyncLog`
+- `BaeminClient` (curl_cffi) + 쿠키 유틸리티 + fetch_orders/settlements
+- 라우터: 자격증명 CRUD / 수동쿠키 / 수동 sync / 대시보드 / superadmin debug (probe, raw-orders)
+- SyncEvent normalizer (매출 일자별 + 수수료 항목별 fan-out)
+- cron 04:30 KST `auto_collection.py` 통합
+- 모델은 외부연동 통합 status 엔드포인트에서도 자동 표시 (배민 카드 등장)
+
+### 다음 세션 작업
+
+1. **사장님 매출관리 페이지 새로고침 → 4개월 수수료 % 정상 표시 검증** (현재 시점)
+2. 토요일 fee 매칭 보강 (정산이 일·월요일에 합쳐지는 케이스 처리) — 정확도 ↑
+3. 5월말~6월초 cron 실제 동작 확인 (자동으로 5월 데이터 다운로드)
+4. 배민 자동수집 prod 검증 — 사장님 ceo.baemin.com 쿠키 입력 후
+5. 텔레그램 봇 외부 푸시 추가 (사장님 BotFather 토큰 발급 시) — 외출 중 알림
+6. 손익계산서 페이지에서 쿠팡이츠 수수료 정확히 표시되는지 확인 (DeliveryRevenue → P/L 전파 검증)
+
+---

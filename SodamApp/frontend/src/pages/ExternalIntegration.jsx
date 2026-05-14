@@ -19,6 +19,7 @@ export default function ExternalIntegration() {
     const [bankStats, setBankStats] = useState({ accountCount: 0, txCount: 0, codefActiveCount: 0 });
     const [easyposStats, setEasyposStats] = useState({ registered: false, lastVerifiedAt: null, status: null });
     const [coupangEatsStats, setCoupangEatsStats] = useState({ registered: false, cookiesPresent: false, lastVerifiedAt: null, status: null, loginMethod: null });
+    const [baeminStats, setBaeminStats] = useState({ registered: false, cookiesPresent: false, lastVerifiedAt: null, status: null, shopName: null });
     const [budgetModalOpen, setBudgetModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [err, setErr] = useState('');
@@ -31,7 +32,7 @@ export default function ExternalIntegration() {
             const today = new Date();
             const monthStart = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
 
-            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes, coupangEatsRes] = await Promise.all([
+            const [budgetRes, cardConnRes, bankAccountsRes, bankTxRes, bankConnRes, easyposRes, coupangEatsRes, baeminRes] = await Promise.all([
                 api.get('/codef/budget/current'),
                 api.get('/codef/connections', { params: { type: 'card' } }),
                 api.get('/bank-sync/accounts').catch(() => ({ data: [] })),
@@ -41,6 +42,7 @@ export default function ExternalIntegration() {
                 api.get('/codef/connections', { params: { type: 'bank' } }).catch(() => ({ data: { connections: [] } })),
                 api.get('/easypos/credential').catch(() => ({ data: { registered: false } })),
                 api.get('/coupang-eats/credential').catch(() => ({ data: { registered: false } })),
+                api.get('/baemin/credential').catch(() => ({ data: { registered: false } })),
             ]);
             setBudget(budgetRes.data);
             const cardConns = cardConnRes.data.connections || [];
@@ -69,6 +71,14 @@ export default function ExternalIntegration() {
                 status: ce.status || null,
                 loginMethod: ce.login_method || null,
                 shopName: ce.shop_name || null,
+            });
+            const bm = baeminRes.data || {};
+            setBaeminStats({
+                registered: !!bm.registered,
+                cookiesPresent: !!bm.cookies_present,
+                lastVerifiedAt: bm.last_verified_at || null,
+                status: bm.status || null,
+                shopName: bm.shop_name || null,
             });
         } catch (e) {
             setErr(e.response?.data?.detail || '데이터를 불러오지 못했습니다.');
@@ -112,7 +122,7 @@ export default function ExternalIntegration() {
                 </div>
 
                 <h2 className="text-lg font-semibold text-slate-800 mb-4">통합 모듈</h2>
-                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} coupangEatsStats={coupangEatsStats} />
+                <ModuleGrid cardStats={cardStats} bankStats={bankStats} easyposStats={easyposStats} coupangEatsStats={coupangEatsStats} baeminStats={baeminStats} />
 
                 <BudgetSettingsModal
                     isOpen={budgetModalOpen}
