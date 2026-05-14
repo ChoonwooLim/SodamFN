@@ -574,7 +574,7 @@ def debug_probe(
     try:
         probe["whoami"] = client.whoami()
     except Exception as e:  # noqa: BLE001
-        probe["whoami_error"] = str(e)
+        probe["whoami_error"] = f"{type(e).__name__}: {e}"
     finally:
         client.close()
     return {
