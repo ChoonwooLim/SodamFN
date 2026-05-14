@@ -122,8 +122,11 @@ def _record_failure(session: Session, cred: BaeminCredential,
     session.commit()
 
 
-def _make_client(business_id: int) -> tuple[BaeminClient, BaeminCredential]:
-    """저장된 쿠키 → BaeminClient 인스턴스 생성. 호출자가 close 책임."""
+def _make_client(business_id: int) -> tuple[BaeminClient, str, Optional[str]]:
+    """저장된 쿠키 → BaeminClient + scalar fields 추출. 호출자가 close 책임.
+
+    Returns: (client, shop_owner_number, shop_name)
+    """
     with Session(database.engine) as s:
         cred = s.exec(
             select(BaeminCredential).where(
@@ -141,7 +144,10 @@ def _make_client(business_id: int) -> tuple[BaeminClient, BaeminCredential]:
             cookies = deserialize_cookies(decrypt_text(cred.cookies_encrypted))
         except Exception as e:  # noqa: BLE001
             raise HTTPException(500, f"쿠키 복호화 실패: {e}") from e
-    return BaeminClient(cookies), cred
+        # session 닫히기 전에 scalar 값 추출 (detached attribute access 회피)
+        shop_owner_number = cred.store_id
+        shop_name = cred.shop_name
+    return BaeminClient(cookies), shop_owner_number, shop_name
 
 
 # ─── DTOs ───
@@ -366,8 +372,7 @@ def _run_sync(business_id: int,
         log_id = sl.id
 
     try:
-        client, cred = _make_client(business_id)
-        shop_owner_number = cred.store_id  # BaeminCredential.store_id = shopOwnerNumber
+        client, shop_owner_number, shop_name = _make_client(business_id)
         if not shop_owner_number:
             raise HTTPException(
                 422,
@@ -376,27 +381,30 @@ def _run_sync(business_id: int,
 
         try:
             # 매장 정보 자동 보강 (shop_name 비어있으면 list_stores 로 채움)
-            if not cred.shop_name:
+            if not shop_name:
                 try:
                     stores = client.list_stores(shop_owner_number)
                     if stores:
                         first_shop = stores[0]
-                        with Session(database.engine) as ss:
-                            cred2 = ss.exec(
-                                select(BaeminCredential).where(
-                                    BaeminCredential.business_id == business_id
-                                )
-                            ).first()
-                            if cred2:
-                                cred2.shop_name = first_shop.get("name") or cred2.shop_name
-                                cred2.updated_at = datetime.datetime.utcnow()
-                                ss.add(cred2); ss.commit()
+                        new_name = first_shop.get("name")
+                        if new_name:
+                            with Session(database.engine) as ss:
+                                cred2 = ss.exec(
+                                    select(BaeminCredential).where(
+                                        BaeminCredential.business_id == business_id
+                                    )
+                                ).first()
+                                if cred2:
+                                    cred2.shop_name = new_name
+                                    cred2.updated_at = datetime.datetime.utcnow()
+                                    ss.add(cred2); ss.commit()
+                            shop_name = new_name
                 except BaeminError as e:
                     log.warning("list_stores 실패 (계속 진행): %s", e)
 
             # shop_number 첫 매장 ID — orders/settlements upsert 시 store_id 컬럼에 저장.
-            # 1차 구현: cred.store_id (= shopOwnerNumber) fallback. 추후 별도 컬럼 분리 시 보강.
-            shop_number = str(cred.store_id)
+            # 1차 구현: shop_owner_number 동일 fallback. 추후 매장 list 활용.
+            shop_number = str(shop_owner_number)
 
             from services.baemin_service import (
                 upsert_orders, upsert_settlements, upsert_revenue_from_orders,

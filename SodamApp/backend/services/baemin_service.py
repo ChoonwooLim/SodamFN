@@ -400,7 +400,13 @@ from sqlmodel import Session, select  # noqa: E402
 
 
 def _parse_order_dt(value: Optional[str]) -> Optional[datetime.datetime]:
-    """배민 orderDateTime → datetime. 포맷: 'YYYY-MM-DDTHH:MM:SS' (KST naive)."""
+    """배민 orderDateTime → datetime.
+
+    포맷: 'YYYY-MM-DDTHH:MM:SS' (KST naive, HAR 확인됨).
+
+    ⚠ NOTE: 배민 응답에 timezone offset 포함 시 (예 '+09:00'), 현재 slice
+    로직이 offset 을 silently truncate 함. API 포맷 변경 시 이 함수 갱신 필요.
+    """
     if not value:
         return None
     s = str(value)
@@ -414,14 +420,22 @@ def _parse_order_dt(value: Optional[str]) -> Optional[datetime.datetime]:
     return None
 
 
+# 배민 취소/거부 status 화이트리스트 — HAR 확인 + 코쿵 패턴.
+# 새 status 발견 시 이 set 에 추가. substring 매칭은 false-positive 위험.
+_CANCELLED_STATUSES = frozenset({
+    "CANCELED", "CANCELLED",
+    "DELIVERY_CANCELED", "DELIVERY_CANCELLED",
+    "OWNER_CANCELED", "OWNER_CANCELLED",
+    "CUSTOMER_CANCELED", "CUSTOMER_CANCELLED",
+    "REJECTED",
+})
+
+
 def _is_cancelled_status(status: str) -> bool:
-    """배민 order.status — CLOSED 가 정상 완료. CANCELED/CANCELLED 계열은 취소."""
+    """배민 order.status 가 취소/거부 status 인지 판정."""
     if not status:
         return False
-    s = status.upper()
-    if "CANCEL" in s or "REJECT" in s or "FAILED" in s:
-        return True
-    return False
+    return status.upper() in _CANCELLED_STATUSES
 
 
 def upsert_orders(session: "Session", business_id: int,
@@ -540,8 +554,12 @@ def upsert_revenue_from_orders(session: "Session", business_id: int,
                                 date: datetime.date) -> int:
     """그 날짜 + 그 달 전체 BaeminOrder 합계 → DeliveryRevenue(channel='배달의민족') upsert.
 
+    ⚠ TIME ZONE: 배민 orderDateTime 는 KST naive. 이 함수의 day_start/day_end /
+    month_start/month_end 도 KST naive (timezone 정보 없음). 향후 UTC 와 섞지 말 것 —
+    commit c7924469 (naive UTC datetime 9시간 어긋남) 같은 클래스 버그 재발 방지.
+
     Returns:
-        date 일자의 매출 합계 (취소 제외). DeliveryRevenue.total_sales 는 월 합계로 갱신.
+        date 일자의 매출 합계 (취소 제외). DeliveryRevenue 는 월 합계로 갱신.
     """
     from models import BaeminOrder, DeliveryRevenue
     day_start = datetime.datetime.combine(date, datetime.time.min)

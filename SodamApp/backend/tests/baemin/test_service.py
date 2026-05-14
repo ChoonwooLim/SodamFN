@@ -156,6 +156,7 @@ def test_upsert_orders_idempotent():
         r2 = upsert_orders(s, business_id=1, shop_number="14746996",
                            orders_contents=contents)
         assert r2["inserted"] == 0
+        assert r2["updated"] == 2  # 같은 orderNumber 다시 → 모두 update 처리
 
 
 def test_upsert_orders_handles_cancelled_status():
@@ -202,6 +203,7 @@ def test_upsert_settlements_idempotent():
         r2 = upsert_settlements(s, business_id=1, shop_number="14746996",
                                 settlements_contents=rows)
         assert r2["inserted"] == 0
+        assert r2["updated"] == 2
         st_rows = s.exec(select(BaeminSettlement)).all()
         # giveId int → str 변환 확인
         ids = {r.seller_transfer_id for r in st_rows}
