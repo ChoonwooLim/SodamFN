@@ -1392,6 +1392,36 @@ class CardMerchant(SQLModel, table=True):
     last_synced_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
 
 
+class PendingCodefAuth(SQLModel, table=True):
+    """CODEF 간편인증 2-step 의 중간 상태.
+
+    1단계(start) 에서 카카오/네이버앱에 본인인증 요청을 발송한 직후 저장.
+    사장님이 모바일에서 본인인증을 완료한 뒤 2단계(complete) 호출 시 사용.
+
+    TTL 2분. expires_at 이후에는 만료 — 사용자가 다시 1단계부터 시도해야 함.
+
+    payload_json 은 1단계에서 SDK 로 전송한 account payload 전체 (RSA 암호화
+    비번 포함). 2단계에서 동일 payload 에 extraInfo + is2Way=true 만 덮어쓰면
+    재호출 가능하므로 그대로 보관.
+    """
+    __table_args__ = (
+        Index("ix_pending_codef_auth_business", "business_id"),
+        Index("ix_pending_codef_auth_expires", "expires_at"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    organization_code: str
+    connection_type: str = Field(default="card_purchase", max_length=32)
+    auth_method: str = Field(default="simple_auth", max_length=32,
+                              description="simple_kakao / simple_naver / simple_pass 등")
+    payload_json: str = Field(description="1단계 SDK payload (RSA 암호화 비번 포함)")
+    extra_info_json: Optional[str] = Field(
+        default=None, description="CODEF 가 응답한 extraInfo (2단계에서 twoWayInfo 로 재사용)"
+    )
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    expires_at: Optional[datetime.datetime] = Field(default=None, index=True)
+
+
 class CodefCallLog(SQLModel, table=True):
     __table_args__ = (
         Index("ix_codef_log_business_date", "business_id", "called_date"),

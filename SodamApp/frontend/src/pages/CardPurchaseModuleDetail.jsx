@@ -3,8 +3,26 @@ import { Link } from 'react-router-dom';
 import {
     ArrowLeft, Plus, RefreshCw, Wallet, Trash2, Loader2,
     AlertCircle, CheckCircle2, X as XIcon, ShieldCheck, BarChart3,
+    Smartphone,
 } from 'lucide-react';
 import api from '../api';
+
+// 간편인증 인증사 옵션 — backend SIMPLE_AUTH_LOGIN_TYPES 와 동기화 필요
+const SIMPLE_AUTH_OPTIONS = [
+    { value: 'simple_kakao', label: '카카오', loginType: 'kakao' },
+    { value: 'simple_naver', label: '네이버', loginType: 'naver' },
+    { value: 'simple_pass', label: 'PASS', loginType: 'pass' },
+    { value: 'simple_toss', label: '토스', loginType: 'toss' },
+    { value: 'simple_payco', label: '페이코', loginType: 'payco' },
+    { value: 'simple_samsung', label: '삼성패스', loginType: 'samsung' },
+];
+
+const TELECOM_OPTIONS = [
+    { value: '0', label: 'SKT' },
+    { value: '1', label: 'KT' },
+    { value: '2', label: 'LG U+' },
+    { value: '3', label: '알뜰폰' },
+];
 
 /**
  * 카드 매입(사용내역) 모듈 디테일.
@@ -491,12 +509,32 @@ function SummaryCard({ summary, fmtWon }) {
 function CardPurchaseRegisterModal({ onClose, onRegistered }) {
     const [orgs, setOrgs] = useState([]);
     const [orgCode, setOrgCode] = useState('');
+
+    // 'id_pw' | 'simple_kakao' | 'simple_naver' | ...
+    const [authMethod, setAuthMethod] = useState('id_pw');
+
+    // ID/PW 흐름 필드
     const [userId, setUserId] = useState('');
     const [password, setPassword] = useState('');
     const [cardPasswordPrefix, setCardPasswordPrefix] = useState('');  // 카드비번 앞 2자리
     const [birthDate, setBirthDate] = useState('');                    // 생년월일 6자리 YYMMDD
     const [extraJson, setExtraJson] = useState('');
+
+    // 간편인증 흐름 필드
+    const [userName, setUserName] = useState('');
+    const [phoneNo, setPhoneNo] = useState('');
+    const [simpleBirthDate, setSimpleBirthDate] = useState('');  // 8자리 YYYYMMDD
+    const [telecom, setTelecom] = useState('0');
+
+    // 2-step 진행 상태
+    const [step, setStep] = useState('input');  // 'input' | 'wait_for_user_auth'
+    const [authPendingId, setAuthPendingId] = useState(null);
+    const [authMethodLabel, setAuthMethodLabel] = useState('');
+    const [authExpiresAt, setAuthExpiresAt] = useState(null);
+    const [secondsLeft, setSecondsLeft] = useState(120);
+
     const [submitting, setSubmitting] = useState(false);
+    const [completing, setCompleting] = useState(false);
     const [err, setErr] = useState('');
 
     useEffect(() => {
@@ -523,43 +561,74 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
         return [...top, ...rest];
     }, [orgs]);
 
+    // 2분 카운트다운
+    useEffect(() => {
+        if (step !== 'wait_for_user_auth' || !authExpiresAt) return;
+        const expiry = new Date(authExpiresAt).getTime();
+        const tick = () => {
+            const left = Math.max(0, Math.floor((expiry - Date.now()) / 1000));
+            setSecondsLeft(left);
+        };
+        tick();
+        const id = setInterval(tick, 1000);
+        return () => clearInterval(id);
+    }, [step, authExpiresAt]);
+
+    const isSimpleAuth = authMethod !== 'id_pw';
+
     async function handleSubmit() {
         setErr('');
         if (!orgCode) { setErr('카드사를 선택하세요.'); return; }
-        if (!userId || !password) { setErr('ID 와 비밀번호를 입력하세요.'); return; }
 
-        // 카드비번 — 카드사별로 앞 2자리 또는 전체 4자리. 2자리 또는 4자리 숫자 허용.
-        if (cardPasswordPrefix && !/^\d{2}$|^\d{4}$/.test(cardPasswordPrefix)) {
-            setErr('카드 비밀번호는 숫자 2자리 (앞 2자리) 또는 4자리 (전체) 여야 합니다.');
-            return;
-        }
-        // 생년월일 — 입력 시 6자리 (YYMMDD) 또는 8자리 (YYYYMMDD) 숫자만
-        if (birthDate && !/^(\d{6}|\d{8})$/.test(birthDate)) {
-            setErr('생년월일은 6자리(YYMMDD) 또는 8자리(YYYYMMDD) 숫자여야 합니다.');
-            return;
-        }
-
-        let extra = null;
-        if (extraJson.trim()) {
-            try {
-                extra = JSON.parse(extraJson);
-                if (typeof extra !== 'object' || Array.isArray(extra)) {
-                    throw new Error('객체 형식이어야 합니다.');
-                }
-            } catch {
-                setErr('추가 정보 JSON 이 유효한 객체가 아닙니다.');
+        let auth;
+        if (!isSimpleAuth) {
+            // ── ID/PW 흐름 ──
+            if (!userId || !password) { setErr('ID 와 비밀번호를 입력하세요.'); return; }
+            if (cardPasswordPrefix && !/^\d{2}$|^\d{4}$/.test(cardPasswordPrefix)) {
+                setErr('카드 비밀번호는 숫자 2자리 (앞 2자리) 또는 4자리 (전체) 여야 합니다.');
                 return;
             }
-        }
-        setSubmitting(true);
-        try {
-            const auth = {
+            if (birthDate && !/^(\d{6}|\d{8})$/.test(birthDate)) {
+                setErr('생년월일은 6자리(YYMMDD) 또는 8자리(YYYYMMDD) 숫자여야 합니다.');
+                return;
+            }
+            let extra = null;
+            if (extraJson.trim()) {
+                try {
+                    extra = JSON.parse(extraJson);
+                    if (typeof extra !== 'object' || Array.isArray(extra)) {
+                        throw new Error('객체 형식이어야 합니다.');
+                    }
+                } catch {
+                    setErr('추가 정보 JSON 이 유효한 객체가 아닙니다.');
+                    return;
+                }
+            }
+            auth = {
                 id: userId,
                 password,
                 ...(cardPasswordPrefix ? { cardPassword: cardPasswordPrefix } : {}),
                 ...(birthDate ? { birthDate } : {}),
                 ...(extra || {}),
             };
+        } else {
+            // ── 간편인증 흐름 ──
+            const opt = SIMPLE_AUTH_OPTIONS.find((o) => o.value === authMethod);
+            if (!opt) { setErr('인증사 선택이 잘못되었습니다.'); return; }
+            if (!userName.trim()) { setErr('이름을 입력하세요.'); return; }
+            if (!/^\d{10,11}$/.test(phoneNo)) { setErr('휴대폰 번호는 10~11자리 숫자만 입력하세요 (- 없이).'); return; }
+            if (!/^\d{8}$/.test(simpleBirthDate)) { setErr('생년월일은 8자리(YYYYMMDD) 숫자여야 합니다.'); return; }
+            auth = {
+                loginType: opt.loginType,
+                userName: userName.trim(),
+                phoneNo,
+                birthDate: simpleBirthDate,
+                telecom,
+            };
+        }
+
+        setSubmitting(true);
+        try {
             const res = await api.post('/codef/connections/register', {
                 organization_type: 'card',
                 organization_code: orgCode,
@@ -567,9 +636,19 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                 auth,
             });
             if (res.data.status === 'additional_auth_required') {
+                if (res.data.auth_pending_id) {
+                    // 간편인증 1단계 성공 — 사장님 인증 대기
+                    setAuthPendingId(res.data.auth_pending_id);
+                    setAuthMethodLabel(res.data.method || authMethod);
+                    setAuthExpiresAt(res.data.expires_at || null);
+                    setStep('wait_for_user_auth');
+                    return;
+                }
+                // ID/PW 인데 SMS 등 추가본인확인 요구 — 현재 미지원
                 setErr(
                     `추가 본인확인이 필요합니다 (${res.data.method}). ` +
-                    `현재 단계에서는 추가 인증 처리가 PoC 대기 중입니다. 별도 연락 부탁드립니다.`
+                    `해당 카드사는 SMS 등 추가 인증이 필요해 본 UI 에서는 처리되지 않습니다. ` +
+                    `간편인증(카카오/네이버)을 시도해보세요.`
                 );
                 return;
             }
@@ -580,6 +659,38 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
         } finally {
             setSubmitting(false);
         }
+    }
+
+    async function handleCompleteSimpleAuth() {
+        if (!authPendingId) return;
+        setErr('');
+        setCompleting(true);
+        try {
+            const res = await api.post('/codef/connections/simple-auth/complete', {
+                auth_pending_id: authPendingId,
+            });
+            if (res.data.status === 'additional_auth_required') {
+                setErr(
+                    '본인인증이 아직 완료되지 않은 것 같습니다. 카카오톡/네이버앱에서 ' +
+                    '인증을 완료한 뒤 다시 [완료] 버튼을 눌러주세요.'
+                );
+                return;
+            }
+            onRegistered?.(res.data.connection);
+        } catch (e) {
+            const detail = e.response?.data?.detail;
+            const msg = typeof detail === 'string' ? detail : (detail?.message || '간편인증 완료 처리 실패');
+            setErr(msg);
+        } finally {
+            setCompleting(false);
+        }
+    }
+
+    function handleCancelWait() {
+        setStep('input');
+        setAuthPendingId(null);
+        setAuthExpiresAt(null);
+        setErr('');
     }
 
     return (
@@ -600,99 +711,237 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
-                    <div>
-                        <label className="block text-sm text-slate-700 mb-1.5">카드사</label>
-                        <select
-                            value={orgCode}
-                            onChange={(e) => setOrgCode(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        >
-                            {sortedOrgs.map((o) => (
-                                <option key={o.code} value={o.code}>{o.label}</option>
-                            ))}
-                        </select>
-                        <p className="text-[11px] text-slate-500 mt-1">
-                            ※ 사장님 카드사 홈페이지/앱 로그인 가능한 카드사를 선택하세요.
-                        </p>
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-700 mb-1.5">카드사 홈페이지 ID</label>
-                        <input
-                            type="text"
-                            value={userId}
-                            onChange={(e) => setUserId(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                            autoComplete="off"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-700 mb-1.5">비밀번호</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                            autoComplete="new-password"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-700 mb-1.5">
-                            카드 비밀번호
-                            <span className="ml-1 text-xs text-slate-500 font-normal">
-                                (카드사별 — 신한·삼성은 앞 2자리, 현대는 전체 4자리)
-                            </span>
-                        </label>
-                        <input
-                            type="password"
-                            value={cardPasswordPrefix}
-                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                            placeholder="숫자 2자리 (앞 2자리) 또는 4자리 (전체)"
-                            maxLength={4}
-                            inputMode="numeric"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                            autoComplete="off"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-700 mb-1.5">
-                            생년월일
-                            <span className="ml-1 text-xs text-slate-500 font-normal">(일부 카드사 필수, YYMMDD 또는 YYYYMMDD)</span>
-                        </label>
-                        <input
-                            type="text"
-                            value={birthDate}
-                            onChange={(e) => setBirthDate(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                            placeholder="예: 800101 또는 19800101"
-                            maxLength={8}
-                            inputMode="numeric"
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
-                            autoComplete="off"
-                        />
-                    </div>
-                    <details className="text-sm">
-                        <summary className="cursor-pointer text-slate-600 hover:text-violet-700">
-                            기타 추가 정보 (JSON) — 고급
-                        </summary>
-                        <div className="mt-2">
-                            <textarea
-                                value={extraJson}
-                                onChange={(e) => setExtraJson(e.target.value)}
-                                rows={3}
-                                placeholder='예: {"cvc": "123"}'
-                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono"
-                            />
-                            <p className="text-[11px] text-slate-500 mt-1">
-                                위 입력 필드 외 추가 필드가 필요한 카드사 대응용.
-                            </p>
+                    {step === 'input' && (
+                        <>
+                            <div>
+                                <label className="block text-sm text-slate-700 mb-1.5">카드사</label>
+                                <select
+                                    value={orgCode}
+                                    onChange={(e) => setOrgCode(e.target.value)}
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                >
+                                    {sortedOrgs.map((o) => (
+                                        <option key={o.code} value={o.code}>{o.label}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    ※ 사장님 카드사 홈페이지/앱 로그인 가능한 카드사를 선택하세요.
+                                </p>
+                            </div>
+
+                            {/* 인증 방식 toggle */}
+                            <div>
+                                <label className="block text-sm text-slate-700 mb-1.5">인증 방식</label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAuthMethod('id_pw')}
+                                        className={`px-3 py-2 text-sm rounded-lg border font-medium transition ${
+                                            authMethod === 'id_pw'
+                                                ? 'bg-violet-600 text-white border-violet-600'
+                                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        ID / 비밀번호
+                                    </button>
+                                    {SIMPLE_AUTH_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setAuthMethod(opt.value)}
+                                            className={`px-3 py-2 text-sm rounded-lg border font-medium transition ${
+                                                authMethod === opt.value
+                                                    ? 'bg-violet-600 text-white border-violet-600'
+                                                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    ※ 정규 카드사 비밀번호를 모르시면 <strong>카카오/네이버 간편인증</strong>을 사용하세요.
+                                </p>
+                            </div>
+
+                            {!isSimpleAuth && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">카드사 홈페이지 ID</label>
+                                        <input
+                                            type="text"
+                                            value={userId}
+                                            onChange={(e) => setUserId(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">비밀번호</label>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="new-password"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">
+                                            카드 비밀번호
+                                            <span className="ml-1 text-xs text-slate-500 font-normal">
+                                                (카드사별 — 신한·삼성은 앞 2자리, 현대는 전체 4자리)
+                                            </span>
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={cardPasswordPrefix}
+                                            onChange={(e) => setCardPasswordPrefix(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                            placeholder="숫자 2자리 (앞 2자리) 또는 4자리 (전체)"
+                                            maxLength={4}
+                                            inputMode="numeric"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">
+                                            생년월일
+                                            <span className="ml-1 text-xs text-slate-500 font-normal">(일부 카드사 필수, YYMMDD 또는 YYYYMMDD)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={birthDate}
+                                            onChange={(e) => setBirthDate(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                            placeholder="예: 800101 또는 19800101"
+                                            maxLength={8}
+                                            inputMode="numeric"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                    <details className="text-sm">
+                                        <summary className="cursor-pointer text-slate-600 hover:text-violet-700">
+                                            기타 추가 정보 (JSON) — 고급
+                                        </summary>
+                                        <div className="mt-2">
+                                            <textarea
+                                                value={extraJson}
+                                                onChange={(e) => setExtraJson(e.target.value)}
+                                                rows={3}
+                                                placeholder='예: {"cvc": "123"}'
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs font-mono"
+                                            />
+                                            <p className="text-[11px] text-slate-500 mt-1">
+                                                위 입력 필드 외 추가 필드가 필요한 카드사 대응용.
+                                            </p>
+                                        </div>
+                                    </details>
+                                </>
+                            )}
+
+                            {isSimpleAuth && (
+                                <>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">이름 (사장님 본인)</label>
+                                        <input
+                                            type="text"
+                                            value={userName}
+                                            onChange={(e) => setUserName(e.target.value)}
+                                            placeholder="예: 홍길동"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">휴대폰 번호</label>
+                                        <input
+                                            type="tel"
+                                            value={phoneNo}
+                                            onChange={(e) => setPhoneNo(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                            placeholder="예: 01012345678 ( - 없이)"
+                                            maxLength={11}
+                                            inputMode="numeric"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">통신사</label>
+                                        <select
+                                            value={telecom}
+                                            onChange={(e) => setTelecom(e.target.value)}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        >
+                                            {TELECOM_OPTIONS.map((t) => (
+                                                <option key={t.value} value={t.value}>{t.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-slate-700 mb-1.5">
+                                            생년월일
+                                            <span className="ml-1 text-xs text-slate-500 font-normal">(8자리 YYYYMMDD)</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={simpleBirthDate}
+                                            onChange={(e) => setSimpleBirthDate(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                            placeholder="예: 19800101"
+                                            maxLength={8}
+                                            inputMode="numeric"
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            autoComplete="off"
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                                <ShieldCheck className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
+                                <span>
+                                    {isSimpleAuth
+                                        ? '인증사 앱(카카오톡/네이버 등)으로 본인인증 요청이 발송됩니다. 본인 외 정보는 셈하나 서버 DB 에 저장되지 않습니다.'
+                                        : '비밀번호는 RSA 공개키로 즉시 암호화되어 CODEF 로만 전송됩니다. 셈하나 서버 DB 에는 저장되지 않습니다.'}
+                                </span>
+                            </div>
+                        </>
+                    )}
+
+                    {step === 'wait_for_user_auth' && (
+                        <div className="space-y-4">
+                            <div className="rounded-xl bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200 p-5 text-center">
+                                <Smartphone className="w-10 h-10 text-violet-600 mx-auto mb-3" />
+                                <h4 className="font-bold text-slate-800 text-base mb-1.5">
+                                    휴대폰에서 본인인증을 완료해주세요
+                                </h4>
+                                <p className="text-sm text-slate-700 leading-relaxed">
+                                    {authMethodLabel?.includes('kakao') && '카카오톡 알림을 확인하고 본인인증을 진행하세요.'}
+                                    {authMethodLabel?.includes('naver') && '네이버 앱에서 본인인증을 진행하세요.'}
+                                    {authMethodLabel?.includes('pass') && 'PASS 앱에서 본인인증을 진행하세요.'}
+                                    {authMethodLabel?.includes('toss') && '토스 앱에서 본인인증을 진행하세요.'}
+                                    {authMethodLabel?.includes('payco') && '페이코 앱에서 본인인증을 진행하세요.'}
+                                    {authMethodLabel?.includes('samsung') && '삼성패스 앱에서 본인인증을 진행하세요.'}
+                                </p>
+                                <div className="mt-4">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-violet-300 text-violet-700 text-sm font-mono">
+                                        남은 시간 {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+                                    </span>
+                                </div>
+                                {secondsLeft === 0 && (
+                                    <p className="mt-3 text-xs text-rose-600">
+                                        만료되었습니다. [취소] 후 다시 시도해주세요.
+                                    </p>
+                                )}
+                            </div>
+                            <ol className="text-sm text-slate-700 space-y-2 pl-5 list-decimal">
+                                <li>휴대폰의 <strong>{authMethodLabel?.replace('simple_', '')}</strong> 앱을 열어 인증 요청을 확인합니다.</li>
+                                <li>본인인증을 완료합니다.</li>
+                                <li>아래 <strong>[인증 완료]</strong> 버튼을 누르면 등록이 완료됩니다.</li>
+                            </ol>
                         </div>
-                    </details>
-                    <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                        <ShieldCheck className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
-                        <span>
-                            비밀번호는 RSA 공개키로 즉시 암호화되어 CODEF 로만 전송됩니다.
-                            셈하나 서버 DB 에는 저장되지 않습니다.
-                        </span>
-                    </div>
+                    )}
+
                     {err && (
                         <div className="text-sm p-2 rounded bg-red-50 text-red-700 border border-red-200">
                             {err}
@@ -700,20 +949,44 @@ function CardPurchaseRegisterModal({ onClose, onRegistered }) {
                     )}
                 </div>
                 <div className="flex justify-end gap-2 p-4 border-t border-slate-200">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg"
-                    >
-                        취소
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={submitting}
-                        className="inline-flex items-center gap-1.5 px-5 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 font-semibold"
-                    >
-                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                        {submitting ? '등록 중...' : '등록'}
-                    </button>
+                    {step === 'input' && (
+                        <>
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                disabled={submitting}
+                                className="inline-flex items-center gap-1.5 px-5 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 font-semibold"
+                            >
+                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                {submitting
+                                    ? (isSimpleAuth ? '인증 요청 중...' : '등록 중...')
+                                    : (isSimpleAuth ? '인증 요청' : '등록')}
+                            </button>
+                        </>
+                    )}
+                    {step === 'wait_for_user_auth' && (
+                        <>
+                            <button
+                                onClick={handleCancelWait}
+                                className="px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 rounded-lg"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleCompleteSimpleAuth}
+                                disabled={completing || secondsLeft === 0}
+                                className="inline-flex items-center gap-1.5 px-5 py-2 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-700 disabled:opacity-50 font-semibold"
+                            >
+                                {completing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                {completing ? '확인 중...' : '인증 완료'}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

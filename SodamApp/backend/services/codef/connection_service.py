@@ -5,14 +5,19 @@
 
 추가본인확인 발생 시 CodefAdditionalAuth 예외를 그대로 라우터로 전파 →
 라우터가 SMS 코드 입력 폼을 띄움.
+
+간편인증 (카카오/네이버/PASS) 은 2-step 흐름:
+  1) start_simple_auth → 사장님 모바일에 본인인증 요청 발송 + PendingCodefAuth 저장
+  2) (사장님 본인인증 완료 후) complete_simple_auth → twoWayInfo 첨부 재호출
 """
 import datetime
+import json
 import re
 from typing import Optional
 
 from sqlmodel import Session, select
 
-from models import CodefConnection, Business
+from models import CodefConnection, Business, PendingCodefAuth
 from .codef_client import CodefClient
 from .organization_catalog import get_organization, AuthPolicy
 
@@ -55,6 +60,153 @@ class CodefConnectionService:
             auth_method=auth_method,
             connection_type=connection_type,
         )
+
+    # ─── 간편인증 2-step 흐름 ────────────────────────
+
+    SIMPLE_AUTH_LOGIN_TYPES = {"kakao", "naver", "pass", "toss", "payco", "samsung"}
+
+    def start_simple_auth(self, business_id: int, card_corp_code: str,
+                          auth_payload: dict,
+                          connection_type: str = "card_purchase") -> dict:
+        """간편인증 1단계 — 카카오/네이버 본인인증 요청 발송.
+
+        Args:
+            business_id: 대상 사업장 id.
+            card_corp_code: 카드사 코드 (organization_catalog).
+            auth_payload: {
+                "loginType": "kakao"|"naver"|"pass"|"toss"|"payco"|"samsung",
+                "userName": "홍길동",
+                "phoneNo": "01071391796",
+                "birthDate": "19800101",  # YYYYMMDD
+                "telecom": "0",            # 0=SKT, 1=KT, 2=LG U+, 3=알뜰
+                # 선택: "client_type": "P"|"B"
+            }
+            connection_type: 'card_sales' | 'card_purchase'.
+
+        Returns:
+            {
+              "status": "additional_auth_required",
+              "method": "simple_kakao" 등,
+              "auth_pending_id": int,
+              "extra_info": dict,           # CODEF 가 응답한 extraInfo (모바일 인증 안내)
+              "expires_at": isoformat str,
+            }
+
+        Raises:
+            ValueError: organization 미지원 / loginType 미지원 / connection_type 잘못됨.
+            CodefAPIError: CODEF 측 명확한 실패.
+        """
+        if connection_type not in {"card_sales", "card_purchase"}:
+            raise ValueError(f"잘못된 connection_type: {connection_type}")
+
+        org = get_organization(card_corp_code)
+        if not org or org.type != "card":
+            raise ValueError(f"알 수 없는 카드사: {card_corp_code}")
+
+        login_type = (auth_payload.get("loginType") or "").lower()
+        if login_type not in self.SIMPLE_AUTH_LOGIN_TYPES:
+            raise ValueError(
+                f"간편인증 미지원 loginType: {login_type} "
+                f"(허용: {sorted(self.SIMPLE_AUTH_LOGIN_TYPES)})"
+            )
+
+        biz_reg_no = self._get_business_reg_no(business_id)
+        sdk_payload, _ = self._build_account_payload(org, auth_payload, biz_reg_no)
+        auth_method = f"simple_{login_type}"
+
+        # SDK 첫 호출 — CF-03002 / CF-03012 응답 기대
+        response = self._client.create_account_raw(sdk_payload)
+        result = response.get("result", {}) or {}
+        code = result.get("code", "")
+        if code not in {"CF-03002", "CF-03012", "CF-03013"}:
+            # 추가인증 응답이 아닌데도 도달했다면 비정상 — 메시지로 에러
+            from .exceptions import CodefAPIError
+            raise CodefAPIError(
+                code=code or "unexpected",
+                message=(
+                    f"간편인증 1단계 응답이 추가인증 코드가 아님: "
+                    f"{result.get('message', '')} {result.get('extraMessage', '')}"
+                ).strip(),
+                raw=response,
+            )
+
+        extra_info = (response.get("data") or {}).get("extraInfo") or {}
+        # extraInfo 가 비어있는 일부 케이스 — data 자체를 그대로 사용
+        if not extra_info:
+            extra_info = response.get("data") or {}
+
+        now = datetime.datetime.utcnow()
+        expires_at = now + datetime.timedelta(minutes=2)
+
+        with Session(self.engine) as s:
+            pending = PendingCodefAuth(
+                business_id=business_id,
+                organization_code=card_corp_code,
+                connection_type=connection_type,
+                auth_method=auth_method,
+                payload_json=json.dumps(sdk_payload, ensure_ascii=False),
+                extra_info_json=json.dumps(extra_info, ensure_ascii=False),
+                created_at=now,
+                expires_at=expires_at,
+            )
+            s.add(pending)
+            s.commit()
+            s.refresh(pending)
+            pending_id = pending.id
+
+        return {
+            "status": "additional_auth_required",
+            "method": auth_method,
+            "auth_pending_id": pending_id,
+            "extra_info": extra_info,
+            "expires_at": expires_at.isoformat(),
+        }
+
+    def complete_simple_auth(self, auth_pending_id: int) -> CodefConnection:
+        """간편인증 2단계 — 사장님 모바일 본인인증 완료 후 호출.
+
+        1단계에서 저장한 payload + extraInfo 를 그대로 재전송하되 ``is2Way=true`` +
+        ``twoWayInfo`` 를 첨부. CODEF 가 본인인증 완료 사실을 확인하면 connectedId 발급.
+        """
+        with Session(self.engine) as s:
+            pending = s.get(PendingCodefAuth, auth_pending_id)
+            if not pending:
+                raise ValueError(f"pending auth {auth_pending_id} 없음")
+            if pending.expires_at and pending.expires_at < datetime.datetime.utcnow():
+                # 만료된 pending 은 삭제 + 명확한 에러
+                s.delete(pending)
+                s.commit()
+                raise ValueError("간편인증 만료. 처음부터 다시 시도해주세요.")
+            sdk_payload = json.loads(pending.payload_json)
+            extra_info = json.loads(pending.extra_info_json or "{}")
+            business_id = pending.business_id
+            card_corp_code = pending.organization_code
+            connection_type = pending.connection_type
+            auth_method = pending.auth_method
+
+        # 2단계 — is2Way + twoWayInfo 첨부
+        account = sdk_payload["accountList"][0]
+        account["is2Way"] = "true"
+        account["twoWayInfo"] = extra_info
+
+        result = self._client.create_account(sdk_payload)
+
+        org = get_organization(card_corp_code)
+        conn = self._upsert_connection(
+            business_id=business_id,
+            organization=org,
+            connected_id=result.connected_id,
+            auth_method=auth_method,
+            connection_type=connection_type,
+        )
+
+        # pending 정리 (성공 시)
+        with Session(self.engine) as s:
+            pending = s.get(PendingCodefAuth, auth_pending_id)
+            if pending:
+                s.delete(pending)
+                s.commit()
+        return conn
 
     def register_bank(self, business_id: int, bank_code: str,
                       auth_payload: dict) -> CodefConnection:

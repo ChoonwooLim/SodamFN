@@ -91,6 +91,37 @@ class CodefClient:
             )
         return CreateAccountResult(connected_id=connected_id, raw=data)
 
+    def create_account_raw(self, account_payload: dict) -> dict:
+        """create_account 와 동일하나 raw response (dict) 를 그대로 반환.
+
+        간편인증 2-step 흐름에서 1단계 응답 (CF-03002 / CF-03012 등 추가인증 코드) 의
+        ``data.extraInfo`` 를 꺼내야 하기 때문에 예외 변환을 거치지 않고 dict 으로
+        반환한다. ``CF-00000`` 일 때도 dict 그대로 반환 — 호출자가 해석.
+
+        성공/추가인증 외의 명확한 실패 코드 (인증 만료·rate limit·기타 API 에러) 는
+        ``_maybe_raise`` 와 동일한 분기로 예외 발생시켜 일관성 유지.
+        """
+        raw_response = self._sdk.create_account(self.service_type, account_payload)
+        data = self._parse(raw_response)
+        if self.env in {"demo", "sandbox"}:
+            import logging
+            logging.getLogger("codef.client").info(
+                "create_account_raw response: env=%s payload_keys=%s response=%s",
+                self.env,
+                list((account_payload.get("accountList") or [{}])[0].keys()),
+                str(data)[:1500],
+            )
+        # 추가인증 코드는 raise 하지 않고 dict 반환 — 호출자가 처리
+        result = data.get("result", {})
+        code = result.get("code", "")
+        if code in _ADDITIONAL_AUTH_CODES:
+            return data
+        if code in _SUCCESS_CODES or code == "":
+            return data
+        # 그 외 (만료 / rate limit / 기타) 는 _maybe_raise 가 표준 예외 변환
+        self._maybe_raise(data)
+        return data  # 이론상 도달 안 함
+
     def request_product(self, url: str, params: dict) -> RequestProductResult:
         raw_response = self._sdk.request_product(url, self.service_type, params)
         data = self._parse(raw_response)

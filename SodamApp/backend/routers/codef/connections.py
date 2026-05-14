@@ -32,6 +32,11 @@ class RegisterRequest(BaseModel):
     connection_type: Optional[str] = "card_sales"
 
 
+class CompleteSimpleAuthRequest(BaseModel):
+    """간편인증 2단계 — 사장님 본인인증 완료 후 호출."""
+    auth_pending_id: int
+
+
 class ReverifyRequest(BaseModel):
     auth: dict
 
@@ -126,8 +131,21 @@ def register(
     conn_type = body.connection_type or "card_sales"
     if conn_type not in {"card_sales", "card_purchase"}:
         raise HTTPException(400, f"잘못된 connection_type: {conn_type}")
+
+    # 간편인증(카카오/네이버/PASS 등) → 2-step 흐름: start_simple_auth 사용.
+    # 기존 ID/PW 흐름은 그대로 register_card.
+    login_type = (body.auth.get("loginType") or "").lower() if isinstance(body.auth, dict) else ""
+    is_simple_auth = login_type in CodefConnectionService.SIMPLE_AUTH_LOGIN_TYPES
+
     svc = CodefConnectionService(engine=engine)
     try:
+        if is_simple_auth:
+            return svc.start_simple_auth(
+                business_id=bid,
+                card_corp_code=body.organization_code,
+                auth_payload=body.auth,
+                connection_type=conn_type,
+            )
         conn = svc.register_card(
             business_id=bid,
             card_corp_code=body.organization_code,
@@ -135,6 +153,7 @@ def register(
             connection_type=conn_type,
         )
     except CodefAdditionalAuth as e:
+        # ID/PW 인데 카드사가 추가본인확인을 요구한 경우 — SMS 등.
         return {
             "status": "additional_auth_required",
             "method": e.method,
@@ -153,6 +172,37 @@ def register(
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    return {"status": "active", "connection": _connection_dto(conn)}
+
+
+@router.post("/connections/simple-auth/complete")
+def complete_simple_auth(
+    body: CompleteSimpleAuthRequest,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """간편인증 2단계 — 사장님이 카톡/네이버앱 본인인증을 완료한 직후 호출.
+
+    1단계(/connections/register) 응답으로 받은 ``auth_pending_id`` 를 그대로 전달.
+    """
+    resolve_bid(admin, x_view_as_business)
+    svc = CodefConnectionService(engine=engine)
+    try:
+        conn = svc.complete_simple_auth(auth_pending_id=body.auth_pending_id)
+    except CodefAdditionalAuth as e:
+        # 사장님이 인증 미완료/타임아웃 등 — 다시 시도 안내
+        return {
+            "status": "additional_auth_required",
+            "method": e.method,
+            "extra_info": e.extra_info,
+        }
+    except CodefAuthExpired as e:
+        raise HTTPException(400, f"인증 만료: {str(e)}")
+    except CodefAPIError as e:
+        detail = {"message": str(e), "code": e.code, "raw": e.raw}
+        raise HTTPException(400, detail)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return {"status": "active", "connection": _connection_dto(conn)}
 
 
