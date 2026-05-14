@@ -1278,6 +1278,119 @@ def update_settlements_from_fees(session, business_id: int,
     }
 
 
+def update_delivery_revenue_from_fees(session, business_id: int,
+                                      year_month: str) -> dict:
+    """월별 OrderFee 합계 → DeliveryRevenue(channel='쿠팡', year, month) upsert.
+
+    매출관리 페이지(/revenue)는 DeliveryRevenue.total_fees + fee_breakdown 을
+    읽어 채널별 수수료율을 계산한다. settlement.fee_* 만 채워서는 그 화면이
+    수수료 0% 로 보이므로, 월 합계를 DeliveryRevenue 로 다시 한 번 적재.
+
+    fee_breakdown JSON 구조:
+      {"중개수수료": int, "결제수수료": int, "배달비": int,
+       "광고비": int, "멤버십": int}
+    """
+    from sqlmodel import select
+    from models import CoupangEatsOrderFee, DeliveryRevenue
+
+    try:
+        year = int(year_month[:4])
+        month = int(year_month[5:7])
+        period_start = datetime.date(year, month, 1)
+        if month == 12:
+            period_end = datetime.date(year + 1, 1, 1) - datetime.timedelta(days=1)
+        else:
+            period_end = datetime.date(year, month + 1, 1) - datetime.timedelta(days=1)
+    except (ValueError, IndexError) as e:
+        raise CoupangEatsError(f"year_month 형식 오류: {year_month!r} ({e})") from e
+
+    fees = session.exec(
+        select(CoupangEatsOrderFee).where(
+            CoupangEatsOrderFee.business_id == business_id,
+            CoupangEatsOrderFee.order_date >= period_start,
+            CoupangEatsOrderFee.order_date <= period_end,
+        )
+    ).all()
+
+    total_sales = 0
+    fee_brokerage = 0
+    fee_payment = 0
+    fee_delivery = 0
+    fee_advertising = 0
+    fee_membership = 0
+    settle_total = 0
+    order_count = 0
+    cancelled_count = 0
+
+    for f in fees:
+        if (f.transaction_type or "").strip() == "취소":
+            cancelled_count += 1
+            continue
+        order_count += 1
+        total_sales += f.total_amount
+        fee_brokerage += f.brokerage_final
+        fee_payment += f.payment_fee_basic + f.payment_fee_promo
+        fee_delivery += f.delivery_final
+        fee_advertising += f.ad_total
+        fee_membership += f.service_after_total
+        settle_total += f.settle_final
+
+    total_fees = fee_brokerage + fee_payment + fee_delivery + fee_advertising + fee_membership
+
+    fee_breakdown_json = json.dumps({
+        "중개수수료": fee_brokerage,
+        "결제수수료": fee_payment,
+        "배달비": fee_delivery,
+        "광고비": fee_advertising,
+        "멤버십": fee_membership,
+    }, ensure_ascii=False)
+
+    existing = session.exec(
+        select(DeliveryRevenue).where(
+            DeliveryRevenue.business_id == business_id,
+            DeliveryRevenue.year == year,
+            DeliveryRevenue.month == month,
+            DeliveryRevenue.channel == "쿠팡",
+        )
+    ).first()
+
+    fields = dict(
+        business_id=business_id,
+        channel="쿠팡",
+        year=year,
+        month=month,
+        total_sales=total_sales,
+        total_fees=total_fees,
+        settlement_amount=settle_total,
+        order_count=order_count,
+        fee_breakdown=fee_breakdown_json,
+        source="auto_coupang_excel",
+    )
+    action = "updated"
+    if existing:
+        for k, v in fields.items():
+            setattr(existing, k, v)
+        session.add(existing)
+    else:
+        session.add(DeliveryRevenue(**fields))
+        action = "inserted"
+    session.commit()
+
+    return {
+        "year_month": year_month,
+        "action": action,
+        "order_count": order_count,
+        "cancelled_count": cancelled_count,
+        "total_sales": total_sales,
+        "total_fees": total_fees,
+        "fee_rate_percent": (
+            round(total_fees / total_sales * 100, 2) if total_sales > 0 else 0
+        ),
+        "settlement_amount": settle_total,
+        "fee_breakdown": json.loads(fee_breakdown_json),
+    }
+
+
 def sync_monthly_excel(session,
                       business_id: int,
                       store_id: int,
@@ -1315,7 +1428,10 @@ def sync_monthly_excel(session,
         # 3) settlement.fee_* 갱신
         settle_report = update_settlements_from_fees(session, business_id, year_month)
 
-        # 4) SyncLog 완료
+        # 4) DeliveryRevenue 월별 합계 갱신 (매출관리 페이지의 데이터 소스)
+        dr_report = update_delivery_revenue_from_fees(session, business_id, year_month)
+
+        # 5) SyncLog 완료
         sl.finished_at = datetime.datetime.utcnow()
         sl.status = "success"
         sl.excel_orders_parsed = report.parsed_count
@@ -1336,6 +1452,7 @@ def sync_monthly_excel(session,
             "period_end": report.period_end.isoformat() if report.period_end else None,
             "settlements_updated": settle_report["settlements_updated"],
             "dates_without_settlement": settle_report["dates_without_settlement"],
+            "delivery_revenue": dr_report,
             "sync_log_id": sl.id,
         }
 
