@@ -11,10 +11,10 @@
   POST   /api/baemin/sync/cron-trigger — Orbitron cron 호출 (X-Cron-Secret)
   GET    /api/baemin/sync/logs         — 동기화 이력 (최대 200건)
 
-엔드포인트 (Task 7 에서 추가 예정):
-  GET    /api/baemin/dashboard         — 잔액 / 예상정산 / 주간 합계
-  GET    /api/baemin/debug/probe       — superadmin 쿠키 진단
-  GET    /api/baemin/debug/raw-orders  — superadmin 응답 raw
+엔드포인트 (구현됨):
+  GET    /api/baemin/dashboard         — 주간 합계 (최근 7일, cancelled 제외)
+  GET    /api/baemin/debug/probe       — superadmin 쿠키 진단 + whoami raw
+  GET    /api/baemin/debug/raw-orders  — superadmin fetch_orders 응답 raw
 """
 from __future__ import annotations
 
@@ -508,3 +508,120 @@ def _run_sync(business_id: int,
         raise
 
     return summary
+
+
+# ─── 7) 대시보드 ───
+@router.get("/dashboard")
+def fetch_dashboard(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """대시보드 — 최근 7일 주문 합계 (cancelled 제외)."""
+    bid = _resolve_bid(admin, x_view_as_business)
+    today = datetime.date.today()
+    week_start = today - datetime.timedelta(days=6)
+    with Session(database.engine) as s:
+        from sqlalchemy import func
+        weekly = s.exec(
+            select(
+                func.count(BaeminOrder.id),
+                func.coalesce(func.sum(BaeminOrder.total_sale_price), 0),
+            ).where(
+                BaeminOrder.business_id == bid,
+                BaeminOrder.ordered_at >= datetime.datetime.combine(week_start, datetime.time.min),
+                BaeminOrder.cancelled == False,  # noqa: E712
+            )
+        ).first()
+        order_count_7d = int(weekly[0] or 0) if weekly else 0
+        total_7d = int(weekly[1] or 0) if weekly else 0
+    return {
+        "weekly_summary": {
+            "from": week_start.isoformat(),
+            "to": today.isoformat(),
+            "order_count": order_count_7d,
+            "total_sales": total_7d,
+        },
+    }
+
+
+# ─── 8) 디버그 — 쿠키 진단 (superadmin 전용) ───
+@router.get("/debug/probe")
+def debug_probe(
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """superadmin 디버그 — 쿠키 list + whoami raw 응답 노출."""
+    if admin.role != "superadmin":
+        raise HTTPException(403, "디버그 엔드포인트는 superadmin 전용입니다.")
+    bid = _resolve_bid(admin, x_view_as_business)
+    with Session(database.engine) as s:
+        cred = s.exec(
+            select(BaeminCredential).where(
+                BaeminCredential.business_id == bid
+            )
+        ).first()
+        if not cred:
+            raise HTTPException(404, "자격증명 미등록")
+        cookies = []
+        if cred.cookies_encrypted:
+            try:
+                cookies = deserialize_cookies(decrypt_text(cred.cookies_encrypted))
+            except Exception as e:  # noqa: BLE001
+                return {"error": f"쿠키 복호화 실패: {e}"}
+    names = [(c.get("name") or "") for c in cookies]
+    client = BaeminClient(cookies)
+    probe: dict = {}
+    try:
+        probe["whoami"] = client.whoami()
+    except Exception as e:  # noqa: BLE001
+        probe["whoami_error"] = str(e)
+    finally:
+        client.close()
+    return {
+        "cookies_total": len(cookies),
+        "cookie_names": names,
+        "cookie_domains": list({(c.get("domain") or "-") for c in cookies}),
+        "probe": probe,
+    }
+
+
+# ─── 9) 디버그 — 주문 raw 응답 (superadmin 전용) ───
+@router.get("/debug/raw-orders")
+def debug_raw_orders(
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    page_size: int = 10,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """superadmin 디버그 — fetch_orders 응답 raw. PII 포함 가능 — superadmin 전용."""
+    if admin.role != "superadmin":
+        raise HTTPException(403, "디버그 엔드포인트는 superadmin 전용입니다.")
+    bid = _resolve_bid(admin, x_view_as_business)
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    try:
+        start_d = datetime.date.fromisoformat(start) if start else yesterday
+        end_d = datetime.date.fromisoformat(end) if end else yesterday
+    except ValueError as e:
+        raise HTTPException(400, f"날짜 형식 오류: {e}") from e
+    client, shop_owner_number, _shop_name = _make_client(bid)
+    try:
+        if not shop_owner_number:
+            raise HTTPException(422, "shopOwnerNumber 가 없습니다.")
+        result = client.fetch_orders(
+            shop_owner_number=shop_owner_number,
+            start_date=start_d, end_date=end_d,
+            offset=0, limit=page_size,
+        )
+        return {
+            "shop_owner_number": shop_owner_number,
+            "summary": {
+                "total_sale_price": result.total_sale_price,
+                "total_order_count": result.total_order_count,
+                "fetched_orders_in_page": len(result.orders),
+            },
+            "first_order": result.orders[0] if result.orders else None,
+            "raw_response": result.raw,
+        }
+    finally:
+        client.close()

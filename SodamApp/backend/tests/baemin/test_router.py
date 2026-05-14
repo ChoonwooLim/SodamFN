@@ -116,3 +116,15 @@ def test_sync_logs_empty(client):
     r = client.get("/api/baemin/sync/logs")
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_dashboard_returns_weekly_summary(client):
+    r = client.get("/api/baemin/dashboard")
+    assert r.status_code == 200
+    body = r.json()
+    assert "weekly_summary" in body
+    assert "order_count" in body["weekly_summary"]
+    assert "total_sales" in body["weekly_summary"]
+    # 데이터 없으면 0
+    assert body["weekly_summary"]["order_count"] == 0
+    assert body["weekly_summary"]["total_sales"] == 0
