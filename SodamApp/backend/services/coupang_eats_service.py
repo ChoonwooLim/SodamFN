@@ -1345,32 +1345,52 @@ def update_delivery_revenue_from_fees(session, business_id: int,
         "멤버십": fee_membership,
     }, ensure_ascii=False)
 
-    existing = session.exec(
+    # 기존 row 검색 — 한국어 alias 모두 (bank_sync 가 "쿠팡이츠" 로 저장, legacy 가 "쿠팡" 으로 저장)
+    # 매출관리 페이지의 LEGACY_CHANNEL_MAP 과 동일 정규화로 한 행만 남기는 게 중요.
+    existing_rows = session.exec(
         select(DeliveryRevenue).where(
             DeliveryRevenue.business_id == business_id,
             DeliveryRevenue.year == year,
             DeliveryRevenue.month == month,
-            DeliveryRevenue.channel == "쿠팡",
+            DeliveryRevenue.channel.in_(["쿠팡이츠", "쿠팡", "쿠팡잇츠", "쿠팡페이"]),
         )
-    ).first()
+    ).all()
+
+    # 채널명은 "쿠팡이츠" 로 통일 (기존 bank_sync 패턴).
+    canonical_channel = "쿠팡이츠"
+
+    # settle_final 이 0 (4월처럼 엑셀에 정산금액 비어있는 케이스) 이면 기존 bank_sync
+    # settle 값 보존. fee_* 는 항상 우리 값으로 덮어씀 (엑셀이 진실의 출처).
+    preserved_settle = settle_total
+    if settle_total == 0 and existing_rows:
+        for r in existing_rows:
+            if r.settlement_amount > 0:
+                preserved_settle = r.settlement_amount
+                break
 
     fields = dict(
         business_id=business_id,
-        channel="쿠팡",
+        channel=canonical_channel,
         year=year,
         month=month,
         total_sales=total_sales,
         total_fees=total_fees,
-        settlement_amount=settle_total,
+        settlement_amount=preserved_settle,
         order_count=order_count,
         fee_breakdown=fee_breakdown_json,
         source="auto_coupang_excel",
     )
-    action = "updated"
-    if existing:
+
+    action = None
+    if existing_rows:
+        # 첫 번째 row 를 업데이트, 나머지 (중복) 는 삭제
+        primary = existing_rows[0]
         for k, v in fields.items():
-            setattr(existing, k, v)
-        session.add(existing)
+            setattr(primary, k, v)
+        session.add(primary)
+        for r in existing_rows[1:]:
+            session.delete(r)
+        action = "updated" + (f" (deduped {len(existing_rows)-1} dup)" if len(existing_rows) > 1 else "")
     else:
         session.add(DeliveryRevenue(**fields))
         action = "inserted"
@@ -1378,6 +1398,7 @@ def update_delivery_revenue_from_fees(session, business_id: int,
 
     return {
         "year_month": year_month,
+        "channel": canonical_channel,
         "action": action,
         "order_count": order_count,
         "cancelled_count": cancelled_count,
@@ -1386,7 +1407,8 @@ def update_delivery_revenue_from_fees(session, business_id: int,
         "fee_rate_percent": (
             round(total_fees / total_sales * 100, 2) if total_sales > 0 else 0
         ),
-        "settlement_amount": settle_total,
+        "settlement_amount_excel": settle_total,
+        "settlement_amount_used": preserved_settle,
         "fee_breakdown": json.loads(fee_breakdown_json),
     }
 
