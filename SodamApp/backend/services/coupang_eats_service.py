@@ -1319,7 +1319,6 @@ def update_delivery_revenue_from_fees(session, business_id: int,
     fee_advertising = 0
     fee_membership = 0
     coupon_store = 0       # 점주 부담 쿠폰 (매출에서 빠지는 추가 부담)
-    coupon_coupang = 0     # 쿠팡 부담 쿠폰 (정보용 — 점주에게 손해 없음)
     settle_total = 0
     order_count = 0
     cancelled_count = 0
@@ -1336,10 +1335,12 @@ def update_delivery_revenue_from_fees(session, business_id: int,
         fee_advertising += f.ad_total
         fee_membership += f.service_after_total
         coupon_store += f.coupon_store
-        coupon_coupang += f.coupon_coupang
         settle_total += f.settle_final
 
-    total_fees = fee_brokerage + fee_payment + fee_delivery + fee_advertising + fee_membership
+    # total_fees = 점주가 실제로 부담한 모든 수수료 + 점주부담 쿠폰
+    # (쿠폰 쿠팡부담은 매출 인식엔 포함되지만 점주가 부담 안 하므로 fee 에서 제외)
+    total_fees = (fee_brokerage + fee_payment + fee_delivery + fee_advertising
+                  + fee_membership + coupon_store)
 
     fee_breakdown_json = json.dumps({
         "중개수수료": fee_brokerage,
@@ -1348,7 +1349,6 @@ def update_delivery_revenue_from_fees(session, business_id: int,
         "광고비": fee_advertising,
         "멤버십": fee_membership,
         "쿠폰(점주부담)": coupon_store,
-        "쿠폰(쿠팡부담)": coupon_coupang,
     }, ensure_ascii=False)
 
     # 기존 row 검색 — 한국어 alias 모두 (bank_sync 가 "쿠팡이츠" 로 저장, legacy 가 "쿠팡" 으로 저장)
