@@ -265,6 +265,21 @@ class CodefConnectionService:
                 "id": auth_payload["id"],
                 "password": encrypted,
             }
+            # 카드 비밀번호 (현대카드 등 일부 카드사 필수 — 2단계 인증).
+            # CODEF 표준: password2 (RSA 암호화). 평문 cardPassword 도 함께 전송 —
+            # 카드사별로 인식 키가 다를 수 있어 안전 차원에서 둘 다 포함.
+            card_pw = auth_payload.get("cardPassword")
+            if card_pw:
+                account["password2"] = self._client.encrypt_password(str(card_pw))
+                account["cardPassword"] = str(card_pw)
+            # 생년월일 (일부 카드사 필수, YYMMDD 또는 YYYYMMDD 평문)
+            birth = auth_payload.get("birthDate")
+            if birth:
+                account["birthDate"] = str(birth)
+            # CVC (드물게 필요)
+            cvc = auth_payload.get("cvc")
+            if cvc:
+                account["cvc"] = str(cvc)
             if client_type == "B" and biz_reg_no:
                 account["businessRegNo"] = biz_reg_no
             return {"accountList": [account]}, "id_pw"
