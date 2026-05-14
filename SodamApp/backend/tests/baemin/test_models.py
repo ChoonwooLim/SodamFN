@@ -1,7 +1,8 @@
 """BaeminCredential / Order / Settlement / SyncLog 모델 검증."""
 import datetime
 import pytest
-from sqlmodel import SQLModel, Session, create_engine, select
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import SQLModel, Session, create_engine
 from models import (
     BaeminCredential, BaeminOrder, BaeminSettlement, BaeminSyncLog, Business,
 )
@@ -22,7 +23,7 @@ def test_credential_unique_per_business(s):
     s.add(BaeminCredential(business_id=1, login_id="boss@example.com"))
     s.commit()
     s.add(BaeminCredential(business_id=1, login_id="other"))
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         s.commit()
 
 
@@ -31,7 +32,7 @@ def test_order_unique_per_business_order_id(s):
                      ordered_at=datetime.datetime(2026, 5, 1, 12, 0)))
     s.commit()
     s.add(BaeminOrder(business_id=1, store_id="A1", order_id="O1"))
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         s.commit()
 
 
@@ -47,7 +48,7 @@ def test_settlement_unique_key(s):
         settlement_date=datetime.date(2026, 5, 1),
         settlement_type="SETTLEMENT",
         seller_transfer_id="T1", amount=100000))
-    with pytest.raises(Exception):
+    with pytest.raises(IntegrityError):
         s.commit()
 
 

@@ -1701,7 +1701,7 @@ class BaeminCredential(SQLModel, table=True):
     status: str = Field(default="active")
     last_failed_at: Optional[datetime.datetime] = None
     last_error_message: Optional[str] = None
-    consecutive_failures: int = 0
+    consecutive_failures: int = Field(default=0, description="연속 실패 횟수 — 쿠키 만료 휴리스틱")
 
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
@@ -1736,6 +1736,8 @@ class BaeminOrder(SQLModel, table=True):
 class BaeminSettlement(SQLModel, table=True):
     """배민 일별 정산 + 수수료 분해."""
     __table_args__ = (
+        # 4-column key (settlement_type 포함): WITHDRAWAL 은 seller_transfer_id=NULL 이므로
+        # SETTLEMENT 와 동일 날짜에 공존할 수 있도록 settlement_type 도 키에 포함.
         UniqueConstraint(
             "business_id", "settlement_date", "settlement_type", "seller_transfer_id",
             name="uq_baemin_settlement",
@@ -1786,4 +1788,4 @@ class BaeminSyncLog(SQLModel, table=True):
 
     error_message: Optional[str] = None
     triggered_by: str = Field(default="cron")
-    auth_refreshed: bool = Field(default=False)
+    auth_refreshed: bool = Field(default=False, description="이 동기화 중 쿠키 갱신 발생 여부 (수동 only — 항상 False, 일관성용)")

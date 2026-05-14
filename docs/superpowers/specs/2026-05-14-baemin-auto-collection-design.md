@@ -136,7 +136,9 @@ class BaeminOrder(SQLModel, table=True):
 class BaeminSettlement(SQLModel, table=True):
     """배민 일별 정산 + 수수료 분해. raw_json 도 보관해 컬럼 추가에 대비."""
     __table_args__ = (
-        UniqueConstraint("business_id", "settlement_date", "seller_transfer_id",
+        # 4-column key (settlement_type 포함): WITHDRAWAL 은 seller_transfer_id=NULL 이므로
+        # SETTLEMENT 와 동일 날짜에 공존할 수 있도록 settlement_type 도 키에 포함.
+        UniqueConstraint("business_id", "settlement_date", "settlement_type", "seller_transfer_id",
                          name="uq_baemin_settlement"),
         Index("ix_baemin_settle_biz_date", "business_id", "settlement_date"),
     )
