@@ -15,6 +15,7 @@ export default function Sidebar() {
     const [productOpen, setProductOpen] = useState(false);
     const [salesGuideOpen, setSalesGuideOpen] = useState(false);
     const [salesGuideAlerts, setSalesGuideAlerts] = useState(0);
+    const [extIntegrationAlerts, setExtIntegrationAlerts] = useState(0);
     const [businessName, setBusinessName] = useState('셈하나');
     const [logoUrl, setLogoUrl] = useState(null);
     const [businesses, setBusinesses] = useState([]);
@@ -53,6 +54,25 @@ export default function Sidebar() {
             );
             setSalesGuideAlerts(incomplete + expiring);
         }).catch(() => setSalesGuideAlerts(0));
+    }, [location.pathname, viewAsBid]);
+
+    // 외부 연동 통합 상태 — 쿠팡이츠/배민 쿠키 만료/실패 카운트.
+    // 60초마다 폴링 (탭 활성 시), 사장님이 어드민 열 때 항상 최신.
+    useEffect(() => {
+        const role = localStorage.getItem('user_role');
+        const viewAs = localStorage.getItem('view_as_business_id');
+        if (role === 'superadmin' && !viewAs) {
+            setExtIntegrationAlerts(0);
+            return;
+        }
+        const fetchAlerts = () => {
+            api.get('/api/external-integration/status')
+                .then(res => setExtIntegrationAlerts(res.data.alert_count || 0))
+                .catch(() => setExtIntegrationAlerts(0));
+        };
+        fetchAlerts();
+        const id = setInterval(fetchAlerts, 60_000);
+        return () => clearInterval(id);
     }, [location.pathname, viewAsBid]);
 
     const token = localStorage.getItem('token');
@@ -145,7 +165,8 @@ export default function Sidebar() {
         { icon: FileText, label: '전자명세서', path: '/finance/statement', color: 'text-amber-400' },
         { icon: Wallet, label: '현금영수증', path: '/finance/cashbill', color: 'text-emerald-400' },
         { icon: BookOpen, label: '홈택스 수집', path: '/finance/hometax', color: 'text-violet-400' },
-        { icon: Link2, label: '외부 연동 (CODEF)', path: '/external-integration', color: 'text-blue-400' },
+        { icon: Link2, label: '외부 연동 (CODEF)', path: '/external-integration', color: 'text-blue-400',
+          alerts: extIntegrationAlerts },
         { icon: Gauge, label: '자동수집 상태', path: '/auto-collection', color: 'text-teal-400' },
     ];
 
@@ -283,7 +304,12 @@ export default function Sidebar() {
                                     className={`sidebar-sub-item ${isSubActive ? 'active' : ''}`}
                                 >
                                     <SubIcon size={14} className={isSubActive ? 'text-white' : sub.color} />
-                                    <span>{sub.label}</span>
+                                    <span className="flex-1">{sub.label}</span>
+                                    {sub.alerts > 0 && (
+                                        <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-semibold rounded-full bg-red-500 text-white">
+                                            {sub.alerts}
+                                        </span>
+                                    )}
                                 </Link>
                             );
                         })}
@@ -422,7 +448,19 @@ export default function Sidebar() {
                         <div className="px-3 pt-4 pb-1.5">
                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">경영관리</span>
                         </div>
-                        {renderSubmenu('손익관리', PieChart, plOpen, setPlOpen, isPLActive, plSubItems, 'emerald')}
+                        {renderSubmenu(
+                            (
+                                <span className="inline-flex items-center gap-2">
+                                    손익관리
+                                    {extIntegrationAlerts > 0 && (
+                                        <span className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-semibold rounded-full bg-red-500 text-white">
+                                            {extIntegrationAlerts}
+                                        </span>
+                                    )}
+                                </span>
+                            ),
+                            PieChart, plOpen, setPlOpen, isPLActive, plSubItems, 'emerald'
+                        )}
                         {renderSubmenu('직원관리', Users, hrOpen, setHrOpen, isHrActive, hrSubItems, 'indigo')}
                         {renderSubmenu('통합게시판', ClipboardList, boardOpen, setBoardOpen, isBoardActive, boardSubItems, 'blue')}
                     </>

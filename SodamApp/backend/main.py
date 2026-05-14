@@ -184,6 +184,10 @@ app.include_router(baemin.router)
 from routers import auto_collection
 app.include_router(auto_collection.router, prefix="/api")
 
+# 외부 연동 통합 상태 — 쿠팡이츠/배민 등 쿠키 만료 모니터링 (어드민 종 알림)
+from routers import external_integration_status
+app.include_router(external_integration_status.router)
+
 @app.get("/api/media/{path:path}")
 async def serve_media(path: str):
     """미디어 서버 파일 프록시 (mixed content / 외부 접근 해결)"""

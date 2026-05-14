@@ -4,6 +4,7 @@ import api from '../api';
 import BudgetSummaryCard from '../components/codef/BudgetSummaryCard';
 import ModuleGrid from '../components/codef/ModuleGrid';
 import BudgetSettingsModal from '../components/codef/BudgetSettingsModal';
+import ChannelStatusCards from '../components/codef/ChannelStatusCards';
 
 /**
  * 외부 데이터 연동 hub 페이지.
@@ -100,6 +101,8 @@ export default function ExternalIntegration() {
                         {err}
                     </div>
                 )}
+
+                <ChannelStatusCards />
 
                 <div className="mb-8">
                     <BudgetSummaryCard
