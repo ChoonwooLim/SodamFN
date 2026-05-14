@@ -176,6 +176,10 @@ app.include_router(easypos.router)
 from routers import coupang_eats
 app.include_router(coupang_eats.router)
 
+# 배민 (ceo.baemin.com) — 사장님사이트 매출 자동수집 (수동 쿠키 only)
+from routers import baemin
+app.include_router(baemin.router)
+
 # 자동수집 파이프라인 — 마이그레이션 B 정책 + 백업 복구 (cron 은 Task 10)
 from routers import auto_collection
 app.include_router(auto_collection.router, prefix="/api")
