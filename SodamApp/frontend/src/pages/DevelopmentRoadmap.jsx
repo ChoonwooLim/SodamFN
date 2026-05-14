@@ -281,6 +281,7 @@ const phases = [
                     { text: 'KICC 이지포스 POS 매출 자동수집 — RSA-PKCS1v15 + JSESSIONID warm-up 비공식 API 역공학 + 야간 cron (5/11 검증: 영수증 309건/235만원)', done: true },
                     { text: '쿠팡이츠 배달앱 매출 자동수집 — Playwright + curl_cffi(Chrome120 TLS 위조) 하이브리드 + unify-token 신버전 인증 + 수동 쿠키 폴백 + 야간 cron (1개월 백필 검증: 주문 436건/696만원)', done: true },
                     { text: 'Orbitron 호스트 cron 등록 — EasyPOS 03:00 + 쿠팡이츠 04:00 일별 자동 동기화 + Docker timezone Asia/Seoul 통일', done: true },
+                    { text: 'CODEF 카드 매입 spec 준수 라운드 — catalog 14개 매핑 정정(현대=0302 등) + 현대카드 cardNo/cardPassword 페이로드 + approval-list 통합 + memberStoreInfoYN 가맹점 업종 + 디버그 UI(clientType 토글, 원응답 펼침, 비번 👁) (DEMO 한계 — PRODUCT 전환 시 즉시 가동)', done: true },
                 ],
             },
             {

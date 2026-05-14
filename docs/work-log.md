@@ -1516,3 +1516,92 @@ Payroll.transfer_status='완료' 마킹 시 P/L 자동 반영. 1~3월 옛 데이
 6. 손익계산서 페이지에서 쿠팡이츠 수수료 정확히 표시되는지 확인 (DeliveryRevenue → P/L 전파 검증)
 
 ---
+
+## 2026-05-14 (오후/저녁) — CODEF 카드 매입 자동수집 — 현대카드 등록 + 데이터 수집 디버깅
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | CODEF 14개 카드사 organization 코드 매핑 전면 정정 (0306 신한만 우연 일치, 나머지 placeholder) | 완료 |
+| fix | 현대카드 등록 CF-04000 — cardNo + cardPassword 필수 필드를 등록 페이로드에 포함 | 완료 |
+| fix | billing-list 조회 시 cardPassword 첨부 버그 — 현대카드 0건 응답 직접 원인 제거 | 완료 |
+| fix | approval-list URL 정정 (`/v1/kr/card/p/account/approval-list` → `/v1/kr/card/common/p/approval`) + 500 에러 격리 | 완료 |
+| feat | 카드 등록 모달에 clientType(개인 P / 사업자 B) 토글 + CODEF 원응답 펼침 디버그 | 완료 |
+| feat | 비밀번호 · 카드비번 input 에 👁 평문 표시 토글 (대소문자 Caps Lock 함정 방지) | 완료 |
+| feat | approval-list (실시간 승인내역) sync 추가 + memberStoreInfoYN/Type 파라미터로 가맹점 업종 응답 포함 | 완료 |
+
+### 세부 내용 — 디버깅 흐름
+
+CODEF 매뉴얼 PDF (`API.xlsx`, 2025-11-11 최종) 와 코드 대조하며 단계적으로 원인 격리:
+
+1. **현대카드 ID 로그인 페이로드 누락 발견**
+   - PDF page 5 (LOGIN INPUT) — 현대카드는 `cardNo` + `cardPassword` 둘 다 필수 (O 표시)
+   - 직전 커밋 54f47646 이 "등록 페이로드 단순화" 명목으로 둘 다 제거 → CF-04000
+   - `_build_account_payload` 의 ID/PW 분기에 두 필드 조건부 추가 (cardNo 평문 / cardPassword RSA 암호화)
+   - 프론트 모달에 카드번호 16자리 input 추가 (현대카드 0302 또는 KB 0301 선택 시 노출)
+
+2. **organization 코드 매핑 오류 발견 (본질적 원인)**
+   - PDF page 3 매트릭스 대조: 0302=현대, 0303=삼성, 0304=NH, 0307=씨티 ...
+   - catalog: 0302=NH농협(오), 0303=롯데(오), 0307=현대(오), BC=0361/0364/0365/0366/0367/0368 (모두 placeholder)
+   - 14개 카드사 모두 PDF 기준 재작성 + `list_card_corps()` 가 PG 4종 제외하도록 수정
+   - `CARD_CORP_TO_CODEF` (card_merchants.py) 매핑도 동시 정정
+   - frontend priority `['0306','0364','0307']` → `['0306','0303','0302']` (신한·삼성·현대)
+
+3. **CF-04000 원응답 분석 → 결국 ID/PW 케이스성 문제 (Caps Lock)**
+   - 사장님이 디버그 UI 에서 펼친 raw 응답: 내부 `errorList.code=CF-12803` "아이디 또는 비밀번호 오류"
+   - 사장님이 현대카드 사이트 직접 로그인 성공 → ID/PW 자체는 정확
+   - 원인: **Caps Lock 미사용** — 브라우저 자동입력(현대 site) vs 수동입력(셈하나 form) 대소문자 차이
+   - 사장님 Caps Lock 눌러서 다시 입력 후 등록 성공
+
+4. **UX 개선 — 향후 같은 함정 방지**
+   - 비밀번호 / 카드비번 input 옆에 👁 Eye/EyeOff 토글. 평문 확인 후 등록 가능
+   - 카드사 사이트 회원종류 (개인 P / 사업자 B) 토글 — `auth.client_type` 으로 백엔드 전달
+   - 에러 박스에 "CODEF 원응답 펼치기" details — `CodefAPIError.raw` 표시
+
+5. **3장 카드 등록 후 데이터 수집 — 현대카드만 0건**
+   - 신한 1월 19건 + 삼성 1월 80건 (= 4,747,930원) 정상 적재
+   - 현대카드 0건 — billing-list 조회 시 `cardPassword=ENC(1234)` 첨부가 CODEF 거부 원인
+   - PDF page 10 (billing-list INPUT) 에 cardPassword 미정의 — 54f47646 의 "조회 시 cardPassword 전달" 해석 오류
+   - `_build_period_params` 에서 cardPassword 첨부 코드 삭제 + 회귀 테스트 추가
+
+6. **approval-list (실시간 승인내역) 추가 시도 → URL 오류 → 격리**
+   - 첫 시도 URL `/v1/kr/card/p/account/approval-list` (billing-list 패턴 미러) → 500 에러
+   - 정정: `/v1/kr/card/common/p/approval` (기존 `card_provider.py` 도 사용, 검증됨)
+   - 안전망 격리: approval-list 가 미지원 예외 던져도 billing-list 흐름 보존 (warning 만 로그)
+
+7. **업종 정보 누락 ("기타" 폴백) 해결**
+   - 모든 row 의 `business_type` 빈값 → 화면 업종별 "기타" 합계 단일
+   - PDF page 7/10: `memberStoreInfoYN="1"` (billing) / `memberStoreInfoType="1"` (approval) 요청 시에만 응답에 가맹점 업종 포함
+   - 두 endpoint 파라미터 모두 추가
+
+### CODEF DEMO 환경 한계 확인
+
+코드는 모두 정상 작동하나 DEMO 환경 mock 데이터 한계:
+- 신한·삼성 1월 99건 (2025-12 사용분의 2026-01 청구) 만 제공
+- 현대카드 mock 데이터 없음
+- 5월 실시간 데이터 없음
+
+→ **PRODUCT 키 신청** 또는 **CSV 수동 업로드** 또는 **직접 스크래핑** 중 선택 (사장님 결정 보류)
+
+### 다음 세션 작업
+
+1. **CODEF PRODUCT 키 신청 여부 결정** — `.env` / Orbitron secrets 교체 (`CODEF_ENV=production`)
+2. PRODUCT 전환 시 즉시 가동될 수 있도록 코드는 준비 완료 (catalog · payload · query 파라미터 모두 spec 준수)
+3. approval-list URL 정정 효과 검증 (DEMO 에서 호출 자체는 정상 응답 받는지)
+4. 업종별 합계가 "음식점/편의점/카페" 등으로 정확히 분류되는지 검증
+5. `_codef_manual/` 폴더 (untracked) — PDF 매뉴얼 보관용. 필요시 별도 commit
+
+### CODEF 운영 메모 (다음 세션 참고)
+
+- **0302 = 현대카드** (이전 잘못 매핑 NH농협 → 정정 완료)
+- **0303 = 삼성카드** (이전 잘못 매핑 롯데 → 정정 완료)
+- **0307 = 씨티카드** (이전 잘못 매핑 현대 → 정정 완료)
+- billing-list / approval-list 둘 다 `cardPassword` 조회 INPUT 에 미정의 — 절대 첨부 금지
+- 업종/가맹점정보 받으려면 `memberStoreInfoYN=1` (billing) / `memberStoreInfoType=1` (approval) 필수
+- 현대카드 ID 로그인 등록 시 `cardNo` (평문) + `cardPassword` (RSA) 둘 다 등록 페이로드에 필수
+- CF-04000 외피 안에 진짜 원인이 `data.errorList[].code` 에 들어옴 — 펼침 UI 로 확인
+
+---
+
+---
