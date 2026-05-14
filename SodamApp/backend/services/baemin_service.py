@@ -622,6 +622,55 @@ def upsert_revenue_from_orders(session: "Session", business_id: int,
 # ──────────────────────────────────────────────────────────────────────────
 
 
+def _build_fee_breakdown(detail_rows) -> dict:
+    """배민 BaeminSettlementDetail rows → 수수료 9 카테고리 분해 dict.
+
+    입금완료 row 만 합산. 음수는 양수로 정규화 (점주 부담 = 양수).
+    매출관리 페이지 "수수료 구성 내역" 표시용.
+
+    카테고리:
+      - 중개수수료: 배민1 + 알뜰배달 + 픽업 중개이용료
+      - 결제수수료: 기본수수료(정률) + 우대수수료
+      - 배달비: 한집배달 + 알뜰배달 배달비
+      - 광고비: 우리가게클릭 + 부가세
+      - 배달팁할인: 한집/알뜰 배달팁 즉시할인 (점주 부담)
+      - 배민클럽할인(점주): 배민클럽 할인 — 지원금 차감 후 점주 순부담분
+      - 고객할인: 주문금액 즉시할인 (점주 부담)
+      - 부가세: (E) 부가세
+      - 기타조정: (D) 기타 + 조정금액
+    """
+    completed = [r for r in detail_rows if (r.status or '') == '입금완료']
+    if not completed:
+        return {}
+
+    def s(field):
+        return sum(abs(getattr(r, field, 0) or 0) for r in completed)
+
+    # 배민클럽 할인 (점주 순부담) = 할인(음수) - 지원금(양수) 절댓값 합산 후 차감
+    club_owner = 0
+    for r in completed:
+        # discount 는 음수(점주 차감), subsidy 는 양수(배민 지원)
+        # 점주 순부담 = 할인 절댓값 - 지원금 절댓값
+        net_single = abs(r.club_single_discount or 0) - abs(r.club_single_subsidy or 0)
+        net_smart = abs(r.club_smart_discount or 0) - abs(r.club_smart_subsidy or 0)
+        club_owner += max(net_single, 0) + max(net_smart, 0)
+
+    # 기타조정 — 부호 그대로 (음수 = 점주 부담, 양수 = 환급)
+    etc_net = sum((r.etc_amount or 0) + (r.adjustment_amount or 0) for r in completed)
+
+    return {
+        "중개수수료": s("brokerage_baemin1") + s("brokerage_smart") + s("brokerage_pickup"),
+        "결제수수료": s("payment_fee_base") + s("payment_fee_preferred"),
+        "배달비":     s("delivery_fee_single") + s("delivery_fee_smart"),
+        "광고비":     s("ad_amount") + s("ad_vat"),
+        "배달팁할인": s("tip_discount_single") + s("tip_discount_smart"),
+        "배민클럽할인(점주)": club_owner,
+        "고객할인":   s("customer_discount"),
+        "부가세":     s("vat"),
+        "기타조정":   abs(etc_net) if etc_net < 0 else 0,  # 점주 부담일 때만 표시
+    }
+
+
 def upsert_excel_settlement(session: "Session", business_id: int,
                             year: int, month: int,
                             parsed) -> dict:
@@ -745,6 +794,10 @@ def upsert_excel_settlement(session: "Session", business_id: int,
     settlement_amount = summary_dict["deposit_total"]   # (H) 입금금액 = 실수령
     total_fees = total_sales - settlement_amount         # 총 차감액 (수수료+배달비+VAT+광고 등)
 
+    # fee_breakdown — 매출관리 페이지 "수수료 구성 내역" 표시용. 9 카테고리.
+    # 입금완료 row 만 합산. 음수는 양수로 정규화 (수수료 = 점주 부담 양).
+    fee_breakdown = _build_fee_breakdown(parsed.detail_rows)
+
     dr = session.exec(
         select(DeliveryRevenue).where(
             DeliveryRevenue.business_id == business_id,
@@ -753,11 +806,13 @@ def upsert_excel_settlement(session: "Session", business_id: int,
             DeliveryRevenue.channel == "배달의민족",
         )
     ).first()
+    fee_bd_json = json.dumps(fee_breakdown, ensure_ascii=False)
     if dr:
         dr.total_sales = total_sales
         dr.total_fees = total_fees
         dr.settlement_amount = settlement_amount
         dr.order_count = agg.row_count
+        dr.fee_breakdown = fee_bd_json
         dr.source = "excel"
     else:
         session.add(DeliveryRevenue(
@@ -767,6 +822,7 @@ def upsert_excel_settlement(session: "Session", business_id: int,
             total_fees=total_fees,
             settlement_amount=settlement_amount,
             order_count=agg.row_count,
+            fee_breakdown=fee_bd_json,
             source="excel",
         ))
 
