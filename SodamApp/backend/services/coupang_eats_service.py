@@ -547,6 +547,85 @@ class CoupangEatsClient:
         self._check_response(r)
         return r.json()
 
+    # ───── 정산 detail probe (URL 미확정 — fee breakdown 발굴용) ──────
+
+    # detail endpoint URL 후보군. 사장님 인계 노트 가설 3종 + 흔한 변형 2종.
+    # 첫 매칭 (status_code=200 + JSON body) 발견 시 그것을 정식 URL 로 채택.
+    SETTLEMENT_DETAIL_URL_CANDIDATES: list[str] = [
+        # 가설 1 — 인계 노트 "가장 가능성 ↑": 컬렉션 URL 끝에 ID
+        "/api/v1/merchant/transactions/{store_id}/settlement-management-data/{seller_transfer_id}",
+        # 가설 2 — 컬렉션/detail/ID
+        "/api/v1/merchant/transactions/{store_id}/settlement-management-data/detail/{seller_transfer_id}",
+        # 가설 3 — 별도 settlement-detail 패스
+        "/api/v1/merchant/transactions/{store_id}/settlement-detail/{seller_transfer_id}",
+        # 변형 — ID/detail
+        "/api/v1/merchant/transactions/{store_id}/settlement-management-data/{seller_transfer_id}/detail",
+        # 변형 — v2
+        "/api/v2/merchant/transactions/{store_id}/settlement-management-data/{seller_transfer_id}",
+    ]
+
+    def probe_settlement_detail(self,
+                                store_id: int,
+                                seller_transfer_id: int,
+                                *,
+                                extra_urls: Optional[list[str]] = None) -> list[dict]:
+        """detail endpoint URL 발굴용 probe — 후보 URL 들을 순회하며 결과 수집.
+
+        절대 raise 하지 않음 (probe 목적). 각 시도마다 응답 상태/타입/본문 일부를 반환.
+        """
+        urls = list(self.SETTLEMENT_DETAIL_URL_CANDIDATES)
+        if extra_urls:
+            urls.extend(extra_urls)
+
+        referer = f"{BASE_URL}/merchant/management/settlement/{store_id}"
+        out: list[dict] = []
+        for tpl in urls:
+            url = BASE_URL + tpl.format(
+                store_id=store_id,
+                seller_transfer_id=seller_transfer_id,
+            )
+            entry: dict = {"url": url, "url_template": tpl}
+            try:
+                r = self._session.get(
+                    url,
+                    headers=self._common_headers(referer),
+                    timeout=self._timeout,
+                )
+            except Exception as e:  # noqa: BLE001
+                entry["error"] = f"통신 실패: {e}"
+                out.append(entry)
+                continue
+
+            body_preview = ""
+            try:
+                body_preview = (r.text or "")[:1200].replace("\n", " ").replace("\r", " ")
+            except Exception:
+                pass
+
+            entry["status_code"] = r.status_code
+            entry["content_type"] = r.headers.get("content-type")
+            entry["content_length"] = r.headers.get("content-length")
+            entry["body_preview"] = body_preview
+
+            # JSON 으로 파싱 시도 — 성공하면 키 list 함께 노출
+            if "application/json" in (entry["content_type"] or "").lower():
+                try:
+                    parsed = r.json()
+                    if isinstance(parsed, dict):
+                        entry["json_top_keys"] = list(parsed.keys())
+                        # data 래핑 한 단계 더 펼쳐서 안내
+                        inner = parsed.get("data")
+                        if isinstance(inner, dict):
+                            entry["json_data_keys"] = list(inner.keys())
+                        # 'code' 등 응답 wrapper 메타
+                        entry["json_code"] = parsed.get("code") or parsed.get("status")
+                except Exception as e:  # noqa: BLE001
+                    entry["json_parse_error"] = str(e)
+
+            out.append(entry)
+
+        return out
+
 
 # ──────────────────────────────────────────────────────────────────────────
 # 비즈니스 로직 — DB 적재

@@ -27,6 +27,7 @@ from database import engine
 from models import (
     CoupangEatsCredential,
     CoupangEatsOrder,
+    CoupangEatsSettlement,
     CoupangEatsSyncLog,
     User,
 )
@@ -688,6 +689,101 @@ def debug_probe(
                 else "인증 쿠키 (EATS_AT) 없음"
             )
         ),
+    }
+
+
+@router.get("/debug/settlement-detail-probe")
+def debug_settlement_detail_probe(
+    seller_transfer_id: Optional[int] = None,
+    extra_url: Optional[str] = None,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """detail endpoint URL 발굴 probe.
+
+    `seller_transfer_id` 미지정 시 DB 의 최신 SETTLEMENT row 사용.
+    `extra_url` 로 후보 URL 추가 가능 (e.g. `/api/v1/merchant/.../my-custom-path/{seller_transfer_id}`).
+      → `{store_id}` / `{seller_transfer_id}` placeholder 치환됨.
+
+    응답: 각 후보 URL 의 status / content-type / 응답 body 앞 1200자 / JSON top keys.
+    """
+    if admin.role != "superadmin":
+        raise HTTPException(403, "디버그 엔드포인트는 superadmin 전용입니다.")
+    bid = _resolve_bid(admin, x_view_as_business)
+
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == bid
+            )
+        ).first()
+        if not cred or not cred.store_id:
+            raise HTTPException(404, "자격증명/매장 ID 미등록")
+        store_id = cred.store_id
+
+        # seller_transfer_id 미지정 — DB 의 최신 SETTLEMENT row 자동 선택
+        chosen_settlement_dto: Optional[dict] = None
+        if seller_transfer_id is None:
+            chosen = s.exec(
+                select(CoupangEatsSettlement).where(
+                    CoupangEatsSettlement.business_id == bid,
+                    CoupangEatsSettlement.settlement_type == "SETTLEMENT",
+                    CoupangEatsSettlement.seller_transfer_id.is_not(None),
+                ).order_by(CoupangEatsSettlement.settlement_date.desc()).limit(1)
+            ).first()
+            if not chosen:
+                raise HTTPException(
+                    422,
+                    "DB 에 SETTLEMENT 행이 없습니다. /sync/manual 로 먼저 정산을 수집하거나 "
+                    "seller_transfer_id 를 직접 지정하세요.",
+                )
+            seller_transfer_id = chosen.seller_transfer_id
+            chosen_settlement_dto = {
+                "id": chosen.id,
+                "settlement_date": chosen.settlement_date.isoformat(),
+                "amount": chosen.amount,
+                "balance": chosen.balance,
+            }
+
+    def _action(client: CoupangEatsClient):
+        return client.probe_settlement_detail(
+            store_id,
+            int(seller_transfer_id),
+            extra_urls=[extra_url] if extra_url else None,
+        )
+
+    try:
+        (results, refreshed) = _execute_with_refresh(bid, _action)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("settlement-detail-probe failed: %s", e, exc_info=True)
+        raise HTTPException(500, f"probe 실패: {e}") from e
+
+    # 200 + JSON 인 결과를 맨 위로 정렬 (눈에 잘 띄게)
+    def _rank(entry: dict) -> int:
+        sc = entry.get("status_code") or 999
+        ct = (entry.get("content_type") or "").lower()
+        if sc == 200 and "json" in ct:
+            return 0
+        if sc == 200:
+            return 1
+        if sc in (401, 403):
+            return 8  # 인증 이슈 — URL 자체는 맞을 수도
+        return 5
+    results_sorted = sorted(results, key=_rank)
+
+    return {
+        "store_id": store_id,
+        "seller_transfer_id": int(seller_transfer_id),
+        "chosen_settlement": chosen_settlement_dto,
+        "auth_refreshed": refreshed,
+        "results": results_sorted,
+        "winners": [
+            r["url_template"] for r in results_sorted
+            if r.get("status_code") == 200
+               and "json" in (r.get("content_type") or "").lower()
+        ],
     }
 
 
