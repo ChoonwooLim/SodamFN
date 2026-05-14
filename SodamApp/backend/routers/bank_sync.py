@@ -1519,6 +1519,10 @@ def _build_learned_remark_map(session, business_id: int, threshold: float = 0.8)
 
     threshold(기본 80%) 이상 동일 분류로 합의된 remark1 만 채택.
     수동 분류('manual')는 자동분류('auto')보다 우선 가중 (manual 1건 = auto 2건).
+
+    ⚠ 카드사 키워드는 학습 패턴에서 제외: 과거 잘못 분류된 row(예: '신한카드' → expense)가
+       학습으로 강화되어 새 BT 도 잘못 분류되는 자기복제 버그 회피. CARD_PAYMENT_KEYWORDS
+       에 매칭되는 remark 는 항상 _classify_one_tx 의 카드대금 분기가 처리.
     """
     rows = session.exec(
         select(BankTransaction).where(
@@ -1530,6 +1534,9 @@ def _build_learned_remark_map(session, business_id: int, threshold: float = 0.8)
     by_remark = defaultdict(Counter)
     for r in rows:
         if not r.remark1:
+            continue
+        # 카드사 키워드는 학습 무시 — 카드대금 분기가 우선 (위 docstring)
+        if any(k in r.remark1 for k in CARD_PAYMENT_KEYWORDS):
             continue
         weight = 2 if (r.classified_by == "manual") else 1
         by_remark[r.remark1][r.classified_as] += weight
@@ -1579,7 +1586,13 @@ def _classify_one_tx(
             if stype == "mobile":
                 return "mobile_settlement"
 
-    # 3) 학습 패턴 (settlement 미매칭 시 적용)
+    # 2.5) 출금 + 카드사 키워드 → 항상 card_payment (학습보다 우선)
+    #      과거 잘못 분류로 학습 패턴이 expense 로 굳어진 자기복제 버그 회피.
+    #      카드대금 납부는 매입 아님 (실제 매입은 카드 사용 시점에 잡힘).
+    if tx.out_amount > 0 and any(k in remark for k in CARD_PAYMENT_KEYWORDS):
+        return "card_payment"
+
+    # 3) 학습 패턴 (settlement / 카드대금 미매칭 시 적용)
     if tx.remark1 and tx.remark1 in learned_remarks:
         return learned_remarks[tx.remark1]
 
@@ -1589,10 +1602,6 @@ def _classify_one_tx(
 
     # 5) 출금 → 벤더 매칭 시 expense/purchase, 미매칭이면 default expense
     if tx.out_amount > 0:
-        # 5a) 카드대금 납부 — 매입 아님 (실제 매입은 카드 사용 시점에 잡힘)
-        if any(k in remark for k in CARD_PAYMENT_KEYWORDS):
-            return "card_payment"
-
         for name, v in vendor_by_name.items():
             if name and name in remark:
                 tx.vendor_id = v.id
