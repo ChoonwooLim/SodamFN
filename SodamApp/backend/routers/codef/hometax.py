@@ -148,14 +148,21 @@ def _register_hometax_connection(
 def _build_hometax_payload(
     svc: CodefConnectionService, org, auth_payload: dict, biz_reg_no: str,
 ) -> tuple[dict, str]:
-    """홈택스 인증 페이로드 빌드 (3가지 방식). businessType='TX' (홈택스 컨벤션)."""
+    """홈택스 인증 페이로드 빌드 (3가지 방식).
+
+    CODEF 공공기관(0001 국세청) 의 표준 페이로드:
+      businessType : "PB" (Public)
+      loginType    : "0" 공동인증서 / "1" ID/PW / "5" 간편인증
+      loginTypeLevel: 간편인증 사 코드 (카카오=1, 페이코=2, 삼성패스=3,
+                      KB모바일=4, 통신사PASS=5, 네이버=6, 신한인증서=7, 토스=8)
+    """
     client_type = (auth_payload.get("client_type") or "B").upper()
     if client_type not in {"P", "B"}:
         client_type = "B"
 
     base = {
         "countryCode": "KR",
-        "businessType": "TX",  # 홈택스(국세청)
+        "businessType": "PB",  # 공공기관 (Public)
         "clientType": client_type,
         "organization": org.code,
     }
@@ -175,22 +182,30 @@ def _build_hometax_payload(
         }
         return {"accountList": [account]}, "cert"
 
-    # 2) 간편인증
-    simple_types = {"kakao", "naver", "pass", "toss", "payco", "samsung"}
+    # 2) 간편인증 — CODEF 표준 loginTypeLevel 매핑
+    simple_types_level = {
+        "kakao": "1", "payco": "2", "samsung": "3", "kbmobile": "4",
+        "pass": "5", "naver": "6", "shinhan": "7", "toss": "8",
+    }
     login_type = (auth_payload.get("loginType") or "").lower()
-    if login_type in simple_types:
+    if login_type in simple_types_level:
         account = {
             **base,
             "loginType": "5",
-            "loginTypeLevel": "1",
-            "loginIdentity": login_type,
-            "userName": auth_payload.get("userName", ""),
-            "phoneNo": auth_payload.get("phoneNo", "") or auth_payload.get("phone", ""),
-            "birthDate": auth_payload.get("birthDate", "") or auth_payload.get("identity", ""),
+            "loginTypeLevel": simple_types_level[login_type],
+            # userName/phoneNo/birthDate/telecom — 사용자가 채운 값만 전달.
+            # CODEF 가 자체적으로 본인인증 단계에서 보강하는 경우 비워둬도 가능.
+            "userName": auth_payload.get("userName", "").strip(),
+            "phoneNo": (auth_payload.get("phoneNo") or auth_payload.get("phone") or "").strip(),
+            "birthDate": (auth_payload.get("birthDate") or auth_payload.get("identity") or "").strip(),
             "telecom": auth_payload.get("telecom", "0"),
             "isIdentify": "1",
             "is2Way": "true",
         }
+        # 빈 문자열은 키 자체 제거 (CODEF 가 null 보다 키 없음을 선호하는 경우 대응)
+        for k in ("userName", "phoneNo", "birthDate"):
+            if not account.get(k):
+                account.pop(k, None)
         return {"accountList": [account]}, f"simple_{login_type}"
 
     # 3) ID/PW (홈택스 ID)
@@ -298,7 +313,15 @@ def connect(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
+    import logging
+    log = logging.getLogger("sodam.codef.hometax.connect")
     bid = resolve_bid(admin, x_view_as_business)
+    # auth 의 password/certPwd 등 민감 정보 마스킹 후 로깅 (디버그 — Phase 1 검증용)
+    masked = {
+        k: ("***" if k in {"password", "certPwd", "cert_pwd"} else v)
+        for k, v in (body.auth or {}).items()
+    }
+    log.warning("hometax/connect bid=%s payload_keys=%s payload=%s", bid, list(masked.keys()), masked)
     svc = CodefConnectionService(engine=engine)
     try:
         return _register_hometax_connection(svc, bid, body.auth)
@@ -307,8 +330,11 @@ def connect(
     except CodefAuthExpired as e:
         raise HTTPException(400, f"인증 만료: {e}")
     except CodefAPIError as e:
+        log.error("hometax/connect CODEF API error code=%s msg=%s raw=%s",
+                  e.code, str(e), str(e.raw)[:1000])
         raise HTTPException(400, {"message": str(e), "code": e.code, "raw": e.raw})
     except ValueError as e:
+        log.error("hometax/connect ValueError: %s", e)
         raise HTTPException(400, str(e))
 
 

@@ -156,7 +156,12 @@ export default function HomeTaxCollect() {
                 await loadConnection();
             }
         } catch (e) {
-            alert(`연결 실패: ${e?.response?.data?.detail?.message || e?.response?.data?.detail || e.message}`);
+            const detail = e?.response?.data?.detail;
+            const msg = typeof detail === 'string' ? detail
+                : (detail?.message || e.message);
+            const code = detail?.code || '';
+            const raw = detail?.raw ? `\n\n[raw]\n${JSON.stringify(detail.raw).slice(0, 500)}` : '';
+            alert(`연결 실패${code ? ` [${code}]` : ''}: ${msg}${raw}`);
         } finally {
             setRegisting(false);
         }
@@ -402,10 +407,10 @@ export default function HomeTaxCollect() {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-semibold text-slate-600 block mb-1">이름</label>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">이름 <span className="text-slate-400 font-normal">(선택)</span></label>
                                             <input value={simpleForm.userName} onChange={(e) => setSimpleForm({ ...simpleForm, userName: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                placeholder="홍길동" />
+                                                placeholder="비워두면 자동 인증" />
                                         </div>
                                         <div>
                                             <label className="text-xs font-semibold text-slate-600 block mb-1">휴대폰</label>
