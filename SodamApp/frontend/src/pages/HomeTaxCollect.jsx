@@ -448,12 +448,12 @@ export default function HomeTaxCollect() {
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-semibold text-slate-600 block mb-1">대표자 주민번호 <span className="text-red-500">*</span></label>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">대표자 주민번호 <span className="text-red-500">*</span> <span className="text-slate-400 font-normal">(13자리)</span></label>
                                             <input value={idPwForm.identity} onChange={(e) => setIdPwForm({ ...idPwForm, identity: e.target.value.replace(/\D/g, '').slice(0, 13) })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono tabular-nums"
-                                                placeholder="앞 7자리 (생년월일 6자리 + 성별 1자리)"
+                                                placeholder="13자리 전체 (예: 6307301234567)"
                                                 maxLength={13} />
-                                            <div className="text-[11px] text-slate-500 mt-1">홈택스 ID 로그인 2차 인증용. 13자리 전체 입력해도 됩니다.</div>
+                                            <div className="text-[11px] text-slate-500 mt-1">홈택스 ID 로그인 2차 인증용 — 주민번호 전체 13자리 입력</div>
                                         </div>
                                     </div>
                                 )}

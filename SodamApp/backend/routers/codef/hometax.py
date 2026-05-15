@@ -220,12 +220,12 @@ def _build_hometax_payload(
     # 3) ID/PW (홈택스 ID) — 2차 인증으로 대표자 주민번호 필요
     if "id" in auth_payload and "password" in auth_payload:
         encrypted = svc._client.encrypt_password(auth_payload["password"])  # type: ignore[attr-defined]
-        # 주민번호 — 7자리 (앞자리만) 또는 13자리 모두 허용. 숫자만 추출.
+        # 주민번호 13자리 전체 필요 (CODEF 홈택스 2차 인증). 숫자만 추출.
         identity = re.sub(r"\D", "", str(auth_payload.get("identity") or ""))
-        if not identity or len(identity) < 7:
+        if len(identity) != 13:
             raise ValueError(
-                "홈택스 ID 로그인은 2차 인증으로 대표자 주민번호 앞 7자리가 필요합니다. "
-                "identity 필드에 주민번호(7자리 또는 13자리)를 입력해주세요.",
+                "홈택스 ID 로그인은 대표자 주민번호 13자리 전체가 필요합니다. "
+                f"(입력된 자릿수: {len(identity)})",
             )
         account = {
             **base,
