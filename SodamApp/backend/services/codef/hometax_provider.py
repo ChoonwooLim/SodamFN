@@ -32,8 +32,16 @@ from .codef_client import CodefClient
 logger = logging.getLogger("sodam.codef.hometax")
 
 
-# 홈택스(국세청) CODEF organization 코드
-HOMETAX_ORG_CODE = "0001"
+# CODEF 홈택스 organization 코드 — product 별로 다름 (PDF spec 검증)
+# 0001 은 존재하지 않는 코드 (CF-04033) — 절대 사용 금지.
+ORG_CASH_RECEIPT = "0003"        # 현금영수증 (매입/매출)
+ORG_TAX_INVOICE = "0002"         # 전자세금계산서 (통계/발행 등)
+ORG_HOMETAX_GENERAL = "0004"     # 세금 납부/환급, 사업자등록상태
+ORG_CARD_SALES = "0006"          # 신용카드 매출자료
+
+# connect (최초 등록) 시 사용할 organization — 사장님 우선순위(현금영수증) 기준.
+# CODEF 는 organization 별 별도 connectedId 발급 — 다른 product 호출 시 추가 등록 필요.
+HOMETAX_ORG_CODE = ORG_CASH_RECEIPT
 
 # CODEF API path — 사장님 제공 PDF spec 으로 모두 확정.
 PATH_CASH_PURCHASE = "/v1/kr/public/nt/cash-receipt/purchase-details"
@@ -211,23 +219,25 @@ class CodefHometaxProvider:
     # ─── sync 메서드 ─────────────────────────────────
 
     def sync_cash_sales(self, connection_id: int) -> SyncResult:
-        """현금영수증 매출 수집 — path 는 PDF 미확보로 추정값 사용."""
+        """현금영수증 매출 수집 (organization 0003)."""
         return self._sync_cash_receipt(
             connection_id=connection_id,
             record_type="cash_sales",
             api_path=PATH_CASH_SALES,
+            organization=ORG_CASH_RECEIPT,
         )
 
     def sync_cash_purchase(self, connection_id: int) -> SyncResult:
-        """현금영수증 매입내역 수집 (PDF spec 확인됨: purchase-details)."""
+        """현금영수증 매입내역 수집 (organization 0003)."""
         return self._sync_cash_receipt(
             connection_id=connection_id,
             record_type="cash_purchase",
             api_path=PATH_CASH_PURCHASE,
+            organization=ORG_CASH_RECEIPT,
         )
 
     def _sync_cash_receipt(self, connection_id: int, record_type: str,
-                            api_path: str) -> SyncResult:
+                            api_path: str, organization: str) -> SyncResult:
         try:
             conn = self._get_connection(connection_id)
         except ValueError as e:
@@ -238,11 +248,12 @@ class CodefHometaxProvider:
         s_date, e_date = self._date_range(business_id, record_type, fallback_days=30)
 
         # CODEF 공공 API spec (PDF 검증):
-        # organization, connectedId, startDate(YYYYMMDD), endDate(YYYYMMDD),
+        # organization (product 별 다름 — 인자로 전달), connectedId,
+        # startDate(YYYYMMDD), endDate(YYYYMMDD),
         # orderBy("0"=오름차순/"1"=내림차순), inquiryType("0"=전체/"1"=본인사업장/"2"=별도사업장)
         # identity (사업자번호, 다중 사업장 시 필수)
         params = {
-            "organization": HOMETAX_ORG_CODE,
+            "organization": organization,
             "connectedId": conn.connected_id,
             "startDate": s_date,
             "endDate": e_date,
@@ -312,12 +323,13 @@ class CodefHometaxProvider:
         s_date, e_date = self._date_range(business_id, "tax_invoice_sales", fallback_days=30)
 
         params = {
-            "organization": HOMETAX_ORG_CODE,
+            "organization": ORG_TAX_INVOICE,  # 0002 (세금계산서)
             "connectedId": conn.connected_id,
-            "businessType": _normalize(biz_reg_no),
             "startDate": s_date,
             "endDate": e_date,
         }
+        if biz_reg_no:
+            params["identity"] = biz_reg_no
         try:
             result = self._client.request_product(PATH_TAXINVOICE_INTEGRATED, params)
         except Exception as e:  # noqa: BLE001

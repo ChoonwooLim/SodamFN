@@ -84,10 +84,24 @@ _PAYMENTS: tuple[Organization, ...] = (
 )
 
 # 공공기관 — 2026-05-15 추가 (홈택스 통한 현금영수증/세금계산서/부가세 자동수집).
-# CODEF 카탈로그: organization 0001 (국세청). 3가지 인증 모두 지원.
+# CODEF 카탈로그: organization 코드는 product 별로 다름 (PDF spec 검증):
+#   0002 = 전자세금계산서 (tax-invoice/*)
+#   0003 = 현금영수증 (cash-receipt/*)
+#   0004 = 세금 납부·환급, 사업자등록상태 (hometax/*, etc-yearend-tax/*)
+#   0006 = 신용카드 매출자료 (tax-payment/credit-card-*)
+# connect 시 가장 우선 product = 현금영수증(0003) 으로 connectedId 발급.
+# 0001 은 존재하지 않는 코드 (CF-04033 발생) — 사용 금지.
 _PUBLIC: tuple[Organization, ...] = (
     Organization(
-        "0001", "국세청 홈택스", "public_tax",
+        "0003", "국세청 홈택스 (현금영수증)", "public_tax",
+        (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH),
+    ),
+    Organization(
+        "0002", "국세청 홈택스 (전자세금계산서)", "public_tax",
+        (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH),
+    ),
+    Organization(
+        "0004", "국세청 홈택스 (세금·사업자정보)", "public_tax",
         (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH),
     ),
 )
