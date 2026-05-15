@@ -72,7 +72,7 @@ export default function HomeTaxCollect() {
     const [simpleForm, setSimpleForm] = useState({
         loginType: 'kakao', userName: '', phoneNo: '', birthDate: '', telecom: '0',
     });
-    const [idPwForm, setIdPwForm] = useState({ id: '', password: '' });
+    const [idPwForm, setIdPwForm] = useState({ id: '', password: '', identity: '' });
 
     useEffect(() => {
         loadConnection();
@@ -437,14 +437,23 @@ export default function HomeTaxCollect() {
                                 {authMethod === 'idpw' && (
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="text-xs font-semibold text-slate-600 block mb-1">홈택스 아이디</label>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">홈택스 아이디 <span className="text-red-500">*</span></label>
                                             <input value={idPwForm.id} onChange={(e) => setIdPwForm({ ...idPwForm, id: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                placeholder="예: limp2004" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">비밀번호 <span className="text-red-500">*</span></label>
+                                            <input type="password" value={idPwForm.password} onChange={(e) => setIdPwForm({ ...idPwForm, password: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
                                         </div>
                                         <div>
-                                            <label className="text-xs font-semibold text-slate-600 block mb-1">비밀번호</label>
-                                            <input type="password" value={idPwForm.password} onChange={(e) => setIdPwForm({ ...idPwForm, password: e.target.value })}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">대표자 주민번호 <span className="text-red-500">*</span></label>
+                                            <input value={idPwForm.identity} onChange={(e) => setIdPwForm({ ...idPwForm, identity: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono tabular-nums"
+                                                placeholder="앞 7자리 (생년월일 6자리 + 성별 1자리)"
+                                                maxLength={13} />
+                                            <div className="text-[11px] text-slate-500 mt-1">홈택스 ID 로그인 2차 인증용. 13자리 전체 입력해도 됩니다.</div>
                                         </div>
                                     </div>
                                 )}
