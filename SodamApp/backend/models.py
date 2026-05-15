@@ -1461,6 +1461,72 @@ class CodefBudgetSetting(SQLModel, table=True):
 
 
 # ──────────────────────────────────────────────────────────────────
+# 홈택스 수집 (CODEF organization 0001) — 2026-05-15 추가
+# 현금영수증 매출/매입 + 세금계산서 통합 + 부가세 신고결과 자동수집.
+# 발행은 팝빌, 조회/수집은 CODEF (외부 통합 전략 SSOT).
+# ──────────────────────────────────────────────────────────────────
+
+class HometaxRecord(SQLModel, table=True):
+    """홈택스 수집 단건 — 현금영수증 / 세금계산서 / 부가세 자료 통합 테이블.
+
+    record_type 으로 카테고리 구분. 같은 사업장 안에서 unique key 는
+    (business_id, record_type, identifier) — identifier 는 자료별 고유 식별자
+    (현금영수증: 승인번호, 세금계산서: 국세청승인번호 ntsconfirmNum 등).
+    """
+    __table_args__ = (
+        Index("ix_hometax_biz_type_date", "business_id", "record_type", "tx_date"),
+        UniqueConstraint("business_id", "record_type", "identifier",
+                         name="uq_hometax_biz_type_identifier"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    record_type: str = Field(
+        index=True, max_length=32,
+        description=(
+            "cash_sales: 현금영수증 매출 / cash_purchase: 현금영수증 매입 / "
+            "tax_invoice_sales: 세금계산서 매출 / tax_invoice_purchase: 세금계산서 매입 / "
+            "vat_return: 부가세 신고결과"
+        ),
+    )
+    identifier: str = Field(index=True, max_length=64,
+                            description="자료별 고유키 (승인번호/ntsconfirmNum 등)")
+    tx_date: datetime.date = Field(index=True, description="거래일자")
+    counterparty_name: Optional[str] = Field(default=None, max_length=128,
+                                             description="거래처명/공급자명")
+    counterparty_corp_num: Optional[str] = Field(default=None, max_length=20,
+                                                  description="거래처 사업자번호")
+    supply_cost: int = Field(default=0, description="공급가액")
+    tax: int = Field(default=0, description="세액")
+    total_amount: int = Field(default=0, description="총액")
+    item_name: Optional[str] = Field(default=None, max_length=200)
+    raw_json: Optional[str] = Field(default=None, description="CODEF 원본 응답 row (JSON)")
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+
+class HometaxSyncCursor(SQLModel, table=True):
+    """홈택스 sync 진행 상태 — 다음 sync 시 어디부터 가져올지 추적.
+
+    business_id + record_type 별로 마지막 성공 sync 시점과 cursor (last_tx_date 등)
+    저장. 정기 cron 호출 시 cursor 기반 증분 sync.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "record_type", name="uq_hometax_cursor_biz_type"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    record_type: str = Field(index=True, max_length=32)
+    last_synced_at: Optional[datetime.datetime] = None
+    last_tx_date: Optional[datetime.date] = Field(
+        default=None, description="마지막 동기화한 거래일자 — 다음 sync 시작점",
+    )
+    last_status: Optional[str] = Field(default=None, max_length=32,
+                                       description="success / failed / partial")
+    last_error: Optional[str] = Field(default=None, max_length=500)
+    rows_total: int = Field(default=0, description="누적 적재 row 수")
+
+
+# ──────────────────────────────────────────────────────────────────
 # EasyPOS (이지포스 smart.easypos.net) — KICC POS 매출 자동수집
 # ──────────────────────────────────────────────────────────────────
 

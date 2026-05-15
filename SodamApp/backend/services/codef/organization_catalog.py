@@ -83,7 +83,16 @@ _PAYMENTS: tuple[Organization, ...] = (
     Organization("0525", "토스페이", "card", (AuthPolicy.ID_PW, AuthPolicy.SIMPLE_AUTH)),
 )
 
-_ALL: dict[str, Organization] = {o.code: o for o in (*_CARDS, *_PAYMENTS, *_BANKS)}
+# 공공기관 — 2026-05-15 추가 (홈택스 통한 현금영수증/세금계산서/부가세 자동수집).
+# CODEF 카탈로그: organization 0001 (국세청). 3가지 인증 모두 지원.
+_PUBLIC: tuple[Organization, ...] = (
+    Organization(
+        "0001", "국세청 홈택스", "public_tax",
+        (AuthPolicy.ID_PW, AuthPolicy.CERT, AuthPolicy.SIMPLE_AUTH),
+    ),
+)
+
+_ALL: dict[str, Organization] = {o.code: o for o in (*_CARDS, *_PAYMENTS, *_BANKS, *_PUBLIC)}
 
 
 def get_organizations() -> dict[str, Organization]:
@@ -106,3 +115,8 @@ def list_payments() -> list[Organization]:
 
 def list_banks() -> list[Organization]:
     return [o for o in _ALL.values() if o.type == "bank"]
+
+
+def list_public_orgs() -> list[Organization]:
+    """공공기관 (현재: 국세청 홈택스 1종). Phase 6 에서 4대보험·관세청 등 확장."""
+    return list(_PUBLIC)

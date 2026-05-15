@@ -1,522 +1,479 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
-    FileText, ExternalLink, Loader2, RefreshCw, AlertCircle, CheckCircle2,
-    Lock, ShieldAlert, Calendar, Database, Download, X, Info,
+    Database, ShieldCheck, Loader2, RefreshCw, AlertCircle, CheckCircle2,
+    Trash2, Download, FileText, Wallet, ListChecks,
 } from 'lucide-react';
 import api from '../api';
 
-const STATE_LABELS = {
-    0: { label: '대기', color: 'text-slate-500 bg-slate-100' },
-    1: { label: '진행 중', color: 'text-blue-700 bg-blue-100' },
-    2: { label: '완료', color: 'text-emerald-700 bg-emerald-100' },
-    3: { label: '실패', color: 'text-red-700 bg-red-100' },
-};
-
 const fmt = (n) => Number(n || 0).toLocaleString('ko-KR');
 
+const SIMPLE_AUTH_OPTIONS = [
+    { value: 'kakao', label: '카카오톡' },
+    { value: 'naver', label: '네이버' },
+    { value: 'pass', label: 'PASS' },
+    { value: 'toss', label: '토스' },
+    { value: 'payco', label: '페이코' },
+    { value: 'samsung', label: '삼성패스' },
+];
+
+const TELECOM_OPTIONS = [
+    { value: '0', label: 'SKT' },
+    { value: '1', label: 'KT' },
+    { value: '2', label: 'LG U+' },
+    { value: '3', label: '알뜰폰' },
+];
+
+const RECORD_TYPES = [
+    {
+        key: 'cash_sales',
+        label: '현금영수증 매출',
+        sub: '소득공제용·지출증빙용 매출',
+        icon: Wallet,
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+        key: 'cash_purchase',
+        label: '현금영수증 매입',
+        sub: '본인 가게의 현금 지출',
+        icon: Wallet,
+        color: 'bg-amber-50 text-amber-700 border-amber-200',
+    },
+    {
+        key: 'tax_invoice_integrated',
+        label: '세금계산서 통합',
+        sub: '매출 + 매입 한 번에',
+        icon: FileText,
+        color: 'bg-blue-50 text-blue-700 border-blue-200',
+    },
+];
+
+const RECORD_TYPE_LABEL = {
+    cash_sales: '현금영수증 매출',
+    cash_purchase: '현금영수증 매입',
+    tax_invoice_sales: '세금계산서 매출',
+    tax_invoice_purchase: '세금계산서 매입',
+};
+
 export default function HomeTaxCollect() {
-    const [status, setStatus] = useState(null);
-    const [deptUser, setDeptUser] = useState(null);
-    const [openingUrl, setOpeningUrl] = useState(null);
-
-    // 등록 모달
-    const [showRegistModal, setShowRegistModal] = useState(false);
-    const [registForm, setRegistForm] = useState({ dept_user_id: '', dept_user_pwd: '' });
-    const [registing, setRegisting] = useState(false);
-
-    // 수집
-    const [type, setType] = useState('SELL');
-    const [presets, setPresets] = useState(null);
-    const [activePreset, setActivePreset] = useState('this_month');
-    const [sDate, setSDate] = useState('');
-    const [eDate, setEDate] = useState('');
-    const [requesting, setRequesting] = useState(false);
-    const [job, setJob] = useState(null); // { job_id, job_state, ... }
-    const [polling, setPolling] = useState(false);
-    const pollRef = useRef(null);
-
-    // 결과
+    const [connectionInfo, setConnectionInfo] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState(null);
     const [summary, setSummary] = useState(null);
-    const [list, setList] = useState([]);
-    const [resultsLoading, setResultsLoading] = useState(false);
+    const [cursors, setCursors] = useState([]);
+    const [records, setRecords] = useState([]);
+    const [recordsLoading, setRecordsLoading] = useState(false);
+    const [filterType, setFilterType] = useState('');
+
+    const [showRegistModal, setShowRegistModal] = useState(false);
+    const [authMethod, setAuthMethod] = useState('simple');
+    const [registing, setRegisting] = useState(false);
+    const [pendingAuth, setPendingAuth] = useState(null);
+
+    const [simpleForm, setSimpleForm] = useState({
+        loginType: 'kakao', userName: '', phoneNo: '', birthDate: '', telecom: '0',
+    });
+    const [idPwForm, setIdPwForm] = useState({ id: '', password: '' });
 
     useEffect(() => {
-        loadStatus();
-        loadDeptUser();
-        loadPresets();
-        return () => { if (pollRef.current) clearInterval(pollRef.current); };
+        loadConnection();
+        loadSummary();
+        loadCursors();
+        loadRecords();
     }, []);
 
-    useEffect(() => {
-        if (presets && activePreset && presets[activePreset]) {
-            setSDate(presets[activePreset].s_date);
-            setEDate(presets[activePreset].e_date);
-        }
-    }, [presets, activePreset]);
+    useEffect(() => { loadRecords(); }, [filterType]);
 
-    const loadStatus = async () => {
+    const loadConnection = async () => {
+        setLoading(true);
         try {
-            const res = await api.get('/hometax/status');
-            setStatus(res.data);
-        } catch { /* noop */ }
-    };
-
-    const loadDeptUser = async () => {
-        try {
-            const res = await api.get('/hometax/dept-user');
-            setDeptUser(res.data);
+            const res = await api.get('/codef/hometax/connection');
+            setConnectionInfo(res.data);
         } catch (e) {
-            setDeptUser({ ok: false, error: e?.response?.data?.detail || '확인 실패' });
+            setConnectionInfo({ connected: false, error: e?.response?.data?.detail || '연결 조회 실패' });
+        } finally {
+            setLoading(false);
         }
     };
 
-    const loadPresets = async () => {
-        try {
-            const res = await api.get('/hometax/quick-range');
-            setPresets(res.data);
-        } catch { /* noop */ }
+    const loadSummary = async () => {
+        try { setSummary((await api.get('/codef/hometax/summary')).data); }
+        catch { /* noop */ }
     };
 
-    const openPopbillURL = async (togo) => {
-        setOpeningUrl(togo);
+    const loadCursors = async () => {
+        try { setCursors((await api.get('/codef/hometax/cursors')).data?.cursors || []); }
+        catch { /* noop */ }
+    };
+
+    const loadRecords = async () => {
+        setRecordsLoading(true);
         try {
-            const res = await api.get('/hometax/popbill-url', { params: { togo } });
-            if (res.data.ok && res.data.url) {
-                window.open(res.data.url, '_blank', 'noopener');
+            const params = { per_page: 100 };
+            if (filterType) params.record_type = filterType;
+            const res = await api.get('/codef/hometax/records', { params });
+            setRecords(res.data?.rows || []);
+        } catch {
+            setRecords([]);
+        } finally {
+            setRecordsLoading(false);
+        }
+    };
+
+    const doSync = async (recordType) => {
+        setSyncing(recordType);
+        try {
+            const res = await api.post('/codef/hometax/sync', { record_type: recordType });
+            if (res.data.ok) {
+                alert(`${RECORD_TYPE_LABEL[recordType] || recordType} 수집 완료\n신규 ${res.data.rows_inserted}건 · 업데이트 ${res.data.rows_updated || 0}건 · 총 ${res.data.rows_total}건`);
+                await Promise.all([loadSummary(), loadCursors(), loadRecords()]);
+            } else {
+                alert(`수집 실패: ${res.data.error}`);
             }
         } catch (e) {
-            alert(e?.response?.data?.detail || 'URL 생성 실패');
+            alert(`수집 오류: ${e?.response?.data?.detail || e.message}`);
         } finally {
-            setOpeningUrl(null);
+            setSyncing(null);
         }
     };
 
-    const handleRegist = async () => {
-        if (!registForm.dept_user_id || !registForm.dept_user_pwd) return;
+    const buildAuthPayload = () => {
+        if (authMethod === 'simple') return { ...simpleForm, client_type: 'B' };
+        if (authMethod === 'idpw') return { ...idPwForm, client_type: 'B' };
+        return {};
+    };
+
+    const submitConnect = async () => {
         setRegisting(true);
+        setPendingAuth(null);
         try {
-            await api.post('/hometax/dept-user', registForm);
-            setShowRegistModal(false);
-            setRegistForm({ dept_user_id: '', dept_user_pwd: '' });
-            await loadDeptUser();
-            alert('홈택스 부서사용자 등록 완료');
+            const res = await api.post('/codef/hometax/connect', { auth: buildAuthPayload() });
+            if (res.data?.status === 'additional_auth_required') {
+                setPendingAuth(res.data);
+                alert(`모바일로 본인인증 요청을 보냈습니다.\n${res.data.extra_info?.message || '카톡/네이버 앱에서 인증 후 [인증 완료] 버튼을 눌러주세요.'}`);
+            } else if (res.data?.status === 'active') {
+                alert('홈택스 연결 완료!');
+                setShowRegistModal(false);
+                await loadConnection();
+            }
         } catch (e) {
-            alert(e?.response?.data?.detail || '등록 실패');
+            alert(`연결 실패: ${e?.response?.data?.detail?.message || e?.response?.data?.detail || e.message}`);
         } finally {
             setRegisting(false);
         }
     };
 
-    const handleDelete = async () => {
-        if (!window.confirm('홈택스 부서사용자 등록을 해제하시겠습니까?\n수집된 데이터는 유지됩니다.')) return;
+    const completeSimpleAuth = async () => {
+        if (!pendingAuth?.auth_pending_id) return;
+        setRegisting(true);
         try {
-            await api.delete('/hometax/dept-user');
-            await loadDeptUser();
-        } catch (e) {
-            alert(e?.response?.data?.detail || '삭제 실패');
-        }
-    };
-
-    const handleRequest = async () => {
-        if (!sDate || !eDate) return;
-        if ((sDate || '').length !== 8 || (eDate || '').length !== 8) {
-            alert('날짜는 YYYYMMDD 형식이어야 합니다.');
-            return;
-        }
-        setRequesting(true);
-        setJob(null);
-        setSummary(null);
-        setList([]);
-        try {
-            const res = await api.post('/hometax/request-job', {
-                type, s_date: sDate, e_date: eDate,
+            const res = await api.post('/codef/hometax/simple-auth/complete', {
+                auth_pending_id: pendingAuth.auth_pending_id,
             });
-            const newJob = { job_id: res.data.job_id, job_state: 0 };
-            setJob(newJob);
-            startPolling(newJob.job_id);
-        } catch (e) {
-            alert(e?.response?.data?.detail || '수집 요청 실패');
-        } finally {
-            setRequesting(false);
-        }
-    };
-
-    const startPolling = (jobId) => {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setPolling(true);
-        pollRef.current = setInterval(async () => {
-            try {
-                const res = await api.get(`/hometax/job-state/${jobId}`);
-                setJob(res.data);
-                if (res.data.job_state === 2) {
-                    clearInterval(pollRef.current);
-                    setPolling(false);
-                    loadResults(jobId);
-                } else if (res.data.job_state === 3) {
-                    clearInterval(pollRef.current);
-                    setPolling(false);
-                }
-            } catch {
-                clearInterval(pollRef.current);
-                setPolling(false);
+            if (res.data?.status === 'active') {
+                alert('홈택스 연결 완료!');
+                setShowRegistModal(false);
+                setPendingAuth(null);
+                await loadConnection();
+            } else {
+                alert(`인증 미완료: ${res.data?.method || '재시도'}`);
             }
-        }, 3000);
-    };
-
-    const loadResults = async (jobId) => {
-        setResultsLoading(true);
-        try {
-            const [sumRes, listRes] = await Promise.all([
-                api.get('/hometax/summary', { params: { job_id: jobId, type } }),
-                api.get('/hometax/search', { params: { job_id: jobId, type, page: 1, per_page: 200 } }),
-            ]);
-            setSummary(sumRes.data);
-            setList(listRes.data.list || []);
         } catch (e) {
-            alert(e?.response?.data?.detail || '결과 조회 실패');
+            alert(`완료 실패: ${e?.response?.data?.detail?.message || e?.response?.data?.detail || e.message}`);
         } finally {
-            setResultsLoading(false);
+            setRegisting(false);
         }
     };
 
-    const exportCsv = () => {
-        if (list.length === 0) return;
-        const headers = ['승인번호', '작성일', '발급일', '공급자', '공급자번호', '공급받는자', '공급받는자번호', '공급가액', '세액', '합계', '청구/영수'];
-        const rows = list.map((r) => [
-            r.ntsconfirmNum || '', r.writeDate || '', r.issueDate || '',
-            r.invoicerCorpName || '', r.invoicerCorpNum || '',
-            r.invoiceeCorpName || '', r.invoiceeCorpNum || '',
-            r.supplyCostTotal || 0, r.taxTotal || 0, r.totalAmount || 0,
-            r.purposeType || '',
-        ]);
-        const csv = [headers, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `homtax_${type}_${sDate}_${eDate}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+    const doDisconnect = async () => {
+        if (!confirm('홈택스 연결을 해제하시겠어요? CODEF 측 등록도 삭제됩니다.')) return;
+        try {
+            await api.delete('/codef/hometax/connection');
+            await loadConnection();
+        } catch (e) {
+            alert(`해제 실패: ${e?.response?.data?.detail || e.message}`);
+        }
     };
 
-    const inputCls = "w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none";
-
-    const isReady = deptUser?.registered;
+    const isConnected = connectionInfo?.connected;
+    const conn = connectionInfo?.connection;
 
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
-                {/* 헤더 */}
                 <div className="mb-6 flex items-center gap-3">
                     <div className="p-2.5 bg-violet-100 text-violet-600 rounded-xl">
                         <Database size={24} />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-900">홈택스 자동 수집</h1>
-                        <p className="text-sm text-slate-500">전자세금계산서 매출/매입을 홈택스에서 일괄 조회 · 세무사 준비용</p>
+                        <h1 className="text-2xl font-bold text-slate-900">홈택스 수집</h1>
+                        <p className="text-sm text-slate-500">CODEF 통한 현금영수증 + 세금계산서 자동수집</p>
                     </div>
                 </div>
 
-                {/* 상태 배너 */}
-                {status?.is_stub && (
-                    <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm flex items-start gap-2">
-                        <AlertCircle size={16} className="mt-0.5" />
-                        <span>{status.note}</span>
-                    </div>
-                )}
-
-                {/* 1. 부서사용자 인증 */}
-                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-bold text-slate-800 flex items-center gap-2">
-                            <Lock size={18} className="text-violet-600" /> 1단계 · 홈택스 인증
-                        </h2>
-                        {isReady && (
-                            <button onClick={handleDelete} className="text-xs text-red-500 hover:underline">등록 해제</button>
-                        )}
-                    </div>
-
-                    {deptUser?.registered ? (
-                        <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-800 rounded-xl text-sm">
-                            <CheckCircle2 size={16} />
-                            <span className="font-medium">홈택스 부서사용자 등록됨 — 수집 가능</span>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            <div className="p-3 bg-amber-50 text-amber-800 rounded-xl text-sm flex items-start gap-2">
-                                <ShieldAlert size={16} className="mt-0.5" />
-                                <div>
-                                    <div className="font-semibold mb-1">홈택스 부서사용자 ID 등록 필요</div>
-                                    <div className="text-xs">홈택스에서 발급한 <b>부서사용자 ID/비밀번호</b>를 팝빌에 등록해야 매출·매입 자동 수집이 가능합니다.</div>
+                <div className={`mb-6 p-5 rounded-2xl border-2 ${
+                    isConnected ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                }`}>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-start gap-3">
+                            {isConnected
+                                ? <CheckCircle2 className="text-emerald-600 mt-1" size={20} />
+                                : <AlertCircle className="text-amber-600 mt-1" size={20} />}
+                            <div>
+                                <div className="font-bold text-slate-900">
+                                    {loading ? '연결 정보 확인 중…' : (isConnected ? '홈택스 연결됨' : '홈택스 연결 필요')}
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => setShowRegistModal(true)}
-                                    className="px-4 py-2.5 bg-violet-600 text-white rounded-xl font-semibold hover:bg-violet-700 text-sm"
-                                >
-                                    부서사용자 ID 등록
-                                </button>
-                                <button
-                                    onClick={() => openPopbillURL('HOMETAX')}
-                                    disabled={openingUrl === 'HOMETAX'}
-                                    className="px-4 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200 text-sm flex items-center justify-center gap-1.5"
-                                >
-                                    {openingUrl === 'HOMETAX' ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                                    팝빌에서 직접 등록
-                                </button>
+                                {isConnected && conn && (
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        인증 방식: {conn.auth_method} · 최근 확인: {conn.last_verified_at ? new Date(conn.last_verified_at).toLocaleString('ko-KR') : '—'}
+                                    </div>
+                                )}
+                                {!isConnected && !loading && (
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        카카오·네이버 등 간편인증 또는 홈택스 ID/PW 중 선택해 1회 연결하면 그 후 자동 수집됩니다.
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    )}
+                        <div className="flex gap-2">
+                            {!isConnected && (
+                                <button onClick={() => setShowRegistModal(true)}
+                                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium flex items-center gap-1.5">
+                                    <ShieldCheck size={14} /> 홈택스 연결
+                                </button>
+                            )}
+                            {isConnected && (
+                                <>
+                                    <button onClick={loadConnection}
+                                        className="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-sm flex items-center gap-1.5 border border-slate-200">
+                                        <RefreshCw size={14} /> 새로고침
+                                    </button>
+                                    <button onClick={doDisconnect}
+                                        className="px-3 py-2 bg-white hover:bg-red-50 text-red-600 rounded-xl text-sm flex items-center gap-1.5 border border-red-200">
+                                        <Trash2 size={14} /> 연결 해제
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
-                {/* 2. 수집 요청 */}
-                <div className={`bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6 ${!isReady ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Calendar size={18} className="text-violet-600" /> 2단계 · 수집 요청
-                    </h2>
+                {isConnected && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                        {RECORD_TYPES.map((rt) => {
+                            const Icon = rt.icon;
+                            const cursor = cursors.find((c) => c.record_type === rt.key
+                                || (rt.key === 'tax_invoice_integrated' && c.record_type === 'tax_invoice_sales'));
+                            return (
+                                <div key={rt.key} className={`p-4 rounded-2xl border-2 ${rt.color}`}>
+                                    <div className="flex items-start gap-2 mb-3">
+                                        <Icon size={20} />
+                                        <div className="flex-1">
+                                            <div className="font-bold text-sm">{rt.label}</div>
+                                            <div className="text-xs opacity-70 mt-0.5">{rt.sub}</div>
+                                        </div>
+                                    </div>
+                                    {cursor && (
+                                        <div className="text-[11px] mb-3 leading-snug">
+                                            <div>마지막 수집: {cursor.last_synced_at ? new Date(cursor.last_synced_at).toLocaleString('ko-KR') : '—'}</div>
+                                            <div>마지막 거래일: {cursor.last_tx_date || '—'} · 누적 {cursor.rows_total || 0}건</div>
+                                            {cursor.last_status === 'failed' && cursor.last_error && (
+                                                <div className="text-red-600 mt-1">⚠ {cursor.last_error.slice(0, 80)}</div>
+                                            )}
+                                        </div>
+                                    )}
+                                    <button onClick={() => doSync(rt.key)} disabled={syncing === rt.key}
+                                        className="w-full px-3 py-2 bg-white hover:bg-slate-50 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 border disabled:opacity-50">
+                                        {syncing === rt.key ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                                        지금 수집
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
-                    {/* 매출/매입 토글 */}
-                    <div className="flex gap-2 mb-4">
-                        {[
-                            { id: 'SELL', label: '매출 (발급)' },
-                            { id: 'BUY', label: '매입 (수신)' },
-                        ].map((t) => (
-                            <button
-                                key={t.id}
-                                onClick={() => setType(t.id)}
-                                className={`flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                                    type === t.id
-                                        ? 'bg-violet-600 text-white'
-                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                            >
-                                {t.label}
+                {summary?.by_type && summary.by_type.length > 0 && (
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
+                        <div className="flex items-center gap-2 mb-3">
+                            <ListChecks size={16} className="text-slate-500" />
+                            <h2 className="font-semibold text-slate-700 text-sm">최근 90일 적재 요약</h2>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {summary.by_type.map((s) => (
+                                <div key={s.record_type} className="p-3 bg-slate-50 rounded-xl">
+                                    <div className="text-xs text-slate-500">{RECORD_TYPE_LABEL[s.record_type] || s.record_type}</div>
+                                    <div className="text-lg font-bold text-slate-900 tabular-nums">{fmt(s.count)}건</div>
+                                    <div className="text-xs text-slate-600">{fmt(s.total)}원</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <FileText size={16} className="text-slate-500" />
+                            <h2 className="font-semibold text-slate-700 text-sm">적재 자료 ({records.length})</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
+                                className="text-xs px-2 py-1.5 border border-slate-200 rounded-lg">
+                                <option value="">전체</option>
+                                <option value="cash_sales">현금영수증 매출</option>
+                                <option value="cash_purchase">현금영수증 매입</option>
+                                <option value="tax_invoice_sales">세금계산서 매출</option>
+                                <option value="tax_invoice_purchase">세금계산서 매입</option>
+                            </select>
+                            <button onClick={loadRecords} disabled={recordsLoading}
+                                className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1">
+                                {recordsLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />} 새로고침
                             </button>
-                        ))}
+                        </div>
                     </div>
-
-                    {/* 기간 프리셋 */}
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                        {presets && Object.entries(presets).map(([key, p]) => (
-                            <button
-                                key={key}
-                                onClick={() => setActivePreset(key)}
-                                className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                                    activePreset === key
-                                        ? 'bg-violet-100 text-violet-700 border border-violet-300'
-                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-transparent'
-                                }`}
-                            >
-                                {p.label}
-                            </button>
-                        ))}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="text-slate-500 border-b">
+                                    <th className="text-left py-2 px-2">거래일</th>
+                                    <th className="text-left py-2 px-2">유형</th>
+                                    <th className="text-left py-2 px-2">거래처</th>
+                                    <th className="text-left py-2 px-2">품목</th>
+                                    <th className="text-right py-2 px-2">공급가액</th>
+                                    <th className="text-right py-2 px-2">세액</th>
+                                    <th className="text-right py-2 px-2">합계</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {records.length === 0 && (
+                                    <tr><td colSpan={7} className="text-center py-8 text-slate-400">
+                                        {isConnected ? '수집된 자료가 없습니다. 상단 [지금 수집] 버튼으로 시작하세요.' : '먼저 홈택스 연결을 진행해주세요.'}
+                                    </td></tr>
+                                )}
+                                {records.map((r) => (
+                                    <tr key={r.id} className="border-b hover:bg-slate-50">
+                                        <td className="py-2 px-2 tabular-nums">{r.tx_date}</td>
+                                        <td className="py-2 px-2">{RECORD_TYPE_LABEL[r.record_type] || r.record_type}</td>
+                                        <td className="py-2 px-2">
+                                            {r.counterparty_name || '—'}
+                                            {r.counterparty_corp_num && <span className="text-slate-400 ml-1">{r.counterparty_corp_num}</span>}
+                                        </td>
+                                        <td className="py-2 px-2 max-w-xs truncate">{r.item_name || '—'}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums">{fmt(r.supply_cost)}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums">{fmt(r.tax)}</td>
+                                        <td className="py-2 px-2 text-right tabular-nums font-semibold">{fmt(r.total_amount)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-
-                    {/* 날짜 입력 */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <input
-                            className={inputCls}
-                            placeholder="시작일 YYYYMMDD"
-                            value={sDate}
-                            onChange={(e) => { setSDate(e.target.value.replace(/\D/g, '').slice(0, 8)); setActivePreset(null); }}
-                        />
-                        <input
-                            className={inputCls}
-                            placeholder="종료일 YYYYMMDD"
-                            value={eDate}
-                            onChange={(e) => { setEDate(e.target.value.replace(/\D/g, '').slice(0, 8)); setActivePreset(null); }}
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleRequest}
-                        disabled={requesting || polling || !sDate || !eDate}
-                        className="w-full py-3 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-700 disabled:bg-slate-300 transition-colors flex items-center justify-center gap-2"
-                    >
-                        {requesting ? <Loader2 size={18} className="animate-spin" /> : <Database size={18} />}
-                        {requesting ? '요청 중...' : `${type === 'SELL' ? '매출' : '매입'} 수집 시작`}
-                    </button>
                 </div>
 
-                {/* 3. 작업 상태 */}
-                {job && (
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 mb-6">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <RefreshCw size={18} className={polling ? 'animate-spin text-violet-600' : 'text-slate-500'} />
-                            3단계 · 작업 상태
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${STATE_LABELS[job.job_state]?.color || 'bg-slate-100'}`}>
-                                {STATE_LABELS[job.job_state]?.label || '알수없음'}
-                            </span>
-                        </h2>
-                        <div className="grid grid-cols-2 gap-2 text-xs text-slate-600">
-                            <div><b>JobID:</b> <span className="font-mono">{job.job_id}</span></div>
-                            <div><b>요청유형:</b> {job.request_type || type}</div>
-                            <div><b>요청기간:</b> {job.request_s_date || sDate} ~ {job.request_e_date || eDate}</div>
-                            <div><b>요청시각:</b> {job.request_dt || '-'}</div>
-                        </div>
-                        {job.error_reason && (
-                            <div className="mt-3 p-2 bg-red-50 text-red-700 rounded-lg text-xs">
-                                {job.error_reason}
-                            </div>
-                        )}
-                        {polling && (
-                            <div className="mt-3 text-xs text-slate-500 flex items-center gap-1">
-                                <Loader2 size={12} className="animate-spin" /> 3초마다 자동 새로고침... (수집 1~5분 소요)
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* 4. 결과 요약 */}
-                {summary?.ok && (
-                    <div className="bg-gradient-to-r from-violet-50 to-indigo-50 p-5 rounded-2xl border border-violet-100 mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="font-bold text-slate-800">📊 수집 결과 요약</h2>
-                            <button
-                                onClick={exportCsv}
-                                disabled={list.length === 0}
-                                className="px-3 py-1.5 bg-white border border-violet-200 rounded-lg text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50 flex items-center gap-1"
-                            >
-                                <Download size={12} /> CSV
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-4 gap-3">
-                            <div className="bg-white p-3 rounded-xl">
-                                <div className="text-xs text-slate-500 mb-1">건수</div>
-                                <div className="text-lg font-bold text-slate-800">{summary.count}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl">
-                                <div className="text-xs text-slate-500 mb-1">공급가액</div>
-                                <div className="text-lg font-bold text-slate-800">{fmt(summary.supplyCostTotal)}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl">
-                                <div className="text-xs text-slate-500 mb-1">세액</div>
-                                <div className="text-lg font-bold text-slate-800">{fmt(summary.taxTotal)}</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl">
-                                <div className="text-xs text-slate-500 mb-1">합계</div>
-                                <div className="text-lg font-bold text-violet-700">{fmt(summary.totalAmount)}</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 5. 결과 리스트 */}
-                {(list.length > 0 || resultsLoading) && (
-                    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                        <h2 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <FileText size={18} className="text-violet-600" /> 수집된 세금계산서
-                            <span className="text-xs text-slate-400">({list.length}건)</span>
-                        </h2>
-                        {resultsLoading ? (
-                            <div className="text-center py-8 text-slate-400">
-                                <Loader2 size={24} className="animate-spin mx-auto mb-2" />
-                                결과 로딩 중...
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
-                                    <thead>
-                                        <tr className="bg-slate-50 text-slate-600">
-                                            <th className="px-2 py-2 text-left">작성일</th>
-                                            <th className="px-2 py-2 text-left">{type === 'SELL' ? '공급받는자' : '공급자'}</th>
-                                            <th className="px-2 py-2 text-right">공급가액</th>
-                                            <th className="px-2 py-2 text-right">세액</th>
-                                            <th className="px-2 py-2 text-right">합계</th>
-                                            <th className="px-2 py-2 text-center">청구/영수</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {list.map((r, idx) => {
-                                            const counterpartName = type === 'SELL' ? r.invoiceeCorpName : r.invoicerCorpName;
-                                            const counterpartNum = type === 'SELL' ? r.invoiceeCorpNum : r.invoicerCorpNum;
-                                            return (
-                                                <tr key={idx} className="border-t hover:bg-slate-50">
-                                                    <td className="px-2 py-2">{r.writeDate}</td>
-                                                    <td className="px-2 py-2">
-                                                        <div className="font-medium">{counterpartName || '-'}</div>
-                                                        <div className="text-[10px] text-slate-400">{counterpartNum}</div>
-                                                    </td>
-                                                    <td className="px-2 py-2 text-right">{fmt(r.supplyCostTotal)}</td>
-                                                    <td className="px-2 py-2 text-right">{fmt(r.taxTotal)}</td>
-                                                    <td className="px-2 py-2 text-right font-bold text-violet-700">{fmt(r.totalAmount)}</td>
-                                                    <td className="px-2 py-2 text-center">{r.purposeType || '-'}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* 가이드 */}
-                {!job && isReady && (
-                    <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-800 flex items-start gap-2">
-                        <Info size={16} className="mt-0.5 flex-shrink-0" />
-                        <div>
-                            <div className="font-semibold mb-1">활용 팁</div>
-                            <ul className="text-xs space-y-1 list-disc list-inside">
-                                <li>매월 1일경 <b>지난달</b> 프리셋으로 매출+매입을 각각 수집하면 세무사 자료 준비 끝</li>
-                                <li>수집은 비동기 — JobID 발급 후 1~5분 정도 소요됩니다</li>
-                                <li>동일 기간 재수집 시 최신 데이터로 갱신됩니다 (홈택스 발행 지연 반영)</li>
-                            </ul>
-                        </div>
-                    </div>
-                )}
-
-                {/* 등록 모달 */}
                 {showRegistModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowRegistModal(false)}>
-                        <div className="bg-white rounded-2xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-slate-800">홈택스 부서사용자 등록</h3>
-                                <button onClick={() => setShowRegistModal(false)} className="text-slate-400 hover:text-slate-600">
-                                    <X size={20} />
-                                </button>
+                    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                            <div className="p-5 border-b sticky top-0 bg-white">
+                                <h3 className="font-bold text-lg text-slate-900">홈택스 연결</h3>
+                                <p className="text-xs text-slate-500 mt-1">간편인증 또는 ID/PW 중 편한 방법을 선택하세요.</p>
                             </div>
-                            <div className="text-xs text-slate-500 mb-4 p-3 bg-slate-50 rounded-lg">
-                                <b>※ 부서사용자 ID란?</b><br />
-                                홈택스 → 회원가입 → "부서사용자" 또는 "수임사용자"로 발급받은 ID입니다. 사업자 ID(대표자)와 별개입니다.
-                            </div>
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">부서사용자 ID</label>
-                                    <input
-                                        className={inputCls}
-                                        value={registForm.dept_user_id}
-                                        onChange={(e) => setRegistForm({ ...registForm, dept_user_id: e.target.value })}
-                                        autoComplete="off"
-                                    />
+                            <div className="p-5">
+                                <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+                                    {[
+                                        { v: 'simple', label: '간편인증' },
+                                        { v: 'idpw', label: 'ID/PW' },
+                                        { v: 'cert', label: '공동인증서' },
+                                    ].map((t) => (
+                                        <button key={t.v} onClick={() => setAuthMethod(t.v)}
+                                            className={`px-3 py-2 rounded-lg text-xs font-medium ${
+                                                authMethod === t.v ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                                            }`}>
+                                            {t.label}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-slate-600 mb-1">부서사용자 비밀번호</label>
-                                    <input
-                                        type="password"
-                                        className={inputCls}
-                                        value={registForm.dept_user_pwd}
-                                        onChange={(e) => setRegistForm({ ...registForm, dept_user_pwd: e.target.value })}
-                                        autoComplete="new-password"
-                                    />
-                                </div>
+
+                                {authMethod === 'simple' && (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">인증 종류</label>
+                                            <select value={simpleForm.loginType} onChange={(e) => setSimpleForm({ ...simpleForm, loginType: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                                                {SIMPLE_AUTH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">이름</label>
+                                            <input value={simpleForm.userName} onChange={(e) => setSimpleForm({ ...simpleForm, userName: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                placeholder="홍길동" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">휴대폰</label>
+                                            <input value={simpleForm.phoneNo} onChange={(e) => setSimpleForm({ ...simpleForm, phoneNo: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                placeholder="01012345678 (하이픈 없이)" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">생년월일</label>
+                                            <input value={simpleForm.birthDate} onChange={(e) => setSimpleForm({ ...simpleForm, birthDate: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                placeholder="19800101 (YYYYMMDD)" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">통신사</label>
+                                            <select value={simpleForm.telecom} onChange={(e) => setSimpleForm({ ...simpleForm, telecom: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+                                                {TELECOM_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {authMethod === 'idpw' && (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">홈택스 아이디</label>
+                                            <input value={idPwForm.id} onChange={(e) => setIdPwForm({ ...idPwForm, id: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-semibold text-slate-600 block mb-1">비밀번호</label>
+                                            <input type="password" value={idPwForm.password} onChange={(e) => setIdPwForm({ ...idPwForm, password: e.target.value })}
+                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {authMethod === 'cert' && (
+                                    <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg">
+                                        공동인증서 (.cer/.key) 파일 업로드는 다음 업데이트에서 지원 예정. 현재는 간편인증 또는 ID/PW 를 권장합니다.
+                                    </div>
+                                )}
+
+                                {pendingAuth && (
+                                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm">
+                                        <div className="font-semibold text-blue-900 mb-1">📱 모바일에서 본인인증을 완료해주세요</div>
+                                        <div className="text-xs text-blue-700">
+                                            {pendingAuth.extra_info?.message || '카카오톡/네이버 앱에서 인증 후 아래 [인증 완료] 버튼을 눌러주세요.'}
+                                        </div>
+                                        <button onClick={completeSimpleAuth} disabled={registing}
+                                            className="mt-3 w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                                            {registing ? '확인 중…' : '인증 완료'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex gap-2 mt-5">
-                                <button
-                                    onClick={() => setShowRegistModal(false)}
-                                    className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200"
-                                >
+                            <div className="p-4 border-t flex gap-2 sticky bottom-0 bg-white">
+                                <button onClick={() => { setShowRegistModal(false); setPendingAuth(null); }}
+                                    className="flex-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm">
                                     취소
                                 </button>
-                                <button
-                                    onClick={handleRegist}
-                                    disabled={registing || !registForm.dept_user_id || !registForm.dept_user_pwd}
-                                    className="flex-1 py-2.5 bg-violet-600 text-white rounded-xl font-bold hover:bg-violet-700 disabled:bg-slate-300 flex items-center justify-center gap-1"
-                                >
-                                    {registing ? <Loader2 size={14} className="animate-spin" /> : null}
-                                    {registing ? '등록 중...' : '등록'}
-                                </button>
+                                {!pendingAuth && (
+                                    <button onClick={submitConnect} disabled={registing || authMethod === 'cert'}
+                                        className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium disabled:opacity-50">
+                                        {registing ? '연결 중…' : '연결하기'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>

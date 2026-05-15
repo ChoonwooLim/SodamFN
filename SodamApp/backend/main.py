@@ -163,11 +163,13 @@ from routers.codef import card_sync as codef_card_sync
 from routers.codef import card_purchase_sync as codef_card_purchase_sync
 from routers.codef import budget as codef_budget
 from routers.codef import card_merchants as codef_card_merchants
+from routers.codef import hometax as codef_hometax
 app.include_router(codef_connections.router)
 app.include_router(codef_card_sync.router)
 app.include_router(codef_card_purchase_sync.router)
 app.include_router(codef_budget.router)
 app.include_router(codef_card_merchants.router)
+app.include_router(codef_hometax.router)
 
 # EasyPOS (KICC smart.easypos.net) — POS 매출 자동수집 (비공식 가맹점 세션)
 from routers import easypos
