@@ -480,18 +480,20 @@ def popbill_url(
 
 @router.get("/balance")
 def get_balance(_admin: User = Depends(get_admin_user)):
-    """현재 팝빌 포인트 잔액 (전자명세서 발행 50원/건 차감 기준)."""
+    """현재 팝빌 포인트 잔액 — 회원 + 파트너 분리 표시 (전자명세서 50원/건)."""
     provider = get_provider()
-    bal = provider.get_balance()
+    bal = provider.get_balance()  # {"member", "partner", "usable"}
     is_test_mode = (os.getenv("POPBILL_IS_TEST", "true").strip().lower() in ("1", "true", "yes"))
     return {
         "ok": True,
-        "balance": bal,
+        "balance": bal.get("usable"),
+        "member_balance": bal.get("member"),
+        "partner_balance": bal.get("partner"),
         "is_test": is_test_mode,
         "unit_cost": 50,
         "note": (
             "TEST 환경 잔액 (test.popbill.com 충전)" if is_test_mode
-            else "LIVE 환경 잔액 (popbill.com 충전)"
+            else "LIVE 환경 잔액 — 파트너 잔액(SODAM 충전) + 회원 잔액"
         ),
     }
 

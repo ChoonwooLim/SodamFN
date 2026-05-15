@@ -309,7 +309,11 @@ class BaseStatementProvider:
     def cancel(self, item_code: str, mgt_key: str, memo: str = "") -> dict:
         raise NotImplementedError
 
-    def get_balance(self) -> Optional[float]:
+    def get_balance(self) -> dict:
+        """잔액 조회. {member, partner, usable} 형식.
+
+        파트너 잔액 (link ID 통해 충전한 분) 이 사장님 주 사용 잔액.
+        """
         raise NotImplementedError
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
@@ -360,8 +364,8 @@ class DevStubProvider(BaseStatementProvider):
     def cancel(self, item_code: str, mgt_key: str, memo: str = "") -> dict:
         return {"ok": True, "note": "STUB"}
 
-    def get_balance(self) -> Optional[float]:
-        return None
+    def get_balance(self) -> dict:
+        return {"member": None, "partner": None, "usable": None}
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
         return "https://www.popbill.com/"
@@ -471,12 +475,26 @@ class PopbillStatementProvider(BaseStatementProvider):
                 EmailSubject=draft.email_subject or None,
             )
             ok = getattr(r, "code", None) in (1, "1") or bool(getattr(r, "receiptNum", None))
+            receipt_num = getattr(r, "receiptNum", None)
+            issue_dt = getattr(r, "issueDT", None)
+
+            # 보강: registIssue 응답에 receipt_num/issue_dt 미포함 시 getInfo 즉시 호출.
+            # (TaxInvoice 와 동일 패턴 — popbill 응답이 시점에 따라 가변)
+            if ok and (not receipt_num or not issue_dt):
+                try:
+                    info = svc.getInfo(self.corp_num, draft.item_code, draft.mgt_key)
+                    if info is not None:
+                        receipt_num = receipt_num or getattr(info, "itemKey", None)
+                        issue_dt = issue_dt or getattr(info, "issueDT", None)
+                except Exception:  # noqa: BLE001
+                    pass
+
             return StatementResult(
                 ok=bool(ok),
                 item_code=draft.item_code,
                 mgt_key=draft.mgt_key,
-                receipt_num=getattr(r, "receiptNum", None),
-                issue_dt=getattr(r, "issueDT", None),
+                receipt_num=receipt_num,
+                issue_dt=issue_dt,
                 error=None if ok else getattr(r, "message", None),
             )
         except PopbillException as pe:
@@ -625,12 +643,24 @@ class PopbillStatementProvider(BaseStatementProvider):
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": f"취소 오류: {e}"}
 
-    def get_balance(self) -> Optional[float]:
+    def get_balance(self) -> dict:
+        """popbill 회원 잔액 + 파트너 잔액 동시 조회 (TaxInvoice 와 동일 패턴)."""
+        svc = self._get_svc()
+        member: Optional[float] = None
+        partner: Optional[float] = None
         try:
-            svc = self._get_svc()
-            return float(svc.getBalance(self.corp_num))
+            member = float(svc.getBalance(self.corp_num))
         except Exception:  # noqa: BLE001
-            return None
+            pass
+        try:
+            partner = float(svc.getPartnerBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            pass
+        if partner is not None and partner > 0:
+            usable = partner
+        else:
+            usable = member if member is not None else partner
+        return {"member": member, "partner": partner, "usable": usable}
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
         svc = self._get_svc()
