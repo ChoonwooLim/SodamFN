@@ -440,7 +440,7 @@ export default function HomeTaxCollect() {
                                             <label className="text-xs font-semibold text-slate-600 block mb-1">홈택스 아이디 <span className="text-red-500">*</span></label>
                                             <input value={idPwForm.id} onChange={(e) => setIdPwForm({ ...idPwForm, id: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
-                                                placeholder="예: limp2004" />
+                                                placeholder="홈택스 로그인 아이디" />
                                         </div>
                                         <div>
                                             <label className="text-xs font-semibold text-slate-600 block mb-1">비밀번호 <span className="text-red-500">*</span></label>
