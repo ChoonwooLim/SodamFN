@@ -50,7 +50,12 @@ export function fmtDate(s) {
     return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-export default function BankSync() {
+export default function BankSync({ source = 'popbill' } = {}) {
+    // source: 'popbill' (기본) | 'codef'
+    //   - popbill: 팝빌 이지펀뱅크 출처 거래만 표시
+    //   - codef:   CODEF 마이데이터 출처 거래만 표시 (외부 연동 화면에서 사용)
+    //   거래내역 API 의 source 파라미터로 백엔드 필터링
+    const isCodef = source === 'codef';
     const [tab, setTab] = useState('accounts');
     const [status, setStatus] = useState(null);
     const [accounts, setAccounts] = useState([]);
@@ -268,6 +273,8 @@ export default function BankSync() {
                 if (v) params.append(k, v);
             });
             params.append('limit', '200');
+            // source 자동 적용 — 백엔드가 tid prefix 'codef:%' 로 분류
+            params.append('source', source);
             const res = await api.get(`/bank-sync/transactions?${params.toString()}`);
             setTxs(res.data.items || []);
             setTxTotal(res.data.total || 0);
@@ -508,9 +515,13 @@ export default function BankSync() {
                             <Landmark size={20} className="text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">은행계좌 연동</h1>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                                {isCodef ? 'CODEF 계좌연동' : '은행계좌 연동'}
+                            </h1>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                팝빌 이지펀뱅크(정액제)로 등록 계좌의 거래내역을 자동 수집하고 매출/지출로 분류합니다.
+                                {isCodef
+                                    ? 'CODEF 마이데이터(20+ 은행)로 등록 계좌의 거래내역을 자동 수집하고 매출/지출로 분류합니다.'
+                                    : '팝빌 이지펀뱅크(정액제)로 등록 계좌의 거래내역을 자동 수집하고 매출/지출로 분류합니다.'}
                             </p>
                         </div>
                     </div>

@@ -24,7 +24,6 @@ const CardSales = React.lazy(() => import('./pages/CardSales'));
 const ExternalIntegration = React.lazy(() => import('./pages/ExternalIntegration'));
 const CardModuleDetail = React.lazy(() => import('./pages/CardModuleDetail'));
 const CardPurchaseModuleDetail = React.lazy(() => import('./pages/CardPurchaseModuleDetail'));
-const BankModuleDetail = React.lazy(() => import('./pages/BankModuleDetail'));
 const EasyPosModuleDetail = React.lazy(() => import('./pages/EasyPosModuleDetail'));
 const CoupangEatsModuleDetail = React.lazy(() => import('./pages/CoupangEatsModuleDetail'));
 const BaeminModuleDetail = React.lazy(() => import('./pages/BaeminModuleDetail'));
@@ -171,7 +170,7 @@ export default function App() {
               <Route path="/external-integration" element={<ProtectedRoute adminOnly><ExternalIntegration /></ProtectedRoute>} />
               <Route path="/external-integration/cards" element={<ProtectedRoute adminOnly><CardModuleDetail /></ProtectedRoute>} />
               <Route path="/external-integration/card-purchase" element={<ProtectedRoute adminOnly><CardPurchaseModuleDetail /></ProtectedRoute>} />
-              <Route path="/external-integration/banks" element={<ProtectedRoute adminOnly><BankModuleDetail /></ProtectedRoute>} />
+              <Route path="/external-integration/banks" element={<ProtectedRoute adminOnly><BankSync source="codef" /></ProtectedRoute>} />
               <Route path="/external-integration/easypos" element={<ProtectedRoute adminOnly><EasyPosModuleDetail /></ProtectedRoute>} />
               <Route path="/external-integration/coupang-eats" element={<ProtectedRoute adminOnly><CoupangEatsModuleDetail /></ProtectedRoute>} />
               <Route path="/external-integration/baemin" element={<ProtectedRoute adminOnly><BaeminModuleDetail /></ProtectedRoute>} />
