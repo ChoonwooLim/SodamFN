@@ -132,7 +132,15 @@ class BaseTaxinvoiceProvider:
     def cancel_issue(self, key_type: str, mgt_key: str, memo: str = "") -> dict:
         raise NotImplementedError
 
-    def get_balance(self) -> Optional[float]:
+    def get_balance(self) -> dict:
+        """잔액 조회. 반환 dict 형식:
+
+        {
+          "member":  float | None,   # 회원 잔액 (popbill.com 직접 충전분)
+          "partner": float | None,   # 파트너 잔액 (link ID 통해 충전분)
+          "usable":  float | None,   # 실제 사용 가능 잔액 (보통 partner)
+        }
+        """
         raise NotImplementedError
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
@@ -176,8 +184,8 @@ class DevStubProvider(BaseTaxinvoiceProvider):
     def cancel_issue(self, key_type: str, mgt_key: str, memo: str = "") -> dict:
         return {"ok": True, "note": "STUB"}
 
-    def get_balance(self) -> Optional[float]:
-        return None
+    def get_balance(self) -> dict:
+        return {"member": None, "partner": None, "usable": None}
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
         return "https://www.popbill.com/"
@@ -269,14 +277,31 @@ class PopbillTaxinvoiceProvider(BaseTaxinvoiceProvider):
             svc = self._get_svc()
             tax = self._build_tax(draft)
             r = svc.registIssue(self.corp_num, tax, memo=draft.remark1 or "셈하나 발행", UserID=self.user_id)
-            # Response: {code, message, receiptNum, ntsconfirmNum, ntsSendDT, issueDT}
+            # registIssue 응답: {code, message, receiptNum, ntsconfirmNum, ntsSendDT, issueDT}
+            # 일부 응답은 ntsconfirmNum 즉시 미포함 — 발행 직후 getInfo 로 보강.
             ok = getattr(r, "code", None) in (1, "1") or getattr(r, "receiptNum", None)
+            invoice_num = getattr(r, "ntsconfirmNum", None) or getattr(r, "invoiceNum", None)
+            receipt_num = getattr(r, "receiptNum", None)
+            issue_dt = getattr(r, "issueDT", None)
+
+            # 보강: registIssue 응답에 핵심 식별자 누락 시 getInfo 즉시 호출.
+            if ok and (not invoice_num or not receipt_num):
+                try:
+                    info = svc.getInfo(self.corp_num, "SELL", draft.mgt_key)
+                    if info is not None:
+                        invoice_num = invoice_num or getattr(info, "ntsconfirmNum", None) \
+                                                  or getattr(info, "itemKey", None)
+                        receipt_num = receipt_num or getattr(info, "itemKey", None)
+                        issue_dt = issue_dt or getattr(info, "issueDT", None)
+                except Exception:  # noqa: BLE001
+                    pass
+
             return TaxinvoiceResult(
                 ok=bool(ok),
                 mgt_key=draft.mgt_key,
-                invoice_num=getattr(r, "ntsconfirmNum", None) or getattr(r, "invoiceNum", None),
-                issue_dt=getattr(r, "issueDT", None),
-                receipt_num=getattr(r, "receiptNum", None),
+                invoice_num=invoice_num,
+                issue_dt=issue_dt,
+                receipt_num=receipt_num,
                 error=None if ok else getattr(r, "message", None),
             )
         except PopbillException as pe:
@@ -294,7 +319,8 @@ class PopbillTaxinvoiceProvider(BaseTaxinvoiceProvider):
 
         try:
             svc = self._get_svc()
-            info = svc.getInfo(self.corp_num, key_type, mgt_key, self.user_id)
+            # popbill SDK 시그니처: getInfo(CorpNum, MgtKeyType, MgtKey) — UserID 인자 없음.
+            info = svc.getInfo(self.corp_num, key_type, mgt_key)
             return {"ok": True, "info": _info_to_dict(info)}
         except PopbillException as pe:
             return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
@@ -372,12 +398,30 @@ class PopbillTaxinvoiceProvider(BaseTaxinvoiceProvider):
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": f"취소 오류: {e}"}
 
-    def get_balance(self) -> Optional[float]:
+    def get_balance(self) -> dict:
+        """popbill 회원 잔액 + 파트너 잔액 동시 조회.
+
+        파트너 link ID (예: SODAM) 를 통해 충전한 금액은 ``getPartnerBalance`` 로
+        조회됨. 회원이 popbill.com 에서 직접 충전한 잔액은 ``getBalance`` 로 조회.
+        실 사용 시 popbill 은 보통 파트너 잔액을 우선 차감 (link 발급자가 운영).
+        """
+        svc = self._get_svc()
+        member: Optional[float] = None
+        partner: Optional[float] = None
         try:
-            svc = self._get_svc()
-            return float(svc.getBalance(self.corp_num))
+            member = float(svc.getBalance(self.corp_num))
         except Exception:  # noqa: BLE001
-            return None
+            pass
+        try:
+            partner = float(svc.getPartnerBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            pass
+        # usable: 파트너 잔액이 있으면 우선 (link 통한 운영), 없으면 회원 잔액.
+        if partner is not None and partner > 0:
+            usable = partner
+        else:
+            usable = member if member is not None else partner
+        return {"member": member, "partner": partner, "usable": usable}
 
     def get_charge_url(self, user_id: Optional[str] = None) -> str:
         svc = self._get_svc()

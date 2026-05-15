@@ -332,6 +332,19 @@ export default function TaxInvoice() {
                                         </span>
                                     )}
                                 </div>
+                                {(balance?.partner_balance != null || balance?.member_balance != null) && (
+                                    <div className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                        {balance?.partner_balance != null && (
+                                            <span>파트너 {Number(balance.partner_balance).toLocaleString()}P</span>
+                                        )}
+                                        {balance?.partner_balance != null && balance?.member_balance != null && (
+                                            <span className="mx-1">·</span>
+                                        )}
+                                        {balance?.member_balance != null && (
+                                            <span>회원 {Number(balance.member_balance).toLocaleString()}P</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <button type="button" onClick={openChargeURL}

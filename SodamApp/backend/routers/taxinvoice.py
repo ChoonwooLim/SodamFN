@@ -361,15 +361,25 @@ def popbill_url(
 
 @router.get("/balance")
 def get_balance(_admin: User = Depends(get_admin_user)):
+    """팝빌 잔액 조회 — 회원 잔액 + 파트너 잔액 동시 표시.
+
+    파트너 잔액: 셈하나 link ID (SODAM) 통해 충전한 금액. 사장님이 사용하는 주 잔액.
+    회원 잔액: popbill.com 에서 직접 충전한 금액.
+    ``balance`` 필드는 호환을 위해 usable (실 사용 가능 잔액) 을 노출.
+    """
     provider = get_provider()
-    bal = provider.get_balance()
+    bal = provider.get_balance()  # {"member", "partner", "usable"}
     is_test_mode = (os.getenv("POPBILL_IS_TEST", "true").strip().lower() in ("1", "true", "yes"))
     return {
-        "ok": True, "balance": bal, "is_test": is_test_mode,
-        "unit_cost": 100,  # 전자세금계산서 100원/건
+        "ok": True,
+        "balance": bal.get("usable"),
+        "member_balance": bal.get("member"),
+        "partner_balance": bal.get("partner"),
+        "is_test": is_test_mode,
+        "unit_cost": 100,
         "note": (
             "TEST 환경 잔액 (test.popbill.com 충전)" if is_test_mode
-            else "LIVE 환경 잔액 (popbill.com 충전)"
+            else "LIVE 환경 잔액 — 파트너 잔액(SODAM 충전) + 회원 잔액"
         ),
     }
 
