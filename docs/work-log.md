@@ -1726,3 +1726,113 @@ GitHub `codef-io/easycodefpy-exam` 의 9개 폴더 중 우리가 안 쓰는 4개
 
 ---
 
+
+
+## 2026-05-15 (세션 2 — 20:30~23:30)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | CODEF SDK 06_delete + 04_list + 05_update 통합 (계정 라이프사이클) | 완료 |
+| fix  | 팝빌 발급 시스템 3페이지 (전자세금계산서·전자명세서·현금영수증) 잔액/응답 매핑 12개 버그 | 완료 |
+| feat | CODEF 기반 홈택스 수집 모듈 신규 (`/finance/hometax`) — 모델/라우터/UI/마이그레이션 | 완료 |
+| fix  | CODEF 홈택스 페이로드 spec 정정 마라톤 8 commits — CF-00007 + CF-04033 근본 해결 | 완료 |
+
+### 세부 내용
+
+#### 1. CODEF SDK 통합 (61dea3a8)
+
+CodefClient 에 `delete_account` / `update_account` / `list_connected_ids` 저수준 래퍼 추가.
+3개 신규 endpoints — 라이프사이클 완성:
+- DELETE `/api/codef/connections/{cid}` 가 CODEF 측 connectedId 도 삭제
+- POST `/api/codef/connections/{cid}/update-credentials` — 비번 변경 (connectedId 유지)
+- GET `/api/codef/diagnostics/connected-id-sync` — DB vs CODEF 양방향 diff 진단
+
+테스트 13건 신규 (client 6 + service 7) 모두 통과.
+
+#### 2. 팝빌 발급 시스템 잔액 표시 + 응답 매핑 (76c1f26c, 20f86863, 6902dfe1)
+
+3페이지 공통 결함:
+- **잔액 4,180원만 표시** — `getBalance` (회원) 만 호출. 사장님 실제 충전 잔액은 파트너 link `SODAM` (189,900원).
+  → `getPartnerBalance` 도 함께 조회, dict 반환. usable = 파트너 > 0 면 우선.
+- **`getInfo()` 시그니처 미스매치** — UserID 인자 잘못 전달. 발행 후 상세 조회 전부 실패.
+- **`registIssue` 응답 보강 누락** — confirmNum/receiptNum 즉시 미포함 시 getInfo 즉시 호출로 보강.
+
+Cashbill 추가 발견:
+- `search()` 인자 1개 초과 ("" 가 Page 자리 침범) → `'>' not supported between str and int`
+- `cancel()` 의 `self._last_confirm` 참조 오류 → CancelIn 에 `orig_confirm_num`+`orig_trade_date` 필수 추가
+- `/balance`+`/charge-url` 엔드포인트 자체 부재 → 신규 추가
+
+DB 정리: TaxInvoice id=1,2 (4/29 옛 'Memo' 오류) + Statement failed 8건 + TEST 잔재 issued 10건 삭제.
+
+LIVE 검증: 세금계산서 1건 발행 성공 (mgt_key `SDM20260515205640`, 국세청 승인번호 `202605154100020300007ce4`).
+
+#### 3. CODEF 기반 홈택스 수집 모듈 (bdbcfc01)
+
+사장님 지시 "현금영수증과 홈택스수집은 CODEF 로 연결" 반영. 팝빌 현금영수증은 운영 권한
+미부여 (-99910002) 상태 → 별건.
+
+신규 컴포넌트 7개:
+1. `organization_catalog`: 홈택스(public_tax) 추가 (3가지 인증 모두 지원)
+2. 모델 `HometaxRecord` (record_type 5종 통합) + `HometaxSyncCursor`
+3. `CodefHometaxProvider` — sync_cash_sales/sync_cash_purchase/sync_tax_invoice_integrated
+4. 라우터 `routers/codef/hometax.py` — 8 endpoints
+5. DB 마이그레이션 `add_hometax_tables.py` (운영 적용)
+6. 프론트 `pages/HomeTaxCollect.jsx` 전면 재작성 (팝빌 → CODEF)
+7. 사이드바 메뉴 [홈택스 수집] (기존)
+
+#### 4. CODEF 홈택스 페이로드 spec 정정 마라톤 (8 commits)
+
+사장님 제공 PDF 8건 (`c:/WORK/SodamFN/2026서류/홈텍스/`) 정밀 검증:
+
+| Pass | 변경 | 커밋 |
+|------|------|------|
+| 1 | businessType TX→PB, loginIdentity 제거, loginTypeLevel 매핑 | 51c2a9d4 |
+| 2 | 빈 값 키 유지 (CODEF 가 키 누락을 invalid 로 판단) | 4f28b0f3 |
+| 3 | isIdentify 조건부 | 899fb47f |
+| 4 | ID/PW 폼 주민번호 필드 추가 + 13자리 필수 | 041549b2, 9b817911 |
+| 5 | placeholder 정정 (limp2004→일반 안내) | aec869e9 |
+| 6 | **공공 API 표준 페이로드 전면 정정** — businessType/clientType/countryCode 제거, password→userPassword, birthDate→loginIdentity | d9d9d99e |
+| 7 | API path 확정 (purchase-details, sales-details, sales-purchase-statistics) | 527e9eea |
+| 8 | **organization 코드 product 별 매핑** — 0001 → 0003 현금영수증, 0002 세금계산서, 0004 세금정보, 0006 카드매출 | 9279c915 |
+
+핵심 학습 3가지:
+- 공공 API 는 카드/은행과 페이로드 구조 완전 다름 (businessType/clientType/countryCode 없음)
+- ID/PW 비번 필드는 `password` 가 아니라 `userPassword`
+- organization 은 product 별로 다름 (0001 은 CODEF 카탈로그에 없는 placeholder)
+
+### AI참고 (다음 세션)
+
+#### 미해결 — 사장님 CODEF 1:1 문의 필요
+
+홈택스 페이로드/path/organization 모두 spec 일치. 그러나 0003 호출도 `CF-04033 "존재하지 않는 기관"` 발생 → **사장님 CODEF client_id (DEMO 환경) 에 홈택스 product 권한 미부여**. 사장님이 CODEF 측 1:1 문의해서 권한 활성화 또는 PRODUCT 환경 키 발급 받아야 정상 작동.
+
+문의 정보:
+- 사업자: 소담김밥 (639-12-01514)
+- CODEF client_id: Orbitron secrets 의 CODEF_CLIENT_ID
+- 환경: DEMO @ development.codef.io (PDF '대표 버전' 과 일치)
+- 시도한 organization: 0003 / 0002 / 0004 모두 CF-04033
+
+#### 팝빌 현금영수증 search API 권한 별건
+
+`/api/cashbill/search` 호출 시 `-99910002` "API 상품에 이용 권한이 부여되지 않아 사용이 제한됩니다". 발행/취소/잔액은 정상 권한. search 만 별도 신청 필요. 사장님이 팝빌 1:1 채팅으로 활성화 요청.
+
+#### 추가 CODEF 홈택스 PDF 사장님이 제공한 11개
+
+폴더 `c:/WORK/SodamFN/2026서류/홈텍스/`:
+1. ✅ 현금영수증 매입내역 (0003 purchase-details)
+2. ✅ 현금영수증 매출내역 (0003 sales-details)
+3. ✅ 전자세금계산서 기간별 매출-매입 통계 (0002 sales-purchase-statistics)
+4. 📦 전자세금계산서 발행 — CODEF 통한 발행 (팝빌 대안)
+5. 📦 제3자 전자(세금)계산서 발급사실 조회
+6. 📦 개인사업자등록상태 조회 (0004)
+7. 📦 세금 납부, 환급, 고지, 체납 내역 (0004)
+8. 📦 신용카드 매출자료 조회 (0006, 공동인증서 전용)
+9. 📦 근로소득 지급명세서
+10. 📦 재무제표
+11. 📦 인증서 등록 (전자(세금)계산서 시스템 사업자)
+
+권한 풀리면 11개 product 모두 점진적 구현 가능.
+
+---
