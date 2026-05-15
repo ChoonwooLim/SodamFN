@@ -28,7 +28,6 @@ from models import (
     HometaxSyncCursor,
 )
 from .codef_client import CodefClient
-from .organization_catalog import get_organization
 
 logger = logging.getLogger("sodam.codef.hometax")
 
@@ -36,12 +35,14 @@ logger = logging.getLogger("sodam.codef.hometax")
 # 홈택스(국세청) CODEF organization 코드
 HOMETAX_ORG_CODE = "0001"
 
-# CODEF API path (sandbox/demo/production 공통)
-# product detail page slug 기반 추정 — 첫 DEMO 호출에서 검증 후 정정.
-PATH_CASH_SALES = "/v1/kr/public/nt/cash-receipt/sales-cash-receipt"
-PATH_CASH_PURCHASE = "/v1/kr/public/nt/cash-receipt/purchase-cash-receipt"
-PATH_TAXINVOICE_INTEGRATED = "/v1/kr/public/nt/tax-invoice/a-integrated-check-list"
-PATH_REPORT_TAX_RESULT = "/v1/kr/public/nt/proof-issue/report-tax-result"
+# CODEF API path — 사장님 제공 PDF spec 으로 검증.
+# 매입 (PDF 확인됨): /v1/kr/public/nt/cash-receipt/purchase-details
+# 매출 / 세금계산서 통합 PDF 는 사장님 추가 제공 시 정확한 path 적용 예정.
+PATH_CASH_PURCHASE = "/v1/kr/public/nt/cash-receipt/purchase-details"
+# 매출은 패턴 추정 (sales-details) — 첫 호출에서 검증/정정 필요.
+PATH_CASH_SALES = "/v1/kr/public/nt/cash-receipt/sales-details"
+# 세금계산서 통합조회 — 사장님 추가 PDF 필요. 임시 placeholder.
+PATH_TAXINVOICE_INTEGRATED = "/v1/kr/public/nt/tax-invoice/integrated-list"
 
 
 @dataclass
@@ -213,25 +214,23 @@ class CodefHometaxProvider:
     # ─── sync 메서드 ─────────────────────────────────
 
     def sync_cash_sales(self, connection_id: int) -> SyncResult:
-        """현금영수증 매출 합계내역 수집 (cash-sales-sum-details)."""
+        """현금영수증 매출 수집 — path 는 PDF 미확보로 추정값 사용."""
         return self._sync_cash_receipt(
             connection_id=connection_id,
             record_type="cash_sales",
             api_path=PATH_CASH_SALES,
-            inquiry_type="0",  # 0=매출, 1=매입 (CODEF 컨벤션 추정 — DEMO 검증 시 정정)
         )
 
     def sync_cash_purchase(self, connection_id: int) -> SyncResult:
-        """현금영수증 매입내역 수집 (cash-purchase-details)."""
+        """현금영수증 매입내역 수집 (PDF spec 확인됨: purchase-details)."""
         return self._sync_cash_receipt(
             connection_id=connection_id,
             record_type="cash_purchase",
             api_path=PATH_CASH_PURCHASE,
-            inquiry_type="1",
         )
 
     def _sync_cash_receipt(self, connection_id: int, record_type: str,
-                            api_path: str, inquiry_type: str) -> SyncResult:
+                            api_path: str) -> SyncResult:
         try:
             conn = self._get_connection(connection_id)
         except ValueError as e:
@@ -241,14 +240,20 @@ class CodefHometaxProvider:
         biz_reg_no = self._get_business_reg_no(business_id)
         s_date, e_date = self._date_range(business_id, record_type, fallback_days=30)
 
+        # CODEF 공공 API spec (PDF 검증):
+        # organization, connectedId, startDate(YYYYMMDD), endDate(YYYYMMDD),
+        # orderBy("0"=오름차순/"1"=내림차순), inquiryType("0"=전체/"1"=본인사업장/"2"=별도사업장)
+        # identity (사업자번호, 다중 사업장 시 필수)
         params = {
             "organization": HOMETAX_ORG_CODE,
             "connectedId": conn.connected_id,
-            "businessType": _normalize(biz_reg_no),
-            "inquiryType": inquiry_type,
             "startDate": s_date,
             "endDate": e_date,
+            "orderBy": "0",
+            "inquiryType": "0",  # 전체
         }
+        if biz_reg_no:
+            params["identity"] = biz_reg_no
         try:
             result = self._client.request_product(api_path, params)
         except Exception as e:  # noqa: BLE001

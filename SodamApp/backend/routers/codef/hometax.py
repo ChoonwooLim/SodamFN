@@ -149,26 +149,23 @@ def _register_hometax_connection(
 def _build_hometax_payload(
     svc: CodefConnectionService, org, auth_payload: dict, biz_reg_no: str,
 ) -> tuple[dict, str]:
-    """홈택스 인증 페이로드 빌드 (3가지 방식).
+    """홈택스(국세청 0001) 표준 페이로드 빌드.
 
-    CODEF 공공기관(0001 국세청) 의 표준 페이로드:
-      businessType : "PB" (Public)
+    CODEF 공공 API spec (사장님 제공 PDF 검증):
+      organization : "0001" (고정)
       loginType    : "0" 공동인증서 / "1" ID/PW / "5" 간편인증
-      loginTypeLevel: 간편인증 사 코드 (카카오=1, 페이코=2, 삼성패스=3,
-                      KB모바일=4, 통신사PASS=5, 네이버=6, 신한인증서=7, 토스=8)
-    """
-    client_type = (auth_payload.get("client_type") or "B").upper()
-    if client_type not in {"P", "B"}:
-        client_type = "B"
+      ❌ businessType / clientType / countryCode / businessRegNo 없음
+         (카드/은행 페이로드와 완전히 다른 구조 — 보내면 CF-00007 발생)
 
+    간편인증 추가 필드:
+      phoneNo, loginIdentity(YYYYMMDD 생년월일), userName,
+      loginTypeLevel(1카톡/2페이코/3삼성/4KB/5통신사PASS/6네이버/7신한/10뱅크사인/11우리), telecom
+    ID/PW 추가 필드:
+      id, userPassword(RSA), identity(사업자번호, 다중 사업장 시 필수)
+    """
     base = {
-        "countryCode": "KR",
-        "businessType": "PB",  # 공공기관 (Public)
-        "clientType": client_type,
         "organization": org.code,
     }
-    if client_type == "B" and biz_reg_no:
-        base["businessRegNo"] = biz_reg_no
 
     # 1) 공동인증서
     if "certFile" in auth_payload and "keyFile" in auth_payload:
@@ -176,25 +173,27 @@ def _build_hometax_payload(
         account = {
             **base,
             "loginType": "0",
-            "certType": "1",
+            "certType": auth_payload.get("certType") or "1",
             "certFile": auth_payload["certFile"],
             "keyFile": auth_payload["keyFile"],
             "certPassword": svc._client.encrypt_password(cert_pwd) if cert_pwd else "",  # type: ignore[attr-defined]
         }
         return {"accountList": [account]}, "cert"
 
-    # 2) 간편인증 — CODEF 표준 loginTypeLevel 매핑
+    # 2) 간편인증 — CODEF 표준 loginTypeLevel 매핑 (PDF spec 검증)
     simple_types_level = {
         "kakao": "1", "payco": "2", "samsung": "3", "kbmobile": "4",
-        "pass": "5", "naver": "6", "shinhan": "7", "toss": "8",
+        "pass": "5", "naver": "6", "shinhan": "7",
+        "banksign": "10", "wooribank": "11",
     }
     login_type = (auth_payload.get("loginType") or "").lower()
     if login_type in simple_types_level:
-        # CF-00007 회피: 카드/은행 simple_auth 와 동일하게 빈 값도 키는 유지.
-        # CODEF 가 키 누락을 "잘못된 파라미터" 로 판단하는 경우 대응.
         user_name = (auth_payload.get("userName") or "").strip()
         phone_no = (auth_payload.get("phoneNo") or auth_payload.get("phone") or "").strip()
-        birth_date = (auth_payload.get("birthDate") or auth_payload.get("identity") or "").strip()
+        # birthDate 호환: 우리 UI 는 birthDate 로 받지만 CODEF spec 은 loginIdentity (YYYYMMDD 8자리).
+        birth_date = (auth_payload.get("loginIdentity")
+                      or auth_payload.get("birthDate")
+                      or "").strip()
         if not user_name:
             raise ValueError("간편인증은 이름이 필요합니다.")
         if not phone_no:
@@ -207,33 +206,30 @@ def _build_hometax_payload(
             "loginTypeLevel": simple_types_level[login_type],
             "userName": user_name,
             "phoneNo": re.sub(r"\D", "", phone_no),
-            "birthDate": re.sub(r"\D", "", birth_date),
+            "loginIdentity": re.sub(r"\D", "", birth_date)[:8],
             "telecom": auth_payload.get("telecom", "0"),
-            "is2Way": "true",
         }
-        # ``isIdentify`` 는 본인확인 강제 모드 — 일부 사이트는 휴대폰만으로 OK.
-        # auth_payload 에 명시적으로 들어왔을 때만 추가. (CF-00007 회피 가설 A)
-        if auth_payload.get("isIdentify") is not None:
-            account["isIdentify"] = str(auth_payload["isIdentify"])
+        # identity (사업자번호) — 다중 사업장인 경우 필수 (사장님은 1개라 옵션)
+        if biz_reg_no:
+            account["identity"] = biz_reg_no
         return {"accountList": [account]}, f"simple_{login_type}"
 
-    # 3) ID/PW (홈택스 ID) — 2차 인증으로 대표자 주민번호 필요
-    if "id" in auth_payload and "password" in auth_payload:
-        encrypted = svc._client.encrypt_password(auth_payload["password"])  # type: ignore[attr-defined]
-        # 주민번호 13자리 전체 필요 (CODEF 홈택스 2차 인증). 숫자만 추출.
-        identity = re.sub(r"\D", "", str(auth_payload.get("identity") or ""))
-        if len(identity) != 13:
-            raise ValueError(
-                "홈택스 ID 로그인은 대표자 주민번호 13자리 전체가 필요합니다. "
-                f"(입력된 자릿수: {len(identity)})",
-            )
+    # 3) ID/PW (홈택스 ID)
+    # CODEF 표준: 비번 필드명은 'userPassword' (카드/은행의 'password' 와 다름)
+    if "id" in auth_payload and ("userPassword" in auth_payload or "password" in auth_payload):
+        plain_pw = auth_payload.get("userPassword") or auth_payload.get("password")
+        encrypted = svc._client.encrypt_password(plain_pw)  # type: ignore[attr-defined]
         account = {
             **base,
             "loginType": "1",
             "id": auth_payload["id"],
-            "password": encrypted,
-            "identity": identity,  # CODEF 가 홈택스 2차 인증 단계에서 사용
+            "userPassword": encrypted,
         }
+        # identity (사업자번호) — 다중 사업장이면 필수, 단일이면 옵션.
+        # 사장님 캡처의 "주민번호 13자리" 는 홈택스 자체 2차 인증 — CODEF spec 의
+        # identity (사업자번호 10자리) 와는 별개. CODEF 가 내부적으로 2차 인증 처리.
+        if biz_reg_no:
+            account["identity"] = biz_reg_no
         return {"accountList": [account]}, "id_pw"
 
     raise ValueError(

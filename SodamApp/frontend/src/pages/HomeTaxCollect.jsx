@@ -7,13 +7,17 @@ import api from '../api';
 
 const fmt = (n) => Number(n || 0).toLocaleString('ko-KR');
 
+// CODEF 홈택스 공식 spec 지원 인증사 (PDF 확인됨)
 const SIMPLE_AUTH_OPTIONS = [
-    { value: 'kakao', label: '카카오톡' },
-    { value: 'naver', label: '네이버' },
-    { value: 'pass', label: 'PASS' },
-    { value: 'toss', label: '토스' },
-    { value: 'payco', label: '페이코' },
-    { value: 'samsung', label: '삼성패스' },
+    { value: 'kakao', label: '카카오톡' },          // 1
+    { value: 'payco', label: '페이코' },            // 2
+    { value: 'samsung', label: '삼성패스' },        // 3
+    { value: 'kbmobile', label: 'KB모바일' },       // 4
+    { value: 'pass', label: '통신사PASS' },         // 5
+    { value: 'naver', label: '네이버' },            // 6
+    { value: 'shinhan', label: '신한인증서' },      // 7
+    { value: 'banksign', label: '뱅크사인' },       // 10
+    { value: 'wooribank', label: '우리은행' },      // 11
 ];
 
 const TELECOM_OPTIONS = [
@@ -72,7 +76,7 @@ export default function HomeTaxCollect() {
     const [simpleForm, setSimpleForm] = useState({
         loginType: 'kakao', userName: '', phoneNo: '', birthDate: '', telecom: '0',
     });
-    const [idPwForm, setIdPwForm] = useState({ id: '', password: '', identity: '' });
+    const [idPwForm, setIdPwForm] = useState({ id: '', userPassword: '' });
 
     useEffect(() => {
         loadConnection();
@@ -444,16 +448,9 @@ export default function HomeTaxCollect() {
                                         </div>
                                         <div>
                                             <label className="text-xs font-semibold text-slate-600 block mb-1">비밀번호 <span className="text-red-500">*</span></label>
-                                            <input type="password" value={idPwForm.password} onChange={(e) => setIdPwForm({ ...idPwForm, password: e.target.value })}
+                                            <input type="password" value={idPwForm.userPassword} onChange={(e) => setIdPwForm({ ...idPwForm, userPassword: e.target.value })}
                                                 className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-semibold text-slate-600 block mb-1">대표자 주민번호 <span className="text-red-500">*</span> <span className="text-slate-400 font-normal">(13자리)</span></label>
-                                            <input value={idPwForm.identity} onChange={(e) => setIdPwForm({ ...idPwForm, identity: e.target.value.replace(/\D/g, '').slice(0, 13) })}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-mono tabular-nums"
-                                                placeholder="13자리 전체 (예: 6307301234567)"
-                                                maxLength={13} />
-                                            <div className="text-[11px] text-slate-500 mt-1">홈택스 ID 로그인 2차 인증용 — 주민번호 전체 13자리 입력</div>
+                                            <div className="text-[11px] text-slate-500 mt-1">홈택스 2차 인증 (대표자 주민번호) 은 CODEF 가 자동 처리합니다.</div>
                                         </div>
                                     </div>
                                 )}
