@@ -160,13 +160,13 @@ export default function Sidebar() {
         { icon: ShoppingBag, label: '매입관리', path: '/purchase', color: 'text-orange-400' },
         { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
-        { icon: Landmark, label: '은행계좌 연동', path: '/finance/bank-sync', color: 'text-indigo-400' },
         { icon: FileText, label: '전자세금계산서', path: '/finance/tax-invoice', color: 'text-rose-400' },
         { icon: FileText, label: '전자명세서', path: '/finance/statement', color: 'text-amber-400' },
         { icon: Wallet, label: '현금영수증', path: '/finance/cashbill', color: 'text-emerald-400' },
         { icon: BookOpen, label: '홈택스 수집', path: '/finance/hometax', color: 'text-violet-400' },
-        { icon: Link2, label: '외부 연동 (CODEF)', path: '/external-integration', color: 'text-blue-400',
+        { icon: Link2, label: '외부 연동', path: '/external-integration', color: 'text-blue-400',
           alerts: extIntegrationAlerts },
+        { icon: Landmark, label: '팝빌계좌연동', path: '/finance/bank-sync', color: 'text-indigo-400', nested: true },
         { icon: Gauge, label: '자동수집 상태', path: '/auto-collection', color: 'text-teal-400' },
     ];
 
@@ -301,7 +301,7 @@ export default function Sidebar() {
                                 <Link
                                     key={sub.path}
                                     to={sub.path}
-                                    className={`sidebar-sub-item ${isSubActive ? 'active' : ''}`}
+                                    className={`sidebar-sub-item ${isSubActive ? 'active' : ''} ${sub.nested ? 'ml-5 border-l border-slate-700/60 pl-3' : ''}`}
                                 >
                                     <SubIcon size={14} className={isSubActive ? 'text-white' : sub.color} />
                                     <span className="flex-1">{sub.label}</span>
