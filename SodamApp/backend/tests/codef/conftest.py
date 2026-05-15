@@ -31,5 +31,8 @@ def mock_codef_sdk(monkeypatch, codef_env):
     sdk.create_account = MagicMock()
     sdk.request_product = MagicMock()
     sdk.request_certification = MagicMock()
+    sdk.delete_account = MagicMock()
+    sdk.update_account = MagicMock()
+    sdk.get_connected_id_list = MagicMock()
     monkeypatch.setattr("services.codef.codef_client.Codef", lambda: sdk)
     return sdk

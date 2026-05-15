@@ -159,6 +159,60 @@ class CodefClient:
             rows_count=len(rows),
         )
 
+    # ─── 계정 관리 (06_delete / 05_update / 04_list) ──────────
+
+    def delete_account(self, accounts: list[dict]) -> dict:
+        """connectedId 삭제 (CODEF 측). 등록 해제.
+
+        accounts 항목 필수 필드:
+          countryCode, businessType, clientType, organization, connectedId
+        """
+        raw = self._sdk.delete_account(self.service_type, {"accountList": accounts})
+        data = self._parse(raw)
+        self._maybe_raise(data)
+        return data
+
+    def update_account(self, accounts: list[dict]) -> dict:
+        """connectedId 의 계정 정보 갱신 (비번 변경 등).
+
+        accounts 항목 필수 필드 (ID/PW):
+          countryCode, businessType, clientType, organization, connectedId,
+          loginType="1", id, password (RSA 암호화된 새 비번)
+        """
+        raw = self._sdk.update_account(self.service_type, {"accountList": accounts})
+        data = self._parse(raw)
+        self._maybe_raise(data)
+        return data
+
+    def list_connected_ids(self) -> list[str]:
+        """현재 client_id 에 등록된 모든 connectedId 목록."""
+        raw = self._sdk.get_connected_id_list(self.service_type, {})
+        data = self._parse(raw)
+        self._maybe_raise(data)
+        payload = data.get("data", {}) or {}
+        if isinstance(payload, list):
+            # 일부 응답은 평면 list — 그대로 사용
+            ids: list[str] = []
+            for item in payload:
+                if isinstance(item, str):
+                    ids.append(item)
+                elif isinstance(item, dict) and item.get("connectedId"):
+                    ids.append(item["connectedId"])
+            return ids
+        # dict 형태 — connectedIdList 키 기대
+        raw_list = (
+            payload.get("connectedIdList")
+            or payload.get("connectedIdInfoList")
+            or []
+        )
+        ids = []
+        for item in raw_list:
+            if isinstance(item, str):
+                ids.append(item)
+            elif isinstance(item, dict) and item.get("connectedId"):
+                ids.append(item["connectedId"])
+        return ids
+
     @staticmethod
     def _parse(raw_response) -> dict:
         if isinstance(raw_response, str):

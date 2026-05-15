@@ -119,12 +119,177 @@ def test_deactivate(db_engine, biz_id):
         s.add(c); s.commit(); s.refresh(c)
         cid = c.id
 
-    svc = CodefConnectionService(engine=db_engine, client=MagicMock())
-    svc.deactivate(connection_id=cid)
+    fake = MagicMock()
+    fake.delete_account = MagicMock(return_value={"result": {"code": "CF-00000"}})
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    result = svc.deactivate(connection_id=cid)
+
+    # 반환 dict 검증
+    assert result["db_deactivated"] is True
+    assert result["codef_called"] is True
+    assert result["codef_error"] is None
+    # CODEF 호출 페이로드 검증 — 카드는 P/CD
+    sent = fake.delete_account.call_args.args[0]
+    assert sent[0]["organization"] == "0306"
+    assert sent[0]["connectedId"] == "x"
+    assert sent[0]["businessType"] == "CD"
+    assert sent[0]["clientType"] == "P"
+    # DB 상태
     with Session(db_engine) as s:
         c = s.get(CodefConnection, cid)
         assert c.status == "deactivated"
         assert c.deactivated_at is not None
+
+
+def test_deactivate_bank_uses_bk_b(db_engine, biz_id):
+    """은행 connection 은 businessType=BK, clientType=B 로 호출."""
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="bank",
+                            organization_code="0088", organization_label="신한은행",
+                            connection_type="bank",
+                            connected_id="bcid", auth_method="cert")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    fake = MagicMock()
+    fake.delete_account = MagicMock(return_value={"result": {"code": "CF-00000"}})
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    svc.deactivate(connection_id=cid)
+
+    sent = fake.delete_account.call_args.args[0]
+    assert sent[0]["businessType"] == "BK"
+    assert sent[0]["clientType"] == "B"
+    assert sent[0]["organization"] == "0088"
+
+
+def test_deactivate_call_codef_false_skips_sdk(db_engine, biz_id):
+    """call_codef=False 면 CODEF 호출 안 함."""
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="card",
+                            organization_code="0306", organization_label="신한",
+                            connected_id="x", auth_method="id_pw")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    fake = MagicMock()
+    fake.delete_account = MagicMock()
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    result = svc.deactivate(connection_id=cid, call_codef=False)
+
+    assert result["codef_called"] is False
+    fake.delete_account.assert_not_called()
+    # DB 는 그래도 비활성
+    with Session(db_engine) as s:
+        c = s.get(CodefConnection, cid)
+        assert c.status == "deactivated"
+
+
+def test_deactivate_codef_error_still_marks_db_deactivated(db_engine, biz_id):
+    """CODEF 호출이 실패해도 DB 는 deactivated — error 는 결과 dict 에 포함."""
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="card",
+                            organization_code="0306", organization_label="신한",
+                            connected_id="x", auth_method="id_pw")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    fake = MagicMock()
+    fake.delete_account = MagicMock(
+        side_effect=CodefAPIError(code="CF-12345", message="DEMO 잔재 없음")
+    )
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    result = svc.deactivate(connection_id=cid)
+
+    assert result["db_deactivated"] is True
+    assert result["codef_called"] is True
+    assert result["codef_error"]["code"] == "CF-12345"
+    with Session(db_engine) as s:
+        c = s.get(CodefConnection, cid)
+        assert c.status == "deactivated"
+
+
+def test_update_credentials_id_pw_success(db_engine, biz_id):
+    """ID/PW connection 의 비번을 CODEF update_account 로 갱신."""
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="card",
+                            organization_code="0307", organization_label="현대",
+                            connected_id="cid-keep", auth_method="id_pw",
+                            status="expired",
+                            last_error_code="CF-12100", last_error_message="비번 오류")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    fake = MagicMock()
+    fake.encrypt_password = MagicMock(side_effect=lambda p: f"ENC({p})")
+    fake.update_account = MagicMock(
+        return_value={"result": {"code": "CF-00000"}, "data": {"connectedId": "cid-keep"}}
+    )
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    updated = svc.update_credentials(
+        connection_id=cid,
+        auth_payload={"id": "myuser", "password": "newpass"},
+    )
+
+    # connectedId 는 유지 (reverify 와의 차이)
+    assert updated.connected_id == "cid-keep"
+    assert updated.status == "active"
+    assert updated.last_error_code is None
+    assert updated.last_verified_at is not None
+
+    # SDK 호출 검증
+    sent = fake.update_account.call_args.args[0]
+    assert sent[0]["organization"] == "0307"
+    assert sent[0]["connectedId"] == "cid-keep"
+    assert sent[0]["loginType"] == "1"
+    assert sent[0]["id"] == "myuser"
+    assert sent[0]["password"] == "ENC(newpass)"
+
+
+def test_update_credentials_rejects_simple_auth(db_engine, biz_id):
+    """간편인증 connection 은 비번 변경 불가 — ValueError."""
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="card",
+                            organization_code="0307", organization_label="현대",
+                            connected_id="x", auth_method="simple_kakao")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    svc = CodefConnectionService(engine=db_engine, client=MagicMock())
+    with pytest.raises(ValueError, match="ID/PW 인증이 아닌"):
+        svc.update_credentials(
+            connection_id=cid,
+            auth_payload={"id": "u", "password": "p"},
+        )
+
+
+def test_update_credentials_requires_id_and_password(db_engine, biz_id):
+    with Session(db_engine) as s:
+        c = CodefConnection(business_id=biz_id, organization_type="card",
+                            organization_code="0306", organization_label="신한",
+                            connected_id="x", auth_method="id_pw")
+        s.add(c); s.commit(); s.refresh(c)
+        cid = c.id
+
+    svc = CodefConnectionService(engine=db_engine, client=MagicMock())
+    with pytest.raises(ValueError, match="id 와 password 필요"):
+        svc.update_credentials(connection_id=cid, auth_payload={"password": "p"})
+
+
+def test_update_credentials_unknown_connection(db_engine):
+    svc = CodefConnectionService(engine=db_engine, client=MagicMock())
+    with pytest.raises(ValueError, match="connection .* 없음"):
+        svc.update_credentials(
+            connection_id=99999,
+            auth_payload={"id": "u", "password": "p"},
+        )
+
+
+def test_list_codef_connected_ids_passthrough(db_engine):
+    fake = MagicMock()
+    fake.list_connected_ids = MagicMock(return_value=["cid-1", "cid-2"])
+    svc = CodefConnectionService(engine=db_engine, client=fake)
+    assert svc.list_codef_connected_ids() == ["cid-1", "cid-2"]
+    fake.list_connected_ids.assert_called_once()
 
 
 def test_mark_failed(db_engine, biz_id):

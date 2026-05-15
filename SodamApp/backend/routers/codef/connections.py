@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
+from sqlmodel import Session, select
 
 from database import engine
 from models import User, CodefConnection
@@ -250,13 +251,126 @@ def reverify(
 @router.delete("/connections/{cid}")
 def deactivate(
     cid: int,
+    call_codef: bool = True,
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
+    """비활성화 + CODEF 측 connectedId 삭제 (06_delete_account).
+
+    Query param ``call_codef=false`` 면 CODEF 호출 건너뛰고 DB 만 비활성 — DEMO 환경
+    잔재가 PRODUCT 전환 후 청구에 영향 안 주도록 기본은 호출. CODEF 호출이 실패해도
+    DB 는 deactivated 로 마킹되며 ``codef_error`` 필드로 원인 확인 가능.
+    """
     resolve_bid(admin, x_view_as_business)
     svc = CodefConnectionService(engine=engine)
     try:
-        svc.deactivate(connection_id=cid)
+        result = svc.deactivate(connection_id=cid, call_codef=call_codef)
     except ValueError as e:
         raise HTTPException(404, str(e))
-    return {"status": "deactivated"}
+    return {"status": "deactivated", **result}
+
+
+class UpdateCredentialsRequest(BaseModel):
+    """ID/PW 비번 변경 — auth 에 새 id + password 전달."""
+    auth: dict  # {"id": "...", "password": "..."}
+
+
+@router.post("/connections/{cid}/update-credentials")
+def update_credentials(
+    cid: int,
+    body: UpdateCredentialsRequest,
+    admin: User = Depends(get_admin_user),
+    x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
+):
+    """ID/PW 인증 connection 의 비번 변경 (05_update_account).
+
+    재등록(/reverify) 과 달리 같은 connectedId 를 유지 — 적재된 거래내역과의 연속성
+    보존 + 호출 한도 절약. 간편인증(kakao 등) 방식 connection 은 ValueError.
+    """
+    resolve_bid(admin, x_view_as_business)
+    svc = CodefConnectionService(engine=engine)
+    try:
+        conn = svc.update_credentials(connection_id=cid, auth_payload=body.auth)
+    except CodefAdditionalAuth as e:
+        return {
+            "status": "additional_auth_required",
+            "method": e.method,
+            "extra_info": e.extra_info,
+        }
+    except CodefAuthExpired as e:
+        raise HTTPException(400, f"인증 만료: {str(e)}")
+    except CodefAPIError as e:
+        detail = {"message": str(e), "code": e.code, "raw": e.raw}
+        raise HTTPException(400, detail)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"status": "active", "connection": _connection_dto(conn)}
+
+
+# ─── 진단 (SuperAdmin) ─────────────────────────────
+
+@router.get("/diagnostics/connected-id-sync")
+def diagnose_connected_id_sync(
+    admin: User = Depends(get_admin_user),
+):
+    """CODEF 측 connectedId 목록 vs 우리 DB 정합성 검증 (04_get_connected_id_list).
+
+    client_id 단위로 CODEF 측 전체 connectedId 를 조회하고 우리 DB 의
+    CodefConnection 과 양방향 diff 산출:
+
+      - ``in_codef_not_in_db`` : CODEF 측에는 존재하나 우리 DB 어디에도 없음.
+                                 (다른 환경에서 등록했거나 과거 잔재)
+      - ``in_db_not_in_codef`` : 우리 DB 는 active 인데 CODEF 측에 없음.
+                                 (CODEF 측에서 수동 삭제됨 → 재등록 필요)
+      - ``deactivated_but_in_codef``: 우리는 deactivated 처리했는데 CODEF 측에 남아있음.
+                                      (운영 청구 정확성 영향 — 06_delete 재시도 대상)
+    """
+    svc = CodefConnectionService(engine=engine)
+    try:
+        codef_ids = svc.list_codef_connected_ids()
+    except CodefAPIError as e:
+        raise HTTPException(502, {"message": str(e), "code": e.code, "raw": e.raw})
+
+    with Session(engine) as s:
+        all_rows = list(s.exec(select(CodefConnection)))
+
+    db_by_cid: dict[str, list[CodefConnection]] = {}
+    for row in all_rows:
+        if not row.connected_id:
+            continue
+        db_by_cid.setdefault(row.connected_id, []).append(row)
+
+    codef_set = set(codef_ids)
+    db_set = set(db_by_cid.keys())
+
+    in_codef_not_in_db = sorted(codef_set - db_set)
+    in_db_not_in_codef = []
+    deactivated_but_in_codef = []
+    for cid, rows in db_by_cid.items():
+        for row in rows:
+            entry = {
+                "connection_id": row.id,
+                "business_id": row.business_id,
+                "organization_code": row.organization_code,
+                "organization_label": row.organization_label,
+                "connection_type": row.connection_type,
+                "connected_id": row.connected_id,
+                "status": row.status,
+            }
+            if cid not in codef_set and row.status == "active":
+                in_db_not_in_codef.append(entry)
+            elif cid in codef_set and row.status == "deactivated":
+                deactivated_but_in_codef.append(entry)
+
+    return {
+        "codef_total": len(codef_ids),
+        "db_total": len(all_rows),
+        "in_codef_not_in_db": in_codef_not_in_db,
+        "in_db_not_in_codef": in_db_not_in_codef,
+        "deactivated_but_in_codef": deactivated_but_in_codef,
+        "summary": {
+            "codef_only_count": len(in_codef_not_in_db),
+            "db_active_missing_codef_count": len(in_db_not_in_codef),
+            "stale_in_codef_count": len(deactivated_but_in_codef),
+        },
+    }

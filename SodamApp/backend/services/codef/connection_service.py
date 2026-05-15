@@ -419,15 +419,129 @@ class CodefConnectionService:
             s.refresh(conn)
             return conn
 
-    def deactivate(self, connection_id: int) -> None:
+    def deactivate(self, connection_id: int, *, call_codef: bool = True) -> dict:
+        """DB 비활성화 + CODEF 측 connectedId 삭제 (06_delete_account).
+
+        call_codef=False 면 CODEF 호출 건너뛰고 DB 만 비활성 (테스트/긴급 정리용).
+        CODEF 호출이 실패해도 DB 는 비활성으로 마킹 — 운영 청구는 CODEF 측 잔재 우선
+        정리가 목적이지만, 사용자에겐 DB 상의 비활성 상태가 더 중요.
+
+        Returns:
+          {
+            "db_deactivated": True,
+            "codef_called": bool,
+            "codef_result": dict | None,
+            "codef_error": {"code": str, "message": str} | None,
+          }
+        """
         with Session(self.engine) as s:
             conn = s.get(CodefConnection, connection_id)
             if not conn:
                 raise ValueError(f"connection {connection_id} 없음")
+            organization_type = conn.organization_type
+            organization_code = conn.organization_code
+            connected_id = conn.connected_id
+
+        codef_result = None
+        codef_error = None
+        should_call = call_codef and bool(connected_id)
+        if should_call:
+            # client_type 은 등록 시 기본값과 동일하게 사용 (DB 미저장 필드).
+            # register_card/register_bank 의 기본값과 정확히 일치 — P (개인 카드) /
+            # B (사업자 은행). 사장님 시나리오 (개인 카드 + 사업자 은행) 와 부합.
+            business_type = "CD" if organization_type == "card" else "BK"
+            client_type = "P" if organization_type == "card" else "B"
+            try:
+                codef_result = self._client.delete_account([{
+                    "countryCode": "KR",
+                    "businessType": business_type,
+                    "clientType": client_type,
+                    "organization": organization_code,
+                    "connectedId": connected_id,
+                }])
+            except Exception as e:
+                from .exceptions import CodefAPIError
+                if isinstance(e, CodefAPIError):
+                    codef_error = {"code": e.code, "message": str(e)}
+                else:
+                    codef_error = {"code": "unknown", "message": str(e)}
+
+        with Session(self.engine) as s:
+            conn = s.get(CodefConnection, connection_id)
             conn.status = "deactivated"
             conn.deactivated_at = datetime.datetime.utcnow()
             s.add(conn)
             s.commit()
+
+        return {
+            "db_deactivated": True,
+            "codef_called": should_call,
+            "codef_result": codef_result,
+            "codef_error": codef_error,
+        }
+
+    def update_credentials(self, connection_id: int, auth_payload: dict) -> CodefConnection:
+        """ID/PW 인증 connection 의 자격증명을 CODEF 측에서 갱신 (05_update_account).
+
+        reverify (재등록) 와 차이:
+          - reverify       : 새 connectedId 발급 → DB 의 connected_id 교체.
+          - update_credentials: 기존 connectedId 유지, CODEF 측 저장된 비번만 갱신.
+        같은 connectedId 를 유지하므로 이미 적재된 거래내역과의 연속성이 좋고
+        호출 한도 측면에서도 유리.
+
+        auth_payload 형식: {"id": "...", "password": "..."} — 새 비번 (id 도 변경 가능).
+        간편인증(simple_*) 방식은 비번 자체가 없으므로 ValueError.
+        """
+        if "id" not in auth_payload or "password" not in auth_payload:
+            raise ValueError("auth_payload 에 id 와 password 필요")
+
+        with Session(self.engine) as s:
+            conn = s.get(CodefConnection, connection_id)
+            if not conn:
+                raise ValueError(f"connection {connection_id} 없음")
+            if conn.auth_method != "id_pw":
+                raise ValueError(
+                    f"ID/PW 인증이 아닌 connection 은 비번 변경 불가 "
+                    f"(현재 auth_method={conn.auth_method}). 재등록(reverify)을 사용하세요."
+                )
+            organization_type = conn.organization_type
+            organization_code = conn.organization_code
+            connected_id = conn.connected_id
+
+        business_type = "CD" if organization_type == "card" else "BK"
+        client_type = "P" if organization_type == "card" else "B"
+        encrypted_pw = self._client.encrypt_password(auth_payload["password"])
+
+        self._client.update_account([{
+            "countryCode": "KR",
+            "businessType": business_type,
+            "clientType": client_type,
+            "organization": organization_code,
+            "connectedId": connected_id,
+            "loginType": "1",
+            "id": auth_payload["id"],
+            "password": encrypted_pw,
+        }])
+
+        with Session(self.engine) as s:
+            conn = s.get(CodefConnection, connection_id)
+            conn.status = "active"
+            conn.last_verified_at = datetime.datetime.utcnow()
+            conn.last_failed_at = None
+            conn.last_error_code = None
+            conn.last_error_message = None
+            s.add(conn)
+            s.commit()
+            s.refresh(conn)
+            return conn
+
+    def list_codef_connected_ids(self) -> list[str]:
+        """CODEF 측에 등록된 모든 connectedId 목록 (04_get_connected_id_list).
+
+        주의: client_id 단위 — 멀티 테넌트 환경에서는 모든 사업장의 connectedId
+        가 섞여 반환됨. business_id 별 필터는 호출자가 DB 측 연관을 통해 수행.
+        """
+        return self._client.list_connected_ids()
 
     def mark_failed(self, connection_id: int, status: str,
                     error_code: str = "", error_message: str = "") -> None:

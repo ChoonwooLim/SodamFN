@@ -94,6 +94,94 @@ def test_request_product_unknown_error(mock_codef_sdk):
     assert exc.value.code == "CF-99999"
 
 
+def test_delete_account_success(mock_codef_sdk):
+    mock_codef_sdk.delete_account.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": {"successList": [{"organization": "0307", "connectedId": "x"}]},
+    })
+    c = CodefClient()
+    res = c.delete_account([{
+        "countryCode": "KR", "businessType": "CD", "clientType": "P",
+        "organization": "0307", "connectedId": "x",
+    }])
+    assert res["result"]["code"] == "CF-00000"
+    # SDK 가 accountList 래퍼와 함께 호출됐는지
+    call_args = mock_codef_sdk.delete_account.call_args
+    sent_payload = call_args.args[1]
+    assert "accountList" in sent_payload
+    assert sent_payload["accountList"][0]["connectedId"] == "x"
+
+
+def test_delete_account_propagates_error(mock_codef_sdk):
+    mock_codef_sdk.delete_account.return_value = json.dumps({
+        "result": {"code": "CF-99999", "message": "삭제 실패"},
+        "data": {},
+    })
+    c = CodefClient()
+    with pytest.raises(CodefAPIError) as exc:
+        c.delete_account([{"connectedId": "x"}])
+    assert exc.value.code == "CF-99999"
+
+
+def test_update_account_success(mock_codef_sdk):
+    mock_codef_sdk.update_account.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": {"connectedId": "x"},
+    })
+    c = CodefClient()
+    res = c.update_account([{
+        "countryCode": "KR", "businessType": "CD", "clientType": "P",
+        "organization": "0307", "connectedId": "x",
+        "loginType": "1", "id": "u", "password": "encrypted-pw",
+    }])
+    assert res["result"]["code"] == "CF-00000"
+    call_args = mock_codef_sdk.update_account.call_args
+    sent_payload = call_args.args[1]
+    assert sent_payload["accountList"][0]["password"] == "encrypted-pw"
+
+
+def test_list_connected_ids_dict_form(mock_codef_sdk):
+    mock_codef_sdk.get_connected_id_list.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": {"connectedIdList": ["cid-1", "cid-2", "cid-3"]},
+    })
+    c = CodefClient()
+    ids = c.list_connected_ids()
+    assert ids == ["cid-1", "cid-2", "cid-3"]
+
+
+def test_list_connected_ids_dict_form_with_objects(mock_codef_sdk):
+    """일부 응답은 dict 항목 — connectedId 필드만 추출."""
+    mock_codef_sdk.get_connected_id_list.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": {"connectedIdList": [
+            {"connectedId": "cid-A", "createdAt": "2026-01-01"},
+            {"connectedId": "cid-B"},
+        ]},
+    })
+    c = CodefClient()
+    assert c.list_connected_ids() == ["cid-A", "cid-B"]
+
+
+def test_list_connected_ids_plain_list(mock_codef_sdk):
+    """data 가 dict 가 아닌 list 인 변종 응답."""
+    mock_codef_sdk.get_connected_id_list.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": ["cid-x", "cid-y"],
+    })
+    c = CodefClient()
+    assert c.list_connected_ids() == ["cid-x", "cid-y"]
+
+
+def test_list_connected_ids_empty(mock_codef_sdk):
+    mock_codef_sdk.get_connected_id_list.return_value = json.dumps({
+        "result": {"code": "CF-00000", "message": "성공"},
+        "data": {},
+    })
+    c = CodefClient()
+    assert c.list_connected_ids() == []
+
+
 def test_request_product_returns_rows(mock_codef_sdk):
     mock_codef_sdk.request_product.return_value = json.dumps({
         "result": {"code": "CF-00000", "message": "성공"},
