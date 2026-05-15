@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Landmark, RefreshCw, Download, ExternalLink, CheckCircle2, AlertCircle, Loader2, Filter, Search, Tag, Trash2, Stethoscope, X as XIcon, Plus, Power, Clock, Sparkles, Send, MessageSquare, HelpCircle } from 'lucide-react';
 import api from '../api';
+import BankModuleDetail from './BankModuleDetail';
 import HelpModal from '../components/HelpModal';
 import { MOBILE_PG_GUIDE_MD, MOBILE_PG_GUIDE_TITLE } from '../data/help/mobilePgGuide';
 import { DEPOSIT_GUIDE_MD, DEPOSIT_GUIDE_TITLE } from '../data/help/depositClassificationGuide';
@@ -576,19 +577,21 @@ export default function BankSync({ source = 'popbill' } = {}) {
                 </div>
 
                 {tab === 'accounts' && (
-                    <AccountsTab
-                        accounts={accounts}
-                        loading={loading}
-                        syncMsg={syncMsg}
-                        onSync={handleSyncAccounts}
-                        onOpenMgtUrl={handleOpenMgtUrl}
-                        onPull={openPullModal}
-                        onDelete={handleDeleteAccount}
-                        onDiagnose={runDiagnose}
-                        onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
-                        onRegistAccount={() => setRegistOpen(true)}
-                        isSuperAdmin={localStorage.getItem('user_role') === 'superadmin'}
-                    />
+                    isCodef
+                        ? <BankModuleDetail embedded />
+                        : <AccountsTab
+                            accounts={accounts}
+                            loading={loading}
+                            syncMsg={syncMsg}
+                            onSync={handleSyncAccounts}
+                            onOpenMgtUrl={handleOpenMgtUrl}
+                            onPull={openPullModal}
+                            onDelete={handleDeleteAccount}
+                            onDiagnose={runDiagnose}
+                            onManualAdd={() => { setManualOpen(true); setManualResult(null); }}
+                            onRegistAccount={() => setRegistOpen(true)}
+                            isSuperAdmin={localStorage.getItem('user_role') === 'superadmin'}
+                          />
                 )}
                 {tab === 'transactions' && (
                     <TransactionsTab

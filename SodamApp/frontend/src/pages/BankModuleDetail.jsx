@@ -20,7 +20,10 @@ const DEFAULT_INTERVAL_MIN = 21;
  *   - 거래 가져오기 모달 (CODEF /v1/kr/bank/.../transaction-list)
  *   - 거래내역 테이블 (분류 라벨 동일)
  */
-export default function BankModuleDetail() {
+export default function BankModuleDetail({ embedded = false } = {}) {
+    // embedded=true: BankSync 의 source='codef' 시 등록 계좌 탭 안에서 inline 렌더.
+    //   - 헤더 / 자동갱신 / 거래내역 테이블 제외 (BankSync 가 처리)
+    //   - 등록 카드 + 등록 모달 + 거래 가져오기 모달만 표시
     const today = new Date();
     const curY = today.getFullYear();
     const curM = today.getMonth() + 1;
@@ -174,6 +177,84 @@ export default function BankModuleDetail() {
 
     const activeCount = conns.filter(c => c.status === 'active').length;
     const accountsForConn = (orgCode) => accounts.filter(a => a.bank_code === orgCode);
+
+    if (embedded) {
+        return (
+            <>
+                {msg && (
+                    <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+                        <CheckCircle2 className="w-4 h-4 inline mr-1" />
+                        {msg}
+                    </div>
+                )}
+                {err && (
+                    <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                        <AlertCircle className="w-4 h-4 inline mr-1" />
+                        {err}
+                    </div>
+                )}
+
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-base font-semibold text-slate-700">
+                        등록된 CODEF 은행 연결 <span className="text-slate-400 font-normal">({activeCount}/{conns.length} 활성)</span>
+                    </h2>
+                    <button
+                        onClick={() => setRegisterOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold"
+                    >
+                        <Plus className="w-4 h-4" /> 은행 연결 추가
+                    </button>
+                </div>
+
+                {conns.length === 0 ? (
+                    <div className="bg-white border border-dashed border-slate-300 rounded-xl p-8 text-center">
+                        <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                        <p className="text-sm text-slate-500 mb-3">등록된 은행 연결이 없습니다.</p>
+                        <button
+                            onClick={() => setRegisterOpen(true)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                        >
+                            <Plus className="w-4 h-4" /> 첫 은행 연결 등록
+                        </button>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {conns.map(c => (
+                            <ConnectionCard
+                                key={c.id}
+                                conn={c}
+                                accounts={accountsForConn(c.organization_code)}
+                                onPull={(acc) => setPullModal({ conn: c, account: acc })}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {registerOpen && (
+                    <BankConnectionRegisterModal
+                        onClose={() => setRegisterOpen(false)}
+                        onRegistered={() => {
+                            setRegisterOpen(false);
+                            setMsg('은행 연결 등록 완료');
+                            fetchAll();
+                        }}
+                    />
+                )}
+                {pullModal && (
+                    <BankPullModal
+                        conn={pullModal.conn}
+                        account={pullModal.account}
+                        onClose={() => setPullModal(null)}
+                        onPulled={(summary) => {
+                            setPullModal(null);
+                            setMsg(`거래 가져오기 완료 — 신규 ${summary.inserted}건, 중복 ${summary.duplicated}건`);
+                            fetchAll();
+                        }}
+                    />
+                )}
+            </>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-slate-50">
