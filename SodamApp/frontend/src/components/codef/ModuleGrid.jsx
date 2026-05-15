@@ -1,4 +1,4 @@
-import { CreditCard, Building2, Users, FileText, IdCard, Store, Bike, Wallet } from 'lucide-react';
+import { CreditCard, Building2, Users, FileText, IdCard, Store, Bike, Wallet, Landmark } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
@@ -20,13 +20,23 @@ const MODULES = [
     },
     {
         id: 'banks',
-        title: '계좌 거래내역',
+        title: 'CODEF 계좌연동',
         provider: 'CODEF',
         icon: Building2,
         color: 'blue',
         active: true,
         href: '/external-integration/banks',
         description: '20+ 은행 입출금 자동수집 (CODEF 마이데이터)',
+    },
+    {
+        id: 'popbill-bank',
+        title: 'POPBILL 계좌연동',
+        provider: 'POPBILL',
+        icon: Landmark,
+        color: 'indigo',
+        active: true,
+        href: '/finance/bank-sync',
+        description: '팝빌 이지펀뱅크 정액제 — 계좌 입출금 실시간 수집',
     },
     {
         id: 'card-purchase',
@@ -143,6 +153,12 @@ function ModuleCard({ module, stats }) {
             icon: 'text-violet-600',
             badge: 'bg-violet-50 text-violet-700',
             link: 'text-violet-600',
+        },
+        indigo: {
+            border: 'border-indigo-200 hover:border-indigo-400',
+            icon: 'text-indigo-600',
+            badge: 'bg-indigo-50 text-indigo-700',
+            link: 'text-indigo-600',
         },
     };
     const c = colorMap[module.color] || colorMap.blue;

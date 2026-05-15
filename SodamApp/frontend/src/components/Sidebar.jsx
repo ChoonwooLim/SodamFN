@@ -166,7 +166,7 @@ export default function Sidebar() {
         { icon: BookOpen, label: '홈택스 수집', path: '/finance/hometax', color: 'text-violet-400' },
         { icon: Link2, label: '외부 연동', path: '/external-integration', color: 'text-blue-400',
           alerts: extIntegrationAlerts },
-        { icon: Landmark, label: '팝빌계좌연동', path: '/finance/bank-sync', color: 'text-indigo-400', nested: true },
+        { icon: Landmark, label: 'POPBILL 계좌연동', path: '/finance/bank-sync', color: 'text-indigo-400', nested: true },
         { icon: Gauge, label: '자동수집 상태', path: '/auto-collection', color: 'text-teal-400' },
     ];
 
