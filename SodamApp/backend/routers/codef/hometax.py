@@ -209,9 +209,12 @@ def _build_hometax_payload(
             "phoneNo": re.sub(r"\D", "", phone_no),
             "birthDate": re.sub(r"\D", "", birth_date),
             "telecom": auth_payload.get("telecom", "0"),
-            "isIdentify": "1",
             "is2Way": "true",
         }
+        # ``isIdentify`` 는 본인확인 강제 모드 — 일부 사이트는 휴대폰만으로 OK.
+        # auth_payload 에 명시적으로 들어왔을 때만 추가. (CF-00007 회피 가설 A)
+        if auth_payload.get("isIdentify") is not None:
+            account["isIdentify"] = str(auth_payload["isIdentify"])
         return {"accountList": [account]}, f"simple_{login_type}"
 
     # 3) ID/PW (홈택스 ID) — 2차 인증으로 대표자 주민번호 필요
