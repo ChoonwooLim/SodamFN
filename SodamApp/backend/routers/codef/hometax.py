@@ -14,9 +14,10 @@
 from __future__ import annotations
 
 import datetime
+import re
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlmodel import Session, func, select
 
@@ -189,33 +190,46 @@ def _build_hometax_payload(
     }
     login_type = (auth_payload.get("loginType") or "").lower()
     if login_type in simple_types_level:
+        # CF-00007 회피: 카드/은행 simple_auth 와 동일하게 빈 값도 키는 유지.
+        # CODEF 가 키 누락을 "잘못된 파라미터" 로 판단하는 경우 대응.
+        user_name = (auth_payload.get("userName") or "").strip()
+        phone_no = (auth_payload.get("phoneNo") or auth_payload.get("phone") or "").strip()
+        birth_date = (auth_payload.get("birthDate") or auth_payload.get("identity") or "").strip()
+        if not user_name:
+            raise ValueError("간편인증은 이름이 필요합니다.")
+        if not phone_no:
+            raise ValueError("간편인증은 휴대폰 번호가 필요합니다.")
+        if not birth_date:
+            raise ValueError("간편인증은 생년월일(YYYYMMDD)이 필요합니다.")
         account = {
             **base,
             "loginType": "5",
             "loginTypeLevel": simple_types_level[login_type],
-            # userName/phoneNo/birthDate/telecom — 사용자가 채운 값만 전달.
-            # CODEF 가 자체적으로 본인인증 단계에서 보강하는 경우 비워둬도 가능.
-            "userName": auth_payload.get("userName", "").strip(),
-            "phoneNo": (auth_payload.get("phoneNo") or auth_payload.get("phone") or "").strip(),
-            "birthDate": (auth_payload.get("birthDate") or auth_payload.get("identity") or "").strip(),
+            "userName": user_name,
+            "phoneNo": re.sub(r"\D", "", phone_no),
+            "birthDate": re.sub(r"\D", "", birth_date),
             "telecom": auth_payload.get("telecom", "0"),
             "isIdentify": "1",
             "is2Way": "true",
         }
-        # 빈 문자열은 키 자체 제거 (CODEF 가 null 보다 키 없음을 선호하는 경우 대응)
-        for k in ("userName", "phoneNo", "birthDate"):
-            if not account.get(k):
-                account.pop(k, None)
         return {"accountList": [account]}, f"simple_{login_type}"
 
-    # 3) ID/PW (홈택스 ID)
+    # 3) ID/PW (홈택스 ID) — 2차 인증으로 대표자 주민번호 필요
     if "id" in auth_payload and "password" in auth_payload:
         encrypted = svc._client.encrypt_password(auth_payload["password"])  # type: ignore[attr-defined]
+        # 주민번호 — 7자리 (앞자리만) 또는 13자리 모두 허용. 숫자만 추출.
+        identity = re.sub(r"\D", "", str(auth_payload.get("identity") or ""))
+        if not identity or len(identity) < 7:
+            raise ValueError(
+                "홈택스 ID 로그인은 2차 인증으로 대표자 주민번호 앞 7자리가 필요합니다. "
+                "identity 필드에 주민번호(7자리 또는 13자리)를 입력해주세요.",
+            )
         account = {
             **base,
             "loginType": "1",
             "id": auth_payload["id"],
             "password": encrypted,
+            "identity": identity,  # CODEF 가 홈택스 2차 인증 단계에서 사용
         }
         return {"accountList": [account]}, "id_pw"
 
