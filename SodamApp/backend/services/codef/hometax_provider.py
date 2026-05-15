@@ -35,14 +35,11 @@ logger = logging.getLogger("sodam.codef.hometax")
 # 홈택스(국세청) CODEF organization 코드
 HOMETAX_ORG_CODE = "0001"
 
-# CODEF API path — 사장님 제공 PDF spec 으로 검증.
-# 매입 (PDF 확인됨): /v1/kr/public/nt/cash-receipt/purchase-details
-# 매출 / 세금계산서 통합 PDF 는 사장님 추가 제공 시 정확한 path 적용 예정.
+# CODEF API path — 사장님 제공 PDF spec 으로 모두 확정.
 PATH_CASH_PURCHASE = "/v1/kr/public/nt/cash-receipt/purchase-details"
-# 매출은 패턴 추정 (sales-details) — 첫 호출에서 검증/정정 필요.
 PATH_CASH_SALES = "/v1/kr/public/nt/cash-receipt/sales-details"
-# 세금계산서 통합조회 — 사장님 추가 PDF 필요. 임시 placeholder.
-PATH_TAXINVOICE_INTEGRATED = "/v1/kr/public/nt/tax-invoice/integrated-list"
+# "전자세금계산서 기간별 매출/매입 통계" — 매출+매입 합계 한 번에.
+PATH_TAXINVOICE_INTEGRATED = "/v1/kr/public/nt/tax-invoice/sales-purchase-statistics"
 
 
 @dataclass
