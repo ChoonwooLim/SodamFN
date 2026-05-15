@@ -85,10 +85,18 @@ class BaseCashbillProvider:
                states: Optional[List[str]] = None, page: int = 1, per_page: int = 100) -> dict:
         raise NotImplementedError
 
-    def cancel(self, mgt_key: str, memo: Optional[str] = None) -> CashbillResult:
+    def cancel(self, mgt_key: str, orig_confirm_num: str, orig_trade_date: str,
+               memo: Optional[str] = None) -> CashbillResult:
         raise NotImplementedError
 
     def get_popbill_url(self, togo: str = "PBOX", user_id: Optional[str] = None) -> str:
+        raise NotImplementedError
+
+    def get_balance(self) -> dict:
+        """잔액 조회. {member, partner, usable} 형식 (TaxInvoice/Statement 동일)."""
+        raise NotImplementedError
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
         raise NotImplementedError
 
 
@@ -112,10 +120,17 @@ class DevStubProvider(BaseCashbillProvider):
     def search(self, **kwargs) -> dict:
         return {"ok": True, "total": 0, "list": [], "note": "STUB 모드"}
 
-    def cancel(self, mgt_key: str, memo: Optional[str] = None) -> CashbillResult:
+    def cancel(self, mgt_key: str, orig_confirm_num: str, orig_trade_date: str,
+               memo: Optional[str] = None) -> CashbillResult:
         return CashbillResult(ok=True, mgt_key=mgt_key)
 
     def get_popbill_url(self, togo: str = "PBOX", user_id: Optional[str] = None) -> str:
+        return "https://www.popbill.com/"
+
+    def get_balance(self) -> dict:
+        return {"member": None, "partner": None, "usable": None}
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
         return "https://www.popbill.com/"
 
 
@@ -181,13 +196,31 @@ class PopbillCashbillProvider(BaseCashbillProvider):
             cb = self._build_cashbill(draft)
             r = svc.registIssue(self.corp_num, cb, "셈하나 발행", self.user_id)
             ok = getattr(r, "code", None) in (1, "1") or getattr(r, "receiptNum", None) or getattr(r, "confirmNum", None)
+            confirm_num = getattr(r, "confirmNum", None)
+            trade_date = getattr(r, "tradeDate", None) or draft.trade_date
+            receipt_num = getattr(r, "receiptNum", None)
+            issue_dt = getattr(r, "issueDT", None)
+
+            # 보강: registIssue 응답이 시점에 따라 confirmNum/issueDT 누락 가능 →
+            # getInfo 즉시 호출로 보강 (TaxInvoice/Statement 동일 패턴).
+            if ok and (not confirm_num or not receipt_num):
+                try:
+                    info = svc.getInfo(self.corp_num, draft.mgt_key)
+                    if info is not None:
+                        confirm_num = confirm_num or getattr(info, "confirmNum", None)
+                        receipt_num = receipt_num or getattr(info, "itemKey", None)
+                        issue_dt = issue_dt or getattr(info, "issueDT", None)
+                        trade_date = trade_date or getattr(info, "tradeDate", None)
+                except Exception:  # noqa: BLE001
+                    pass
+
             return CashbillResult(
                 ok=bool(ok),
                 mgt_key=draft.mgt_key,
-                confirm_num=getattr(r, "confirmNum", None),
-                trade_date=getattr(r, "tradeDate", None) or draft.trade_date,
-                receipt_num=getattr(r, "receiptNum", None),
-                issue_dt=getattr(r, "issueDT", None),
+                confirm_num=confirm_num,
+                trade_date=trade_date,
+                receipt_num=receipt_num,
+                issue_dt=issue_dt,
                 error=None if ok else getattr(r, "message", None),
             )
         except PopbillException as pe:
@@ -203,7 +236,8 @@ class PopbillCashbillProvider(BaseCashbillProvider):
             PopbillException = Exception  # type: ignore
         try:
             svc = self._get_svc()
-            info = svc.getInfo(self.corp_num, mgt_key, self.user_id)
+            # popbill SDK 시그니처: getInfo(CorpNum, MgtKey) — UserID 인자 없음.
+            info = svc.getInfo(self.corp_num, mgt_key)
             return {"ok": True, "info": _row_to_dict(info)}
         except PopbillException as pe:
             return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
@@ -218,19 +252,24 @@ class PopbillCashbillProvider(BaseCashbillProvider):
             PopbillException = Exception  # type: ignore
         try:
             svc = self._get_svc()
+            # popbill SDK 시그니처:
+            #   search(CorpNum, DType, SDate, EDate, State, TradeType, TradeUsage,
+            #          TaxationType, Page, PerPage, Order, UserID=None, QString=None, ...)
+            # 기존 코드는 TaxationType 과 Page 사이에 빈 "" 가 들어가 모든 인자가
+            # 한 칸씩 밀려 Page 자리에 str "" 가 들어가는 버그 — Page 비교 시
+            # "'>' not supported between instances of 'str' and 'int'" 발생.
             res = svc.search(
                 self.corp_num,
                 d_type,
                 s_date,
                 e_date,
                 states or [],
-                [],   # tradeType
-                [],   # tradeUsage
-                [],   # taxationType
-                "",   # qString
-                page,
-                per_page,
-                "D",
+                [],          # TradeType
+                [],          # TradeUsage
+                [],          # TaxationType
+                page,        # Page (int)
+                per_page,    # PerPage (int)
+                "D",         # Order
                 self.user_id,
             )
             total = getattr(res, "total", 0) or 0
@@ -239,11 +278,17 @@ class PopbillCashbillProvider(BaseCashbillProvider):
                 items.append(_row_to_dict(row))
             return {"ok": True, "total": total, "list": items, "page": page, "per_page": per_page}
         except PopbillException as pe:
-            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}"}
+            return {"ok": False, "error": f"Popbill[{getattr(pe, 'code', None)}] {getattr(pe, 'message', str(pe))}", "list": []}
         except Exception as e:
-            return {"ok": False, "error": f"조회 오류: {e}"}
+            return {"ok": False, "error": f"조회 오류: {e}", "list": []}
 
-    def cancel(self, mgt_key: str, memo: Optional[str] = None) -> CashbillResult:
+    def cancel(self, mgt_key: str, orig_confirm_num: str, orig_trade_date: str,
+               memo: Optional[str] = None) -> CashbillResult:
+        """발행된 현금영수증 취소 (revokeRegistIssue — 취소 거래로 새 발행).
+
+        팝빌은 원거래의 confirmNum + tradeDate 가 필요. DB에 저장돼 있지 않으면
+        호출자가 popbill getInfo 로 미리 조회해 인자로 전달.
+        """
         try:
             from popbill import PopbillException  # type: ignore
         except ImportError:
@@ -254,9 +299,9 @@ class PopbillCashbillProvider(BaseCashbillProvider):
             r = svc.revokeRegistIssue(
                 self.corp_num,
                 new_mgt_key,
-                getattr(self, "_last_confirm", None) or "",
-                "",  # orgTradeDate (필요시 조회 후 채움)
-                False,  # smssendYN
+                orig_confirm_num or "",
+                orig_trade_date or "",
+                False,                  # smssendYN
                 memo or "취소",
                 self.user_id,
             )
@@ -272,7 +317,39 @@ class PopbillCashbillProvider(BaseCashbillProvider):
 
     def get_popbill_url(self, togo: str = "PBOX", user_id: Optional[str] = None) -> str:
         svc = self._get_svc()
-        return svc.getPopbillURL(self.corp_num, user_id or self.user_id or "sodam", togo)
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다.")
+        return svc.getPopbillURL(self.corp_num, uid, togo)
+
+    def get_balance(self) -> dict:
+        """popbill 회원 + 파트너 잔액 동시 조회 (TaxInvoice/Statement 동일 패턴).
+
+        현금영수증 발행 단가는 100원/건 (LIVE). 파트너 잔액이 사장님 주 사용 잔액.
+        """
+        svc = self._get_svc()
+        member: Optional[float] = None
+        partner: Optional[float] = None
+        try:
+            member = float(svc.getBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            partner = float(svc.getPartnerBalance(self.corp_num))
+        except Exception:  # noqa: BLE001
+            pass
+        if partner is not None and partner > 0:
+            usable = partner
+        else:
+            usable = member if member is not None else partner
+        return {"member": member, "partner": partner, "usable": usable}
+
+    def get_charge_url(self, user_id: Optional[str] = None) -> str:
+        svc = self._get_svc()
+        uid = user_id or self.user_id
+        if not uid:
+            raise RuntimeError("POPBILL_USER_ID 가 설정되지 않았습니다.")
+        return svc.getChargeURL(self.corp_num, uid)
 
 
 def _row_to_dict(obj) -> dict:

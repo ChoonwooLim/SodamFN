@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
     Banknote, ExternalLink, Loader2, RefreshCw, AlertCircle, CheckCircle2,
-    Send, Smartphone, FileCheck, Info,
+    Send, Smartphone, FileCheck, Info, Wallet, CreditCard,
 } from 'lucide-react';
 import api from '../api';
 
@@ -21,6 +21,7 @@ export default function CashBill() {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [history, setHistory] = useState({ total: 0, list: [] });
     const [openingUrl, setOpeningUrl] = useState(null);
+    const [balance, setBalance] = useState(null);
 
     const [form, setForm] = useState({
         trade_usage: '소득공제용',
@@ -43,6 +44,7 @@ export default function CashBill() {
         loadStatus();
         loadIssuer();
         loadHistory();
+        loadBalance();
     }, []);
 
     // 과세 시 공급가액의 10% = 세액 자동 계산
@@ -85,6 +87,17 @@ export default function CashBill() {
             if (res.data.ok && res.data.url) window.open(res.data.url, '_blank', 'noopener');
         } catch (e) { alert(e?.response?.data?.detail || 'URL 생성 실패'); }
         finally { setOpeningUrl(null); }
+    };
+
+    const loadBalance = async () => {
+        try { setBalance((await api.get('/cashbill/balance')).data); } catch { /* noop */ }
+    };
+
+    const openChargeURL = async () => {
+        try {
+            const res = await api.get('/cashbill/charge-url');
+            if (res.data.ok && res.data.url) window.open(res.data.url, '_blank', 'noopener');
+        } catch (e) { alert(e?.response?.data?.detail || '충전 URL 생성 실패'); }
     };
 
     const idNumPlaceholder = useMemo(() => {
@@ -159,27 +172,70 @@ export default function CashBill() {
                     </div>
                 )}
 
-                {/* 팝빌 바로가기 */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
-                    <div className="flex items-center gap-2 mb-3">
-                        <ExternalLink size={16} className="text-slate-500" />
-                        <h2 className="font-semibold text-slate-700 text-sm">팝빌 공식 페이지</h2>
+                {/* 잔액 + 팝빌 바로가기 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                    {/* 잔액 카드 */}
+                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                        <div className="flex items-start gap-2 mb-2">
+                            <div className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg">
+                                <Wallet size={16} />
+                            </div>
+                            <div className="flex-1">
+                                <div className="text-xs font-semibold text-slate-500">팝빌 잔액 ({balance?.is_test ? 'TEST' : 'LIVE'})</div>
+                                <div className="text-xl font-bold text-slate-900 tabular-nums">
+                                    {balance?.balance != null ? `${Number(balance.balance).toLocaleString()}P` : '—'}
+                                </div>
+                                <div className="text-xs text-slate-500 mt-0.5">
+                                    발행 {balance?.unit_cost || 100}원/건
+                                    {balance?.balance != null && (
+                                        <span className="ml-1 text-emerald-700">
+                                            (≈ {Math.floor((balance.balance || 0) / (balance.unit_cost || 100))}건)
+                                        </span>
+                                    )}
+                                </div>
+                                {(balance?.partner_balance != null || balance?.member_balance != null) && (
+                                    <div className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                        {balance?.partner_balance != null && (
+                                            <span>파트너 {Number(balance.partner_balance).toLocaleString()}P</span>
+                                        )}
+                                        {balance?.partner_balance != null && balance?.member_balance != null && (
+                                            <span className="mx-1">·</span>
+                                        )}
+                                        {balance?.member_balance != null && (
+                                            <span>회원 {Number(balance.member_balance).toLocaleString()}P</span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <button type="button" onClick={openChargeURL}
+                            className="w-full flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition-colors">
+                            <CreditCard size={12} /> 잔액 충전
+                        </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {[
-                            { togo: 'PBOX', label: '발행함', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
-                            { togo: 'WRITE', label: '직접 작성', color: 'bg-slate-50 text-slate-700 hover:bg-slate-100' },
-                        ].map((b) => (
-                            <button
-                                key={b.togo}
-                                onClick={() => openPopbillURL(b.togo)}
-                                disabled={openingUrl === b.togo}
-                                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${b.color} disabled:opacity-50`}
-                            >
-                                {openingUrl === b.togo ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                                {b.label}
-                            </button>
-                        ))}
+
+                    {/* 팝빌 바로가기 (2칸) */}
+                    <div className="md:col-span-2 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="flex items-center gap-2 mb-3">
+                            <ExternalLink size={16} className="text-slate-500" />
+                            <h2 className="font-semibold text-slate-700 text-sm">팝빌 공식 페이지</h2>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {[
+                                { togo: 'PBOX', label: '발행함', color: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
+                                { togo: 'WRITE', label: '직접 작성', color: 'bg-slate-50 text-slate-700 hover:bg-slate-100' },
+                            ].map((b) => (
+                                <button
+                                    key={b.togo}
+                                    onClick={() => openPopbillURL(b.togo)}
+                                    disabled={openingUrl === b.togo}
+                                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${b.color} disabled:opacity-50`}
+                                >
+                                    {openingUrl === b.togo ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                                    {b.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 

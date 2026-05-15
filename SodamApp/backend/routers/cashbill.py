@@ -74,6 +74,8 @@ class IssueIn(BaseModel):
 
 class CancelIn(BaseModel):
     mgt_key: str
+    orig_confirm_num: str = Field(..., description="원거래 confirmNum (필수)")
+    orig_trade_date: str = Field(..., description="원거래 거래일자 YYYYMMDD (필수)")
     memo: Optional[str] = "취소"
 
 
@@ -184,7 +186,14 @@ def search(
 
 @router.post("/cancel")
 def cancel(body: CancelIn, _admin: User = Depends(get_admin_user)):
-    res = get_provider().cancel(body.mgt_key, body.memo or "취소")
+    """발행된 현금영수증 취소 (revokeRegistIssue — 취소 거래로 새 발행).
+
+    팝빌은 원거래 confirmNum + tradeDate 가 필요. 발행 후 응답 또는 /info 로 미리
+    확보한 값을 호출자가 전달.
+    """
+    res = get_provider().cancel(
+        body.mgt_key, body.orig_confirm_num, body.orig_trade_date, body.memo or "취소",
+    )
     if not res.ok:
         raise HTTPException(status_code=400, detail=res.error or "취소 실패")
     return res.to_dict()
@@ -198,5 +207,35 @@ def popbill_url(
     try:
         url = get_provider().get_popbill_url(togo=togo)
         return {"ok": True, "url": url, "togo": togo}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/balance")
+def get_balance(_admin: User = Depends(get_admin_user)):
+    """팝빌 잔액 조회 — 회원 + 파트너 분리 표시 (현금영수증 100원/건 기준)."""
+    p = get_provider()
+    bal = p.get_balance()  # {"member", "partner", "usable"}
+    is_test_mode = (os.getenv("POPBILL_IS_TEST", "true").strip().lower() in ("1", "true", "yes"))
+    return {
+        "ok": True,
+        "balance": bal.get("usable"),
+        "member_balance": bal.get("member"),
+        "partner_balance": bal.get("partner"),
+        "is_test": is_test_mode,
+        "unit_cost": 100,
+        "note": (
+            "TEST 환경 잔액 (test.popbill.com 충전)" if is_test_mode
+            else "LIVE 환경 잔액 — 파트너 잔액(SODAM 충전) + 회원 잔액"
+        ),
+    }
+
+
+@router.get("/charge-url")
+def get_charge_url(_admin: User = Depends(get_admin_user)):
+    """팝빌 포인트 충전 페이지 URL."""
+    try:
+        url = get_provider().get_charge_url()
+        return {"ok": True, "url": url}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
