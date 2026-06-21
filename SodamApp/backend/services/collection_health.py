@@ -112,6 +112,7 @@ def evaluate_channels(session: Session, business_id: int,
                                     data_model=BaeminOrder))
 
     # CODEF — 연결 status + 마지막 호출 최신성. 자동 cron 없어 stale 정상.
+    # card_sales(카드매출)는 health 모니터링 스코프 외 (spec 3.1: CODEF=카드매입/은행만). 의도적 제외.
     conns = session.exec(select(CodefConnection).where(
         CodefConnection.business_id == business_id)).all()
     for conn_type, key, label in (("card_purchase", "codef_card", "CODEF 카드"),
@@ -123,6 +124,7 @@ def evaluate_channels(session: Session, business_id: int,
         if any(c.status != "active" for c in matching):
             out.append(ChannelHealth(key, label, "failed", "연결 비활성"))
             continue
+        # CODEF는 per-type cron이 없어 card/bank가 동일 last_call 공유 — 둘이 함께 stale/healthy 전환되어 phantom/누락 없음.
         last_call = session.exec(
             select(func.max(CodefCallLog.called_at)).where(
                 CodefCallLog.business_id == business_id)

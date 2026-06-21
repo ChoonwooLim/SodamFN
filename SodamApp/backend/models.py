@@ -168,7 +168,7 @@ class Revenue(SQLModel, table=True):
     )
     id: Optional[int] = Field(default=None, primary_key=True)
     date: datetime.date = Field(index=True)
-    channel: str # Store, Coupang, Baemin
+    channel: str  # 매장 / 쿠팡이츠 / 배달의민족 (한글 표준 — constants.py)
     amount: int
     description: Optional[str] = None
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
