@@ -27,3 +27,14 @@ def test_status_includes_easypos_and_codef(db):
         channels = m.build_all_channels(s, 1, now)
     keys = {c["channel_key"] for c in channels}
     assert {"coupang_eats", "baemin", "easypos", "codef_card", "codef_bank"} <= keys
+
+
+def test_alert_count_zero_when_all_unconfigured(db):
+    """미등록 채널만 있으면 배지 alert_count == 0 (skipping 은 alertable 아님)."""
+    import datetime
+    from routers import external_integration_status as m
+    now = datetime.datetime(2026, 6, 22, 0, 0)
+    with Session(db.engine) as s:
+        channels = m.build_all_channels(s, 1, now)
+    alert_count = sum(1 for c in channels if c["status"] in m.ALERTABLE_STATUSES)
+    assert alert_count == 0

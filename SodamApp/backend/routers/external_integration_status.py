@@ -175,7 +175,7 @@ def _build_baemin_status(session: Session,
     }
 
 
-ALERTABLE_STATUSES = {"expiring_soon", "expired", "failed", "stale", "skipping"}
+ALERTABLE_STATUSES = {"expiring_soon", "expired", "failed", "stale"}
 
 # 상태 정렬: 위험한 것 위로
 _STATUS_ORDER = {
@@ -216,7 +216,8 @@ def get_integration_status(
 
     프론트 헤더 종 컴포넌트 + 외부연동 페이지 상단 카드가 폴링.
 
-    alert_count: 사장님 주의 필요한 채널 수 (expiring_soon / expired / failed / stale / skipping).
+    alert_count: 사장님 주의 필요한 채널 수 (expiring_soon / expired / failed / stale).
+    skipping(미등록 채널)은 배지 카운트 제외 — 정보 표시용으로만 channels[] 에 포함.
     어드민 종 뱃지 숫자로 사용.
     """
     bid = _resolve_bid(admin, x_view_as_business)
