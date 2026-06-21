@@ -69,3 +69,21 @@ def test_resolves_when_recovered(db):
     row = s.exec(select(CollectionHealthAlert).where(
         CollectionHealthAlert.channel_key == "easypos")).first()
     assert row.status == "resolved"
+
+
+def test_renotify_after_days(db):
+    """RENOTIFY_DAYS(3일) 경과 후 리마인드 1회 재발송."""
+    import datetime as dt
+    from models import CoupangEatsCredential
+    from services import collection_health
+    d = dt.datetime(2026, 6, 22, 0, 0)
+    sms = []
+    with Session(db.engine) as s:
+        s.add(CoupangEatsCredential(business_id=1, status="failed", consecutive_failures=3))
+        s.commit()
+        collection_health.dispatch_alerts(
+            s, 1, d, sms_send=lambda p, t: sms.append(t), tg_send=lambda t: None)
+        r = collection_health.dispatch_alerts(
+            s, 1, d + dt.timedelta(days=4), sms_send=lambda p, t: sms.append(t), tg_send=lambda t: None)
+    assert "coupang_eats" in r["renotified"]
+    assert len(sms) == 2

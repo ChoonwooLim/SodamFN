@@ -7,10 +7,20 @@
 """
 from __future__ import annotations
 import datetime
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 from sqlmodel import Session, select, func
+
+log = logging.getLogger(__name__)
+
+
+def _safe_send(fn, *args):
+    try:
+        fn(*args)
+    except Exception as e:  # noqa: BLE001
+        log.warning("alert send failed: %s", e)
 
 STALE_DAYS = 2
 
@@ -161,7 +171,7 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                 alert.detail = f"{h.label}: {h.detail}"
                 session.add(alert)
                 _send_owner_sms(sms_send, owner_phone, h)
-                tg_send(f"{h.channel_key}: {h.status} — {h.detail}")
+                _safe_send(tg_send, f"{h.channel_key}: {h.status} — {h.detail}")
                 opened.append(h.channel_key)
             else:
                 # 이미 open — RENOTIFY_DAYS 경과 시만 리마인드
@@ -170,7 +180,7 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                     alert.last_notified_at = now
                     session.add(alert)
                     _send_owner_sms(sms_send, owner_phone, h)
-                    tg_send(f"[리마인드] {h.channel_key}: {h.status} — {h.detail}")
+                    _safe_send(tg_send, f"[리마인드] {h.channel_key}: {h.status} — {h.detail}")
                     renotified.append(h.channel_key)
         else:
             # healthy — open 이던 게 있으면 resolve
@@ -178,9 +188,9 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                 alert.status = "resolved"
                 alert.resolved_at = now
                 session.add(alert)
-                sms_send(owner_phone,
-                         f"[소담] {h.label} 수집이 정상화되었습니다.")
-                tg_send(f"{h.channel_key}: resolved (정상화)")
+                _safe_send(sms_send, owner_phone,
+                           f"[소담] {h.label} 수집이 정상화되었습니다.")
+                _safe_send(tg_send, f"{h.channel_key}: resolved (정상화)")
                 resolved.append(h.channel_key)
 
     session.commit()
@@ -188,11 +198,17 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
 
 
 def _send_owner_sms(sms_send, owner_phone, h):
-    msg = {
-        "coupang_eats": "쿠팡이츠 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
-        "baemin": "배민 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
-        "easypos": "매장(POS) 매출 수집이 멈췄어요. 확인이 필요합니다.",
-        "codef_card": "카드 매입내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
-        "codef_bank": "은행 거래내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
-    }.get(h.channel_key, f"{h.label} 수집에 문제가 있어요.")
-    sms_send(owner_phone, f"[소담] {msg}")
+    if h.status == "expiring_soon":
+        msg = {
+            "coupang_eats": "쿠팡이츠 쿠키가 곧 만료됩니다. 끊기기 전에 어드민 → 외부연동에서 미리 갱신해 주세요.",
+            "baemin": "배민 쿠키가 곧 만료됩니다. 끊기기 전에 어드민 → 외부연동에서 미리 갱신해 주세요.",
+        }.get(h.channel_key, f"{h.label} 쿠키가 곧 만료됩니다. 미리 갱신해 주세요.")
+    else:
+        msg = {
+            "coupang_eats": "쿠팡이츠 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
+            "baemin": "배민 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
+            "easypos": "매장(POS) 매출 수집이 멈췄어요. 확인이 필요합니다.",
+            "codef_card": "카드 매입내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
+            "codef_bank": "은행 거래내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
+        }.get(h.channel_key, f"{h.label} 수집에 문제가 있어요.")
+    _safe_send(sms_send, owner_phone, f"[소담] {msg}")
