@@ -544,13 +544,14 @@ def upsert_daily_receipts(session, business_id: int, result: DailySalesResult) -
 
 
 def upsert_revenue_aggregate(session, business_id: int, sale_date: datetime.date) -> int:
-    """일자 영수증 집계 → Revenue(channel='Store') upsert.
+    """일자 영수증 집계 → Revenue(channel='매장') upsert.
 
     이지포스 raw 영수증을 sum 해서 매장 매출 1건으로 저장.
     Revenue.amount 는 **순매출** (부가세 제외) — 매출분석/손익에서 일관성.
     """
     from sqlmodel import select
     from models import EasyPosSaleReceipt, Revenue
+    from constants import REVENUE_CHANNEL_STORE
 
     rows = session.exec(
         select(EasyPosSaleReceipt).where(
@@ -569,7 +570,7 @@ def upsert_revenue_aggregate(session, business_id: int, sale_date: datetime.date
         select(Revenue).where(
             Revenue.business_id == business_id,
             Revenue.date == sale_date,
-            Revenue.channel == "Store",
+            Revenue.channel == REVENUE_CHANNEL_STORE,
         )
     ).first()
     description = f"이지포스 자동수집 (영수 {receipt_count}건)"
@@ -581,7 +582,7 @@ def upsert_revenue_aggregate(session, business_id: int, sale_date: datetime.date
         rev = Revenue(
             business_id=business_id,
             date=sale_date,
-            channel="Store",
+            channel=REVENUE_CHANNEL_STORE,
             amount=total_net,
             description=description,
         )
