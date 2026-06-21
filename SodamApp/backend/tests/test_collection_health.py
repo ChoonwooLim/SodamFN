@@ -62,3 +62,34 @@ def test_coupang_failed_when_cookie_invalid(db):
         result = collection_health.evaluate_channels(s, 1, now)
     ce = next(c for c in result if c.channel_key == "coupang_eats")
     assert ce.status == "failed"
+
+
+def test_easypos_stale_not_contaminated_by_other_business(db):
+    """business_id=2의 최신 데이터가 business_id=1 판정에 영향 없어야."""
+    from models import EasyPosCredential, EasyPosSaleReceipt
+    from services import collection_health
+    now = datetime.datetime(2026, 6, 22, 0, 0)
+    with Session(db.engine) as s:
+        s.add(EasyPosCredential(business_id=1, easypos_id="x",
+                                password_encrypted="x", status="active"))
+        s.add(EasyPosSaleReceipt(business_id=2, sale_date=datetime.date(2026, 6, 21),
+                                 pos_no="01", receipt_no="99", net_amount=500))
+        s.commit()
+        result = collection_health.evaluate_channels(s, 1, now)
+    ez = next(c for c in result if c.channel_key == "easypos")
+    assert ez.status == "stale"
+
+
+def test_coupang_expiring_soon(db):
+    """쿠키 만료 6시간 전 → expiring_soon."""
+    import datetime as dt
+    from models import CoupangEatsCredential
+    from services import collection_health
+    now = dt.datetime(2026, 6, 22, 0, 0)
+    with Session(db.engine) as s:
+        s.add(CoupangEatsCredential(business_id=1, status="active",
+                                    cookies_expires_at=now + dt.timedelta(hours=6)))
+        s.commit()
+        result = collection_health.evaluate_channels(s, 1, now)
+    ce = next(c for c in result if c.channel_key == "coupang_eats")
+    assert ce.status == "expiring_soon"

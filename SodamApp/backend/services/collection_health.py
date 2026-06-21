@@ -24,23 +24,36 @@ class ChannelHealth:
     last_data_date: Optional[datetime.date] = None
 
 
-def _max_date(session: Session, col) -> Optional[datetime.date]:
-    v = session.exec(select(func.max(col))).first()
+def _max_date(session: Session, col, model, business_id: int) -> Optional[datetime.date]:
+    v = session.exec(
+        select(func.max(col)).where(model.business_id == business_id)
+    ).first()
     if v is None:
         return None
     return v.date() if isinstance(v, datetime.datetime) else v
 
 
 def _eval_cookie_channel(session, business_id, now, *, cred, label, key,
-                          data_col) -> ChannelHealth:
-    """쿠팡/배민 — 쿠키 기반."""
+                          data_col, data_model) -> ChannelHealth:
+    """쿠팡/배민 — 쿠키 기반.
+
+    판정 순서: failed → expiring_soon → stale(데이터 최신성) → healthy
+    """
     if cred is None:
         return ChannelHealth(key, label, "skipping", "자격증명 미등록")
     if cred.status in ("failed", "cookie_invalid", "expired") or \
             (cred.consecutive_failures or 0) >= 3:
         return ChannelHealth(key, label, "failed",
                              f"인증 실패 ({cred.status}, 연속 {cred.consecutive_failures})")
-    last = _max_date(session, data_col) if data_col is not None else None
+    # 쿠키 만료 임박 (≤12h)
+    expires_at = getattr(cred, "cookies_expires_at", None)
+    if expires_at is not None:
+        hours_left = (expires_at - now).total_seconds() / 3600
+        if 0 < hours_left <= 12:
+            h = int(hours_left) or 1
+            return ChannelHealth(key, label, "expiring_soon",
+                                 f"쿠키 {h}시간 후 만료 — 갱신 필요")
+    last = _max_date(session, data_col, data_model, business_id) if data_col is not None else None
     if last is None or (now.date() - last).days > STALE_DAYS:
         return ChannelHealth(key, label, "stale",
                              f"최근 {STALE_DAYS}일 데이터 없음 (최신 {last})", last)
@@ -65,7 +78,7 @@ def evaluate_channels(session: Session, business_id: int,
     elif ez.status != "active":
         out.append(ChannelHealth("easypos", "EasyPOS", "failed", f"status={ez.status}"))
     else:
-        last = _max_date(session, EasyPosSaleReceipt.sale_date)
+        last = _max_date(session, EasyPosSaleReceipt.sale_date, EasyPosSaleReceipt, business_id)
         if last is None or (now.date() - last).days > STALE_DAYS:
             out.append(ChannelHealth("easypos", "EasyPOS", "stale",
                                      f"최근 {STALE_DAYS}일 데이터 없음 (최신 {last})", last))
@@ -77,14 +90,16 @@ def evaluate_channels(session: Session, business_id: int,
         CoupangEatsCredential.business_id == business_id)).first()
     out.append(_eval_cookie_channel(session, business_id, now, cred=ce,
                                     label="쿠팡이츠", key="coupang_eats",
-                                    data_col=CoupangEatsOrder.ordered_at))
+                                    data_col=CoupangEatsOrder.ordered_at,
+                                    data_model=CoupangEatsOrder))
 
     # 배민
     bm = session.exec(select(BaeminCredential).where(
         BaeminCredential.business_id == business_id)).first()
     out.append(_eval_cookie_channel(session, business_id, now, cred=bm,
                                     label="배민", key="baemin",
-                                    data_col=BaeminOrder.ordered_at))
+                                    data_col=BaeminOrder.ordered_at,
+                                    data_model=BaeminOrder))
 
     # CODEF — 연결 status + 마지막 호출 최신성. 자동 cron 없어 stale 정상.
     conns = session.exec(select(CodefConnection).where(
@@ -97,7 +112,10 @@ def evaluate_channels(session: Session, business_id: int,
         if any(c.status != "active" for c in matching):
             out.append(ChannelHealth(key, label, "failed", "연결 비활성"))
             continue
-        last_call = session.exec(select(func.max(CodefCallLog.called_at))).first()
+        last_call = session.exec(
+            select(func.max(CodefCallLog.called_at)).where(
+                CodefCallLog.business_id == business_id)
+        ).first()
         last = last_call.date() if last_call else None
         if last is None or (now.date() - last).days > STALE_DAYS:
             out.append(ChannelHealth(key, label, "stale",
