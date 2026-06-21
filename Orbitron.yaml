@@ -160,6 +160,17 @@ services:
       # ─────────────────────────────────────────────
       - key: CREDENTIAL_ENCRYPTION_KEY
         value: ""  # ⚠️ Orbitron Secrets에 48자+ random URL-safe string
+      # ─────────────────────────────────────────────
+      # 수집 건강도 알림 (collection health watch)
+      # OWNER_ALERT_PHONE: 사장님 전화번호 국제형식 (82-10-XXXX-XXXX)
+      # TELEGRAM_*: 텔레그램 봇 활성화 시 대시보드에서 설정
+      # ─────────────────────────────────────────────
+      - key: OWNER_ALERT_PHONE
+        value: ""  # ⚠️ Orbitron 대시보드에서 설정 (예: 82-10-4173-6570)
+      - key: TELEGRAM_BOT_TOKEN
+        value: ""  # ⚠️ 텔레그램 봇 토큰 (봇 생성 후 대시보드 설정, 1차 보류)
+      - key: TELEGRAM_CHAT_ID
+        value: ""  # ⚠️ 텔레그램 chat_id (봇 생성 후 대시보드 설정, 1차 보류)
     healthCheck:
       path: /api/health
       interval: 30

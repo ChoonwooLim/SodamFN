@@ -118,6 +118,7 @@ def evaluate_channels(session: Session, business_id: int,
                                   ("bank", "codef_bank", "CODEF 은행")):
         matching = [c for c in conns if c.connection_type == conn_type]
         if not matching:
+            out.append(ChannelHealth(key, label, "skipping", "연결 미등록"))
             continue
         if any(c.status != "active" for c in matching):
             out.append(ChannelHealth(key, label, "failed", "연결 비활성"))

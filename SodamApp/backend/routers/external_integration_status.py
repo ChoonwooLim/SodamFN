@@ -175,7 +175,36 @@ def _build_baemin_status(session: Session,
     }
 
 
-ALERTABLE_STATUSES = {"expiring_soon", "expired", "failed"}
+ALERTABLE_STATUSES = {"expiring_soon", "expired", "failed", "stale", "skipping"}
+
+# 상태 정렬: 위험한 것 위로
+_STATUS_ORDER = {
+    "expired": 0, "failed": 1, "expiring_soon": 2, "stale": 2,
+    "unknown": 3, "not_configured": 4, "skipping": 4, "healthy": 5,
+}
+
+
+def build_all_channels(session: Session, business_id: int,
+                       now: datetime.datetime) -> list[dict]:
+    """쿠팡/배민(쿠키 상세) + easypos/codef(건강 판정) 통합 채널 목록."""
+    from services import collection_health
+    channels = [
+        _build_coupang_eats_status(session, business_id, now),
+        _build_baemin_status(session, business_id, now),
+    ]
+    have = {c["channel_key"] for c in channels}
+    for h in collection_health.evaluate_channels(session, business_id, now):
+        if h.channel_key in have:
+            continue
+        channels.append({
+            "channel": h.label,
+            "channel_key": h.channel_key,
+            "configured": h.status != "skipping",
+            "status": h.status,
+            "last_data_date": h.last_data_date.isoformat() if h.last_data_date else None,
+            "last_error_message": h.detail,
+        })
+    return channels
 
 
 @router.get("/status")
@@ -187,25 +216,17 @@ def get_integration_status(
 
     프론트 헤더 종 컴포넌트 + 외부연동 페이지 상단 카드가 폴링.
 
-    alert_count: 사장님 주의 필요한 채널 수 (expiring_soon / expired / failed).
+    alert_count: 사장님 주의 필요한 채널 수 (expiring_soon / expired / failed / stale / skipping).
     어드민 종 뱃지 숫자로 사용.
     """
     bid = _resolve_bid(admin, x_view_as_business)
     now = datetime.datetime.utcnow()
 
-    channels: list[dict] = []
     with Session(engine) as s:
-        channels.append(_build_coupang_eats_status(s, bid, now))
-        channels.append(_build_baemin_status(s, bid, now))
+        channels = build_all_channels(s, bid, now)
 
     alert_count = sum(1 for c in channels if c["status"] in ALERTABLE_STATUSES)
-
-    # 상태 정렬: 위험한 것 위로 (expired > failed > expiring_soon > unknown > not_configured > healthy)
-    _order = {
-        "expired": 0, "failed": 1, "expiring_soon": 2,
-        "unknown": 3, "not_configured": 4, "healthy": 5,
-    }
-    channels.sort(key=lambda c: _order.get(c["status"], 9))
+    channels.sort(key=lambda c: _STATUS_ORDER.get(c["status"], 9))
 
     return {
         "as_of": utc_iso(now),
