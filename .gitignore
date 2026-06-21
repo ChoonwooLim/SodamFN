@@ -56,3 +56,6 @@ scratch_*.json
 
 # 2026서류 — 사장님 raw 데이터·캡처본·매장 운영자료 (git 외부 보관)
 2026서류/
+
+# Git LFS hook 이 core.hooksPath 오설정으로 잘못 생성되는 위치 (.git/hooks 가 정상)
+dev/null/

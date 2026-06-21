@@ -529,6 +529,36 @@ def cron_settlement_watch(_: None = Depends(_verify_cron_secret)):
         return {"business_count": len(bizs)}
 
 
+@router.post("/cron/health-watch")
+def cron_health_watch(_: None = Depends(_verify_cron_secret)):
+    """09:00 KST — 자동수집 채널 건강 점검 + 이상 시 사장님 SMS / Steven 텔레그램."""
+    import os, datetime as _dt
+    from services import collection_health
+    from services.telegram_service import send_message as _tg
+    from services.notification_service import get_provider
+    from models import Business
+
+    owner_phone = os.getenv("OWNER_ALERT_PHONE", "").strip()
+    sender = os.getenv("POPBILL_SENDER_NUMBER", "").strip()
+    svc = get_provider()
+
+    def _sms(phone, text):
+        if not phone or not sender:
+            return
+        svc.send_sms(sender_number=sender, receiver=phone, content=text)
+
+    now = _dt.datetime.utcnow()
+    summary = []
+    with Session(engine) as s:
+        bizs = s.exec(select(Business).where(
+            Business.subscription_status == "active")).all()
+        for biz in bizs:
+            r = collection_health.dispatch_alerts(
+                s, biz.id, now, sms_send=_sms, tg_send=_tg, owner_phone=owner_phone)
+            summary.append({"business_id": biz.id, **r})
+    return {"ok": True, "business_count": len(summary), "results": summary}
+
+
 @router.post("/cron/learn-fee-rates")
 def cron_learn_fee_rates(_: None = Depends(_verify_cron_secret)):
     """일요일 04:30 — 카드사별 수수료율 학습 갱신."""

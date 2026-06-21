@@ -143,6 +143,11 @@ def _run_migrations():
             except Exception as e:
                 print(f"  [SKIP] Migration {table}.{column}: {e}")
 
+    # Revenue 채널명 한글 통일 (spec 2026-06-22)
+    from database import _run_revenue_channel_migration
+    _run_revenue_channel_migration(engine)
+
+
 def _seed_default_stores():
     """기존 사업장에 default BusinessStore 1개를 자동 생성 (idempotent).
 

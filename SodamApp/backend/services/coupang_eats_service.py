@@ -1025,13 +1025,14 @@ def upsert_settlements(session, business_id: int, store_id: int,
 
 def upsert_revenue_from_orders(session, business_id: int,
                                sale_date: datetime.date) -> int:
-    """일자 주문 집계 → Revenue(channel='CoupangEats') upsert.
+    """일자 주문 집계 → Revenue(channel='쿠팡이츠') upsert.
 
     Revenue.amount 는 **취소 제외 총 주문가** (EasyPOS net_amount 와 의미는 다르지만
     배달앱은 영수증 단위 부가세 분리가 응답에 없으므로 totalSalePrice 사용).
     """
     from sqlmodel import select
     from models import CoupangEatsOrder, Revenue
+    from constants import REVENUE_CHANNEL_COUPANG
 
     rows = session.exec(
         select(CoupangEatsOrder).where(
@@ -1054,7 +1055,7 @@ def upsert_revenue_from_orders(session, business_id: int,
         select(Revenue).where(
             Revenue.business_id == business_id,
             Revenue.date == sale_date,
-            Revenue.channel == "CoupangEats",
+            Revenue.channel == REVENUE_CHANNEL_COUPANG,
         )
     ).first()
     description = f"쿠팡이츠 자동수집 (주문 {order_count}건)"
@@ -1066,7 +1067,7 @@ def upsert_revenue_from_orders(session, business_id: int,
         rev = Revenue(
             business_id=business_id,
             date=sale_date,
-            channel="CoupangEats",
+            channel=REVENUE_CHANNEL_COUPANG,
             amount=total,
             description=description,
         )

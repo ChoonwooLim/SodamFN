@@ -50,6 +50,7 @@ def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
     _run_codef_phase1_migrations(engine)
     _run_private_payment_migrations(engine)
+    _run_revenue_channel_migration(engine)
 
 def get_session():
     with Session(engine) as session:
@@ -108,3 +109,32 @@ def _run_private_payment_migrations(engine_):
     with engine_.begin() as conn:
         conn.execute(text("UPDATE staff SET private_payment_method = 'transfer' WHERE private_payment_method IS NULL"))
         conn.execute(text("UPDATE staff SET private_tax_unreported = FALSE WHERE private_tax_unreported IS NULL"))
+
+
+def _run_revenue_channel_migration(engine_):
+    """Revenue 채널명 한글 통일 — idempotent (ORM, DB 중립).
+
+    'Store'→'매장', 'CoupangEats'→'쿠팡이츠'. 같은 (business_id, date)에
+    영문+한글이 공존하면 한글 행에 amount 합산 후 영문 행 삭제.
+    spec: 2026-06-22 Revenue 채널명 한글 통일 Part B Task 2
+    """
+    from sqlmodel import Session, select
+    from models import Revenue
+    renames = {"Store": "매장", "CoupangEats": "쿠팡이츠"}
+    with Session(engine_) as s:
+        for eng_name, kor_name in renames.items():
+            eng_rows = s.exec(select(Revenue).where(Revenue.channel == eng_name)).all()
+            for er in eng_rows:
+                dup = s.exec(select(Revenue).where(
+                    Revenue.channel == kor_name,
+                    Revenue.business_id == er.business_id,
+                    Revenue.date == er.date,
+                )).first()
+                if dup:
+                    dup.amount = (dup.amount or 0) + (er.amount or 0)
+                    s.add(dup)
+                    s.delete(er)
+                else:
+                    er.channel = kor_name
+                    s.add(er)
+        s.commit()

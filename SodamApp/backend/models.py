@@ -168,7 +168,7 @@ class Revenue(SQLModel, table=True):
     )
     id: Optional[int] = Field(default=None, primary_key=True)
     date: datetime.date = Field(index=True)
-    channel: str # Store, Coupang, Baemin
+    channel: str  # 매장 / 쿠팡이츠 / 배달의민족 (한글 표준 — constants.py)
     amount: int
     description: Optional[str] = None
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
@@ -750,6 +750,28 @@ class SettlementWatchAlert(SQLModel, table=True):
     acknowledged_by: Optional[int] = Field(default=None, foreign_key="user.id")
     notes: Optional[str] = None
     raw_ref: Optional[str] = None  # 원본 식별자 ('card_approval_group:{corp}:{date}' or 'coupang_settle:{id}')
+
+
+class CollectionHealthAlert(SQLModel, table=True):
+    """자동수집 채널 건강 경보 — 중복 발송 방지 + 복구 추적.
+
+    (business_id, channel_key) 당 1행. open→resolved 상태전이.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "channel_key",
+                         name="uq_collection_health_alert"),
+        Index("ix_collection_health_biz_status", "business_id", "status"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    channel_key: str = Field(max_length=32, index=True,
+                             description="easypos / coupang_eats / baemin / codef_card / codef_bank")
+    status: str = Field(default="open", index=True, description="open / resolved")
+    alert_type: str = Field(max_length=32, description="failed / stale / skipping / expiring_soon")
+    opened_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    last_notified_at: Optional[datetime.datetime] = None
+    resolved_at: Optional[datetime.datetime] = None
+    detail: Optional[str] = Field(default=None, max_length=500)
 
 
 class DailyExpense(SQLModel, table=True):
