@@ -157,6 +157,7 @@ def db(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
     import database
     importlib.reload(database)
+    import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
     SQLModel.metadata.create_all(database.engine)
     yield database
     try:
@@ -449,6 +450,7 @@ def db(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
     import database
     importlib.reload(database)
+    import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
     SQLModel.metadata.create_all(database.engine)
     yield database
     try:
@@ -544,6 +546,7 @@ def db(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
     import database
     importlib.reload(database)
+    import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
     SQLModel.metadata.create_all(database.engine)
     yield database
     try:
@@ -755,6 +758,7 @@ def db(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
     import database
     importlib.reload(database)
+    import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
     SQLModel.metadata.create_all(database.engine)
     yield database
     try:
@@ -971,6 +975,7 @@ def db(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
     import database
     importlib.reload(database)
+    import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
     SQLModel.metadata.create_all(database.engine)
     yield database
     try:
