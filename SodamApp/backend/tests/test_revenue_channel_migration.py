@@ -57,7 +57,7 @@ def test_merge_on_overlap(db):
     assert len(eng) == 0
 
 
-def test_idempotent(db):
+def test_idempotent_rename(db):
     """2회 호출해도 안전 (두 번째는 no-op)."""
     from models import Revenue
     d = datetime.date(2026, 6, 20)
@@ -69,3 +69,16 @@ def test_idempotent(db):
     with Session(db.engine) as s:
         rows = s.exec(select(Revenue).where(Revenue.channel == "매장")).all()
     assert len(rows) == 1 and rows[0].amount == 1000
+
+
+def test_idempotent_after_merge(db):
+    """병합 후 2회 호출 — 금액 중복 없음 (1700 아님)."""
+    from models import Revenue
+    d = datetime.date(2026, 2, 28)
+    _add(db, "매장", 1, d, 700)
+    _add(db, "Store", 1, d, 300)
+    db._run_revenue_channel_migration(db.engine)
+    db._run_revenue_channel_migration(db.engine)  # 두 번째 호출
+    with Session(db.engine) as s:
+        rows = s.exec(select(Revenue).where(Revenue.channel == "매장")).all()
+    assert len(rows) == 1 and rows[0].amount == 1000  # 1700 아님

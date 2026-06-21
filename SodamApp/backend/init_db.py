@@ -147,6 +147,7 @@ def _run_migrations():
     from database import _run_revenue_channel_migration
     _run_revenue_channel_migration(engine)
 
+
 def _seed_default_stores():
     """기존 사업장에 default BusinessStore 1개를 자동 생성 (idempotent).
 
