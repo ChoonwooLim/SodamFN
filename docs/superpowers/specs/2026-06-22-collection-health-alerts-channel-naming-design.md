@@ -57,7 +57,7 @@
 
 - **사장님 → 팝빌 SMS** (`NotificationService.send_sms`, 완비됨)
   - 비즈니스 언어. 예: `"[소담] 쿠팡이츠 매출이 2일째 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요."`
-  - 발신: `POPBILL_SENDER_NUMBER`(010-4173-6570), 수신: `OWNER_ALERT_PHONE`(신규).
+  - 발신: `POPBILL_SENDER_NUMBER`(010-4173-6570), 수신: `OWNER_ALERT_PHONE` = **82-10-4173-6570** (사장님 본인폰 — 발신번호와 동일, 본인 발신·수신 구성. `_normalize_kr_mobile`이 국가코드 정규화).
 - **개발자(Steven) → 텔레그램** (`telegram_service.send_message`, 신규 구현)
   - 기술 상세. 예: `"coupang_eats: failed (consec=3), last_success=2026-05-15, err=Akamai blocked"`.
 
@@ -87,9 +87,12 @@
 `services/telegram_service.py`: `send_message(text)` — Telegram Bot API `sendMessage` 호출.
 env `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 미설정 시 **no-op + 로그**(현재 `notify_summary`가 이미 import를 시도하므로 동작 호환 유지).
 
+> **1차 범위 (사장님 결정 2026-06-22)**: 텔레그램은 **기능(코드)만 구현하고 발송은 보류**한다. `TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`를 비워두면 자동 no-op이므로, 1차 배포에서는 **SMS만 활성**되고 텔레그램은 추후 토큰 주입 시 즉시 동작한다.
+
 ### 3.6 환경변수 (배포 4곳 동기화)
 
-신규: `OWNER_ALERT_PHONE`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, (선택) `STALE_DAYS`·`RENOTIFY_DAYS`.
+신규: `OWNER_ALERT_PHONE`(= 82-10-4173-6570), (선택) `STALE_DAYS`·`RENOTIFY_DAYS`.
+`TELEGRAM_BOT_TOKEN`·`TELEGRAM_CHAT_ID`는 **1차 미설정**(텔레그램 발송 보류 — 코드는 준비, 토큰 주입 시 활성).
 기존 재사용: `POPBILL_SENDER_NUMBER`.
 → `backend/.env` + `Orbitron.yaml` backend env + Orbitron secrets. **프론트 VITE 변수 불요.**
 
