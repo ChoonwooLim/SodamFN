@@ -124,3 +124,75 @@ def evaluate_channels(session: Session, business_id: int,
             out.append(ChannelHealth(key, label, "healthy", "정상", last))
 
     return out
+
+
+# ---------------------------------------------------------------------------
+# Alert dispatch — open / resolve / renotify
+# ---------------------------------------------------------------------------
+
+RENOTIFY_DAYS = 3
+ALERTABLE = {"failed", "stale", "expiring_soon"}
+
+
+def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
+                    owner_phone: str = "") -> dict:
+    """채널 건강 평가 후 경보 open/resolve + 발송. 발송 함수는 주입."""
+    from models import CollectionHealthAlert
+    healths = evaluate_channels(session, business_id, now)
+    opened, resolved, renotified = [], [], []
+
+    for h in healths:
+        alert = session.exec(select(CollectionHealthAlert).where(
+            CollectionHealthAlert.business_id == business_id,
+            CollectionHealthAlert.channel_key == h.channel_key)).first()
+        is_bad = h.status in ALERTABLE
+
+        if is_bad:
+            if alert is None or alert.status == "resolved":
+                # 신규 open
+                if alert is None:
+                    alert = CollectionHealthAlert(
+                        business_id=business_id, channel_key=h.channel_key)
+                alert.status = "open"
+                alert.alert_type = h.status
+                alert.opened_at = now
+                alert.last_notified_at = now
+                alert.resolved_at = None
+                alert.detail = f"{h.label}: {h.detail}"
+                session.add(alert)
+                _send_owner_sms(sms_send, owner_phone, h)
+                tg_send(f"{h.channel_key}: {h.status} — {h.detail}")
+                opened.append(h.channel_key)
+            else:
+                # 이미 open — RENOTIFY_DAYS 경과 시만 리마인드
+                if alert.last_notified_at and \
+                        (now - alert.last_notified_at).days >= RENOTIFY_DAYS:
+                    alert.last_notified_at = now
+                    session.add(alert)
+                    _send_owner_sms(sms_send, owner_phone, h)
+                    tg_send(f"[리마인드] {h.channel_key}: {h.status} — {h.detail}")
+                    renotified.append(h.channel_key)
+        else:
+            # healthy — open 이던 게 있으면 resolve
+            if alert and alert.status == "open":
+                alert.status = "resolved"
+                alert.resolved_at = now
+                session.add(alert)
+                sms_send(owner_phone,
+                         f"[소담] {h.label} 수집이 정상화되었습니다.")
+                tg_send(f"{h.channel_key}: resolved (정상화)")
+                resolved.append(h.channel_key)
+
+    session.commit()
+    return {"opened": opened, "resolved": resolved, "renotified": renotified}
+
+
+def _send_owner_sms(sms_send, owner_phone, h):
+    msg = {
+        "coupang_eats": "쿠팡이츠 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
+        "baemin": "배민 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
+        "easypos": "매장(POS) 매출 수집이 멈췄어요. 확인이 필요합니다.",
+        "codef_card": "카드 매입내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
+        "codef_bank": "은행 거래내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
+    }.get(h.channel_key, f"{h.label} 수집에 문제가 있어요.")
+    sms_send(owner_phone, f"[소담] {msg}")
