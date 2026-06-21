@@ -752,6 +752,28 @@ class SettlementWatchAlert(SQLModel, table=True):
     raw_ref: Optional[str] = None  # 원본 식별자 ('card_approval_group:{corp}:{date}' or 'coupang_settle:{id}')
 
 
+class CollectionHealthAlert(SQLModel, table=True):
+    """자동수집 채널 건강 경보 — 중복 발송 방지 + 복구 추적.
+
+    (business_id, channel_key) 당 1행. open→resolved 상태전이.
+    """
+    __table_args__ = (
+        UniqueConstraint("business_id", "channel_key",
+                         name="uq_collection_health_alert"),
+        Index("ix_collection_health_biz_status", "business_id", "status"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    channel_key: str = Field(max_length=32, index=True,
+                             description="easypos / coupang_eats / baemin / codef_card / codef_bank")
+    status: str = Field(default="open", index=True, description="open / resolved")
+    alert_type: str = Field(max_length=32, description="failed / stale / skipping / expiring_soon")
+    opened_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    last_notified_at: Optional[datetime.datetime] = None
+    resolved_at: Optional[datetime.datetime] = None
+    detail: Optional[str] = Field(default=None, max_length=500)
+
+
 class DailyExpense(SQLModel, table=True):
     __table_args__ = (
         Index("ix_dailyexpense_business_date", "business_id", "date"),
