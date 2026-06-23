@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from models import Business, SubscriptionPlan
 from .normalizers.easypos import normalize_easypos
 from .normalizers.coupang_eats import normalize_coupang_eats
+from .normalizers.baemin import normalize_baemin
 from .normalizers.bank import normalize_bank
 from .fan_out import apply as fan_out_apply
 
@@ -47,6 +48,7 @@ def run_one_business(session: Session, business_id: int,
     events = []
     events.extend(normalize_easypos(session, business_id, period_start, period_end))
     events.extend(normalize_coupang_eats(session, business_id, period_start, period_end))
+    events.extend(normalize_baemin(session, business_id, period_start, period_end))
     events.extend(normalize_bank(session, business_id, period_start, period_end))
 
     fan_out_report = fan_out_apply(session, business_id, events)

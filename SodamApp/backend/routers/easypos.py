@@ -408,6 +408,17 @@ def _run_sync(business_id: int, dates: list[datetime.date],
                         d, business_id, e,
                     )
 
+                # 매출관리(DailyExpense) 즉시 반영 — orchestrator cron 의존 제거.
+                # 영수증/카드승인 적재 직후 결제수단별 fan-out → 화면 항상 싱크.
+                try:
+                    with Session(engine) as s:
+                        from services.auto_collection_sync.reflect import reflect_channel
+                        reflect_channel(s, business_id, "easypos", d, d)
+                        from services.profit_loss_service import sync_revenue_to_pl
+                        sync_revenue_to_pl(d.year, d.month, s, business_id)
+                except Exception as e:
+                    log.warning("EasyPOS 매출 반영 실패 %s bid=%s: %s", d, business_id, e)
+
                 summary["success_dates"] += 1
                 summary["total_inserted"] += up["inserted"]
                 summary["total_updated"] += up["updated"]

@@ -1208,6 +1208,15 @@ def _run_sync(business_id: int,
             summary["settlements"]["inserted"] = up["inserted"]
             summary["settlements"]["updated"] = up["updated"]
 
+        # 매출관리(DailyExpense) 즉시 반영 — orchestrator cron 의존 제거.
+        try:
+            with Session(engine) as s:
+                from services.auto_collection_sync.reflect import reflect_channel
+                reflect_channel(s, business_id, "coupang_eats", start_date, end_date)
+        except Exception as e:
+            log.warning("쿠팡이츠 매출 반영 실패 %s~%s bid=%s: %s",
+                        start_date, end_date, business_id, e)
+
         # 완료
         with Session(engine) as s:
             sl = s.get(CoupangEatsSyncLog, log_id)

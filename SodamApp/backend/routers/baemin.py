@@ -448,6 +448,15 @@ def _run_sync(business_id: int,
                     sync_delivery_revenue_to_pl(
                         end_date.year, end_date.month, s5, business_id
                     )
+
+            # 매출관리(DailyExpense) 즉시 반영 — orchestrator cron 의존 제거.
+            try:
+                with Session(database.engine) as s7:
+                    from services.auto_collection_sync.reflect import reflect_channel
+                    reflect_channel(s7, business_id, "baemin", start_date, end_date)
+            except Exception as e:
+                log.warning("배민 매출 반영 실패 %s~%s bid=%s: %s",
+                            start_date, end_date, business_id, e)
         finally:
             client.close()
 
