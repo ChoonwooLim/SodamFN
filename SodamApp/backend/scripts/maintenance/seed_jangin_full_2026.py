@@ -19,14 +19,15 @@ APPLY = "--apply" in sys.argv
 BID = 2
 random.seed(20260623)
 
-# ── 월별 매출 목표 (store, delivery_total) — 우상향 ──
+# ── 월별 매출 목표 (store, delivery_total) — 6월=100% 기준 퍼센트 패턴 ──
+#    1월80% 2월70% 3월85% 4월93% 5월86% 6월100% (6월 5,750만 = 100%)
 MONTHLY = {
-    1: dict(store=26_000_000, deliv=15_500_000, ingredient=0.310, utility=800_000),
-    2: dict(store=27_500_000, deliv=16_300_000, ingredient=0.306, utility=820_000),
-    3: dict(store=29_500_000, deliv=17_700_000, ingredient=0.302, utility=850_000),
-    4: dict(store=31_200_000, deliv=18_900_000, ingredient=0.298, utility=880_000),
-    5: dict(store=33_500_000, deliv=20_300_000, ingredient=0.295, utility=900_000),
-    6: dict(store=35_800_000, deliv=21_700_000, ingredient=0.292, utility=920_000),
+    1: dict(store=28_700_000, deliv=17_300_000, ingredient=0.310, utility=800_000),   # 80% = 46.00M
+    2: dict(store=25_050_000, deliv=15_200_000, ingredient=0.306, utility=820_000),   # 70% = 40.25M
+    3: dict(store=30_450_000, deliv=18_425_000, ingredient=0.302, utility=850_000),   # 85% = 48.875M
+    4: dict(store=33_300_000, deliv=20_175_000, ingredient=0.298, utility=880_000),   # 93% = 53.475M
+    5: dict(store=30_800_000, deliv=18_650_000, ingredient=0.295, utility=900_000),   # 86% = 49.45M
+    6: dict(store=35_800_000, deliv=21_700_000, ingredient=0.292, utility=920_000),   # 100% = 57.50M
 }
 DELIV_SPLIT = {"배달의민족": 0.45, "쿠팡이츠": 0.35, "요기요": 0.20}
 SUPPLY_RATIO = 0.025      # 소모품비 (매출 대비)
