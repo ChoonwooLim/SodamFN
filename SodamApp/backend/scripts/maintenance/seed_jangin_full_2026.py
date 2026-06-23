@@ -34,10 +34,34 @@ INSURANCE_BIZ = 250_000   # 보험료(사업용) 고정
 TAX_RATIO = 0.010         # 세금과공과 (매출 대비)
 CARD_FEE_RATIO = 0.013    # 카드수수료 (매장매출 대비) — P/L 직접 세팅
 DELIV_FEE_RATIO = 0.280   # 배달앱수수료 (배달매출 대비)
-LABOR_GROSS_RATIO = 0.220 # 급여 gross 합 (매출 대비)
 
-# 직원 가중치 (id → weight, 합=1.0)
-STAFF_W = {22: 0.20, 23: 0.17, 18: 0.15, 24: 0.12, 19: 0.10, 20: 0.09, 21: 0.09, 25: 0.08}
+# ── 급여체계 (소담김밥 방식: 주방장만 월급제, 나머지 시급제+주휴수당) ──
+HEAD_ID = 18              # 박준혁 주방장 (월급제)
+HEAD_MONTHLY = 2_400_000  # 주방장 월급 (주휴 포함)
+WEEKS = 4.345             # 월 평균 주수 (주휴수당 환산)
+# id: (시급, 1월 근무시간, 주휴 일소정시간, 4대보험가입) — 주 15h 미만은 주휴 자동 미지급
+HOURLY_CFG = {
+    22: (13_000, 152, 8.0, True),   # 김장인 점장 (~35h/주)
+    23: (12_000, 132, 7.0, True),   # 이주방 주방실장 (~30h/주)
+    24: (10_800, 96, 6.0, True),    # 박홀서 홀서빙 (~22h/주)
+    19: (10_400, 72, 5.0, False),   # 이서연 홀서빙 (~16.6h/주)
+    20: (10_400, 68, 5.0, False),   # 김태호 저녁서빙 (~15.6h/주)
+    21: (10_200, 52, 4.0, False),   # 최민지 주방보조 (~12h/주 → 주휴 미달)
+    25: (10_030, 40, 0.0, False),   # 최알바 알바 (~9h/주 → 주휴 미달)
+}
+HOUR_GROWTH = {1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.16}  # 성장에 따른 근무시간 증가
+
+
+def calc_deductions(gross, ins4):
+    """4대보험 가입자 ~10%, 미가입자 3.3%(사업소득 원천징수)."""
+    if ins4:
+        np_ = round(gross * 0.045); hi = round(gross * 0.0354)
+        lti = round(hi * 0.1295); ei = round(gross * 0.009)
+        it = round(gross * 0.013); lit = round(it * 0.1)
+    else:
+        np_ = hi = lti = ei = 0
+        it = round(gross * 0.030); lit = round(it * 0.1)
+    return np_, hi, lti, ei, it, lit
 
 
 def daily_split(total, year, month):
@@ -105,6 +129,19 @@ def run():
         s.delete(dr)
     s.commit()
     print(f"기존 삭제: DailyExpense {len(old_de)}건\n")
+
+    # ── 직원 급여체계 설정: 주방장(id18) 월급제, 나머지 7명 시급제 ──
+    head = staffs.get(HEAD_ID)
+    if head:
+        head.monthly_salary = HEAD_MONTHLY; head.hourly_wage = 13_500
+        head.insurance_4major = True; head.tax_support_enabled = False
+        s.add(head)
+    for sid, (wage, _jh, _dh, ins4) in HOURLY_CFG.items():
+        st = staffs.get(sid)
+        if st:
+            st.monthly_salary = 0; st.hourly_wage = wage; st.insurance_4major = ins4
+            st.tax_support_enabled = False; s.add(st)
+    s.commit()
 
     seen = set()  # (date, vendor_id, pm, source) 유니크 가드
     def add_de(date, vendor, amount, cat, pm, source="manual", note=None):
@@ -180,19 +217,38 @@ def run():
                   order_count=orders, fee_breakdown=json.dumps(breakdown, ensure_ascii=False),
                   source="excel"))
 
-        # ── 급여 (8명) ──
-        gross_month = round(total_rev * LABOR_GROSS_RATIO)
-        for sid, w in STAFF_W.items():
-            gross = round(gross_month * w / 1000) * 1000
-            np_ = round(gross * 0.045); hi = round(gross * 0.0354)
-            lti = round(hi * 0.1295); ei = round(gross * 0.009)
-            it = round(gross * 0.013); lit = round(it * 0.1)
+        # ── 급여: 주방장(월급제) + 나머지(시급제 + 주휴수당) ──
+        tt = datetime.datetime(2026, month, 25, 10, 0, 0)
+        # 주방장 박준혁 — 월급제 (주휴 월급 포함)
+        gross = HEAD_MONTHLY
+        np_, hi, lti, ei, it, lit = calc_deductions(gross, True)
+        ded = np_ + hi + lti + ei + it + lit
+        s.add(Payroll(business_id=BID, staff_id=HEAD_ID, month=f"2026-{month:02d}",
+              base_pay=gross, bonus_holiday=0, deductions=ded, total_pay=gross - ded,
+              deduction_np=np_, deduction_hi=hi, deduction_lti=lti, deduction_ei=ei,
+              deduction_it=it, deduction_lit=lit, transfer_status="완료", transferred_at=tt))
+        # 시급제 — 기본급 = 시급 × 근무시간, 주휴수당 별도(주별 w1~w5)
+        g = HOUR_GROWTH[month]
+        for sid, (wage, jan_h, daily_h, ins4) in HOURLY_CFG.items():
+            hours = round(jan_h * g)
+            base = wage * hours
+            # 주휴수당: 주 소정시간 ≥15h 자격 시 일소정시간 × 시급 (주별)
+            weekly_hours = hours / WEEKS
+            wk_hol = round(daily_h * wage) if (daily_h > 0 and weekly_hours >= 15) else 0
+            n_weeks = 4 if calendar.monthrange(2026, month)[1] <= 30 else 5
+            w_list = [wk_hol] * n_weeks + [0] * (6 - n_weeks)
+            bonus_hol = round(wk_hol * WEEKS) if wk_hol else 0
+            if wk_hol:  # w 합 = bonus_hol 보정
+                w_list[n_weeks - 1] += bonus_hol - wk_hol * n_weeks
+            gross = base + bonus_hol
+            np_, hi, lti, ei, it, lit = calc_deductions(gross, ins4)
             ded = np_ + hi + lti + ei + it + lit
             s.add(Payroll(business_id=BID, staff_id=sid, month=f"2026-{month:02d}",
-                  base_pay=gross, bonus_holiday=0, deductions=ded, total_pay=gross - ded,
+                  base_pay=base, bonus_holiday=bonus_hol, deductions=ded, total_pay=gross - ded,
+                  holiday_w1=w_list[0], holiday_w2=w_list[1], holiday_w3=w_list[2],
+                  holiday_w4=w_list[3], holiday_w5=w_list[4], holiday_w6=w_list[5],
                   deduction_np=np_, deduction_hi=hi, deduction_lti=lti, deduction_ei=ei,
-                  deduction_it=it, deduction_lit=lit, transfer_status="완료",
-                  transferred_at=datetime.datetime(2026, month, 25, 10, 0, 0)))
+                  deduction_it=it, deduction_lit=lit, transfer_status="완료", transferred_at=tt))
 
     s.commit()
     print("데이터 생성 완료. P/L 재집계 + 카드수수료 세팅...\n")
