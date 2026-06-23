@@ -14,7 +14,8 @@ def normalize_name(name):
 
 def get_staff_map(session):
     staffs = session.exec(select(Staff)).all()
-    return {normalize_name(s.name): s.id for s in staffs}
+    # (staff_id, business_id) — Payroll.business_id 누락 방지 (멀티테넌트 격리/인건비 집계)
+    return {normalize_name(s.name): (s.id, s.business_id) for s in staffs}
 
 def extract_payroll_from_sheet(df):
     values = df.values
@@ -346,7 +347,7 @@ def process_files():
                 for sheet in xl.sheet_names:
                     norm_sheet = normalize_name(sheet)
                     if norm_sheet in staff_map:
-                        staff_id = staff_map[norm_sheet]
+                        staff_id, staff_bid = staff_map[norm_sheet]
                         df = pd.read_excel(file, sheet_name=sheet, header=None)
                         base, bonus, ded, total, bank, wage, b_meal, b_holiday, d_np, d_hi, d_ei, d_lti, d_it, d_lit, h1, h2, h3, h4, h5, d_json = extract_payroll_from_sheet(df)
                         
@@ -355,6 +356,8 @@ def process_files():
                         # UPSERT PAYROLL
                         existing = session.exec(select(Payroll).where(Payroll.staff_id == staff_id, Payroll.month == month)).first()
                         if existing:
+                            if existing.business_id is None:
+                                existing.business_id = staff_bid
                             existing.base_pay = base
                             existing.bonus = bonus
                             existing.deductions = ded
@@ -377,6 +380,7 @@ def process_files():
                         else:
                             new_p = Payroll(
                                 staff_id=staff_id,
+                                business_id=staff_bid,
                                 month=month,
                                 base_pay=base,
                                 bonus=bonus,
