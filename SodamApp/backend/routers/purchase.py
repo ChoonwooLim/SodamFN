@@ -12,13 +12,15 @@ from models import Vendor, DailyExpense, UploadHistory, User
 from routers.auth import get_admin_user
 from tenant_filter import get_bid_from_token, apply_bid_filter
 from services.excluded_vendors import should_skip_expense
+from services.profit_loss_service import is_four_insurance_payment
 
 router = APIRouter()
 
 
-# 매입관리에서 제외할 카테고리 — 카드대금 납부는 매입 아님
-# (실제 매입은 카드 사용 시점에 잡힘; 카드대금 출금은 정산이므로 이중 계상 방지)
-EXCLUDED_PURCHASE_CATEGORIES = ("카드대금", "card_payment")
+# 비용관리에서 제외할 카테고리
+#  - 카드대금: 실제 비용은 카드 사용 시점에 잡힘; 카드대금 출금은 정산이므로 이중 계상 방지
+#  - 4대보험납부: 4대보험은 인건비 섹션(4대보험료 사업주/직원)에 이미 반영 → 이중 계상 방지
+EXCLUDED_PURCHASE_CATEGORIES = ("카드대금", "card_payment", "4대보험납부")
 
 
 # ─── Schemas ───
@@ -71,8 +73,11 @@ def get_daily_purchases(year: int, month: int, _admin: User = Depends(get_admin_
 
     records = []
     for exp in expenses:
-        # 카드대금/card_payment 카테고리는 매입 아님 — 제외
+        # 카드대금/card_payment/4대보험납부 카테고리는 비용 아님 — 제외
         if exp.category in EXCLUDED_PURCHASE_CATEGORIES:
+            continue
+        # 4대보험 공단 납부(월별 거래처명 변동) — 오분류 안전망
+        if is_four_insurance_payment(exp.vendor_name, exp.category):
             continue
         # Include if vendor is expense type, or if no vendor linked
         if exp.vendor_id and exp.vendor_id not in expense_vendor_ids:
@@ -124,6 +129,7 @@ def get_purchase_summary(year: int, month: int, _admin: User = Depends(get_admin
     expenses = [
         e for e in expenses
         if e.category not in EXCLUDED_PURCHASE_CATEGORIES
+        and not is_four_insurance_payment(e.vendor_name, e.category)
         and (not e.vendor_id or e.vendor_id in expense_vendor_ids)
     ]
 

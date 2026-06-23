@@ -58,6 +58,20 @@ CATEGORY_TO_PL_FIELD = {
     "other": "expense_other",
 }
 
+# 4대보험(국민연금·건강보험·고용보험·산재보험) 공단 납부 출금은 인건비 섹션의
+# "4대보험료(사업주)+(직원)" 줄(Payroll 파생)에 이미 반영됨. 은행 출금을 세금과공과/
+# 기타경비로 또 잡으면 이중계상 → 카드대금과 동일하게 P/L 집계에서 제외한다.
+# (category '4대보험납부' 는 CATEGORY_TO_PL_FIELD 에 없어 자동 제외되지만, 월별로
+#  거래처명이 바뀌는 신규 은행 거래처가 오분류돼도 걸러지도록 거래처명 키워드로도 차단.)
+FOUR_INSURANCE_CATEGORY = "4대보험납부"
+FOUR_INSURANCE_KEYWORDS = ("국민건강", "건강보험", "국민연금", "고용보험", "산재보험")
+
+def is_four_insurance_payment(vendor_name: str, category: str = None) -> bool:
+    if category == FOUR_INSURANCE_CATEGORY:
+        return True
+    n = vendor_name or ""
+    return any(k in n for k in FOUR_INSURANCE_KEYWORDS)
+
 def sync_all_expenses(year: int, month: int, session: Session, business_id: int = None):
     """Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
 
@@ -107,6 +121,10 @@ def sync_all_expenses(year: int, month: int, session: Session, business_id: int 
         elif expense.category:
             category = expense.category
         if not category:
+            continue
+
+        # 4대보험 공단 납부는 인건비 섹션에 이미 반영 → 이중계상 방지로 제외
+        if is_four_insurance_payment(expense.vendor_name, category):
             continue
 
         # 발생주의 귀속 판정 — 이 expense 가 (year, month) 에 귀속되는지
