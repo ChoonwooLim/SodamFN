@@ -59,7 +59,13 @@ export default function ProfitLoss() {
     const [editValue, setEditValue] = useState('');
     const [year, setYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('dashboard');
-    const businessName = localStorage.getItem('business_name') || '소담김밥';
+    // 현재 매장(View-As 포함)명 — API에서 가져옴 (localStorage 폴백)
+    const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || '');
+    useEffect(() => {
+        api.get('/auth/business-info')
+            .then(res => { if (res.data?.business_name) setBusinessName(res.data.business_name); })
+            .catch(() => {});
+    }, []);
 
     // Mobile collapse states
     const [revOpen, setRevOpen] = useState(false);
@@ -1009,7 +1015,7 @@ export default function ProfitLoss() {
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colSpan="2">{businessName} 월별손익계산서_{year} 하반기</th>
+                            <th colSpan="2">{businessName} 월별손익계산서_{year}</th>
                             {MONTHS.map(m => <th key={m}>{m}월</th>)}
                             <th>합계</th>
                             <th>월평균</th>
