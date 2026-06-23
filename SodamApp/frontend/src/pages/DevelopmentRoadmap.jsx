@@ -267,7 +267,7 @@ const phases = [
                     { text: '팝빌 사업자등록상태 조회 (ClosedownService) — 거래처 자동확인', done: true },
                     { text: '팝빌 예금주조회 (AccountCheckService) — 급여이체 오입금 방지', done: true },
                     { text: '팝빌 기업정보 자동채움 (BizInfoCheckService) — 거래처 prefill', done: true },
-                    { text: '팝빌 EasyFinBank 계좌조회 — TEST 환경 검증 완료(411건 적재) + 자동분류·매출/매입관리 연동 + 21분 자동 갱신. LIVE 활성화 대기', done: true },
+                    { text: '팝빌 EasyFinBank 계좌조회 — 자동분류·매출/매입관리 연동 + 21분 자동 갱신 + LIVE 전환 완료(2026-06-23, 팝빌 메인 / CODEF 보조)', done: true },
                     { text: '영업관리 V1 — 휴게음식점 38항목 6카테고리 + 진행률 트래킹 + 빨간 배지', done: true },
                     { text: '팝빌 전자명세서 6종(거래/청구/견적/발주/입금표/영수증) 발행 + 잔액/샘플/미리보기/이메일/취소 운영 풀세트', done: true },
                     { text: '팝빌 전자세금계산서 Statement 패턴 일괄 적용 (TaxinvoiceRecord + 9 endpoints + DetailModal)', done: true },
@@ -282,6 +282,7 @@ const phases = [
                     { text: '쿠팡이츠 배달앱 매출 자동수집 — Playwright + curl_cffi(Chrome120 TLS 위조) 하이브리드 + unify-token 신버전 인증 + 수동 쿠키 폴백 + 야간 cron (1개월 백필 검증: 주문 436건/696만원)', done: true },
                     { text: 'Orbitron 호스트 cron 등록 — EasyPOS 03:00 + 쿠팡이츠 04:00 일별 자동 동기화 + Docker timezone Asia/Seoul 통일', done: true },
                     { text: 'CODEF 카드 매입 spec 준수 라운드 — catalog 14개 매핑 정정(현대=0302 등) + 현대카드 cardNo/cardPassword 페이로드 + approval-list 통합 + memberStoreInfoYN 가맹점 업종 + 디버그 UI(clientType 토글, 원응답 펼침, 비번 👁) (DEMO 한계 — PRODUCT 전환 시 즉시 가동)', done: true },
+                    { text: '재무 데이터 즉시 싱크 — 수집 직후 raw→DailyExpense 반영(reflect.py) + 손익계산서 조회 시 자동 재집계 + bank-sync 다중 provider 중복 dedup + 동기화 시각 KST 보정', done: true },
                 ],
             },
             {

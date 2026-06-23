@@ -51,7 +51,7 @@ LinkID=`SODAM` · SecretKey 발급 완료. 11개 서비스 모두 동일 Key로 
 - **선행작업**: 홈택스 부서사용자 ID 발급 (마이홈택스 → 부서사용자 관리)
 - **현금영수증 수집(HTCashbillService)은 별도 세션**
 
-### Phase F — 계좌조회 (7순위) · **TEST 검증 진행 중** (2026-04-27 업데이트)
+### Phase F — 계좌조회 (7순위) · **LIVE 전환 완료 — 팝빌 메인 승격** (2026-06-23 업데이트)
 
 - **구현 완료 (2026-04-25)**: `services/bank_sync_service.py` EasyFinBankService 래핑 + 30+ 엔드포인트 + 7섹션 UI
 - **2026-04-27 진전**:
@@ -144,7 +144,7 @@ backend/services/{domain}/
 | 팝빌 예금주조회 (Phase C) | 완료 | - | 급여계좌 입력 시 "예금주 자동확인" |
 | 팝빌 전자세금계산서 발행 (Phase D) | 완료 | - | /finance/tax-invoice |
 | 팝빌 홈택스 자동 수집 (Phase E) | 완료 | - | /finance/hometax · 부서사용자 ID 등록 필요 |
-| 팝빌 계좌조회 (Phase F) | 코드완료 | - | -99010016 차단, 팝빌 답변 대기 |
+| 팝빌 계좌조회 (Phase F) | 완료 | - | LIVE 전환 2026-06-23 — 팝빌 메인 + CODEF 보조 |
 | 팝빌 기업정보 자동채움 (Phase G) | 완료 | - | 거래처 "자동채움" 버튼 |
 | 팝빌 현금영수증 발행 (Phase G) | 완료 | - | /finance/cashbill |
 | 연말정산 직원별 연간 소득·세금 집계 | 완료 | - | Payroll 12개월 자동 합산 (services/yearend/aggregator) |

@@ -1883,3 +1883,43 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - CODEF `card_sales`(카드매출)는 health 모니터링 스코프 외(의도, spec 3.1).
 
 ---
+
+## 2026-06-23 (팝빌 LIVE 전환 + 재무 데이터 싱크 정합성 + KST 시각 보정)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 계좌조회 팝빌 메인 승격 + CODEF 보조 — 카드 정리 | 완료 |
+| infra | 팝빌 정식(LIVE) 운영 전환 (POPBILL_IS_TEST / POPBILL_BANK_IS_TEST=false) | 완료 |
+| fix | 동기화 이력/검증 시각 KST 변환 (UTC naive 직렬화 9h 오차) | 완료 |
+| fix | 수집 직후 raw→DailyExpense 즉시 반영 (매출관리 항상 싱크) | 완료 |
+| fix | 손익계산서 조회 시 매입/매출 자동 재집계 (항상 싱크) | 완료 |
+| fix | bank-sync 같은 거래 다중 provider 중복 적재 차단 (시각+금액 dedup) | 완료 |
+
+### 세부 내용
+
+#### 1. 팝빌 정식(LIVE) 운영 전환 + 계좌조회 메인 승격 (31041ed6, d3ead67d)
+
+- `POPBILL_IS_TEST` / `POPBILL_BANK_IS_TEST` = false → 팝빌 SODAM LinkID **정식(LIVE) 운영 시작** (`Orbitron.yaml`). 4/27 이후 EasyFinBank `-99010016` 차단·TEST 잔재 해소.
+- 외부연동 hub(`ModuleGrid.jsx`)에서 **계좌조회 = 팝빌 메인 / CODEF 보조**로 카드 재배치 — 기존 "CODEF primary, 팝빌 backup"(LIVE 차단 회피용) 전략을 LIVE 활성화로 역전.
+
+#### 2. 재무 데이터 싱크 정합성 (c5ddb41f, 37b763d6, afe0fe5d)
+
+- **수집 직후 즉시 반영** (`services/auto_collection_sync/reflect.py` 신규): easypos/coupang_eats/baemin 수집 endpoint가 야간 orchestrator 외에도 수집 직후 raw→DailyExpense 반영을 즉시 호출 → 매출관리 항상 싱크.
+- **손익계산서 자동 재집계** (`routers/profitloss.py`): 손익계산서 GET 시 매입/매출 자동 재집계 → 조회 시점 항상 최신.
+- **bank-sync dedup** (`routers/bank_sync.py`): 같은 거래가 여러 provider(팝빌·CODEF)로 중복 적재되던 것을 시각+금액 기준 dedup 차단.
+
+#### 3. 동기화 시각 KST 보정 (b53b2321)
+
+- `utils/format.js` + 외부연동 모듈 상세 7종(ChannelStatusCards / AutoCollection / Baemin / Bank / CoupangEats / EasyPos / HomeTax): 동기화 이력·검증 시각이 naive UTC 직렬화로 9시간 어긋나던 것을 KST 변환.
+- (동 커밋에 사장님 4·5월 직원급여 PDF 정리분 동봉 — 코드 무관.)
+
+### AI참고 (다음 세션)
+
+- **팝빌 LIVE 운영 시작** — 발행/조회가 실 과금. 파트너 SODAM 잔액 모니터링.
+- **미해결 운영 액션 (HEAD 유지)**: ①팝빌 문자 발신번호 0개 등록 → 알림 SMS 발송 불가(발신번호 등록 or 텔레그램 토큰). ②쿠팡이츠·배민 쿠키 재입력(사장님 직접)→백필.
+- **계좌조회 전략 역전**: dev-plan §외부통합의 "CODEF primary, 팝빌 backup"은 이제 팝빌 메인. 다음에 전략 표 prose 정합성 점검 필요.
+- 오늘은 신규 라우터/모델 없음 → [HEAD] DevWorkLog 미갱신(6/22 갱신 유지).
+
+---
