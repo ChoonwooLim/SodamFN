@@ -118,7 +118,7 @@ const Layout = ({ children }) => {
   // Use location for page transition animation key
   const location = useLocation();
   const role = localStorage.getItem('user_role');
-  const isAdmin = role === 'admin' || role === 'superadmin';
+  const isAdmin = role === 'admin' || role === 'superadmin' || role === 'superadmin_viewer';
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/' || location.pathname === '/store' || location.pathname === '/guest' || location.pathname === '/apply';
 
   if (isAuthPage) {
