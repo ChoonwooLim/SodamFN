@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, X, Flame, ListOrdered, ChefHat, Search, UtensilsCrossed, ShoppingBag, Wheat, Plus, Pencil, Trash2, Save } from 'lucide-react';
+import { ChevronLeft, X, Flame, ListOrdered, ChefHat, Search, UtensilsCrossed, ShoppingBag, Wheat, Plus, Pencil, Trash2, Save, ImagePlus } from 'lucide-react';
 import './RecipeBook.css';
 import api from '../api';
 
@@ -98,6 +98,7 @@ export default function RecipeBook() {
         const payload = {
             item_type: form.item_type, name: form.name.trim() || '새 메뉴', category: form.category,
             price: Number(form.price) || 0, emoji: form.emoji || '', spec: form.spec || null,
+            image_url: form.image_url || null,
             ingredients: (form.ingredients || []).map(s => s.trim()).filter(Boolean),
             steps: (form.steps || []).map(s => s.trim()).filter(Boolean),
         };
@@ -112,6 +113,18 @@ export default function RecipeBook() {
         if (!r?.id || !window.confirm(`'${r.name}'을(를) 삭제할까요?`)) return;
         try { await api.delete(`/menu-items/${r.id}`); await fetchAll(); closePanel(); }
         catch (e) { alert('삭제 실패: ' + (e.response?.data?.detail || e.message)); }
+    };
+    const [uploading, setUploading] = useState(false);
+    const uploadImage = async (fileObj) => {
+        if (!fileObj) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', fileObj);
+            const res = await api.post('/menu-items/upload-image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+            if (res.data?.url) setForm(f => ({ ...f, image_url: res.data.url }));
+        } catch (e) { alert('이미지 업로드 실패: ' + (e.response?.data?.detail || e.message)); }
+        finally { setUploading(false); }
     };
 
     return (
@@ -186,8 +199,12 @@ export default function RecipeBook() {
                             return (
                                 <div key={r.id} onClick={() => { setDetail(r); setEditing(false); }} style={{ animationDelay: `${idx * 0.04}s` }}
                                     className="group bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden card-animate cursor-pointer">
-                                    <div className={`aspect-[4/3] flex flex-col items-center justify-center gap-1 ${colors.bg} relative overflow-hidden`}>
-                                        <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm">{r.emoji || '🍽️'}</span>
+                                    <div className={`aspect-[4/3] flex items-center justify-center ${colors.bg} relative overflow-hidden`}>
+                                        {r.image_url ? (
+                                            <img src={r.image_url} alt={r.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        ) : (
+                                            <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm">{r.emoji || '🍽️'}</span>
+                                        )}
                                         {isProduct && r.price > 0 && (
                                             <span className="absolute bottom-2 right-2 text-[12px] font-extrabold text-slate-700 bg-white/85 px-2 py-0.5 rounded-md shadow-sm">{r.price.toLocaleString('ko-KR')}원</span>
                                         )}
@@ -235,6 +252,29 @@ export default function RecipeBook() {
                         {/* Body */}
                         {editing ? (
                             <div className="px-5 py-6 space-y-4">
+                                {isProduct && (
+                                    <div>
+                                        <label className="text-xs text-slate-400 block mb-1">상품 사진</label>
+                                        <div className="relative rounded-2xl border-2 border-dashed border-slate-200 overflow-hidden bg-slate-50 aspect-[4/3] flex items-center justify-center">
+                                            {form.image_url ? (
+                                                <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="text-center text-slate-400">
+                                                    <ImagePlus size={28} className="mx-auto mb-1" />
+                                                    <div className="text-xs">사진을 업로드하세요</div>
+                                                </div>
+                                            )}
+                                            <label className="absolute bottom-2 right-2 px-3 py-1.5 rounded-lg bg-white/90 border border-slate-200 text-xs font-bold text-slate-700 cursor-pointer hover:bg-white shadow-sm flex items-center gap-1">
+                                                <ImagePlus size={13} /> {uploading ? '업로드 중…' : (form.image_url ? '변경' : '사진 선택')}
+                                                <input type="file" accept="image/*" className="hidden" disabled={uploading}
+                                                    onChange={e => { uploadImage(e.target.files?.[0]); e.target.value = ''; }} />
+                                            </label>
+                                            {form.image_url && (
+                                                <button onClick={() => setForm(f => ({ ...f, image_url: null }))} className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"><X size={14} /></button>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-[64px_1fr] gap-3">
                                     <div>
                                         <label className="text-xs text-slate-400 block mb-1">이모지</label>
@@ -274,6 +314,9 @@ export default function RecipeBook() {
                             </div>
                         ) : (
                             <div className="px-5 py-6 space-y-6">
+                                {detail.image_url && (
+                                    <img src={detail.image_url} alt={detail.name} className="w-full aspect-[4/3] object-cover rounded-2xl border border-slate-100" />
+                                )}
                                 {isProduct && detail.price > 0 && (
                                     <div className="text-2xl font-extrabold text-slate-800">{detail.price.toLocaleString('ko-KR')}원</div>
                                 )}

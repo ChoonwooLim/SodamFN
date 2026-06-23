@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """매장별 통합 메뉴 상품 API — 메뉴판/가격표 + 레시피관리 공용."""
 import json
+import os
+from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import Session, select
 from database import get_session
@@ -144,3 +146,19 @@ def delete_menu_item(item_id: int,
     session.delete(m)
     session.commit()
     return {"status": "success"}
+
+
+@router.post("/api/menu-items/upload-image")
+async def upload_menu_image(file: UploadFile = File(...),
+                            _admin: User = Depends(get_admin_user)):
+    """메뉴(상품) 사진 업로드 → 저장 후 URL 반환. 프론트가 image_url 로 저장."""
+    from services.storage_service import get_storage
+    allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="이미지 파일만 업로드할 수 있습니다. (JPG/PNG/GIF/WEBP)")
+    storage = get_storage()
+    ts = int(datetime.now().timestamp() * 1000)
+    ext = os.path.splitext(file.filename or "menu.jpg")[1] or ".jpg"
+    storage_key = f"menu_images/menu_{ts}{ext}"
+    url = storage.upload_file(file.file, storage_key, file.content_type)
+    return {"status": "success", "url": url}

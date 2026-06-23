@@ -62,3 +62,6 @@ dev/null/
 
 # 중복정리 백업 (재무데이터 — 로컬 보관)
 SodamApp/backend/scripts/maintenance/*_backup.csv
+
+# 원본 복원 임시 추출물 (실데이터 — 커밋 금지)
+/_tmp/
