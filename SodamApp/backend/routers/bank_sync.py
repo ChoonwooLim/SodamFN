@@ -645,6 +645,25 @@ def _do_pull(
             duplicated += 1
             continue
 
+        # 시각+금액 기반 2차 중복 차단 — 같은 거래를 다른 provider/등록(CODEF·팝빌)이
+        # 서로 다른 tid 로 가져오는 경우 tid 체크만으로는 못 거른다. 같은 계좌·같은 초·
+        # 같은 입출금액이면 동일 이체로 간주(동시에 두 곳 이체 불가). trans_time(HHMMSS)
+        # 이 있을 때만 적용 — 없으면 tid 체크로 폴백.
+        if r.trans_time:
+            td_dup = _ymd_to_date(r.trans_date) or start_d
+            dup = service.session.exec(
+                select(BankTransaction).where(
+                    BankTransaction.account_id == acc.id,
+                    BankTransaction.trans_date == td_dup,
+                    BankTransaction.trans_time == r.trans_time,
+                    BankTransaction.in_amount == r.in_amount,
+                    BankTransaction.out_amount == r.out_amount,
+                )
+            ).first()
+            if dup:
+                duplicated += 1
+                continue
+
         td = _ymd_to_date(r.trans_date) or start_d
         tdt = None
         if r.trans_date and r.trans_time and len(r.trans_time) == 6:
