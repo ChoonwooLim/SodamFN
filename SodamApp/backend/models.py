@@ -126,6 +126,27 @@ class DeliveryImage(SQLModel, table=True):
     source: str = "upload"  # upload, ai_generated, static
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+class MenuItem(SQLModel, table=True):
+    """매장별 통합 메뉴 상품 — 메뉴판/가격표 + 레시피관리 공용.
+    item_type='product'(판매메뉴, 가격O) / 'ingredient'(재료 레시피, 가격X)."""
+    __table_args__ = (
+        Index("ix_menuitem_business_type", "business_id", "item_type"),
+    )
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    item_type: str = Field(default="product", index=True)  # product | ingredient
+    name: str
+    category: Optional[str] = None  # product: gimbap/bunsik/onigiri/ramen/drinks · ingredient: banchan/tuna/...
+    price: int = 0                  # 판매가 (product)
+    emoji: Optional[str] = None
+    spec: Optional[str] = None      # 규격/수율 (예: "1인분", "10개")
+    ingredients: Optional[str] = None  # JSON 배열 문자열
+    steps: Optional[str] = None        # JSON 배열 문자열
+    image_url: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
 class FoodTranslation(SQLModel, table=True):
     """음식명 한→영 번역 사전 (AI 이미지 생성 프롬프트용)"""
     id: Optional[int] = Field(default=None, primary_key=True)

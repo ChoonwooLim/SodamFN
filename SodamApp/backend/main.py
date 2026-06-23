@@ -103,11 +103,13 @@ from routers import inventory_check
 from routers import store_applications
 from routers import delivery_images
 from routers import promotions
+from routers import menu_items
 app.include_router(inventory_check.router, prefix="/api")
 app.include_router(superadmin.router, prefix="/api/superadmin")
 app.include_router(store_applications.router, prefix="/api/store-applications")
 app.include_router(delivery_images.router)
 app.include_router(promotions.router)
+app.include_router(menu_items.router)
 
 from routers import worklog
 app.include_router(worklog.router, prefix="/api/superadmin")

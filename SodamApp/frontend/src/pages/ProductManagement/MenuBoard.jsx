@@ -1,17 +1,19 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  FileText, Download, Printer, Edit3, Eye, ChevronDown,
+  FileText, Download, Printer, Edit3, Eye,
   Plus, Minus, RotateCcw, Palette, Type, Image as ImageIcon
 } from 'lucide-react';
-import { MENU_PRICES } from '../../data/menuPrices';
+import api from '../../api';
 
-/* ── 카테고리 한글 라벨 ── */
+/* ── 카테고리 한글 라벨 / 순서 ── */
 const CAT_LABELS = {
   gimbap: '김밥류',
   bunsik: '분식류',
+  onigiri: '주먹밥류',
   ramen: '라면류',
   drinks: '음료류',
 };
+const CAT_ORDER = ['gimbap', 'bunsik', 'onigiri', 'ramen', 'drinks'];
 
 /* ── 템플릿 색상 프리셋 ── */
 const COLOR_PRESETS = [
@@ -23,9 +25,10 @@ const COLOR_PRESETS = [
 
 export default function MenuBoard() {
   const [editMode, setEditMode] = useState(false);
-  const [prices, setPrices] = useState(() => JSON.parse(JSON.stringify(MENU_PRICES)));
+  const [prices, setPrices] = useState({});  // { category: [{id,name,price,emoji,spec}] }
+  const [loading, setLoading] = useState(true);
   const [colorIdx, setColorIdx] = useState(0);
-  const [shopName, setShopName] = useState('소담김밥');
+  const [shopName, setShopName] = useState('우리 가게');
   const [shopSub, setShopSub] = useState('정성을 담은 한 줄');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -33,12 +36,31 @@ export default function MenuBoard() {
 
   const theme = COLOR_PRESETS[colorIdx];
 
-  /* ── 가격 수정 핸들러 ── */
+  /* ── 매장 메뉴(상품) 불러오기 — 카테고리별 그룹 ── */
+  const fetchMenu = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/menu-items', { params: { item_type: 'product' } });
+      const grouped = {};
+      (res.data.items || []).forEach(it => {
+        const c = it.category || 'gimbap';
+        (grouped[c] = grouped[c] || []).push(it);
+      });
+      setPrices(grouped);
+    } catch (e) {
+      console.error('메뉴 로드 실패', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { fetchMenu(); }, [fetchMenu]);
+
+  /* ── 가격/이름 수정 (로컬 즉시 반영) ── */
   const handlePriceChange = useCallback((cat, idx, field, value) => {
     setPrices(prev => {
       const next = JSON.parse(JSON.stringify(prev));
       if (field === 'price') {
-        const num = parseInt(value.replace(/[^0-9]/g, ''), 10);
+        const num = parseInt(String(value).replace(/[^0-9]/g, ''), 10);
         next[cat][idx].price = isNaN(num) ? 0 : num;
       } else {
         next[cat][idx][field] = value;
@@ -47,30 +69,39 @@ export default function MenuBoard() {
     });
   }, []);
 
-  /* ── 항목 추가/삭제 ── */
-  const addItem = useCallback((cat) => {
-    setPrices(prev => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next[cat].push({ name: '새 메뉴', price: 0, nameEn: '' });
-      return next;
-    });
+  /* ── 서버 저장 (입력 onBlur) ── */
+  const saveItem = useCallback(async (cat, idx) => {
+    const it = prices[cat]?.[idx];
+    if (!it?.id) return;
+    try {
+      await api.put(`/menu-items/${it.id}`, { name: it.name, price: it.price });
+    } catch (e) { console.error('저장 실패', e); }
+  }, [prices]);
+
+  /* ── 항목 추가/삭제 (서버 반영) ── */
+  const addItem = useCallback(async (cat) => {
+    try {
+      const res = await api.post('/menu-items', { item_type: 'product', name: '새 메뉴', price: 0, category: cat });
+      setPrices(prev => ({ ...prev, [cat]: [...(prev[cat] || []), res.data] }));
+    } catch (e) { console.error('추가 실패', e); }
   }, []);
 
-  const removeItem = useCallback((cat, idx) => {
-    setPrices(prev => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next[cat].splice(idx, 1);
-      return next;
-    });
-  }, []);
+  const removeItem = useCallback(async (cat, idx) => {
+    const it = prices[cat]?.[idx];
+    if (!it?.id) return;
+    if (!window.confirm(`'${it.name}' 메뉴를 삭제할까요?`)) return;
+    try {
+      await api.delete(`/menu-items/${it.id}`);
+      setPrices(prev => {
+        const next = JSON.parse(JSON.stringify(prev));
+        next[cat].splice(idx, 1);
+        return next;
+      });
+    } catch (e) { console.error('삭제 실패', e); }
+  }, [prices]);
 
-  /* ── 초기화 ── */
-  const resetPrices = () => {
-    setPrices(JSON.parse(JSON.stringify(MENU_PRICES)));
-    setShopName('소담김밥');
-    setShopSub('정성을 담은 한 줄');
-    setColorIdx(0);
-  };
+  /* ── 서버에서 다시 불러오기 ── */
+  const resetPrices = () => fetchMenu();
 
   /* ── PNG 내보내기 ── */
   const exportPNG = async () => {
@@ -276,7 +307,9 @@ export default function MenuBoard() {
             </div>
 
             {/* 카테고리별 메뉴 */}
-            {Object.entries(prices).map(([cat, items]) => (
+            {CAT_ORDER.filter(cat => (prices[cat] || []).length || editMode).map((cat) => {
+              const items = prices[cat] || [];
+              return (
               <div key={cat} style={{ marginBottom: 28 }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14,
@@ -301,12 +334,14 @@ export default function MenuBoard() {
                         <input
                           value={item.name}
                           onChange={e => handlePriceChange(cat, idx, 'name', e.target.value)}
+                          onBlur={() => saveItem(cat, idx)}
                           className="flex-1 bg-transparent border-b border-dashed outline-none text-base font-semibold"
                           style={{ color: theme.text, borderColor: theme.border }}
                         />
                         <input
                           value={item.price}
                           onChange={e => handlePriceChange(cat, idx, 'price', e.target.value)}
+                          onBlur={() => saveItem(cat, idx)}
                           className="w-24 text-right bg-transparent border-b border-dashed outline-none text-base font-bold tabular-nums"
                           style={{ color: theme.header, borderColor: theme.border }}
                         />
@@ -322,9 +357,9 @@ export default function MenuBoard() {
                       <>
                         <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>
                           {item.name}
-                          {item.unit && (
+                          {item.spec && (
                             <span style={{ fontSize: 12, fontWeight: 400, color: theme.accent, marginLeft: 6 }}>
-                              ({item.unit})
+                              ({item.spec})
                             </span>
                           )}
                         </span>
@@ -359,7 +394,8 @@ export default function MenuBoard() {
                   </button>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {/* 하단 안내 */}
             <div style={{
