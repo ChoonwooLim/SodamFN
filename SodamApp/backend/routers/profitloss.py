@@ -1,22 +1,62 @@
 from fastapi import APIRouter, Depends, HTTPException
 from routers.auth import get_admin_user
 from models import User as AuthUser
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from database import get_session
 from models import MonthlyProfitLoss, DailyExpense, Revenue, Vendor
 from pydantic import BaseModel
 from typing import Optional, List
 import datetime
+import logging
 from tenant_filter import get_bid_from_token, apply_bid_filter
 from services.profit_loss_service import (
-    sync_all_expenses, 
-    sync_labor_cost, 
-    sync_summary_material_cost, 
+    sync_all_expenses,
+    sync_labor_cost,
+    sync_summary_material_cost,
     sync_delivery_revenue_to_pl,
+    sync_revenue_to_pl,
     CATEGORY_TO_PL_FIELD
 )
 
 router = APIRouter(prefix="/api/profitloss", tags=["profitloss"])
+
+_autosync_log = logging.getLogger("profitloss.autosync")
+
+
+def _months_with_data(year: int, session: Session, bid) -> list[int]:
+    """해당 연도에 매입(DailyExpense)/매출(Revenue)/기존 PL 레코드가 있는 월 목록."""
+    start = datetime.date(year, 1, 1)
+    end = datetime.date(year + 1, 1, 1)
+    months: set[int] = set()
+    for model, datecol in ((DailyExpense, DailyExpense.date), (Revenue, Revenue.date)):
+        q = apply_bid_filter(
+            select(func.extract('month', datecol)).where(datecol >= start, datecol < end),
+            model, bid,
+        ).distinct()
+        months.update(int(v) for v in session.exec(q).all() if v is not None)
+    pl_q = apply_bid_filter(
+        select(MonthlyProfitLoss.month).where(MonthlyProfitLoss.year == year),
+        MonthlyProfitLoss, bid,
+    )
+    months.update(int(v) for v in session.exec(pl_q).all() if v is not None)
+    return sorted(months)
+
+
+def _recompute_pl_months(year: int, months: list[int], session: Session, bid):
+    """조회 시 자동 재집계 — DailyExpense/Revenue 원천에서 MonthlyProfitLoss 재계산.
+
+    매입관리/매출관리/은행분류/자동수집 등 어느 경로로 데이터가 들어왔든, 손익계산서를
+    열 때마다 항상 최신 상태로 맞춘다 (별도 cron·수동 동기화 의존 제거).
+    멱등 — sync_* 는 월 단위 전량 upsert. 한 달 실패해도 나머지·조회는 계속 진행.
+    labor 는 sync_all_expenses 가 건드리지 않으므로 급여대장 동기화 결과 유지.
+    """
+    for m in months:
+        try:
+            sync_revenue_to_pl(year, m, session, bid)   # 내부에서 delivery 매출도 sync
+            sync_all_expenses(year, m, session, bid)
+        except Exception as e:  # noqa: BLE001
+            session.rollback()
+            _autosync_log.warning("PL 자동 재집계 실패 %d-%02d bid=%s: %s", year, m, bid, e)
 
 # --- Pydantic Schemas ---
 
@@ -113,7 +153,14 @@ def sync_expenses_endpoint(year: int, month: int, session: Session = Depends(get
 
 @router.get("/monthly")
 def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
-    """Get all monthly P/L records, optionally filtered by year"""
+    """Get all monthly P/L records, optionally filtered by year.
+
+    year 가 지정되면 조회 직전 그 해의 매입/매출을 자동 재집계해 항상 최신값을 반환한다.
+    (year 미지정 전체 조회는 비용이 커서 재집계 생략 — 화면은 항상 year 를 지정해 호출)
+    """
+    if year:
+        _recompute_pl_months(year, _months_with_data(year, session, bid), session, bid)
+
     query = select(MonthlyProfitLoss)
     query = apply_bid_filter(query, MonthlyProfitLoss, bid)
     if year:
@@ -146,7 +193,8 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
 
 @router.get("/monthly/{year}/{month}")
 def get_monthly_profitloss_single(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
-    """Get a specific month's P/L record"""
+    """Get a specific month's P/L record (조회 직전 자동 재집계)"""
+    _recompute_pl_months(year, [month], session, bid)
     result = session.exec(
         apply_bid_filter(select(MonthlyProfitLoss), MonthlyProfitLoss, bid)
         .where(MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
