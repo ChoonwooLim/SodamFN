@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { fmtWon } from './BankSync';
+import { formatUtcDateTime, parseUtc } from '../utils/format';
 
 /**
  * 쿠팡이츠(store.coupangeats.com) 배달앱 매출 자동수집 페이지.
@@ -283,10 +284,10 @@ export default function CoupangEatsModuleDetail() {
     }
 
     const cookieAgeDays = cred?.cookies_obtained_at
-        ? Math.floor((Date.now() - new Date(cred.cookies_obtained_at).getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((Date.now() - parseUtc(cred.cookies_obtained_at)?.getTime()) / (1000 * 60 * 60 * 24))
         : null;
     const cookieExpiresIn = cred?.cookies_expires_at
-        ? Math.floor((new Date(cred.cookies_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((parseUtc(cred.cookies_expires_at)?.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : null;
 
     return (
@@ -421,7 +422,7 @@ export default function CoupangEatsModuleDetail() {
                             <div className="text-slate-500 text-xs">쿠키 발급</div>
                             <div className="text-slate-800">
                                 {cred.cookies_obtained_at
-                                    ? `${new Date(cred.cookies_obtained_at).toLocaleString('ko-KR')}` + (cookieAgeDays !== null ? ` (${cookieAgeDays}일 전)` : '')
+                                    ? `${formatUtcDateTime(cred.cookies_obtained_at)}` + (cookieAgeDays !== null ? ` (${cookieAgeDays}일 전)` : '')
                                     : '아직 없음'}
                             </div>
                         </div>
@@ -429,14 +430,14 @@ export default function CoupangEatsModuleDetail() {
                             <div className="text-slate-500 text-xs">쿠키 만료</div>
                             <div className={cookieExpiresIn !== null && cookieExpiresIn < 1 ? 'text-amber-700' : 'text-slate-800'}>
                                 {cred.cookies_expires_at
-                                    ? `${new Date(cred.cookies_expires_at).toLocaleString('ko-KR')}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
+                                    ? `${formatUtcDateTime(cred.cookies_expires_at)}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
                                     : '-'}
                             </div>
                         </div>
                         <div>
                             <div className="text-slate-500 text-xs">마지막 검증 성공</div>
                             <div className="text-slate-800">
-                                {cred.last_verified_at ? new Date(cred.last_verified_at).toLocaleString('ko-KR') : '-'}
+                                {formatUtcDateTime(cred.last_verified_at)}
                             </div>
                         </div>
                         <div>
@@ -788,7 +789,7 @@ export default function CoupangEatsModuleDetail() {
                                 {logs.map((l) => (
                                     <tr key={l.id} className="border-b border-slate-100 last:border-0">
                                         <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
-                                            {new Date(l.started_at).toLocaleString('ko-KR')}
+                                            {formatUtcDateTime(l.started_at)}
                                         </td>
                                         <td className="py-2 px-2 text-slate-700 text-xs whitespace-nowrap">
                                             {l.target_start && l.target_end

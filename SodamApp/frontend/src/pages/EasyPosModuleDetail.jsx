@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { fmtWon, fmtDate } from './BankSync';
+import { formatUtcDateTime } from '../utils/format';
 
 /**
  * 이지포스(KICC smart.easypos.net) POS 매출 자동수집 페이지.
@@ -248,7 +249,7 @@ export default function EasyPosModuleDetail() {
                         <div>
                             <div className="text-slate-500 text-xs">마지막 인증 성공</div>
                             <div className="text-slate-800">
-                                {cred.last_verified_at ? new Date(cred.last_verified_at).toLocaleString('ko-KR') : '-'}
+                                {formatUtcDateTime(cred.last_verified_at)}
                             </div>
                         </div>
                         {cred.last_error_message && (
@@ -392,7 +393,7 @@ export default function EasyPosModuleDetail() {
                                 {logs.map((l) => (
                                     <tr key={l.id} className="border-b border-slate-100 last:border-0">
                                         <td className="py-2 px-2 text-slate-700 whitespace-nowrap">
-                                            {new Date(l.started_at).toLocaleString('ko-KR')}
+                                            {formatUtcDateTime(l.started_at)}
                                         </td>
                                         <td className="py-2 px-2 text-slate-700">{l.target_date || '-'}</td>
                                         <td className="py-2 px-2 text-slate-700">{l.sync_mode}</td>

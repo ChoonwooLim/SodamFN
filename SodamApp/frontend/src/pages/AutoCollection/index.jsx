@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
 import SettlementWatch from "./SettlementWatch";
+import { formatUtcDateTime } from "../../utils/format";
 
 export default function AutoCollection() {
     const [status, setStatus] = useState(null);
@@ -47,7 +48,7 @@ function ChannelStatus({ s }) {
     if (s.status === "no_data") return <p className="text-sm text-slate-500">아직 동기화 안 됨</p>;
     return (
         <p className="text-sm text-slate-700">
-            마지막 동기화: {s.started_at}<br/>
+            마지막 동기화: {formatUtcDateTime(s.started_at)}<br/>
             inserted {s.inserted} / updated {s.updated} ({s.status})
         </p>
     );

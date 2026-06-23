@@ -4,6 +4,7 @@ import {
     Trash2, Download, FileText, Wallet, ListChecks,
 } from 'lucide-react';
 import api from '../api';
+import { formatUtcDateTime } from '../utils/format';
 
 const fmt = (n) => Number(n || 0).toLocaleString('ko-KR');
 
@@ -233,7 +234,7 @@ export default function HomeTaxCollect() {
                                 </div>
                                 {isConnected && conn && (
                                     <div className="text-xs text-slate-600 mt-1">
-                                        인증 방식: {conn.auth_method} · 최근 확인: {conn.last_verified_at ? new Date(conn.last_verified_at).toLocaleString('ko-KR') : '—'}
+                                        인증 방식: {conn.auth_method} · 최근 확인: {formatUtcDateTime(conn.last_verified_at, '—')}
                                     </div>
                                 )}
                                 {!isConnected && !loading && (

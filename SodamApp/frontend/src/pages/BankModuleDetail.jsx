@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { CLASSIFIED_LABELS, fmtWon, fmtDate } from './BankSync';
+import { formatUtcDate } from '../utils/format';
 
 const AUTO_REFRESH_KEY = 'codef-bank-auto-refresh';
 const DEFAULT_INTERVAL_MIN = 21;
@@ -575,7 +576,7 @@ function ConnectionCard({ conn, accounts, onPull }) {
             </div>
             {conn.last_verified_at && (
                 <div className="text-xs text-slate-400 mb-2">
-                    인증: {new Date(conn.last_verified_at).toLocaleDateString('ko-KR')}
+                    인증: {formatUtcDate(conn.last_verified_at)}
                 </div>
             )}
             {accounts.length === 0 ? (

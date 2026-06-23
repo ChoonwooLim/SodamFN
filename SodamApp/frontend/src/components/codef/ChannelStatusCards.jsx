@@ -5,6 +5,7 @@ import {
     HelpCircle, Plus, XCircle,
 } from 'lucide-react';
 import api from '../../api';
+import { formatUtcDateTime } from '../../utils/format';
 
 /**
  * 외부 연동 채널 (쿠팡이츠/배민 등) 의 쿠키 만료/실패 상태를 시각화.
@@ -183,7 +184,7 @@ export default function ChannelStatusCards() {
 
                             <div className="mt-2 flex items-center gap-3 text-[11px] text-slate-500">
                                 {ch.last_verified_at && (
-                                    <span>마지막 검증: {new Date(ch.last_verified_at).toLocaleString('ko-KR')}</span>
+                                    <span>마지막 검증: {formatUtcDateTime(ch.last_verified_at)}</span>
                                 )}
                                 {ch.consecutive_failures > 0 && (
                                     <span className="text-red-500">연속실패 {ch.consecutive_failures}회</span>
