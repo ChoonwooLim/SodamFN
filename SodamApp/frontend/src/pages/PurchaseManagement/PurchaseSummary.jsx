@@ -19,7 +19,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
         <div className="space-y-4">
             {/* Category Breakdown */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate">
-                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">📂 카테고리별 매입 현황</h3>
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">📂 카테고리별 비용 현황</h3>
                 <div className="space-y-3">
                     {EXPENSE_CATEGORIES.filter(cat => cat.id !== '개인가계부').map(cat => {
                         const catInfo = categoryData[cat.id];
@@ -49,7 +49,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                 <div className="flex flex-col gap-4">
                     {/* Card Company Breakdown */}
                     <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-animate min-w-0">
-                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">💳 카드사별 매입 현황</h3>
+                        <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">💳 카드사별 비용 현황</h3>
                         <div className="grid grid-cols-2 gap-2">
                             {Object.entries(cardData).filter(([k]) => k !== '기타').sort((a, b) => b[1].amount - a[1].amount).map(([card, info]) => {
                                 const colors = CARD_COLORS[card] || CARD_COLORS['기타'];

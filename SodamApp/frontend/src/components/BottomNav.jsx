@@ -12,7 +12,7 @@ export default function BottomNav() {
     const navItems = [
         { icon: Receipt, path: '/finance/profitloss', label: '손익' },
         { icon: BarChart3, path: '/revenue', label: '매출' },
-        { icon: ShoppingBag, path: '/purchase', label: '매입' },
+        { icon: ShoppingBag, path: '/purchase', label: '비용' },
         { icon: CreditCard, path: '/finance/card-sales', label: '카드' },
         { icon: Truck, path: '/revenue?view=delivery', label: '배달앱' },
         { icon: MoreHorizontal, path: '/more', label: '더보기' },

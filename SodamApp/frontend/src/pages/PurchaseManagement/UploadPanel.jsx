@@ -237,7 +237,7 @@ export function UploadPanel({ fetchData }) {
                                                 영수증 촬영 또는 이미지 선택
                                             </p>
                                             <p className="text-xs text-slate-400">
-                                                매입 영수증을 촬영하면 자동으로 거래처, 금액, 날짜를 분석합니다
+                                                비용 영수증을 촬영하면 자동으로 거래처, 금액, 날짜를 분석합니다
                                             </p>
                                         </>
                                     )}

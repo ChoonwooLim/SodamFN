@@ -1134,7 +1134,7 @@ export default {
           tips: ['선입선출 (FIFO) 원칙 준수'],
           deepLinks: [],
           internalLinks: [
-            { label: 'SodamFN 매입 관리', path: '/finance/purchase', external: false },
+            { label: 'SodamFN 비용 관리', path: '/finance/purchase', external: false },
           ],
           dateFields: [],
         },

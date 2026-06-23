@@ -30,7 +30,7 @@ export default function UserManual() {
                     <li><a href="#dedup">중복 방지 시스템</a></li>
                     <li><a href="#upload-steps">업로드 절차 (권장)</a></li>
                     <li><a href="#rollback">업로드 취소 (롤백)</a></li>
-                    <li><a href="#purchase-smart">매입 관리 스마트 업로드</a></li>
+                    <li><a href="#purchase-smart">비용 관리 스마트 업로드</a></li>
                     <li><a href="#open-checklist">오픈 체크리스트 (직원용)</a></li>
                     <li><a href="#faq">자주 묻는 질문</a></li>
                 </ul>
@@ -524,7 +524,7 @@ export default function UserManual() {
                             잘못된 데이터가 입력된 경우, 업로드 단위로 데이터를 되돌릴 수 있습니다:
                         </p>
                         <ol className="step-list">
-                            <li>매출 관리 또는 매입 관리 페이지에서 <strong>취소/기록</strong> 탭을 클릭합니다.</li>
+                            <li>매출 관리 또는 비용 관리 페이지에서 <strong>취소/기록</strong> 탭을 클릭합니다.</li>
                             <li>취소하려는 업로드 건의 <strong>「↩」</strong> 버튼을 클릭합니다.</li>
                             <li>해당 업로드로 저장된 모든 데이터가 삭제됩니다.</li>
                             <li><strong>매출 및 매입 손익계산서가 자동으로 재계산</strong>됩니다.</li>
@@ -548,11 +548,11 @@ export default function UserManual() {
                 )}
             </div>
 
-            {/* ═══ 4. 매입 관리 스마트 업로드 ═══ */}
+            {/* ═══ 4. 비용 관리 스마트 업로드 ═══ */}
             <div className="manual-section" id="purchase-smart">
                 <h2 onClick={() => toggle('purchase')} style={{ cursor: 'pointer' }}>
                     {openSections.purchase ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-                    <ShoppingBag size={20} /> 매입 관리 스마트 업로드
+                    <ShoppingBag size={20} /> 비용 관리 스마트 업로드
                 </h2>
                 {openSections.purchase && (
                     <>

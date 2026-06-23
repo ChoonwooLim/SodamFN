@@ -157,7 +157,7 @@ export default function Sidebar() {
     const plSubItems = [
         { icon: Receipt, label: '손익계산서', path: '/finance/profitloss', color: 'text-emerald-400' },
         { icon: BarChart3, label: '매출관리', path: '/revenue', color: 'text-blue-400' },
-        { icon: ShoppingBag, label: '매입관리', path: '/purchase', color: 'text-orange-400' },
+        { icon: ShoppingBag, label: '비용관리', path: '/purchase', color: 'text-orange-400' },
         { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
         { icon: FileText, label: '전자세금계산서', path: '/finance/tax-invoice', color: 'text-rose-400' },

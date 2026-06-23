@@ -332,8 +332,8 @@ export default function PurchaseManagement() {
                             <ShoppingBag size={20} className="text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0">매입관리</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">Purchase Management</p>
+                            <h1 className="text-xl font-extrabold text-slate-800 tracking-tight m-0">비용관리</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">Expense Management</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-xl">
@@ -348,7 +348,7 @@ export default function PurchaseManagement() {
             <div className="max-w-6xl mx-auto px-6">
                 <div className="grid grid-cols-5 gap-3 mb-6">
                     <div className="rounded-2xl p-4 shadow-sm card-animate" style={{ background: 'linear-gradient(135deg, #134e4a 0%, #1e3a3a 100%)' }}>
-                        <div className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>💰 사업용 총 매입</div>
+                        <div className="text-[11px] font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>💰 사업용 총 비용</div>
                         <div className="text-lg font-extrabold mt-1 text-white">{formatNumber(businessTotal)}원</div>
                         <div className="text-[10px] mt-0.5" style={{ color: 'rgba(255,255,255,0.6)' }}>개인가계부 제외</div>
                     </div>
@@ -451,7 +451,7 @@ export default function PurchaseManagement() {
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                            <h3 className="text-base font-bold text-slate-800">{modalMode === 'add' ? '매입 추가' : '매입 수정'}</h3>
+                            <h3 className="text-base font-bold text-slate-800">{modalMode === 'add' ? '비용 추가' : '비용 수정'}</h3>
                             <button className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center border-none cursor-pointer text-slate-400 transition-colors" onClick={() => setShowModal(false)}><X size={18} /></button>
                         </div>
                         <div className="p-5 space-y-4">

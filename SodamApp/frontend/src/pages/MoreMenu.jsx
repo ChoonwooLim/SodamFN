@@ -51,7 +51,7 @@ export default function MoreMenu() {
                 { icon: BarChart3, label: '매출 관리', path: '/revenue', color: '#3b82f6', bg: '#eff6ff' },
                 { icon: CreditCard, label: '카드 매출 분석', path: '/finance/card-sales', color: '#8b5cf6', bg: '#f5f3ff' },
                 { icon: Receipt, label: '손익계산서', path: '/finance/profitloss', color: '#10b981', bg: '#ecfdf5' },
-                { icon: ShoppingBag, label: '매입 관리', path: '/purchase', color: '#f59e0b', bg: '#fffbeb' },
+                { icon: ShoppingBag, label: '비용 관리', path: '/purchase', color: '#f59e0b', bg: '#fffbeb' },
             ]
         },
         {

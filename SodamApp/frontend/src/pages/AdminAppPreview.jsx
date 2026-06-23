@@ -43,7 +43,7 @@ export default function AdminAppPreview() {
             { path: '/employees', label: '직원관리' },
             { path: '/finance/profitloss', label: '손익현황' },
             { path: '/revenue', label: '매출관리' },
-            { path: '/purchase', label: '매입관리' },
+            { path: '/purchase', label: '비용관리' },
             { path: '/vendor-settings', label: '거래처' },
             { path: '/settings', label: '설정' },
         ];
