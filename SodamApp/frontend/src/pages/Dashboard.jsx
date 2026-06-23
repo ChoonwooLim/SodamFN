@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { formatNumber, formatCurrency } from '../utils/format';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, Wallet, Users, BarChart3, ShoppingBag, LayoutDashboard } from 'lucide-react';
+import { TrendingUp, TrendingDown, Wallet, Users, BarChart3, ShoppingBag, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 const fmtWon = (v) => formatCurrency(v);
@@ -20,6 +20,16 @@ export default function Dashboard() {
     const [currentTime, setCurrentTime] = useState(new Date());
 
     useEffect(() => { fetchData(selectedYear, selectedMonth); }, [selectedYear, selectedMonth]);
+
+    // 전달/다음달 이동 (연도 자동 넘김)
+    const changeMonth = (delta) => {
+        let m = selectedMonth + delta;
+        let y = selectedYear;
+        if (m < 1) { m = 12; y -= 1; }
+        else if (m > 12) { m = 1; y += 1; }
+        setSelectedYear(y);
+        setSelectedMonth(m);
+    };
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
@@ -135,7 +145,10 @@ export default function Dashboard() {
                                 {formatTime(currentTime)}
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => changeMonth(-1)} title="전달" className="w-7 h-7 flex items-center justify-center bg-white/10 border border-white/15 text-white rounded-lg hover:bg-white/20">
+                                <ChevronLeft size={15} />
+                            </button>
                             <select
                                 value={selectedYear}
                                 onChange={e => setSelectedYear(Number(e.target.value))}
@@ -150,6 +163,9 @@ export default function Dashboard() {
                             >
                                 {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m} className="text-slate-800">{m}월</option>)}
                             </select>
+                            <button onClick={() => changeMonth(1)} title="다음달" className="w-7 h-7 flex items-center justify-center bg-white/10 border border-white/15 text-white rounded-lg hover:bg-white/20">
+                                <ChevronRight size={15} />
+                            </button>
                         </div>
                     </div>
 
@@ -329,7 +345,14 @@ export default function Dashboard() {
                             <p className="text-sm text-slate-400 mt-0.5">{formatDate(currentTime)} <span className="text-slate-300 ml-1">{formatTime(currentTime)}</span></p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => changeMonth(-1)}
+                            title="전달"
+                            className="w-9 h-9 flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
                         <select
                             value={selectedYear}
                             onChange={e => setSelectedYear(Number(e.target.value))}
@@ -344,6 +367,13 @@ export default function Dashboard() {
                         >
                             {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => <option key={m} value={m}>{m}월</option>)}
                         </select>
+                        <button
+                            onClick={() => changeMonth(1)}
+                            title="다음달"
+                            className="w-9 h-9 flex items-center justify-center bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
                         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-1.5">
                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-sm font-bold text-emerald-600">영업중</span>
