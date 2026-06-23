@@ -19,24 +19,24 @@ const MODULES = [
         description: '14개 카드사 사업자 매출 자동수집',
     },
     {
-        id: 'banks',
-        title: 'CODEF 계좌연동',
-        provider: 'CODEF',
-        icon: Building2,
-        color: 'blue',
-        active: true,
-        href: '/external-integration/banks',
-        description: '20+ 은행 입출금 자동수집 (CODEF 마이데이터)',
-    },
-    {
         id: 'popbill-bank',
-        title: 'POPBILL 계좌연동',
+        title: '팝빌 계좌연동 (메인)',
         provider: 'POPBILL',
         icon: Landmark,
         color: 'indigo',
         active: true,
         href: '/finance/bank-sync',
-        description: '팝빌 이지펀뱅크 정액제 — 계좌 입출금 실시간 수집',
+        description: '팝빌 이지펀뱅크 정액제 — 등록 계좌 입출금 자동수집 (메인 조회수단)',
+    },
+    {
+        id: 'banks',
+        title: 'CODEF 계좌연동 (보조)',
+        provider: 'CODEF',
+        icon: Building2,
+        color: 'blue',
+        active: true,
+        href: '/external-integration/banks',
+        description: 'CODEF 마이데이터 — 보조 수단 (정액제 한도·과거내역 보강용)',
     },
     {
         id: 'card-purchase',
@@ -195,7 +195,7 @@ function ModuleCard({ module, stats }) {
                     )}
                 </div>
             )}
-            {stats && module.id === 'banks' && (
+            {stats && module.id === 'popbill-bank' && (
                 <div className="text-sm space-y-1">
                     <div className="flex justify-between text-slate-700">
                         <span>등록 계좌</span>
@@ -205,11 +205,15 @@ function ModuleCard({ module, stats }) {
                         <span>이번 달 거래</span>
                         <span className="font-semibold">{stats.txCount?.toLocaleString() || 0}건</span>
                     </div>
-                    {stats.codefActiveCount > 0 && (
-                        <div className="text-xs text-emerald-700">
-                            ✓ CODEF 연결 {stats.codefActiveCount}건 활성
-                        </div>
-                    )}
+                </div>
+            )}
+            {stats && module.id === 'banks' && (
+                <div className="text-sm space-y-1">
+                    <div className="flex justify-between text-slate-700">
+                        <span>CODEF 연결</span>
+                        <span className="font-semibold">{stats.codefActiveCount || 0}건</span>
+                    </div>
+                    <div className="text-xs text-slate-400">보조 — 평소엔 팝빌이 자동수집</div>
                 </div>
             )}
             {stats && module.id === 'easypos' && (
@@ -337,6 +341,7 @@ export default function ModuleGrid({
                     stats={
                         m.id === 'cards' ? cardStats :
                         m.id === 'banks' ? bankStats :
+                        m.id === 'popbill-bank' ? bankStats :
                         m.id === 'easypos' ? easyposStats :
                         m.id === 'coupang-eats' ? coupangEatsStats :
                         m.id === 'baemin' ? baeminStats :

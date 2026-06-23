@@ -123,7 +123,7 @@ services:
       - key: POPBILL_BANK_IS_TEST
         value: "true"
       - key: BANK_SYNC_PROVIDER
-        value: ""  # 빈값 = 자동(LINK_ID/SECRET_KEY 있으면 popbill, 없으면 stub)
+        value: "popbill"  # 계좌조회 메인 = 팝빌(EasyFinBank). CODEF 는 보조(과거내역 보강·한도 우회)
       # ─────────────────────────────────────────────
       # CODEF (마이데이터 통합) — 2026-04-29 데모버전 발급
       # 환경 전환: CODEF_ENV + CODEF_API_HOST + CLIENT_ID/SECRET 동시 교체
