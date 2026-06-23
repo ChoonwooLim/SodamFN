@@ -219,7 +219,7 @@ export default function Sidebar() {
     const bottomMenuItems = isSuperAdmin
         ? [
             ...(isViewingBusiness ? [
-                { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
+                { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
                 { icon: Settings, label: '설정', path: '/settings' },
             ] : []),
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
