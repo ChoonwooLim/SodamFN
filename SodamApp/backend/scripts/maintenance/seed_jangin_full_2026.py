@@ -26,6 +26,7 @@ MONTHLY = {
     3: dict(store=29_500_000, deliv=17_700_000, ingredient=0.302, utility=850_000),
     4: dict(store=31_200_000, deliv=18_900_000, ingredient=0.298, utility=880_000),
     5: dict(store=33_500_000, deliv=20_300_000, ingredient=0.295, utility=900_000),
+    6: dict(store=35_800_000, deliv=21_700_000, ingredient=0.292, utility=920_000),
 }
 DELIV_SPLIT = {"배달의민족": 0.45, "쿠팡이츠": 0.35, "요기요": 0.20}
 SUPPLY_RATIO = 0.025      # 소모품비 (매출 대비)
@@ -49,7 +50,7 @@ HOURLY_CFG = {
     21: (10_200, 52, 4.0, False),   # 최민지 주방보조 (~12h/주 → 주휴 미달)
     25: (10_030, 40, 0.0, False),   # 최알바 알바 (~9h/주 → 주휴 미달)
 }
-HOUR_GROWTH = {1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.16}  # 성장에 따른 근무시간 증가
+HOUR_GROWTH = {1: 1.00, 2: 1.04, 3: 1.08, 4: 1.12, 5: 1.16, 6: 1.20}  # 성장에 따른 근무시간 증가
 
 
 def calc_deductions(gross, ins4):
@@ -117,15 +118,15 @@ def run():
         s.close(); return
 
     # ── 0) 기존 1~5월 데이터 삭제 ──
-    start = datetime.date(2026, 1, 1); end = datetime.date(2026, 5, 31)
+    start = datetime.date(2026, 1, 1); end = datetime.date(2026, 6, 30)
     old_de = s.exec(select(DailyExpense).where(DailyExpense.business_id == BID,
               DailyExpense.date >= start, DailyExpense.date <= end)).all()
     for e in old_de: s.delete(e)
     for p in s.exec(select(Payroll).where(Payroll.business_id == BID,
-              Payroll.month.in_([f"2026-{m:02d}" for m in range(1, 6)]))).all():
+              Payroll.month.in_([f"2026-{m:02d}" for m in range(1, 7)]))).all():
         s.delete(p)
     for dr in s.exec(select(DeliveryRevenue).where(DeliveryRevenue.business_id == BID,
-              DeliveryRevenue.year == 2026, DeliveryRevenue.month <= 5)).all():
+              DeliveryRevenue.year == 2026, DeliveryRevenue.month <= 6)).all():
         s.delete(dr)
     s.commit()
     print(f"기존 삭제: DailyExpense {len(old_de)}건\n")
