@@ -90,9 +90,8 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     return <Navigate to="/guest" replace />;
   }
 
-  if (adminOnly && role !== 'admin' && role !== 'superadmin') {
-    // 읽기전용 SuperAdmin 뷰어는 일반 매장 화면 접근 불가 → SuperAdmin 으로
-    return <Navigate to={role === 'superadmin_viewer' ? '/superadmin' : '/dashboard'} replace />;
+  if (adminOnly && role !== 'admin' && role !== 'superadmin' && role !== 'superadmin_viewer') {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

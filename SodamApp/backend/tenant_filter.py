@@ -35,6 +35,12 @@ def get_bid_from_token(authorization: Optional[str] = Header(None), x_view_as_bu
             if x_view_as_business is not None:
                 return x_view_as_business
             return None  # SuperAdmin sees everything (default)
+        if role == "superadmin_viewer":
+            # 읽기전용 뷰어: 소담 본점(1) 제외한 매장만 View-As 가능.
+            # 미선택/소담 본점 → -1(존재하지 않는 bid)로 빈 결과 강제.
+            if x_view_as_business is not None and x_view_as_business != 1:
+                return x_view_as_business
+            return -1
         return payload.get("business_id")
     except Exception:
         return None

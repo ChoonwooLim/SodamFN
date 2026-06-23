@@ -76,7 +76,7 @@ def get_tenant_bid(user):
         return None  # No filtering - sees everything
     return user.business_id
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -97,12 +97,16 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         user = service.session.exec(stmt).first()
         if user is None:
             raise credentials_exception
+        # 읽기전용 SuperAdmin 뷰어(superadmin_viewer) — 모든 쓰기(비-GET) 전역 차단
+        if user.role == "superadmin_viewer" and request.method not in ("GET", "HEAD", "OPTIONS"):
+            raise HTTPException(status_code=403, detail="읽기 전용 계정은 수정할 수 없습니다.")
         return user
     finally:
         service.close()
 
 def get_admin_user(current_user: User = Depends(get_current_user)):
-    if current_user.role not in ('admin', 'superadmin'):
+    # superadmin_viewer: 읽기 허용 (쓰기는 get_current_user 의 메서드 차단으로 막힘)
+    if current_user.role not in ('admin', 'superadmin', 'superadmin_viewer'):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The user doesn't have enough privileges"
@@ -110,8 +114,8 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
     return current_user
 
 def get_admin_or_above(current_user: User = Depends(get_current_user)):
-    """Admin 또는 SuperAdmin 권한 확인"""
-    if current_user.role not in ('admin', 'superadmin'):
+    """Admin 또는 SuperAdmin 권한 확인 (읽기전용 viewer 포함)"""
+    if current_user.role not in ('admin', 'superadmin', 'superadmin_viewer'):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="관리자 권한이 필요합니다."

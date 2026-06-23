@@ -94,7 +94,8 @@ export default function Sidebar() {
     }
 
     useEffect(() => {
-        if (user.role === 'superadmin') {
+        if (user.role === 'superadmin' || user.role === 'superadmin_viewer') {
+            // 뷰어는 백엔드에서 소담 본점(id1) 제외된 목록을 받음
             api.get('/superadmin/businesses/dropdown')
                 .then(res => { if (res.data?.data) setBusinesses(res.data.data); })
                 .catch(err => console.error('Failed to fetch businesses for dropdown', err));
@@ -102,7 +103,7 @@ export default function Sidebar() {
     }, [user.role]);
 
     useEffect(() => {
-        if (user.role === 'superadmin') {
+        if (user.role === 'superadmin' || user.role === 'superadmin_viewer') {
             if (viewAsBid) {
                 const biz = businesses.find(b => String(b.id) === String(viewAsBid));
                 setBusinessName(biz ? biz.name : '사업장 선택');
@@ -143,7 +144,7 @@ export default function Sidebar() {
     const isRealSuperAdmin = user.role === 'superadmin';
     const isViewer = user.role === 'superadmin_viewer';  // 읽기전용 SuperAdmin 뷰어
     const isSuperAdmin = isRealSuperAdmin || isViewer;   // SuperAdmin 화면 표시 여부
-    const isViewingBusiness = isRealSuperAdmin && viewAsBid;  // View-As는 정식 superadmin만
+    const isViewingBusiness = (isRealSuperAdmin || isViewer) && viewAsBid;  // 뷰어도 매장 진입 가능
 
     const adminMenuItems = [
         { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },

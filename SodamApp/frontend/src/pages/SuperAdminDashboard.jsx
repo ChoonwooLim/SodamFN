@@ -324,11 +324,9 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-lg font-bold">전체 매장 ({businesses.length})</h2>
-                                    {!isViewer && (
                                     <button onClick={() => setShowStoreModal(true)} className="flex items-center gap-2 bg-amber-500 text-slate-900 px-4 py-2 rounded-xl text-sm font-bold hover:bg-amber-400 shadow-lg">
                                         <Plus size={16} /> 매장 등록
                                     </button>
-                                    )}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {businesses.map(biz => (
@@ -355,7 +353,6 @@ export default function SuperAdminDashboard() {
                                                     <div className="font-bold">{biz.staff_count}명</div>
                                                 </div>
                                             </div>
-                                            {!isViewer && (
                                             <div className="flex gap-2">
                                                 <button onClick={() => {
                                                     localStorage.setItem('view_as_business_id', biz.id);
@@ -366,7 +363,6 @@ export default function SuperAdminDashboard() {
                                                     <button onClick={() => handleDeactivateBusiness(biz.id, biz.name)} className="py-1.5 px-3 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30"><Trash2 size={12} /></button>
                                                 )}
                                             </div>
-                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -662,7 +658,6 @@ export default function SuperAdminDashboard() {
                         {/* =========== 5. ANNOUNCEMENTS =========== */}
                         {activeTab === 'announcements' && (
                             <div className="space-y-6">
-                                {!isViewer && (
                                 <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
                                     <h3 className="font-bold mb-3 flex items-center gap-2"><Bell size={16} className="text-amber-400" /> 전체 매장 공지 배포</h3>
                                     <input value={announcementForm.title} onChange={e => setAnnouncementForm(p => ({ ...p, title: e.target.value }))} placeholder="제목" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl mb-3 text-white placeholder:text-slate-500 outline-none" />
@@ -675,7 +670,6 @@ export default function SuperAdminDashboard() {
                                         <button onClick={handleCreateAnnouncement} className="px-4 py-2 bg-amber-500 text-slate-900 rounded-xl text-sm font-bold hover:bg-amber-400">전체 배포</button>
                                     </div>
                                 </div>
-                                )}
                                 <div className="space-y-3">
                                     {announcements.map(a => (
                                         <div key={a.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
@@ -796,7 +790,7 @@ export default function SuperAdminDashboard() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        {isPending && !isViewer && (
+                                                        {isPending && (
                                                             <div className="flex gap-2 sm:flex-col">
                                                                 <button
                                                                     onClick={() => {

@@ -31,6 +31,13 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     (response) => response,
     (error) => {
+        // 읽기전용 계정의 쓰기 시도 → 친절한 안내
+        if (error.response && error.response.status === 403 &&
+            typeof error.response.data?.detail === 'string' &&
+            error.response.data.detail.includes('읽기 전용')) {
+            alert('🔒 읽기 전용 계정입니다. 조회만 가능하며 수정/등록/삭제는 할 수 없습니다.');
+            return Promise.reject(error);
+        }
         if (error.response && error.response.status === 401) {
             // Token expired or invalid — clear session and redirect to login
             localStorage.removeItem('token');
