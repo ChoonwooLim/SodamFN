@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from models import Staff, User as AuthUser
 from database import get_session
 from routers.auth import get_admin_user
+from tenant_filter import get_bid_from_token
 
 router = APIRouter(prefix="/distribute", tags=["Distribute"])
 
@@ -47,12 +48,13 @@ APP_URLS = {
 def get_distributable_staff(
     session: Session = Depends(get_session),
     _admin: AuthUser = Depends(get_admin_user),
+    bid = Depends(get_bid_from_token),
 ):
     """Get list of active staff with phone numbers for distribution"""
-    stmt = select(Staff).where(Staff.status == "재직")
-    # Tenant filter - scope to admin's business
-    if _admin.role != "superadmin" and _admin.business_id:
-        stmt = stmt.where(Staff.business_id == _admin.business_id)
+    # 사업장 스코프 — View-As(superadmin/뷰어) 포함. bid 없으면(매장 미선택) 빈 목록.
+    if bid is None:
+        return []
+    stmt = select(Staff).where(Staff.status == "재직", Staff.business_id == bid)
     staff_list = session.exec(stmt).all()
 
     result = []

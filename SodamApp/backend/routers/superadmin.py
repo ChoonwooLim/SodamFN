@@ -212,22 +212,30 @@ def get_monitoring_overview(
         Staff.status == "재직"
     ).scalar_subquery().label("staff_count")
 
-    rev_subq = select(func.coalesce(func.sum(Revenue.amount), 0)).where(
-        Revenue.business_id == Business.id,
-        func.extract('year', Revenue.date) == year,
-        func.extract('month', Revenue.date) == month
-    ).scalar_subquery().label("biz_revenue")
+    # 매출/인건비/지출은 손익계산서(MonthlyProfitLoss) 기준 — 실데이터와 일치
+    M = MonthlyProfitLoss
+    rev_expr = (M.revenue_store + M.revenue_coupang + M.revenue_baemin + M.revenue_yogiyo + M.revenue_ddangyo)
+    labor_expr = (M.expense_labor + M.expense_retirement + M.expense_insurance + M.expense_insurance_employee + M.expense_tax_employee)
+    exp_expr = (labor_expr + M.expense_ingredient + M.expense_material + M.expense_utility + M.expense_rent
+                + M.expense_rent_fee + M.expense_repair + M.expense_depreciation + M.expense_tax
+                + M.expense_card_fee + M.expense_delivery_fee + M.expense_other)
 
-    labor_subq = select(func.coalesce(func.sum(Payroll.base_pay + Payroll.bonus_holiday), 0)).where(
-        Payroll.business_id == Business.id,
-        Payroll.month == month_str
+    rev_subq = select(func.coalesce(func.sum(rev_expr), 0)).where(
+        M.business_id == Business.id, M.year == year, M.month == month
+    ).scalar_subquery().label("biz_revenue")
+    labor_subq = select(func.coalesce(func.sum(labor_expr), 0)).where(
+        M.business_id == Business.id, M.year == year, M.month == month
     ).scalar_subquery().label("biz_labor")
+    exp_subq = select(func.coalesce(func.sum(exp_expr), 0)).where(
+        M.business_id == Business.id, M.year == year, M.month == month
+    ).scalar_subquery().label("biz_expense")
 
     stmt = select(
         Business,
         staff_subq,
         rev_subq,
-        labor_subq
+        labor_subq,
+        exp_subq
     ).where(Business.is_active == True)
 
     rows = s.exec(stmt).all()
@@ -240,11 +248,12 @@ def get_monitoring_overview(
     total_labor = 0
     total_profit = 0
 
-    for biz, staff_count, biz_revenue, biz_labor in rows:
+    for biz, staff_count, biz_revenue, biz_labor, biz_expense in rows:
         staff_count = staff_count or 0
         biz_revenue = biz_revenue or 0
         biz_labor = biz_labor or 0
-        biz_profit = biz_revenue - biz_labor
+        biz_expense = biz_expense or 0
+        biz_profit = biz_revenue - biz_expense  # 영업이익(매출 − 전체지출)
 
         total_revenue += biz_revenue
         total_labor += biz_labor
@@ -595,10 +604,10 @@ def get_analytics(
         Staff.business_id == Business.id, Staff.status == "재직"
     ).scalar_subquery()
 
-    rev_subq = select(func.coalesce(func.sum(Revenue.amount), 0)).where(
-        Revenue.business_id == Business.id,
-        func.extract('year', Revenue.date) == year,
-        func.extract('month', Revenue.date) == month
+    M = MonthlyProfitLoss
+    rev_expr = (M.revenue_store + M.revenue_coupang + M.revenue_baemin + M.revenue_yogiyo + M.revenue_ddangyo)
+    rev_subq = select(func.coalesce(func.sum(rev_expr), 0)).where(
+        M.business_id == Business.id, M.year == year, M.month == month
     ).scalar_subquery()
 
     stmt = select(
