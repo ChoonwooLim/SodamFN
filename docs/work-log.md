@@ -1923,3 +1923,41 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - 오늘은 신규 라우터/모델 없음 → [HEAD] DevWorkLog 미갱신(6/22 갱신 유지).
 
 ---
+
+## 2026-06-23 (오후 — 비용관리 재무 정합성 2차)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | 비용 교차-source 중복 199건(9,538만원) 정리 — auto_bank/manual 이중적재 | 완료 |
+| refactor | '매입관리' → '비용관리' 명칭 통일 (실제 매입 17%뿐, 영업비용 개념) | 완료 |
+| fix | 4대보험 이중계상 제거 — 신규 '4대보험납부' 카테고리 + 키워드 가드 | 완료 |
+| fix | 급여 임포트 business_id 누락 → 5월 인건비 0원 정상화 | 완료 |
+
+### 세부 내용
+
+#### 1. 비용 교차-source 중복 199건 정리 (51350a24)
+
+- CODEF·팝빌이 같은 은행거래를 다른 tid의 BankTransaction 2건으로 수집 → 레거시 `_materialize_link`(source=manual) + `normalize_bank`(source=auto_bank)가 각각 DailyExpense 생성. note·금액·날짜 동일한데 source만 달라 기존 중복체크(date+vendor_id+amount)·유니크제약(+source) 모두 우회.
+- 2026-03~05 199건/9,538만원 정리(그룹당 vendor 연결 행 보존). 3월 112.7M→56.2M, 4월 62.8M→33.3M, 5월 40.5M→31.2M. dry-run 검증 + CSV 백업(gitignore) 후 삭제 + P/L 재집계.
+
+#### 2. '매입관리' → '비용관리' 개명 (24ae01e8, 6fdf95ff)
+
+- 실제 매입(원재료+식자재)은 17%뿐, 나머지 83%가 인건비·임차료·세금 → 발생주의 '비용'(손익계산서 일치)으로 통일. Sidebar/BottomNav/MoreMenu/AdminAppPreview/페이지 라벨/매뉴얼/영업가이드 변경. 라우트 `/purchase`·폴더명·API 유지. 개인가계부는 businessTotal·P/L에서 이미 제외 확인.
+
+#### 3. 4대보험 이중계상 제거 + 지출 오분류 정정 (2c02a36e)
+
+- 국민연금·건강·고용·산재 공단 납부가 세금과공과/기타경비/보험료로 제각각 분류 → 인건비 섹션 4대보험료(사업주/직원)와 이중계상. 카드대금처럼 '4대보험납부' 카테고리 분리 + `is_four_insurance_payment()` 키워드 가드(profit_loss_service/purchase/parser 공유, 월별 거래처명 변동 대응). 23건/12,571,810원 재분류. 세금과공과 15.38M→6.54M, 기타경비 9.22M→2.14M. 김지연 500만→개인가계부, 성동(206)→세금과공과 유지(사장님 확인).
+
+#### 4. 급여 임포트 business_id 누락 → 5월 인건비 0원 (d17ba6c6)
+
+- `import_payroll_data.py`가 Payroll 생성 시 business_id 미설정 → 5월 7건 bid=None → sync_labor_cost(bid=1)에서 누락 → 인건비/퇴직금/4대보험/원천세 전부 0. get_staff_map이 (id, business_id) 반환하도록 + 신규/기존 모두 staff.bid 주입. DB 7건 정정 + 재집계: 5월 인건비 0→15,196,030원.
+
+### AI참고 (다음 세션)
+
+- **⚠️ 6월 급여 미입력** — Payroll 0건. 입력 시 sync_labor_cost가 6월 인건비 섹션 자동 채움.
+- **4대보험납부** 카테고리는 P/L·비용관리에서 제외(카드대금과 동일). 신규 월 거래처(26XX국민건강 등)는 키워드 가드로 자동 차단.
+- raw BankTransaction 중복(메모리 455건)은 미정리 — DailyExpense 레벨만 정리함. 재수집 시 bank-sync dedup(afe0fe5d)이 신규 중복은 차단.
+
+---
