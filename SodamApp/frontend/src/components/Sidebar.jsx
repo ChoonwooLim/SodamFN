@@ -140,8 +140,10 @@ export default function Sidebar() {
         window.location.href = newBid ? '/dashboard' : '/superadmin';
     };
 
-    const isSuperAdmin = user.role === 'superadmin';
-    const isViewingBusiness = isSuperAdmin && viewAsBid;
+    const isRealSuperAdmin = user.role === 'superadmin';
+    const isViewer = user.role === 'superadmin_viewer';  // 읽기전용 SuperAdmin 뷰어
+    const isSuperAdmin = isRealSuperAdmin || isViewer;   // SuperAdmin 화면 표시 여부
+    const isViewingBusiness = isRealSuperAdmin && viewAsBid;  // View-As는 정식 superadmin만
 
     const adminMenuItems = [
         { icon: LayoutDashboard, label: '대시보드', path: '/dashboard' },
@@ -173,12 +175,14 @@ export default function Sidebar() {
         { icon: Shield, label: 'SuperAdmin 대시보드', path: '/superadmin' },
         { icon: Building2, label: '매장 관리', path: '/superadmin?tab=stores' },
         { icon: FileText, label: '사용신청 관리', path: '/superadmin?tab=applications' },
-        { icon: Users, label: '사용자 관리', path: '/superadmin?tab=users' },
+        // 사용자 관리 — 읽기전용 뷰어 차단
+        ...(isViewer ? [] : [{ icon: Users, label: '사용자 관리', path: '/superadmin?tab=users' }]),
         { icon: TrendingUp, label: '실시간 모니터링', path: '/superadmin?tab=monitoring' },
         { icon: CreditCard, label: '요금 정산', path: '/superadmin?tab=billing' },
         { icon: Bell, label: '공지 배포', path: '/superadmin?tab=announcements' },
         { icon: BarChart3, label: '통계/벤치마크', path: '/superadmin?tab=analytics' },
-        { icon: FileText, label: '작업일지', path: '/superadmin/worklog' },
+        // 작업일지 — 내부 개발로그(소담 언급 포함)라 뷰어 차단
+        ...(isViewer ? [] : [{ icon: FileText, label: '작업일지', path: '/superadmin/worklog' }]),
     ];
 
     const mainMenuItems = isSuperAdmin

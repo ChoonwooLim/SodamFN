@@ -91,7 +91,8 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
   }
 
   if (adminOnly && role !== 'admin' && role !== 'superadmin') {
-    return <Navigate to="/dashboard" replace />;
+    // 읽기전용 SuperAdmin 뷰어는 일반 매장 화면 접근 불가 → SuperAdmin 으로
+    return <Navigate to={role === 'superadmin_viewer' ? '/superadmin' : '/dashboard'} replace />;
   }
 
   return children;
@@ -101,7 +102,8 @@ const SuperAdminRoute = ({ children }) => {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('user_role');
   if (!token) return <Navigate to="/" replace />;
-  if (role !== 'superadmin') return <Navigate to="/dashboard" replace />;
+  // superadmin + 읽기전용 뷰어(superadmin_viewer) 허용
+  if (role !== 'superadmin' && role !== 'superadmin_viewer') return <Navigate to="/dashboard" replace />;
   return children;
 };
 

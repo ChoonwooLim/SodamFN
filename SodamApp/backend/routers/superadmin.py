@@ -19,11 +19,33 @@ router = APIRouter()
 
 # --- Auth Helpers ---
 
+# 읽기 전용 SuperAdmin 뷰어 역할 (adminext 등)
+VIEWER_ROLE = "superadmin_viewer"
+# 뷰어가 볼 수 없는 사업장 (소담김밥 본점)
+VIEWER_BLOCKED_BIDS = {1}
+
+
 def get_superadmin_user(current_user: User = Depends(get_current_user)):
-    """SuperAdmin 권한 확인"""
-    if current_user.role != "superadmin":
+    """SuperAdmin 페이지 접근(읽기) — 정식 superadmin + 읽기전용 viewer 허용."""
+    if current_user.role not in ("superadmin", VIEWER_ROLE):
         raise HTTPException(status_code=403, detail="SuperAdmin 권한이 필요합니다.")
     return current_user
+
+
+def get_superadmin_editor(current_user: User = Depends(get_current_user)):
+    """수정/사용자관리 권한 — 정식 superadmin 만. 읽기전용 viewer 차단."""
+    if current_user.role != "superadmin":
+        raise HTTPException(status_code=403, detail="읽기 전용 계정은 이 기능을 사용할 수 없습니다.")
+    return current_user
+
+
+def is_viewer(user: User) -> bool:
+    return getattr(user, "role", None) == VIEWER_ROLE
+
+
+def viewer_blocked_bids(user: User) -> set:
+    """뷰어면 차단 사업장 id 집합, 정식 superadmin이면 빈 집합."""
+    return set(VIEWER_BLOCKED_BIDS) if is_viewer(user) else set()
 
 # --- Pydantic Models ---
 
@@ -90,8 +112,11 @@ def list_businesses(
 
     rows = s.exec(stmt.order_by(Business.created_at.desc())).all()
 
+    blocked = viewer_blocked_bids(admin)
     results = []
     for biz, staff_count, user_count in rows:
+        if biz.id in blocked:
+            continue
         results.append({
             "id": biz.id,
             "name": biz.name,
@@ -113,7 +138,7 @@ def list_businesses(
 
 
 @router.post("/businesses")
-def create_business(data: BusinessCreate, admin: User = Depends(get_superadmin_user), s: Session = Depends(get_session)):
+def create_business(data: BusinessCreate, admin: User = Depends(get_superadmin_editor), s: Session = Depends(get_session)):
     """새 매장 등록"""
     biz = Business(
         name=data.name,
@@ -133,7 +158,7 @@ def create_business(data: BusinessCreate, admin: User = Depends(get_superadmin_u
 
 
 @router.put("/businesses/{business_id}")
-def update_business(business_id: int, data: BusinessUpdate, admin: User = Depends(get_superadmin_user), s: Session = Depends(get_session)):
+def update_business(business_id: int, data: BusinessUpdate, admin: User = Depends(get_superadmin_editor), s: Session = Depends(get_session)):
     """매장 정보 수정"""
     biz = s.get(Business, business_id)
     if not biz:
@@ -149,7 +174,7 @@ def update_business(business_id: int, data: BusinessUpdate, admin: User = Depend
 
 
 @router.delete("/businesses/{business_id}")
-def deactivate_business(business_id: int, admin: User = Depends(get_superadmin_user), s: Session = Depends(get_session)):
+def deactivate_business(business_id: int, admin: User = Depends(get_superadmin_editor), s: Session = Depends(get_session)):
     """매장 해지 (소프트 삭제)"""
     biz = s.get(Business, business_id)
     if not biz:
@@ -207,6 +232,9 @@ def get_monitoring_overview(
 
     rows = s.exec(stmt).all()
 
+    blocked = viewer_blocked_bids(admin)
+    rows = [r for r in rows if r[0].id not in blocked]
+
     overview = []
     total_revenue = 0
     total_labor = 0
@@ -262,7 +290,7 @@ def list_plans(admin: User = Depends(get_superadmin_user), s: Session = Depends(
 
 
 @router.post("/plans")
-def create_plan(data: PlanCreate, admin: User = Depends(get_superadmin_user), s: Session = Depends(get_session)):
+def create_plan(data: PlanCreate, admin: User = Depends(get_superadmin_editor), s: Session = Depends(get_session)):
     """요금제 생성"""
     plan = SubscriptionPlan(**data.dict())
     s.add(plan)
@@ -289,6 +317,9 @@ def get_billing_summary(
     ).where(Business.is_active == True)
 
     rows = s.exec(stmt).all()
+
+    blocked = viewer_blocked_bids(admin)
+    rows = [r for r in rows if r[0].id not in blocked]
 
     billing = []
     total_billing = 0
@@ -324,7 +355,7 @@ def get_billing_summary(
 @router.get("/users")
 def list_all_users(
     business_id: Optional[int] = None,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """전체 사용자 목록 (매장별 그룹화)"""
@@ -380,7 +411,7 @@ def list_all_users(
 def update_user_role(
     user_id: int,
     role: str = Body(..., embed=True),
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용자 권한 변경"""
@@ -400,7 +431,7 @@ def update_user_role(
 def assign_user_business(
     user_id: int,
     business_id: int = Body(..., embed=True),
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용자를 매장에 배정"""
@@ -427,7 +458,7 @@ class UserUpdate(BaseModel):
 def update_user_info(
     user_id: int,
     data: UserUpdate,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용자 정보 수정 (아이디, 이름, 이메일)"""
@@ -456,7 +487,7 @@ def update_user_info(
 def update_user_password(
     user_id: int,
     new_password: str = Body(..., embed=True),
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용자 비밀번호 변경"""
@@ -478,7 +509,7 @@ def update_user_password(
 @router.delete("/users/{user_id}")
 def delete_user(
     user_id: int,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용자 계정 삭제"""
@@ -503,7 +534,7 @@ def delete_user(
 @router.post("/announcements/global")
 def create_global_announcement(
     data: GlobalAnnouncementCreate,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """전체 매장 공지사항 일괄 배포"""
@@ -577,6 +608,10 @@ def get_analytics(
         rev_subq.label("biz_revenue")
     ).where(Business.is_active == True)
 
+    blocked = viewer_blocked_bids(admin)
+    if blocked:
+        stmt = stmt.where(Business.id.notin_(list(blocked)))
+
     rows = s.exec(stmt).all()
 
     # Group by business_type
@@ -634,7 +669,7 @@ def create_business_admin(
     username: str = Body(..., embed=True),
     password: str = Body(..., embed=True),
     real_name: str = Body(None, embed=True),
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """기존 매장에 관리자(Admin) 계정 생성"""
@@ -682,7 +717,7 @@ def onboard_new_business(
     data: BusinessCreate,
     admin_username: str = Body(...),
     admin_password: str = Body(...),
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """
@@ -798,7 +833,7 @@ def list_store_applications(
 def approve_store_application(
     application_id: int,
     data: ApplicationApproval,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """
@@ -874,7 +909,7 @@ def approve_store_application(
 def reject_store_application(
     application_id: int,
     data: ApplicationRejection,
-    admin: User = Depends(get_superadmin_user),
+    admin: User = Depends(get_superadmin_editor),
     s: Session = Depends(get_session)
 ):
     """사용신청 거절"""
@@ -907,8 +942,10 @@ def list_businesses_dropdown(admin: User = Depends(get_superadmin_user), s: Sess
     businesses = s.exec(
         select(Business).where(Business.is_active == True).order_by(Business.name)
     ).all()
+    blocked = viewer_blocked_bids(admin)
     return {
         "status": "success",
-        "data": [{"id": b.id, "name": b.name, "business_type": b.business_type} for b in businesses]
+        "data": [{"id": b.id, "name": b.name, "business_type": b.business_type}
+                 for b in businesses if b.id not in blocked]
     }
 

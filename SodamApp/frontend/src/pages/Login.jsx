@@ -26,7 +26,9 @@ export default function LoginPage() {
                 const isExpired = payload.exp && (payload.exp * 1000 < Date.now());
                 if (!isExpired) {
                     const role = payload.role;
-                    if (role === 'superadmin') {
+                    if (role === 'superadmin_viewer') {
+                        navigate('/superadmin', { replace: true });
+                    } else if (role === 'superadmin') {
                         const viewAs = localStorage.getItem('view_as_business_id');
                         navigate(viewAs ? '/dashboard' : '/superadmin', { replace: true });
                     } else if (role === 'admin') {
@@ -102,7 +104,9 @@ export default function LoginPage() {
 
             setLoading(false); // Reset loading BEFORE navigate
 
-            if (payload.role === 'superadmin') {
+            if (payload.role === 'superadmin_viewer') {
+                navigate('/superadmin');
+            } else if (payload.role === 'superadmin') {
                 const viewAs = localStorage.getItem('view_as_business_id');
                 navigate(viewAs ? '/dashboard' : '/superadmin');
             } else if (payload.role === 'admin') {
