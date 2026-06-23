@@ -120,9 +120,13 @@ def run():
         days = calendar.monthrange(2026, month)[1]
         total_rev = cfg['store'] + cfg['deliv']
 
-        # ── 매출: 매장 (일별) ──
+        # ── 매출: 매장 (일별, 현금 ~22% + 카드 ~78% 분리) ──
         for i, val in enumerate(daily_split(cfg['store'], 2026, month), start=1):
-            add_de(datetime.date(2026, month, i), v_store, val, "store", "Card", "auto_easypos")
+            d = datetime.date(2026, month, i)
+            cash = round(val * random.uniform(0.18, 0.26) / 1000) * 1000
+            card = val - cash
+            add_de(d, v_store, cash, "store", "Cash", "auto_easypos")
+            add_de(d, v_store, card, "store", "Card", "auto_easypos")
         # ── 매출: 배달 3채널 (일별) ──
         deliv_month = {}
         for ch, ratio in DELIV_SPLIT.items():
@@ -203,7 +207,7 @@ def run():
         pl = s.exec(select(MonthlyProfitLoss).where(MonthlyProfitLoss.year == 2026,
               MonthlyProfitLoss.month == month, MonthlyProfitLoss.business_id == BID)).first()
         if pl:
-            pl.expense_card_fee = round(cfg['store'] * CARD_FEE_RATIO)
+            pl.expense_card_fee = round(cfg['store'] * 0.78 * CARD_FEE_RATIO)  # 카드 결제분에만
             s.add(pl)
     s.commit()
 
