@@ -109,19 +109,17 @@ services:
       - key: POPBILL_SENDER_NUMBER
         value: "0224526570"
       - key: POPBILL_IS_TEST
-        value: "true"
+        value: "false"  # 2026-06-23 정식(LIVE) 운영 — 팩스/현금영수증/세금계산서/홈택스/계좌확인 실 발행·수집
       - key: POPBILL_USER_ID
         value: "sodam2025"  # 일반회원 ID — popbill-url 발급/회원 식별 호출에 필요
       - key: NOTIFICATION_PROVIDER
         value: "popbill"  # SMS/카카오 알림톡 활성. stub 으로 토글하면 로그만 남고 미발송
       # ─────────────────────────────────────────────
-      # Popbill 계좌조회 (EasyFinBank)
-      # 2026-04-27 현재: TEST 환경으로 검증 진행 중 (LIVE -99010016 차단 유지)
-      # TEST 등록계좌: 신한 110-357-7***** 사용기간 2026-04-27 ~ 2026-06-04
-      # 검증 완료 후 LIVE 활성화되면 "false" 로 토글 + 계좌 재등록 필요
+      # Popbill 계좌조회 (EasyFinBank) — 2026-06-23 정식(LIVE) 운영 전환 완료
+      # ※ TEST→LIVE 전환 시 실계좌 재등록 필요(테스트 계좌는 LIVE 미인계)
       # ─────────────────────────────────────────────
       - key: POPBILL_BANK_IS_TEST
-        value: "true"
+        value: "false"
       - key: BANK_SYNC_PROVIDER
         value: "popbill"  # 계좌조회 메인 = 팝빌(EasyFinBank). CODEF 는 보조(과거내역 보강·한도 우회)
       # ─────────────────────────────────────────────
