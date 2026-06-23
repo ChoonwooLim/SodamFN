@@ -109,3 +109,8 @@
 | 2026-06-23 | 비용(매입)관리 합계가 실제보다 과대 — 같은 거래 중복 표시 | CODEF·팝빌이 같은 은행거래를 다른 tid로 수집 → manual/auto_bank 두 source로 DailyExpense 이중 적재, source만 달라 중복체크·유니크제약 우회 | 3~5월 199건/9,538만원 정리(그룹당 vendor연결 행 보존) + P/L 재집계. dry-run+CSV백업 후 삭제 | scripts/maintenance/dedup_purchase_2026.py |
 | 2026-06-23 | 손익계산서 4대보험 이중계상 (지출 과대) | 국민연금·건강·고용·산재 공단 납부가 세금과공과/기타경비로 분류돼 인건비 섹션 4대보험료(사업주/직원)와 중복 | '4대보험납부' 카테고리 분리 + is_four_insurance_payment() 키워드 가드. 23건/12.57M 재분류, 세금과공과 15.38M→6.54M | services/profit_loss_service.py, routers/purchase.py, services/purchase_parser.py |
 | 2026-06-23 | 손익계산서 5월 인건비/퇴직금/4대보험/원천세 전부 0원 (실제 지급됐는데) | 급여 임포트 스크립트가 Payroll.business_id 미설정 → 5월 7건 bid=None → sync_labor_cost(bid=1) 필터에서 누락 | import_payroll_data.py가 staff.business_id 주입(신규/기존 백필). DB 7건 정정+재집계, 5월 인건비 0→15,196,030원 | scripts/import/import_payroll_data.py |
+| 2026-06-23 | 읽기전용 뷰어(adminext) 로그인 후 사이드바 전체 안 보임(로그아웃 불가) | App Layout의 isAdmin이 superadmin_viewer 미포함 → 사이드바 미렌더 | isAdmin에 superadmin_viewer 포함 | SodamApp/frontend/src/App.jsx |
+| 2026-06-23 | SuperAdmin 실시간 모니터링 매출 0원·이익 마이너스 | 옛 Revenue 테이블 조회였으나 실데이터는 MonthlyProfitLoss에 있음 | 매출/인건비/영업이익을 손익계산서 기준 집계로 변경 | SodamApp/backend/routers/superadmin.py |
+| 2026-06-23 | 앱전송 직원목록에 타 매장 직원 섞임 | staff-list가 superadmin/뷰어일 때 사업장 필터 안 함 | View-As bid(get_bid_from_token)로 스코프, 미선택 시 빈 목록 | SodamApp/backend/routers/distribute.py |
+| 2026-06-23 | 손익계산서 매장명이 항상 '소담김밥', 제목에 불필요한 '_2026 하반기' | localStorage 폴백 사용 + 하드코딩 접미사 | /auth/business-info(View-As 반영)에서 매장명 fetch + 접미사 제거 | SodamApp/frontend/src/pages/ProfitLoss/index.jsx |
+| 2026-06-23 | SuperAdmin 카드가 흐릿해 업체 구분·버튼 식별 안 됨 | 라이트 배경에 다크테마 클래스(bg-white/5 등) 사용 | 전체 탭·모달 라이트 테마로 변환, 매장카드 재디자인 | SodamApp/frontend/src/pages/SuperAdminDashboard.jsx |

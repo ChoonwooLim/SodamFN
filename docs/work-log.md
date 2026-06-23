@@ -1961,3 +1961,50 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - raw BankTransaction 중복(메모리 455건)은 미정리 — DailyExpense 레벨만 정리함. 재수집 시 bank-sync dedup(afe0fe5d)이 신규 중복은 차단.
 
 ---
+
+## 2026-06-23 (저녁 — 장인김밥 데모 + 읽기전용 뷰어 + 상품관리 매장별)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| chore | 장인김밥(bid=2) 종합 데모 데이터 — 매출/급여(주휴)/현금분리/6월/매출패턴 | 완료 |
+| feat | 사이드바 '거래처 관리'→'사용 매뉴얼' + 초보자용 27화면 종합 설명서 | 완료 |
+| feat | 읽기전용 SuperAdmin 뷰어 역할(superadmin_viewer)·adminext 계정 | 완료 |
+| feat | 상품관리 매장별 전환 — 통합 메뉴 상품(MenuItem) + 등록/이미지 | 완료 |
+| feat | 대시보드 전달/다음달 이동 버튼 | 완료 |
+| fix | 뷰어 사이드바 누락, 모니터링 매출0, 앱전송 타매장 누출, 손익 매장명 | 완료 |
+| style | SuperAdmin 전체 탭·모달 라이트 테마 통일 + 매장카드 재디자인 | 완료 |
+| chore | 레시피 전역 데이터 가상화(비법 비공개) + 소담 원본 DB 복원 | 완료 |
+
+### 세부 내용
+
+#### 1. 장인김밥 종합 데모 데이터 (a1083133, f6a0c33e, 1f84aef6, 9b577e2e, 0130b76a)
+- `scripts/maintenance/seed_jangin_full_2026.py`: 1~6월 매장+배달3채널 매출, 전 비용 카테고리, 배달정산, 8명 급여.
+- 현금/카드 분리(현금 ~매장의 22%), 급여 소담방식(주방장 월급제 + 시급제+주휴수당, 주15h 미만 주휴 제외).
+- 매출 패턴 6월=100% 기준(1월80·2월70·3월85·4월93·5월86·6월100%) — 연동 비용 재집계.
+
+#### 2. 사용 매뉴얼 (227cef02, 77706446)
+- Sidebar(SuperAdmin 뷰잉)의 거래처관리 → 사용매뉴얼(/manual). UserManual 27개 화면 전 기능 초보자용 정밀화.
+
+#### 3. 읽기전용 SuperAdmin 뷰어 (83e8dfda, 0f3a0fde, 69f86489, d7b3b8d2, cad9749d, b47e3508)
+- 새 역할 `superadmin_viewer`(adminext / Adminext2026!). get_superadmin_user 읽기 허용 + get_superadmin_editor(쓰기/사용자관리 차단).
+- get_current_user 비-GET 전역 403(읽기전용), tenant_filter View-As 허용(소담 본점 id1 차단), get_admin_user 뷰어 읽기 허용.
+- 차단: 소담 본점·사용자관리·작업일지. Layout isAdmin에 뷰어 포함(사이드바 복구).
+- SuperAdmin 전체 탭·모달 라이트테마 통일(bg-white/5 등 다크클래스 → 라이트), 매장카드 재디자인+진입버튼.
+- 모니터링 매출 0(Revenue테이블→MonthlyProfitLoss), 앱전송 staff-list View-As bid 필터.
+
+#### 4. 상품관리 매장별 전환 (cb1b58f0, f8d38611, 50fa742b)
+- 신규 `MenuItem` 모델(business_id, item_type=product/ingredient), `/api/menu-items` CRUD + 빈 매장 자동 시드 + 이미지 업로드.
+- `services/default_menu.py` 기본 메뉴, 기존 3매장 각 36건 시드. MenuBoard·RecipeBook API 연동+등록/편집/삭제, 상품 사진 표시.
+- 레시피 전역(recipes.js) 가상화(0eddd122) + 소담 원본(실 레시피·가격·사진) DB 복원(저장소 미포함). 장인은 동일 사진+가상 레시피.
+
+#### 5. 기타 fix (daa55d2f, 15b70ebf, c350e8f6)
+- 손익계산서 매장명 /auth/business-info(View-As 반영) + '_2026 하반기' 제거. 대시보드 전/다음달 버튼.
+
+### AI참고 (다음 세션)
+- **adminext / Adminext2026!** = 읽기전용 SuperAdmin 뷰어. 소담본점·사용자관리·작업일지 차단, 장인/강동 읽기열람.
+- **MenuItem** = 매장별 메뉴/레시피 단일 모델. 빈 매장 첫 GET 자동 시드. 소담 원본 비법은 DB만(저장소 X).
+- 장인 매출은 6월=100% 기준 퍼센트 패턴. 시드 재실행 시 1~6월 전체 재생성.
+
+---
