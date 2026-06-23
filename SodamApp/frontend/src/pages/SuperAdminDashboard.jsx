@@ -4,7 +4,7 @@ import {
     ChevronLeft, ChevronDown, Building2, Users, CreditCard, Bell, BarChart3,
     Plus, Edit2, Trash2, Eye, TrendingUp, TrendingDown,
     Globe, Shield, Settings, RefreshCw, Search, Filter,
-    FileText, CheckCircle2, XCircle, Clock3, UserPlus
+    FileText, CheckCircle2, XCircle, Clock3, UserPlus, ArrowRight
 } from 'lucide-react';
 import api from '../api';
 import { formatNumber } from '../utils/format';
@@ -328,43 +328,57 @@ export default function SuperAdminDashboard() {
                                         <Plus size={16} /> 매장 등록
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {businesses.map(biz => (
-                                        <div key={biz.id} className="bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10 hover:border-amber-500/30 transition-all">
-                                            <div className="flex items-start justify-between mb-3">
-                                                <div>
-                                                    <h3 className="font-bold text-lg">{biz.name}</h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">{biz.business_type}</span>
-                                                        {biz.region && <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">{biz.region}</span>}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {businesses.map(biz => {
+                                        const isActive = biz.subscription_status === 'active';
+                                        return (
+                                        <div key={biz.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-blue-300 transition-all overflow-hidden flex flex-col">
+                                            {/* 상단: 업체 식별 */}
+                                            <div className="p-5 border-b border-slate-100">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20 shrink-0">
+                                                            {(biz.name || '?').trim().charAt(0)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-extrabold text-base text-slate-800 truncate">{biz.name}</h3>
+                                                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                                                                <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{biz.business_type}</span>
+                                                                {biz.region && <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">📍 {biz.region}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                                        {isActive ? '● 활성' : '○ 해지'}
+                                                    </span>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                                    <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                                                        <div className="text-slate-400 text-[11px]">대표</div>
+                                                        <div className="font-bold text-slate-700 truncate">{biz.owner_name || '-'}</div>
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                                                        <div className="text-slate-400 text-[11px]">직원</div>
+                                                        <div className="font-bold text-slate-700">{biz.staff_count}명</div>
                                                     </div>
                                                 </div>
-                                                <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${biz.subscription_status === 'active' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                                    {biz.subscription_status === 'active' ? '활성' : '해지'}
-                                                </span>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-2 text-xs mb-4">
-                                                <div className="bg-white/5 rounded-lg px-3 py-2">
-                                                    <span className="text-slate-400">대표</span>
-                                                    <div className="font-bold">{biz.owner_name || '-'}</div>
-                                                </div>
-                                                <div className="bg-white/5 rounded-lg px-3 py-2">
-                                                    <span className="text-slate-400">직원</span>
-                                                    <div className="font-bold">{biz.staff_count}명</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
+                                            {/* 하단: 액션 */}
+                                            <div className="p-3 flex gap-2 bg-slate-50/50">
                                                 <button onClick={() => {
                                                     localStorage.setItem('view_as_business_id', biz.id);
                                                     localStorage.setItem('business_id', biz.id);
                                                     window.location.href = '/dashboard';
-                                                }} className="flex-1 py-1.5 bg-white/10 rounded-lg text-xs font-bold hover:bg-white/20"><Eye size={12} className="inline mr-1" />상세</button>
-                                                {biz.subscription_status === 'active' && (
-                                                    <button onClick={() => handleDeactivateBusiness(biz.id, biz.name)} className="py-1.5 px-3 bg-red-500/20 text-red-400 rounded-lg text-xs font-bold hover:bg-red-500/30"><Trash2 size={12} /></button>
+                                                }} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/20">
+                                                    이 매장 관리화면 열기 <ArrowRight size={15} />
+                                                </button>
+                                                {isActive && (
+                                                    <button onClick={() => handleDeactivateBusiness(biz.id, biz.name)} title="매장 해지" className="py-2.5 px-3 bg-white border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition-all"><Trash2 size={15} /></button>
                                                 )}
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 {/* Store Create Modal */}
