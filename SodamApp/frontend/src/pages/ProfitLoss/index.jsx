@@ -1015,7 +1015,7 @@ export default function ProfitLoss() {
                     </colgroup>
                     <thead>
                         <tr>
-                            <th colSpan="2">{businessName} 월별손익계산서_{year}</th>
+                            <th colSpan="2">{businessName} 월별손익계산서</th>
                             {MONTHS.map(m => <th key={m}>{m}월</th>)}
                             <th>합계</th>
                             <th>월평균</th>
