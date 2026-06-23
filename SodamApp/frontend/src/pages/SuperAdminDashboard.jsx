@@ -274,7 +274,7 @@ export default function SuperAdminDashboard() {
                 <header className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
-                            <Shield size={20} className="text-white" />
+                            <Shield size={20} className="text-slate-800" />
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-slate-900 tracking-tight">SuperAdmin</h1>
@@ -315,7 +315,7 @@ export default function SuperAdminDashboard() {
                 {/* Tab Content */}
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <RefreshCw size={32} className="animate-spin text-amber-400" />
+                        <RefreshCw size={32} className="animate-spin text-amber-600" />
                     </div>
                 ) : (
                     <>
@@ -384,25 +384,25 @@ export default function SuperAdminDashboard() {
                                 {/* Store Create Modal */}
                                 {showStoreModal && (
                                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
-                                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Building2 size={20} className="text-amber-400" /> 신규 매장 등록</h3>
+                                        <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-2xl">
+                                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Building2 size={20} className="text-amber-600" /> 신규 매장 등록</h3>
                                             <div className="space-y-3">
-                                                <input value={storeForm.name} onChange={e => setStoreForm(p => ({ ...p, name: e.target.value }))} placeholder="매장명" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                <input value={storeForm.name} onChange={e => setStoreForm(p => ({ ...p, name: e.target.value }))} placeholder="매장명" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <select value={storeForm.business_type} onChange={e => setStoreForm(p => ({ ...p, business_type: e.target.value }))} className="p-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none">
+                                                    <select value={storeForm.business_type} onChange={e => setStoreForm(p => ({ ...p, business_type: e.target.value }))} className="p-3 bg-white border border-slate-300 rounded-xl text-slate-800 outline-none">
                                                         {BUSINESS_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                                     </select>
-                                                    <select value={storeForm.region} onChange={e => setStoreForm(p => ({ ...p, region: e.target.value }))} className="p-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none">
+                                                    <select value={storeForm.region} onChange={e => setStoreForm(p => ({ ...p, region: e.target.value }))} className="p-3 bg-white border border-slate-300 rounded-xl text-slate-800 outline-none">
                                                         <option value="">지역 선택</option>
                                                         {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
                                                     </select>
                                                 </div>
-                                                <input value={storeForm.owner_name} onChange={e => setStoreForm(p => ({ ...p, owner_name: e.target.value }))} placeholder="대표자명" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none" />
-                                                <input value={storeForm.phone} onChange={e => setStoreForm(p => ({ ...p, phone: e.target.value }))} placeholder="연락처" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none" />
-                                                <input value={storeForm.business_number} onChange={e => setStoreForm(p => ({ ...p, business_number: e.target.value }))} placeholder="사업자등록번호" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none" />
+                                                <input value={storeForm.owner_name} onChange={e => setStoreForm(p => ({ ...p, owner_name: e.target.value }))} placeholder="대표자명" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none" />
+                                                <input value={storeForm.phone} onChange={e => setStoreForm(p => ({ ...p, phone: e.target.value }))} placeholder="연락처" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none" />
+                                                <input value={storeForm.business_number} onChange={e => setStoreForm(p => ({ ...p, business_number: e.target.value }))} placeholder="사업자등록번호" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none" />
                                             </div>
                                             <div className="flex gap-3 mt-6">
-                                                <button onClick={() => setShowStoreModal(false)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={() => setShowStoreModal(false)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">취소</button>
                                                 <button onClick={handleCreateBusiness} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg">등록</button>
                                             </div>
                                         </div>
@@ -424,8 +424,8 @@ export default function SuperAdminDashboard() {
                                     ].map((card, i) => {
                                         const Icon = card.icon;
                                         return (
-                                            <div key={i} className={`bg-white/5 backdrop-blur-sm rounded-2xl p-5 border border-white/10`}>
-                                                <Icon size={20} className={`text-${card.color}-400 mb-2`} />
+                                            <div key={i} className={`bg-white rounded-2xl p-5 border border-slate-200 shadow-sm`}>
+                                                <Icon size={20} className={`text-${card.color}-600 mb-2`} />
                                                 <div className="text-xs text-slate-400">{card.label}</div>
                                                 <div className="text-xl font-black mt-1">{card.value}</div>
                                             </div>
@@ -434,14 +434,14 @@ export default function SuperAdminDashboard() {
                                 </div>
 
                                 {/* Business List */}
-                                <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
-                                    <div className="p-4 border-b border-white/10">
+                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <div className="p-4 border-b border-slate-200">
                                         <h3 className="font-bold">매장별 현황 ({monitoringData.summary.total_businesses}개)</h3>
                                     </div>
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="text-slate-400 border-b border-white/5">
+                                                <tr className="text-slate-400 border-b border-slate-100">
                                                     <th className="text-left p-3">매장</th>
                                                     <th className="text-left p-3">업종</th>
                                                     <th className="text-right p-3">직원</th>
@@ -452,13 +452,13 @@ export default function SuperAdminDashboard() {
                                             </thead>
                                             <tbody>
                                                 {(monitoringData.businesses || []).map(biz => (
-                                                    <tr key={biz.business_id} className="border-b border-white/5 hover:bg-white/5">
+                                                    <tr key={biz.business_id} className="border-b border-slate-100 hover:bg-slate-50">
                                                         <td className="p-3 font-bold">{biz.name}</td>
                                                         <td className="p-3 text-slate-400">{biz.business_type}</td>
                                                         <td className="p-3 text-right">{biz.staff_count}</td>
-                                                        <td className="p-3 text-right text-emerald-400 font-mono">{fmt(biz.revenue)}</td>
-                                                        <td className="p-3 text-right text-rose-400 font-mono">{fmt(biz.labor_cost)}</td>
-                                                        <td className={`p-3 text-right font-bold font-mono ${biz.profit >= 0 ? 'text-blue-400' : 'text-red-400'}`}>{fmt(biz.profit)}</td>
+                                                        <td className="p-3 text-right text-emerald-600 font-mono">{fmt(biz.revenue)}</td>
+                                                        <td className="p-3 text-right text-rose-600 font-mono">{fmt(biz.labor_cost)}</td>
+                                                        <td className={`p-3 text-right font-bold font-mono ${biz.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>{fmt(biz.profit)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -471,19 +471,19 @@ export default function SuperAdminDashboard() {
                         {/* =========== 3. BILLING =========== */}
                         {activeTab === 'billing' && billingData && (
                             <div className="space-y-6">
-                                <div className="bg-gradient-to-r from-amber-500/20 to-amber-600/10 rounded-2xl p-6 border border-amber-500/20">
-                                    <div className="text-sm text-amber-300">이번 달 총 이용료</div>
-                                    <div className="text-3xl font-black text-amber-400 mt-1">{fmt(billingData.total_billing)}원</div>
+                                <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200">
+                                    <div className="text-sm text-amber-700">이번 달 총 이용료</div>
+                                    <div className="text-3xl font-black text-amber-600 mt-1">{fmt(billingData.total_billing)}원</div>
                                 </div>
                                 <div className="space-y-3">
                                     {(billingData.businesses || []).map(biz => (
-                                        <div key={biz.business_id} className="bg-white/5 rounded-xl p-4 border border-white/10 flex items-center justify-between">
+                                        <div key={biz.business_id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
                                             <div>
                                                 <div className="font-bold">{biz.name}</div>
                                                 <div className="text-xs text-slate-400">{biz.plan_name} • {biz.subscription_status === 'active' ? '활성' : '해지'}</div>
                                             </div>
                                             <div className="text-right">
-                                                <div className="font-bold text-amber-400">{fmt(biz.monthly_fee)}원</div>
+                                                <div className="font-bold text-amber-600">{fmt(biz.monthly_fee)}원</div>
                                                 <div className="text-[10px] text-slate-500">월 이용료</div>
                                             </div>
                                         </div>
@@ -496,8 +496,8 @@ export default function SuperAdminDashboard() {
                             <div className="space-y-4">
                                 {/* Summary Bar */}
                                 <div className="flex items-center gap-4 text-sm">
-                                    <span className="text-slate-400">전체 <strong className="text-white">{users.length}</strong>명</span>
-                                    <span className="text-slate-400">매장 <strong className="text-amber-400">{userGroups.filter(g => g.business_id !== null).length}</strong>개</span>
+                                    <span className="text-slate-400">전체 <strong className="text-slate-800">{users.length}</strong>명</span>
+                                    <span className="text-slate-400">매장 <strong className="text-amber-600">{userGroups.filter(g => g.business_id !== null).length}</strong>개</span>
                                 </div>
 
                                 {/* Business Groups */}
@@ -506,32 +506,32 @@ export default function SuperAdminDashboard() {
                                     const isExpanded = expandedGroups[groupKey];
                                     const isUnassigned = group.business_id === null;
                                     return (
-                                        <div key={groupKey} className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+                                        <div key={groupKey} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                                             {/* Group Header */}
                                             <button
                                                 onClick={() => setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))}
-                                                className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+                                                className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnassigned ? 'bg-slate-600/50' : 'bg-amber-500/20'}`}>
-                                                        {isUnassigned ? <Users size={18} className="text-slate-400" /> : <Building2 size={18} className="text-amber-400" />}
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isUnassigned ? 'bg-slate-200' : 'bg-amber-100'}`}>
+                                                        {isUnassigned ? <Users size={18} className="text-slate-400" /> : <Building2 size={18} className="text-amber-600" />}
                                                     </div>
                                                     <div className="text-left">
                                                         <div className="font-bold flex items-center gap-2">
                                                             {group.business_name}
-                                                            {group.business_type && <span className="text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded">{group.business_type}</span>}
+                                                            {group.business_type && <span className="text-[10px] text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">{group.business_type}</span>}
                                                         </div>
                                                         {group.owner_name && <div className="text-xs text-slate-400">대표: {group.owner_name}</div>}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-3">
-                                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${group.user_count > 0 ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-slate-500'}`}>
+                                                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${group.user_count > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                                                         {group.user_count}명
                                                     </span>
                                                     {group.business_id && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setCreateAdminModal({ business_id: group.business_id, business_name: group.business_name }); }}
-                                                            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
+                                                            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-500/30 transition-colors"
                                                             title="매장 관리자 추가"
                                                         >
                                                             <UserPlus size={12} /> 관리자 추가
@@ -543,13 +543,13 @@ export default function SuperAdminDashboard() {
 
                                             {/* Group Users */}
                                             {isExpanded && (
-                                                <div className="border-t border-white/5">
+                                                <div className="border-t border-slate-100">
                                                     {group.users.length === 0 ? (
                                                         <div className="p-6 text-center text-slate-500 text-sm">등록된 사용자가 없습니다</div>
                                                     ) : (
                                                         <table className="w-full text-sm">
                                                             <thead>
-                                                                <tr className="text-slate-400 border-b border-white/5 text-xs">
+                                                                <tr className="text-slate-400 border-b border-slate-100 text-xs">
                                                                     <th className="text-left p-3 pl-5">아이디</th>
                                                                     <th className="text-left p-3">이름</th>
                                                                     <th className="text-center p-3">권한</th>
@@ -558,16 +558,16 @@ export default function SuperAdminDashboard() {
                                                             </thead>
                                                             <tbody>
                                                                 {group.users.map(u => (
-                                                                    <tr key={u.id} className="border-b border-white/5 hover:bg-white/5">
+                                                                    <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50">
                                                                         <td className="p-3 pl-5 font-bold">{u.username}</td>
                                                                         <td className="p-3">{u.real_name || '-'}</td>
                                                                         <td className="p-3 text-center">
                                                                             <select
                                                                                 value={u.role}
                                                                                 onChange={e => handleRoleChange(u.id, e.target.value)}
-                                                                                className={`text-xs font-bold px-2 py-1 rounded-lg bg-transparent border outline-none cursor-pointer ${u.role === 'superadmin' ? 'border-amber-500 text-amber-400' :
-                                                                                    u.role === 'admin' ? 'border-blue-500 text-blue-400' :
-                                                                                        u.role === 'staff' ? 'border-emerald-500 text-emerald-400' :
+                                                                                className={`text-xs font-bold px-2 py-1 rounded-lg bg-transparent border outline-none cursor-pointer ${u.role === 'superadmin' ? 'border-amber-500 text-amber-600' :
+                                                                                    u.role === 'admin' ? 'border-blue-500 text-blue-600' :
+                                                                                        u.role === 'staff' ? 'border-emerald-500 text-emerald-600' :
                                                                                         'border-slate-500 text-slate-400'
                                                                                     }`}
                                                                             >
@@ -579,10 +579,10 @@ export default function SuperAdminDashboard() {
                                                                         </td>
                                                                         <td className="p-3 text-center">
                                                                             <div className="flex items-center justify-center gap-1">
-                                                                                <button onClick={() => handleEditUser(u)} className="p-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30" title="수정">
+                                                                                <button onClick={() => handleEditUser(u)} className="p-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-500/30" title="수정">
                                                                                     <Edit2 size={13} />
                                                                                 </button>
-                                                                                <button onClick={() => handleDeleteUser(u.id, u.username)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30" title="삭제">
+                                                                                <button onClick={() => handleDeleteUser(u.id, u.username)} className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-500/30" title="삭제">
                                                                                     <Trash2 size={13} />
                                                                                 </button>
                                                                             </div>
@@ -601,31 +601,31 @@ export default function SuperAdminDashboard() {
                                 {/* User Edit Modal */}
                                 {editingUser && (
                                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                        <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-2xl">
                                             <h3 className="text-lg font-bold mb-5 flex items-center gap-2">
-                                                <Edit2 size={18} className="text-amber-400" />
+                                                <Edit2 size={18} className="text-amber-600" />
                                                 사용자 수정 <span className="text-slate-400 text-sm font-normal">#{editingUser.id}</span>
                                             </h3>
                                             <div className="space-y-3">
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">아이디</label>
-                                                    <input value={editForm.username} onChange={e => setEditForm(p => ({ ...p, username: e.target.value }))} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                                                    <input value={editForm.username} onChange={e => setEditForm(p => ({ ...p, username: e.target.value }))} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 outline-none focus:ring-2 focus:ring-amber-500" />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">이름</label>
-                                                    <input value={editForm.real_name} onChange={e => setEditForm(p => ({ ...p, real_name: e.target.value }))} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white outline-none focus:ring-2 focus:ring-amber-500" />
+                                                    <input value={editForm.real_name} onChange={e => setEditForm(p => ({ ...p, real_name: e.target.value }))} className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 outline-none focus:ring-2 focus:ring-amber-500" />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">이메일</label>
-                                                    <input value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} placeholder="(선택)" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                    <input value={editForm.email} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} placeholder="(선택)" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                                 </div>
-                                                <div className="border-t border-white/10 pt-3 mt-2">
+                                                <div className="border-t border-slate-200 pt-3 mt-2">
                                                     <label className="text-xs text-slate-400 block mb-1">새 비밀번호 <span className="text-slate-600">(변경 시에만 입력)</span></label>
-                                                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="변경하지 않으면 비워두세요" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                                    <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="변경하지 않으면 비워두세요" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                                 </div>
                                             </div>
                                             <div className="flex gap-3 mt-6">
-                                                <button onClick={() => setEditingUser(null)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={() => setEditingUser(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">취소</button>
                                                 <button onClick={handleSaveUser} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg">저장</button>
                                             </div>
                                         </div>
@@ -638,9 +638,9 @@ export default function SuperAdminDashboard() {
                         {/* Create Admin Modal */}
                         {createAdminModal && (
                             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-2xl">
                                     <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
-                                        <UserPlus size={18} className="text-amber-400" />
+                                        <UserPlus size={18} className="text-amber-600" />
                                         매장 관리자 생성
                                     </h3>
                                     <p className="text-sm text-slate-400 mb-5">
@@ -649,20 +649,20 @@ export default function SuperAdminDashboard() {
                                     </p>
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">관리자 아이디 <span className="text-red-400">*</span></label>
-                                            <input value={createAdminForm.username} onChange={e => setCreateAdminForm(p => ({ ...p, username: e.target.value }))} placeholder="예: jangin_admin" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                            <label className="text-xs text-slate-400 block mb-1">관리자 아이디 <span className="text-red-600">*</span></label>
+                                            <input value={createAdminForm.username} onChange={e => setCreateAdminForm(p => ({ ...p, username: e.target.value }))} placeholder="예: jangin_admin" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                         </div>
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">비밀번호 <span className="text-red-400">*</span></label>
-                                            <input type="password" value={createAdminForm.password} onChange={e => setCreateAdminForm(p => ({ ...p, password: e.target.value }))} placeholder="최소 4자 이상" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                            <label className="text-xs text-slate-400 block mb-1">비밀번호 <span className="text-red-600">*</span></label>
+                                            <input type="password" value={createAdminForm.password} onChange={e => setCreateAdminForm(p => ({ ...p, password: e.target.value }))} placeholder="최소 4자 이상" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                         </div>
                                         <div>
                                             <label className="text-xs text-slate-400 block mb-1">담당자 이름 <span className="text-slate-600">(선택)</span></label>
-                                            <input value={createAdminForm.real_name} onChange={e => setCreateAdminForm(p => ({ ...p, real_name: e.target.value }))} placeholder="예: 홍길동" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-amber-500" />
+                                            <input value={createAdminForm.real_name} onChange={e => setCreateAdminForm(p => ({ ...p, real_name: e.target.value }))} placeholder="예: 홍길동" className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-amber-500" />
                                         </div>
                                     </div>
                                     <div className="flex gap-3 mt-6">
-                                        <button onClick={() => { setCreateAdminModal(null); setCreateAdminForm({ username: '', password: '', real_name: '' }); }} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                        <button onClick={() => { setCreateAdminModal(null); setCreateAdminForm({ username: '', password: '', real_name: '' }); }} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">취소</button>
                                         <button onClick={handleCreateAdmin} className="flex-1 py-2.5 bg-amber-500 text-slate-900 rounded-xl font-bold hover:bg-amber-400 shadow-lg flex items-center justify-center gap-2"><UserPlus size={16} /> 생성</button>
                                     </div>
                                 </div>
@@ -672,10 +672,10 @@ export default function SuperAdminDashboard() {
                         {/* =========== 5. ANNOUNCEMENTS =========== */}
                         {activeTab === 'announcements' && (
                             <div className="space-y-6">
-                                <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
-                                    <h3 className="font-bold mb-3 flex items-center gap-2"><Bell size={16} className="text-amber-400" /> 전체 매장 공지 배포</h3>
-                                    <input value={announcementForm.title} onChange={e => setAnnouncementForm(p => ({ ...p, title: e.target.value }))} placeholder="제목" className="w-full p-3 bg-white/5 border border-white/10 rounded-xl mb-3 text-white placeholder:text-slate-500 outline-none" />
-                                    <textarea value={announcementForm.content} onChange={e => setAnnouncementForm(p => ({ ...p, content: e.target.value }))} placeholder="내용" rows={3} className="w-full p-3 bg-white/5 border border-white/10 rounded-xl mb-3 text-white placeholder:text-slate-500 outline-none resize-none" />
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                                    <h3 className="font-bold mb-3 flex items-center gap-2"><Bell size={16} className="text-amber-600" /> 전체 매장 공지 배포</h3>
+                                    <input value={announcementForm.title} onChange={e => setAnnouncementForm(p => ({ ...p, title: e.target.value }))} placeholder="제목" className="w-full p-3 bg-white border border-slate-300 rounded-xl mb-3 text-slate-800 placeholder:text-slate-400 outline-none" />
+                                    <textarea value={announcementForm.content} onChange={e => setAnnouncementForm(p => ({ ...p, content: e.target.value }))} placeholder="내용" rows={3} className="w-full p-3 bg-white border border-slate-300 rounded-xl mb-3 text-slate-800 placeholder:text-slate-400 outline-none resize-none" />
                                     <div className="flex items-center justify-between">
                                         <label className="flex items-center gap-2 text-sm">
                                             <input type="checkbox" checked={announcementForm.pinned} onChange={e => setAnnouncementForm(p => ({ ...p, pinned: e.target.checked }))} className="w-4 h-4 rounded" />
@@ -686,10 +686,10 @@ export default function SuperAdminDashboard() {
                                 </div>
                                 <div className="space-y-3">
                                     {announcements.map(a => (
-                                        <div key={a.id} className="bg-white/5 rounded-xl p-4 border border-white/10">
+                                        <div key={a.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="font-bold flex items-center gap-2">
-                                                    {a.pinned && <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">고정</span>}
+                                                    {a.pinned && <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">고정</span>}
                                                     {a.title}
                                                 </div>
                                                 <div className="text-[10px] text-slate-500">{a.created_at?.split('T')[0]}</div>
@@ -704,30 +704,30 @@ export default function SuperAdminDashboard() {
                         {/* =========== 6. ANALYTICS =========== */}
                         {activeTab === 'analytics' && analyticsData && (
                             <div className="space-y-6">
-                                <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
                                     <h3 className="font-bold mb-4">업종별 벤치마크</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {Object.entries(analyticsData.by_business_type || {}).map(([type, stats]) => (
-                                            <div key={type} className="bg-white/5 rounded-xl p-4 border border-white/10">
-                                                <div className="text-sm font-bold text-amber-400 mb-2">{type}</div>
+                                            <div key={type} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+                                                <div className="text-sm font-bold text-amber-600 mb-2">{type}</div>
                                                 <div className="space-y-1 text-xs">
                                                     <div className="flex justify-between"><span className="text-slate-400">매장 수</span><span>{stats.count}</span></div>
                                                     <div className="flex justify-between"><span className="text-slate-400">총 매출</span><span className="font-mono">{fmt(stats.total_revenue)}</span></div>
-                                                    <div className="flex justify-between"><span className="text-slate-400">평균 매출</span><span className="font-mono text-emerald-400">{fmt(stats.avg_revenue)}</span></div>
+                                                    <div className="flex justify-between"><span className="text-slate-400">평균 매출</span><span className="font-mono text-emerald-600">{fmt(stats.avg_revenue)}</span></div>
                                                     <div className="flex justify-between"><span className="text-slate-400">평균 직원</span><span>{stats.avg_staff}</span></div>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                                <div className="bg-white/5 rounded-2xl p-5 border border-white/10">
+                                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
                                     <h3 className="font-bold mb-4">지역별 현황</h3>
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                         {Object.entries(analyticsData.by_region || {}).map(([region, stats]) => (
-                                            <div key={region} className="bg-white/5 rounded-xl p-3 border border-white/10 text-center">
+                                            <div key={region} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm text-center">
                                                 <div className="text-sm font-bold">{region}</div>
                                                 <div className="text-xs text-slate-400 mt-1">{stats.count}개 매장</div>
-                                                <div className="text-sm font-bold text-emerald-400 mt-1">{fmt(stats.avg_revenue)}원</div>
+                                                <div className="text-sm font-bold text-emerald-600 mt-1">{fmt(stats.avg_revenue)}원</div>
                                                 <div className="text-[10px] text-slate-500">평균 매출</div>
                                             </div>
                                         ))}
@@ -740,10 +740,10 @@ export default function SuperAdminDashboard() {
                         {activeTab === 'applications' && (
                             <div className="space-y-4">
                                 <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <FileText size={20} className="text-amber-400" />
+                                    <FileText size={20} className="text-amber-600" />
                                     사용신청 관리 ({applications.length})
                                     {pendingCount > 0 && (
-                                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                                        <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
                                             대기 {pendingCount}건
                                         </span>
                                     )}
@@ -760,33 +760,33 @@ export default function SuperAdminDashboard() {
                                             const isPending = app.status === 'pending';
                                             const isApproved = app.status === 'approved';
                                             return (
-                                                <div key={app.id} className={`bg-white/5 rounded-2xl p-5 border transition-all ${isPending ? 'border-amber-500/30 hover:border-amber-500/50' :
+                                                <div key={app.id} className={`bg-white shadow-sm rounded-2xl p-5 border transition-all ${isPending ? 'border-amber-500/30 hover:border-amber-500/50' :
                                                     isApproved ? 'border-emerald-500/20' : 'border-red-500/20'
                                                     }`}>
                                                     <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap mb-2">
                                                                 <span className="font-bold text-lg">{app.business_name}</span>
-                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isPending ? 'bg-amber-500/20 text-amber-400' :
-                                                                    isApproved ? 'bg-emerald-500/20 text-emerald-400' :
-                                                                        'bg-red-500/20 text-red-400'
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isPending ? 'bg-amber-100 text-amber-700' :
+                                                                    isApproved ? 'bg-emerald-100 text-emerald-700' :
+                                                                        'bg-red-100 text-red-600'
                                                                     }`}>
                                                                     {isPending ? '검토 대기' : isApproved ? '승인 완료' : '거절'}
                                                                 </span>
-                                                                <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">
+                                                                <span className="text-xs bg-slate-100 px-2 py-0.5 rounded-full">
                                                                     {app.plan_type === 'free' ? '무료' : app.plan_type === 'basic' ? 'Basic' : 'Premium'}
                                                                 </span>
                                                             </div>
                                                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-400">
-                                                                <div>대표: <span className="text-white">{app.owner_name}</span></div>
-                                                                <div>연락처: <span className="text-white">{app.phone}</span></div>
-                                                                <div>업종: <span className="text-white">{app.business_type}</span></div>
-                                                                <div>지역: <span className="text-white">{app.region || '-'}</span></div>
-                                                                <div>예상 직원: <span className="text-white">{app.staff_count}명</span></div>
-                                                                <div>사업자번호: <span className="text-white">{app.business_number || '-'}</span></div>
+                                                                <div>대표: <span className="text-slate-800">{app.owner_name}</span></div>
+                                                                <div>연락처: <span className="text-slate-800">{app.phone}</span></div>
+                                                                <div>업종: <span className="text-slate-800">{app.business_type}</span></div>
+                                                                <div>지역: <span className="text-slate-800">{app.region || '-'}</span></div>
+                                                                <div>예상 직원: <span className="text-slate-800">{app.staff_count}명</span></div>
+                                                                <div>사업자번호: <span className="text-slate-800">{app.business_number || '-'}</span></div>
                                                             </div>
                                                             {app.message && (
-                                                                <div className="mt-2 text-sm bg-white/5 rounded-lg px-3 py-2 text-slate-300">
+                                                                <div className="mt-2 text-sm bg-slate-50 rounded-lg px-3 py-2 text-slate-600">
                                                                     💬 {app.message}
                                                                 </div>
                                                             )}
@@ -794,12 +794,12 @@ export default function SuperAdminDashboard() {
                                                                 신청자: {app.applicant_name || app.applicant_username} {app.applicant_email ? `(${app.applicant_email})` : ''} · {app.created_at ? new Date(app.created_at).toLocaleString('ko-KR') : ''}
                                                             </div>
                                                             {isApproved && app.assigned_username && (
-                                                                <div className="mt-2 text-sm text-emerald-400 bg-emerald-500/10 rounded-lg px-3 py-2">
+                                                                <div className="mt-2 text-sm text-emerald-600 bg-emerald-50 rounded-lg px-3 py-2">
                                                                     ✅ Admin ID: <strong>{app.assigned_username}</strong>
                                                                 </div>
                                                             )}
                                                             {app.admin_note && (
-                                                                <div className="mt-2 text-sm text-slate-300 bg-white/5 rounded-lg px-3 py-2">
+                                                                <div className="mt-2 text-sm text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
                                                                     📝 관리자 메모: {app.admin_note}
                                                                 </div>
                                                             )}
@@ -811,7 +811,7 @@ export default function SuperAdminDashboard() {
                                                                         setApprovalModal(app);
                                                                         setApprovalForm({ admin_username: '', admin_password: '', admin_note: '' });
                                                                     }}
-                                                                    className="flex items-center gap-1 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-xl text-sm font-bold hover:bg-emerald-500/30 transition-all"
+                                                                    className="flex items-center gap-1 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-sm font-bold hover:bg-emerald-500/30 transition-all"
                                                                 >
                                                                     <CheckCircle2 size={14} /> 승인
                                                                 </button>
@@ -820,7 +820,7 @@ export default function SuperAdminDashboard() {
                                                                         setRejectionModal(app);
                                                                         setRejectionNote('');
                                                                     }}
-                                                                    className="flex items-center gap-1 px-4 py-2 bg-red-500/20 text-red-400 rounded-xl text-sm font-bold hover:bg-red-500/30 transition-all"
+                                                                    className="flex items-center gap-1 px-4 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-bold hover:bg-red-500/30 transition-all"
                                                                 >
                                                                     <XCircle size={14} /> 거절
                                                                 </button>
@@ -836,9 +836,9 @@ export default function SuperAdminDashboard() {
                                 {/* Approval Modal */}
                                 {approvalModal && (
                                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                        <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-2xl">
                                             <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
-                                                <CheckCircle2 size={20} className="text-emerald-400" /> 사용신청 승인
+                                                <CheckCircle2 size={20} className="text-emerald-600" /> 사용신청 승인
                                             </h3>
                                             <p className="text-sm text-slate-400 mb-5">{approvalModal.business_name} · {approvalModal.owner_name}</p>
                                             <div className="space-y-3">
@@ -847,7 +847,7 @@ export default function SuperAdminDashboard() {
                                                     <input
                                                         value={approvalForm.admin_username}
                                                         onChange={e => setApprovalForm(p => ({ ...p, admin_username: e.target.value }))}
-                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500"
                                                         placeholder="매장 관리자 아이디 (예: sodam005)"
                                                     />
                                                 </div>
@@ -857,7 +857,7 @@ export default function SuperAdminDashboard() {
                                                         type="password"
                                                         value={approvalForm.admin_password}
                                                         onChange={e => setApprovalForm(p => ({ ...p, admin_password: e.target.value }))}
-                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500"
                                                         placeholder="초기 비밀번호"
                                                     />
                                                 </div>
@@ -867,13 +867,13 @@ export default function SuperAdminDashboard() {
                                                         value={approvalForm.admin_note}
                                                         onChange={e => setApprovalForm(p => ({ ...p, admin_note: e.target.value }))}
                                                         rows={2}
-                                                        className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
+                                                        className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none resize-none focus:ring-2 focus:ring-emerald-500"
                                                         placeholder="승인 시 참고 메모"
                                                     />
                                                 </div>
                                             </div>
                                             <div className="flex gap-3 mt-6">
-                                                <button onClick={() => setApprovalModal(null)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={() => setApprovalModal(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">취소</button>
                                                 <button onClick={handleApproveApplication} className="flex-1 py-2.5 bg-emerald-500 text-slate-900 rounded-xl font-bold hover:bg-emerald-400 shadow-lg flex items-center justify-center gap-2">
                                                     <UserPlus size={16} /> 승인 및 계정 생성
                                                 </button>
@@ -885,9 +885,9 @@ export default function SuperAdminDashboard() {
                                 {/* Rejection Modal */}
                                 {rejectionModal && (
                                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                                        <div className="bg-slate-800 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+                                        <div className="bg-white rounded-2xl p-6 w-full max-w-md border border-slate-200 shadow-2xl">
                                             <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
-                                                <XCircle size={20} className="text-red-400" /> 사용신청 거절
+                                                <XCircle size={20} className="text-red-600" /> 사용신청 거절
                                             </h3>
                                             <p className="text-sm text-slate-400 mb-5">{rejectionModal.business_name} · {rejectionModal.owner_name}</p>
                                             <div>
@@ -896,12 +896,12 @@ export default function SuperAdminDashboard() {
                                                     value={rejectionNote}
                                                     onChange={e => setRejectionNote(e.target.value)}
                                                     rows={3}
-                                                    className="w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-slate-500 outline-none resize-none focus:ring-2 focus:ring-red-500"
+                                                    className="w-full p-3 bg-white border border-slate-300 rounded-xl text-slate-800 placeholder:text-slate-400 outline-none resize-none focus:ring-2 focus:ring-red-500"
                                                     placeholder="거절 사유를 입력해 주세요"
                                                 />
                                             </div>
                                             <div className="flex gap-3 mt-6">
-                                                <button onClick={() => setRejectionModal(null)} className="flex-1 py-2.5 bg-white/10 rounded-xl font-bold hover:bg-white/20">취소</button>
+                                                <button onClick={() => setRejectionModal(null)} className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200">취소</button>
                                                 <button onClick={handleRejectApplication} className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-bold hover:bg-red-400 shadow-lg">거절</button>
                                             </div>
                                         </div>
