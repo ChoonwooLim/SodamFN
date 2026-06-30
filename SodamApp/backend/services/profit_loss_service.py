@@ -395,6 +395,52 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
 
     payrolls = session.exec(pay_stmt).all()
 
+    # ── 인건비 보완 (2026-06-30 사장님 정책) ──
+    # Payroll(완료)이 한 건도 없는 달은 은행 출금 중 '직원급여(labor)' 로 분류된
+    # 금액 합계로 인건비를 채운다. Payroll 이 있으면 Payroll 이 우선(SSOT) —
+    # 은행 labor 출금을 더하지 않아 이중계상을 방지한다.
+    if not payrolls:
+        from models import BankTransaction
+        labor_stmt = select(BankTransaction).where(
+            BankTransaction.classified_as == "labor",
+            BankTransaction.trans_date >= datetime.date(year, month, 1),
+            BankTransaction.trans_date < (
+                datetime.date(year + 1, 1, 1) if month == 12
+                else datetime.date(year, month + 1, 1)
+            ),
+        )
+        if business_id is not None:
+            labor_stmt = labor_stmt.where(BankTransaction.business_id == business_id)
+        bank_labor = sum((t.out_amount or 0) for t in session.exec(labor_stmt).all())
+
+        pl_stmt = select(MonthlyProfitLoss).where(
+            MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+        if business_id is not None:
+            pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        pl_record = session.exec(pl_stmt).first()
+
+        # 은행 labor 도 없으면(0) 수동 입력값을 0 으로 덮어쓰지 않는다 —
+        # 조회 시 자동 재집계가 사용자가 직접 넣은 인건비를 지우는 사고 방지.
+        if bank_labor == 0:
+            return (pl_record.expense_labor if pl_record else 0)
+
+        # 퇴직금/보험/원천세는 은행내역만으로 분해 불가 → 인건비 본값만 채우고 0.
+        if pl_record:
+            pl_record.expense_labor = bank_labor
+            pl_record.expense_retirement = 0
+            pl_record.expense_insurance = 0
+            pl_record.expense_insurance_employee = 0
+            pl_record.expense_tax_employee = 0
+            session.add(pl_record)
+        else:
+            pl_record = MonthlyProfitLoss(
+                year=year, month=month, business_id=business_id,
+                expense_labor=bank_labor,
+            )
+            session.add(pl_record)
+        session.commit()
+        return bank_labor
+
     employee_insurance = sum(
         (p.deduction_np or 0) + (p.deduction_hi or 0) +
         (p.deduction_lti or 0) + (p.deduction_ei or 0)

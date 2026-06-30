@@ -48,12 +48,14 @@ def _recompute_pl_months(year: int, months: list[int], session: Session, bid):
     매입관리/매출관리/은행분류/자동수집 등 어느 경로로 데이터가 들어왔든, 손익계산서를
     열 때마다 항상 최신 상태로 맞춘다 (별도 cron·수동 동기화 의존 제거).
     멱등 — sync_* 는 월 단위 전량 upsert. 한 달 실패해도 나머지·조회는 계속 진행.
-    labor 는 sync_all_expenses 가 건드리지 않으므로 급여대장 동기화 결과 유지.
+    labor: Payroll(완료)이 있으면 급여대장 기준, 없으면 은행 '직원급여(labor)' 출금
+    합계로 보완 (2026-06-30). 둘 다 없으면 sync_labor_cost 가 수동 입력값을 보존.
     """
     for m in months:
         try:
             sync_revenue_to_pl(year, m, session, bid)   # 내부에서 delivery 매출도 sync
             sync_all_expenses(year, m, session, bid)
+            sync_labor_cost(year, m, session, bid)      # 급여대장 or 은행 labor 출금 보완
         except Exception as e:  # noqa: BLE001
             session.rollback()
             _autosync_log.warning("PL 자동 재집계 실패 %d-%02d bid=%s: %s", year, m, bid, e)

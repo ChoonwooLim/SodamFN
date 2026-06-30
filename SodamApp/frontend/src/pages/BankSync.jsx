@@ -39,6 +39,12 @@ export const CLASSIFIED_LABELS = {
     owner_deposit:       { label: '현금입금', color: 'bg-teal-100 text-teal-700' },         // 사장님 자금, 매출 X
     loan_in:             { label: '차입금',   color: 'bg-indigo-100 text-indigo-700' },     // 대출, 매출 X
     other_income:        { label: '기타입금', color: 'bg-stone-100 text-stone-700' },       // 영업외수익, 매출 X
+    // 2026-06-30: 출금 세분류 (정밀 1차 분류). 손익 — 직원급여→인건비, 세금/임대료→비용, 4대보험·개인출금→제외
+    labor:               { label: '직원급여', color: 'bg-violet-100 text-violet-700' },     // 인건비 (Payroll 없는 달 보완)
+    insurance_payment:   { label: '4대보험', color: 'bg-cyan-100 text-cyan-700' },          // 4대보험 납부, 비용 제외(이중계상 방지)
+    tax_payment:         { label: '세금공과', color: 'bg-red-100 text-red-700' },           // 세금/공과금 → 세금과공과
+    rent:                { label: '임대료',   color: 'bg-orange-200 text-orange-800' },     // 월세/임차료 → 임대료
+    owner_withdraw:      { label: '개인출금', color: 'bg-slate-200 text-slate-700' },       // 사장님 인출, 비용 X
 };
 
 export function fmtWon(n) {
@@ -310,6 +316,7 @@ export default function BankSync({ source = 'popbill' } = {}) {
                 `자동 분류 완료\n총 ${res.data.processed}건 처리\n`
                 + `매출 ${c.revenue || 0} · 지출 ${c.expense || 0} · 매입 ${c.purchase || 0} · 이체 ${c.transfer || 0}\n`
                 + `카드입금 ${c.card_settlement || 0} · 페이입금 ${c.pay_settlement || 0} · 배달입금 ${c.delivery_settlement || 0} · 이동식카드 ${c.mobile_settlement || 0}\n`
+                + `직원급여 ${c.labor || 0} · 4대보험 ${c.insurance_payment || 0} · 세금공과 ${c.tax_payment || 0} · 임대료 ${c.rent || 0}\n`
                 + `학습 ${c.learned || 0} · 미분류 ${c.skip || 0}`
             );
             fetchTxs();

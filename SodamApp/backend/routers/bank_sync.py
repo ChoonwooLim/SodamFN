@@ -191,7 +191,8 @@ class TxUpdateIn(BaseModel):
         description=(
             "revenue/expense/purchase/transfer/excluded/unclassified/"
             "card_settlement/pay_settlement/delivery_settlement/mobile_settlement/"
-            "cash_revenue/owner_deposit/loan_in/other_income"
+            "cash_revenue/owner_deposit/loan_in/other_income/"
+            "labor/insurance_payment/tax_payment/rent/owner_withdraw"
         ),
     )
     vendor_id: Optional[int] = None
@@ -845,7 +846,8 @@ def list_transactions(
         description=(
             "unclassified/revenue/expense/purchase/transfer/excluded/"
             "card_settlement/pay_settlement/delivery_settlement/mobile_settlement/"
-            "cash_revenue/owner_deposit/loan_in/other_income"
+            "cash_revenue/owner_deposit/loan_in/other_income/"
+            "labor/insurance_payment/tax_payment/rent/owner_withdraw"
         ),
     ),
     direction: Optional[str] = Query(None, description="in / out / all"),
@@ -930,6 +932,8 @@ def update_transaction(
                 "unclassified", "revenue", "expense", "purchase", "transfer", "excluded",
                 "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
                 "cash_revenue", "owner_deposit", "loan_in", "other_income",
+                "card_payment",
+                "labor", "owner_withdraw", "tax_payment", "rent", "insurance_payment",
             }
             if body.classified_as not in valid:
                 raise HTTPException(status_code=400, detail=f"classified_as 값 오류: {body.classified_as}")
@@ -1006,10 +1010,14 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
     #    loan_in:       차입금/대출 (부채)
     #    other_income:  영업외수익 (이자/환급 등)
     #    card_payment:  카드대금 납부 (실제 매입은 카드 사용 시점에 잡힘 — 이중 계상 방지)
+    #    owner_withdraw:     사장님 개인 인출 (비용 아님)
+    #    insurance_payment:  4대보험 납부 — 손익 비용 집계에서 제외(이중계상 방지),
+    #                        인건비는 sync_labor_cost 가 Payroll/labor 출금으로 별도 산정.
     if tx.classified_as in (
         "transfer", "excluded", "unclassified",
         "owner_deposit", "loan_in", "other_income",
         "card_payment",
+        "owner_withdraw", "insurance_payment",
     ):
         return
 
@@ -1103,10 +1111,21 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
         tx.linked_daily_id = de.id
         return
 
-    # 7) 매입/지출 (출금)
-    if tx.classified_as in ("expense", "purchase") and tx.out_amount > 0:
+    # 7) 매입/지출/세금/임대료/직원급여 (출금) → DailyExpense
+    #    labor 는 손익 인건비를 sync_labor_cost 가 BankTransaction(labor) 출금에서
+    #    직접 합산하므로, 여기서 만든 category="인건비" DailyExpense 는 비용관리
+    #    명세 표시용일 뿐 손익에 이중 합산되지 않는다 — "인건비" 는 profit_loss_service
+    #    의 CATEGORY_TO_PL_FIELD 에 없어 sync_all_expenses 가 무시하기 때문.
+    _OUT_CATEGORY = {
+        "purchase": "매입",
+        "expense": "기타비용",
+        "tax_payment": "세금과공과",
+        "rent": "임대료",
+        "labor": "인건비",
+    }
+    if tx.classified_as in _OUT_CATEGORY and tx.out_amount > 0:
         vendor_name = tx.remark1 or tx.remark2 or "은행출금"
-        category = "매입" if tx.classified_as == "purchase" else "기타비용"
+        category = _OUT_CATEGORY[tx.classified_as]
         de = DailyExpense(
             business_id=tx.business_id,
             date=tx.trans_date,
@@ -1396,6 +1415,23 @@ def _get_mobile_commission_rate(pay_corp: str) -> float:
 
 TRANSFER_KEYWORDS = ["내계좌", "자행이체", "이체입금", "적금이체", "예금이체", "본인이체"]
 
+# ── 출금 세분류 키워드 (2026-06-30 사장님 요청: 정밀 1차 분류) ──
+# 4대보험 납부 (직원 부담분 대납 등) — 인건비 이중계상 방지 위해 별도 분류.
+#   메모리 project_pl_expense_classification: 4대보험은 손익 비용 집계에서 제외.
+INSURANCE_PAYMENT_KEYWORDS = [
+    "국민건강보험", "건강보험공단", "국민연금", "연금공단", "고용보험",
+    "산재보험", "근로복지공단", "장기요양", "4대보험", "사회보험",
+]
+# 세금/공과금 — 관할 관청 + 세목.
+TAX_PAYMENT_KEYWORDS = [
+    "세무서", "구청", "시청", "군청", "국세청", "지방소득세", "부가세",
+    "부가가치세", "원천세", "법인세", "종합소득세", "주민세", "재산세",
+    "자동차세", "지방세", "국세", "전자납부", "위택스", "홈택스",
+]
+# 임대료 — 월세/임대. "관리비"/"건물주" 단독은 오탐(인터넷관리비·OO건물주식회사)이
+# 많아 제외. 구체적 복합어만. 학습 패턴이 우선이므로 휴리스틱은 보수적으로.
+RENT_KEYWORDS = ["월세", "임대료", "임차료", "상가임대", "상가관리비", "임대관리비", "임대인"]
+
 # 카드대금 납부 키워드 — 출금 시 이 키워드가 remark 에 있으면 매입 아님
 # (실제 매입은 카드 사용 시점에 잡힘; 이 출금은 그 정산)
 CARD_PAYMENT_KEYWORDS = [
@@ -1571,10 +1607,31 @@ def _build_learned_remark_map(session, business_id: int, threshold: float = 0.8)
     return result
 
 
+def _build_staff_name_set(session, business_id: int) -> set:
+    """사업장 직원의 매칭용 이름 집합 — 급여 출금 판정에 사용.
+
+    Staff.name / account_holder / private_actual_payee_name(실수령자 대리계좌)
+    을 모두 포함. remark1 이 이 집합 중 하나와 '정확히 일치'할 때만 급여로 본다.
+    (부분 포함 매칭은 '이수'='이수정' 같은 오탐 위험이 커서 exact match 만.)
+    공백/None 은 제외.
+    """
+    from models import Staff
+    rows = session.exec(
+        select(Staff).where(Staff.business_id == business_id)
+    ).all()
+    names = set()
+    for s in rows:
+        for v in (s.name, s.account_holder, getattr(s, "private_actual_payee_name", None)):
+            if v and v.strip():
+                names.add(v.strip())
+    return names
+
+
 def _classify_one_tx(
     tx: BankTransaction,
     vendor_by_name: dict,
     learned_remarks: dict,
+    staff_names: Optional[set] = None,
 ) -> Optional[str]:
     """단일 tx 분류 결정. classified_as 반환 또는 None(미분류 유지).
 
@@ -1611,9 +1668,25 @@ def _classify_one_tx(
     if tx.out_amount > 0 and any(k in remark for k in CARD_PAYMENT_KEYWORDS):
         return "card_payment"
 
-    # 3) 학습 패턴 (settlement / 카드대금 미매칭 시 적용)
+    # 2.6) 출금 + 등록 직원 이름 '정확 일치' → 직원급여(labor). 학습보다 우선.
+    #      exact match 라 오탐 위험이 낮고, 급여는 정산 못지않게 확실한 규칙.
+    if tx.out_amount > 0 and staff_names and (tx.remark1 or "").strip() in staff_names:
+        return "labor"
+
+    # 3) 학습 패턴 (수동 분류 합의) — 키워드 휴리스틱(세금/임대료/보험)보다 우선.
+    #    사장님이 직접 고친 분류가 키워드에 의해 반복적으로 덮어써지는 것을 막는다.
     if tx.remark1 and tx.remark1 in learned_remarks:
         return learned_remarks[tx.remark1]
+
+    # 3.5) 출금 세분류 키워드 (2026-06-30) — 학습 미매칭 시에만 적용 (휴리스틱).
+    #      우선순위: 4대보험 > 세금 > 임대료.
+    if tx.out_amount > 0:
+        if any(k in remark for k in INSURANCE_PAYMENT_KEYWORDS):
+            return "insurance_payment"
+        if any(k in remark for k in TAX_PAYMENT_KEYWORDS):
+            return "tax_payment"
+        if any(k in remark for k in RENT_KEYWORDS):
+            return "rent"
 
     # 4) 입금 + settlement 미매칭 + 학습 없음 → 미분류 유지
     if tx.in_amount > 0:
@@ -1648,6 +1721,7 @@ def _classify_txs(
         "card_payment": 0,
         "card_settlement": 0, "pay_settlement": 0, "delivery_settlement": 0,
         "mobile_settlement": 0,
+        "labor": 0, "insurance_payment": 0, "tax_payment": 0, "rent": 0,
         "learned": 0, "skip": 0,
     }
     if not txs:
@@ -1670,6 +1744,7 @@ def _classify_txs(
     ).all()
 
     learned_remarks = _build_learned_remark_map(sess, business_id)
+    staff_names = _build_staff_name_set(sess, business_id)
 
     for tx in txs:
         if only_unclassified and tx.classified_as != "unclassified":
@@ -1686,7 +1761,7 @@ def _classify_txs(
 
         # Step B: 기본 분류 (기존 로직 — 이체/카드/페이/배달/하드코딩 코페이 등)
         if not new_class:
-            new_class = _classify_one_tx(tx, vendor_by_name, learned_remarks)
+            new_class = _classify_one_tx(tx, vendor_by_name, learned_remarks, staff_names)
         if not new_class:
             counts["skip"] += 1
             continue

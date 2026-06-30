@@ -32,6 +32,8 @@ VALID_CLASSES = {
     "card_settlement", "pay_settlement", "delivery_settlement", "mobile_settlement",
     "cash_revenue", "owner_deposit", "loan_in", "other_income",
     "transfer", "revenue", "expense", "purchase", "excluded", "unclassified",
+    # 2026-06-30: 출금 세분류
+    "labor", "insurance_payment", "tax_payment", "rent", "owner_withdraw",
 }
 
 
@@ -64,9 +66,20 @@ SYSTEM_PROMPT = (
     "- '이자'/'환급'/'세금환급'/'환불' → other_income\n"
     "- 판단 어려우면 unclassified 로 두고 사장님 수동 분류 유도\n\n"
     "[출금 분류]\n"
+    "- labor: 직원급여. 등록된 직원 이름으로 매월 비슷한 시기·금액 송금. 인건비\n"
+    "- insurance_payment: 4대보험 납부. 적요에 국민건강보험/건강보험공단/국민연금/"
+    "연금공단/고용보험/산재보험/근로복지공단/장기요양 등. 인건비 이중계상 방지로 별도\n"
+    "- tax_payment: 세금/공과금. 적요에 세무서/구청/시청/지방소득세/부가세/원천세/"
+    "위택스/홈택스/전자납부 등. 세금과공과 비용\n"
+    "- rent: 임대료. 적요에 월세/임대료/임차료/건물주/임대인 등\n"
+    "- owner_withdraw: 사장님 개인 인출 (생활비/개인이체). 비용 X\n"
     "- purchase: 식자재/상품 매입 (도매·식자재 거래처)\n"
-    "- expense: 일반 운영 지출 (임대료/관리비/세금/카드대금 등)\n"
+    "- expense: 일반 운영 지출 (위 카테고리 아닌 기타 운영비)\n"
     "- transfer: 본인 자행 출금\n\n"
+    "[출금 분류 결정 가이드]\n"
+    "- 등록 직원 이름 + 매월 반복 송금 → labor (직원급여)\n"
+    "- 공단/관청/세목 키워드 → insurance_payment 또는 tax_payment 우선\n"
+    "- 매월 같은 금액 큰 출금 + 월세/건물주 → rent\n\n"
     "[분류 불가]\n"
     "- unclassified: 정보 부족으로 확신 못함\n\n"
     "반드시 다음 JSON 형식으로만 응답하고, 다른 텍스트는 절대 포함하지 마세요:\n"
