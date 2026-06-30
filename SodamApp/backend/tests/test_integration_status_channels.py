@@ -1,22 +1,21 @@
-import importlib, os, tempfile, datetime
+import datetime
+from types import SimpleNamespace
+
 import pytest
-from sqlmodel import SQLModel, Session
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel, Session, create_engine
 
 
 @pytest.fixture
-def db(monkeypatch):
-    f = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    f.close()
-    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{f.name}")
-    import database
-    importlib.reload(database)
+def db():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     import models  # noqa: F401 — create_all 전 전체 테이블 등록 보장 (conftest.py 패턴)
-    SQLModel.metadata.create_all(database.engine)
-    yield database
-    try:
-        os.unlink(f.name)
-    except (PermissionError, FileNotFoundError):
-        pass
+    SQLModel.metadata.create_all(engine)
+    yield SimpleNamespace(engine=engine)
 
 
 def test_status_includes_easypos_and_codef(db):

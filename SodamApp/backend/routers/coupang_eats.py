@@ -149,6 +149,26 @@ def _record_failure(session: Session, cred: CoupangEatsCredential,
     session.commit()
 
 
+def _persist_client_cookies(business_id: int, client: CoupangEatsClient) -> None:
+    """성공한 API 호출 뒤 서버가 회전/연장한 쿠키를 DB에 보존."""
+    try:
+        cookies = client.get_cookies()
+    except Exception as e:  # noqa: BLE001
+        log.warning("coupang cookie snapshot failed bid=%s: %s", business_id, e)
+        return
+    if not cookies:
+        return
+
+    with Session(engine) as s:
+        cred = s.exec(
+            select(CoupangEatsCredential).where(
+                CoupangEatsCredential.business_id == business_id
+            )
+        ).first()
+        if cred:
+            _save_cookies(s, cred, cookies)
+
+
 def _refresh_via_playwright(session: Session,
                             cred: CoupangEatsCredential) -> list[dict]:
     """저장된 ID/PW 로 Playwright 자동 로그인 → 새 쿠키 저장.
@@ -228,6 +248,7 @@ def _execute_with_refresh(business_id: int,
         client = CoupangEatsClient(cookies)
         try:
             result = action(client)
+            _persist_client_cookies(business_id, client)
             return result, auth_refreshed
         except CookieInvalidError as e:
             client.close()
