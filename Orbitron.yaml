@@ -243,6 +243,14 @@ crons:
   - name: auto-collection-learn-fee-rates
     schedule: "30 4 * * 0"
     command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/learn-fee-rates'
+  # 수집 건강도 점검 + 이상 시 사장님 알림(텔레그램/SMS). 하루 2회 — 새벽 수집(03~04시)
+  # 결과가 반영된 뒤 09:00, 그리고 쿠키 만료 12h 임박 창을 놓치지 않도록 21:00 재점검.
+  - name: auto-collection-health-watch-morning
+    schedule: "0 9 * * *"
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/health-watch'
+  - name: auto-collection-health-watch-evening
+    schedule: "0 21 * * *"
+    command: 'curl -fsS -X POST -H "X-Cron-Secret: $CRON_SHARED_SECRET" $BACKEND_URL/api/auto-collection/cron/health-watch'
 
 # ─────────────────────────────────────────────
 # Post-deploy: Staff App → Cloudflare Pages
