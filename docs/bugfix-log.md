@@ -114,3 +114,5 @@
 | 2026-06-23 | 앱전송 직원목록에 타 매장 직원 섞임 | staff-list가 superadmin/뷰어일 때 사업장 필터 안 함 | View-As bid(get_bid_from_token)로 스코프, 미선택 시 빈 목록 | SodamApp/backend/routers/distribute.py |
 | 2026-06-23 | 손익계산서 매장명이 항상 '소담김밥', 제목에 불필요한 '_2026 하반기' | localStorage 폴백 사용 + 하드코딩 접미사 | /auth/business-info(View-As 반영)에서 매장명 fetch + 접미사 제거 | SodamApp/frontend/src/pages/ProfitLoss/index.jsx |
 | 2026-06-23 | SuperAdmin 카드가 흐릿해 업체 구분·버튼 식별 안 됨 | 라이트 배경에 다크테마 클래스(bg-white/5 등) 사용 | 전체 탭·모달 라이트 테마로 변환, 매장카드 재디자인 | SodamApp/frontend/src/pages/SuperAdminDashboard.jsx |
+| 2026-07-04 | 세션쿠키 만료 사전경보 미작동 (쿠팡/배민) | cookies_expires_at이 세션쿠키에서 NULL → expiring_soon 판정 불가 | 발급시각+TTL 추정 폴백 cookie_expiry.py로 단일화, _cred_dto에 expires_at_effective 노출 | SodamApp/backend/services/cookie_expiry.py, collection_health.py, routers/coupang_eats.py, routers/baemin.py |
+| 2026-07-04 | 수집 이상 알림이 실제로 발송 안 됨 | 텔레그램 토큰 미설정 + SMS 발신번호 0개 → dispatch는 돌지만 no-op | 텔레그램 봇 연결(env 주입) + SMS·텔레그램 동일 사장님 문구로 통일 | SodamApp/backend/services/collection_health.py |

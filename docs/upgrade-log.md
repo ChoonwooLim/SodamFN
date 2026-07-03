@@ -144,3 +144,4 @@
 | 2026-06-23 | 사이드바 '거래처 관리'→'사용 매뉴얼' + 초보자용 27화면 종합 설명서 | feat(manual) | SodamApp/frontend/src/pages/UserManual.jsx, components/Sidebar.jsx |
 | 2026-06-23 | 상품관리 매장별 전환 — MenuItem 모델·/api/menu-items CRUD·기본메뉴 시드·이미지 업로드 | feat(product) | SodamApp/backend/models.py, routers/menu_items.py, services/default_menu.py, frontend RecipeBook/MenuBoard |
 | 2026-06-23 | 대시보드 전달/다음달 이동 버튼 | feat(dashboard) | SodamApp/frontend/src/pages/Dashboard.jsx |
+| 2026-07-04 | 수집 건강도 알림 텔레그램 사장님 승격 (SMS·텔레그램 동일 한국어 문구) + 봇 @semhana_alert_bot 연결 | feat(collection-health) | SodamApp/backend/services/collection_health.py, telegram_service.py |

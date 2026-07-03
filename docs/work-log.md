@@ -2008,3 +2008,23 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - 장인 매출은 6월=100% 기준 퍼센트 패턴. 시드 재실행 시 1~6월 전체 재생성.
 
 ---
+## 2026-07-04
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| infra | 수집 건강도 알림 파이프라인 완성 (텔레그램 사장님 승격 + 봇 연결) | 완료 |
+| fix | 세션쿠키 만료 사전경보 복구 (cookie_expiry.py SSOT) + 프론트 추정만료 표시 | 완료 |
+| infra | 서버 crontab health-watch 21:00 추가 (09:00+21:00 2회/일) | 완료 |
+| other | 셈하나 1등 앱 개선 로드맵 P0~P3 수립 (전체 코드분석) | 완료 |
+
+### 세부 내용
+
+- **텔레그램 알림 완성**: SMS가 팝빌 발신번호 0개로 막힌 상황에서 텔레그램을 사장님 1차 채널로 승격. `_owner_message()`/`_notify_owner()`로 SMS·텔레그램 동일 한국어 문구 통일. 봇 @semhana_alert_bot 생성·연결, 운영서버→폰 발송 SSH 검증 완료 (커밋 68ff219c).
+- **만료경보 복구**: 세션쿠키(만료 NULL)면 발급시각+TTL 추정 폴백. 쿠팡/배민 `_cred_dto`에 expires_at_effective 추가, 프론트 ModuleDetail·배민 임박배너가 세션쿠키에서도 동작 (커밋 76de4169, 68ff219c).
+- **cron 아키텍처 규명**: 실제 cron SSOT는 Orbitron.yaml이 아니라 Orbitron 서버 crontab. orchestrator/profit-loss cron 부재는 버그 아님 — 수집 직후 인라인 reflect(→DailyExpense) + 손익 on-view 재계산 구조. health-watch는 원래 09:00에 돌고 있었고 텔레그램 미설정으로 no-op였던 것 (이전 오진단 정정).
+- **로드맵 수립**: 신뢰성(P0)→제품완성도(P1)→차별화(P2, AI 경영비서 등)→스케일(P3). auto-memory `project_top_app_roadmap.md`가 SSOT.
+- **미완(운영)**: 쿠팡(6/21)·배민(5/14) 쿠키 만료로 수집중단 → 사장님 어드민 쿠키 재입력 필요.
+
+---
