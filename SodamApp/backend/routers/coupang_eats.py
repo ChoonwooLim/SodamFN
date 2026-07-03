@@ -155,6 +155,40 @@ def _record_failure(session: Session, cred: CoupangEatsCredential,
     session.commit()
 
 
+def _normalize_stores(stores: list[dict]) -> list[dict]:
+    """list_stores 응답 → [{store_id, store_name}] 정규화.
+
+    쿠팡 응답 키 변형(storeId/id/store_id, shopName/name/storeName)을 흡수.
+    store_id 를 int 변환할 수 없는 항목은 제외.
+    """
+    out: list[dict] = []
+    for st in stores or []:
+        sid = st.get("storeId") or st.get("id") or st.get("store_id")
+        try:
+            sid = int(sid)
+        except (TypeError, ValueError):
+            continue
+        name = st.get("shopName") or st.get("name") or st.get("storeName")
+        out.append({"store_id": sid, "store_name": name})
+    return out
+
+
+def _last_success_sync_date(session: Session,
+                            business_id: int) -> Optional[datetime.date]:
+    """마지막 성공 동기화의 target_end — 쿠키 재등록 후 백필 시작점 계산용."""
+    row = session.exec(
+        select(CoupangEatsSyncLog)
+        .where(
+            CoupangEatsSyncLog.business_id == business_id,
+            CoupangEatsSyncLog.status == "success",
+            CoupangEatsSyncLog.target_end != None,  # noqa: E711
+        )
+        .order_by(CoupangEatsSyncLog.target_end.desc())  # type: ignore[union-attr]
+        .limit(1)
+    ).first()
+    return row.target_end if row else None
+
+
 def _persist_client_cookies(business_id: int, client: CoupangEatsClient) -> None:
     """성공한 API 호출 뒤 서버가 회전/연장한 쿠키를 DB에 보존."""
     try:
