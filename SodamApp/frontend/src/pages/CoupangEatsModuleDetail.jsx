@@ -998,6 +998,22 @@ function CredentialModal({ initial, initialStoreId, onSave, onClose }) {
 }
 
 
+// ─── cURL 텍스트 파서 ───────────────────────────────────
+
+/** Chrome "Copy as cURL" (bash/cmd) 텍스트에서 cookie 헤더 값 추출. */
+function extractCookieFromCurl(text) {
+    // cmd 형식: ^" ^% 등 캐럿 이스케이프 + ^ 줄연속 제거
+    const cleaned = text.replace(/\^(\r?\n)/g, ' ').replace(/\^(.)/g, '$1');
+    // -H 'cookie: ...' / -H "cookie: ..." / --header 'cookie: ...'
+    const hMatch = cleaned.match(/(?:-H|--header)\s+(['"])cookie:\s*([\s\S]*?)\1/i);
+    if (hMatch) return hMatch[2].trim();
+    // -b '...' / --cookie '...'
+    const bMatch = cleaned.match(/(?:-b|--cookie)\s+(['"])([\s\S]*?)\1/i);
+    if (bMatch) return bMatch[2].trim();
+    return null;
+}
+
+
 // ─── 수동 쿠키 입력 모달 ─────────────────────────────────
 
 function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) {
@@ -1013,9 +1029,19 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
         setParsed(null);
         const trimmed = (text || '').trim();
         if (!trimmed) return;
+        // 0) cURL 텍스트 (Chrome "Copy as cURL" bash/cmd)
+        let effective = trimmed;
+        if (/^curl[\s^]/i.test(trimmed)) {
+            const cookieStr = extractCookieFromCurl(trimmed);
+            if (!cookieStr) {
+                setParseErr("cURL 텍스트에서 cookie 헤더를 찾지 못했습니다 — 로그인 후의 요청에서 Copy as cURL 했는지 확인하세요.");
+                return;
+            }
+            effective = cookieStr;
+        }
         // 1) JSON array
         try {
-            const arr = JSON.parse(trimmed);
+            const arr = JSON.parse(effective);
             if (Array.isArray(arr) && arr.length > 0 && arr[0].name && arr[0].value !== undefined) {
                 setParsed(arr);
                 return;
@@ -1026,7 +1052,7 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
         // 2) Cookie header format "name1=value1; name2=value2"
         //    Application 탭 테이블에서 탭/줄바꿈으로 복사된 경우도 best-effort 처리
         try {
-            const cookies = trimmed
+            const cookies = effective
                 // 줄바꿈 + 탭 → 세미콜론 통일
                 .replace(/\r?\n/g, ';')
                 .replace(/\t+/g, '=')
@@ -1067,7 +1093,7 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
             setParseErr('파싱 실패: ' + (e?.message || e));
             return;
         }
-        setParseErr('인식되는 쿠키 형식이 없습니다. JSON 배열 또는 "name=value; name=value" 형식 필요.');
+        setParseErr('인식되는 쿠키 형식이 없습니다. cURL 텍스트 또는 JSON 배열, "name=value; name=value" 형식 필요.');
     }
 
     async function submit(e) {
@@ -1109,12 +1135,11 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                         <li>크롬에서 <a href="https://store.coupangeats.com" target="_blank" rel="noopener" className="text-blue-700 underline inline-flex items-center gap-0.5">store.coupangeats.com<ExternalLink className="w-3 h-3" /></a> 에 로그인</li>
                         <li>F12 → <strong>Network</strong> 탭 → <strong>Preserve log</strong> ✅ 체크 → F5 새로고침</li>
                         <li>요청 list 에서 아무 <code>coupangeats.com</code> 요청 1개 클릭 (예: <code>whoami</code>, <code>home-banner</code>)</li>
-                        <li>우측 <strong>Headers</strong> 탭 → 아래로 스크롤 → <strong>Request Headers</strong> 섹션</li>
-                        <li><code>cookie:</code> 로 시작하는 줄의 값 전체 (보통 2000~5000자) 마우스 드래그 → <strong>Ctrl+C</strong></li>
-                        <li>아래 텍스트박스에 그대로 붙여넣기 → "쿠키 N개 인식" 표시 (15~30개 정상)</li>
+                        <li>요청 <strong>우클릭</strong> → <strong>Copy</strong> → <strong>Copy as cURL</strong> (bash 또는 cmd)</li>
+                        <li>아래 텍스트박스에 통째로 붙여넣기 → "쿠키 N개 인식" 표시 (15~30개 정상)</li>
                     </ol>
-                    <p className="mt-2 text-amber-800 font-semibold">
-                        ⚠️ Application 탭의 Cookies 테이블을 직접 복사하지 마세요 — 탭으로 깨진 형식이라 인식 실패합니다.
+                    <p className="mt-1 text-amber-800">
+                        또는 Headers 탭에서 <code>cookie:</code> 줄의 값만 드래그 복사해도 됩니다.
                     </p>
                 </div>
 
