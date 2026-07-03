@@ -40,6 +40,7 @@ export default function CoupangEatsModuleDetail() {
     const [testResult, setTestResult] = useState(null);
     const [msg, setMsg] = useState('');
     const [err, setErr] = useState('');
+    const [cookieResult, setCookieResult] = useState(null);  // manual-cookies 응답 + rawCookies
 
     // 수동 동기화 폼
     const [startDate, setStartDate] = useState(ymd(yesterday));
@@ -154,9 +155,15 @@ export default function CoupangEatsModuleDetail() {
                 store_id: storeId || undefined,
                 shop_name: shopName || undefined,
             });
-            setCred({ registered: true, ...res.data });
+            const d = res.data;
+            setCred({ registered: true, ...d });
             setCookieModalOpen(false);
-            showMsg(`쿠키 ${cookies.length}개를 등록했습니다.`);
+            setCookieResult({ ...d, rawCookies: cookies });
+            if (d.verified) {
+                showMsg(`✓ 쿠키 인증 확인 — ${cookies.length}개 등록${d.shop_name ? `, 매장: ${d.shop_name}` : ''}`);
+            } else {
+                showMsg(`쿠키 ${cookies.length}개 등록 (검증 보류 — 아래 경고 확인)`);
+            }
         } catch (e) {
             showErr('쿠키 등록 실패: ' + (e.response?.data?.detail || e.message));
         }
@@ -341,6 +348,17 @@ export default function CoupangEatsModuleDetail() {
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div>{err}</div>
                 </div>
+            )}
+
+            {cookieResult && (
+                <CookieResultBanner
+                    result={cookieResult}
+                    onSelectStore={(s) => handleSubmitCookies(
+                        cookieResult.rawCookies, s.store_id, s.store_name)}
+                    onBackfill={null}
+                    backfilling={false}
+                    onDismiss={() => setCookieResult(null)}
+                />
             )}
 
             {/* 자격증명 상태 카드 */}
@@ -1164,12 +1182,12 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                     <label className="block">
-                        <span className="text-sm text-slate-700">매장 ID</span>
+                        <span className="text-sm text-slate-700">매장 ID (선택)</span>
                         <input
                             type="text"
                             value={storeId}
                             onChange={(e) => setStoreId(e.target.value.replace(/\D/g, ''))}
-                            placeholder="예: 823245"
+                            placeholder="비워두면 자동 감지"
                             className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
                         />
                     </label>
@@ -1203,6 +1221,79 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                     </button>
                 </div>
             </form>
+        </div>
+    );
+}
+
+
+// ─── 쿠키 등록 결과 배너 ─────────────────────────────────
+
+function CookieResultBanner({ result, onSelectStore, onBackfill, backfilling, onDismiss }) {
+    const needStoreChoice = !result.store_id && (result.stores?.length || 0) > 1;
+
+    // 수집 공백: 마지막 성공일 다음날 ~ 어제
+    let gapStart = null;
+    let gapEnd = null;
+    if (result.last_success_sync_date) {
+        const s = new Date(result.last_success_sync_date + 'T00:00:00');
+        s.setDate(s.getDate() + 1);
+        const e = new Date();
+        e.setDate(e.getDate() - 1);
+        e.setHours(0, 0, 0, 0);
+        if (s <= e) { gapStart = s; gapEnd = e; }
+    }
+    const fmtD = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+    return (
+        <div className={`rounded-xl border p-4 mb-4 ${result.verified
+            ? 'bg-emerald-50 border-emerald-200'
+            : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2 font-semibold text-slate-800">
+                    {result.verified
+                        ? <><CheckCircle2 className="w-5 h-5 text-emerald-600" /> 쿠키 인증 확인됨</>
+                        : <><AlertCircle className="w-5 h-5 text-amber-600" /> 쿠키 등록됨 (검증 보류)</>}
+                </div>
+                <button type="button" onClick={onDismiss}
+                        className="p-1 hover:bg-black/5 rounded-md">
+                    <XIcon className="w-4 h-4 text-slate-500" />
+                </button>
+            </div>
+
+            {result.verify_warning && (
+                <p className="mt-2 text-sm text-amber-800">⚠ {result.verify_warning}</p>
+            )}
+
+            {needStoreChoice && (
+                <div className="mt-3">
+                    <p className="text-sm text-slate-700 mb-2">
+                        매장이 여러 개입니다 — 수집할 매장을 선택하세요:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {result.stores.map((s) => (
+                            <button key={s.store_id} type="button"
+                                    onClick={() => onSelectStore(s)}
+                                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm hover:bg-slate-50">
+                                {s.store_name || `매장 ${s.store_id}`} <span className="text-slate-400 font-mono">#{s.store_id}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {result.verified && !needStoreChoice && gapStart && onBackfill && (
+                <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <span className="text-sm text-slate-700">
+                        📅 <strong>{fmtD(gapStart)} ~ {fmtD(gapEnd)}</strong> 수집 공백 감지
+                    </span>
+                    <button type="button" onClick={onBackfill} disabled={backfilling}
+                            className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1.5">
+                        {backfilling
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> 백필 중...</>
+                            : <><Download className="w-4 h-4" /> 지금 백필</>}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
