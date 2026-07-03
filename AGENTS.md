@@ -343,3 +343,41 @@ UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니�
 | `.agents/workflows/end.md` | 세션 종료 상세 지침 |
 | `.agents/workflows/deployment.md` | 배포 아키텍처 상세 |
 | `.agents/workflows/project-reference.md` | 프로젝트 구조 참조 |
+
+
+<claude-mem-context>
+# Memory Context
+
+# [SodamFN] recent context, 2026-06-30 1:37pm GMT+9
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 13 obs (6,591t read) | 473,222t work | 99% savings
+
+### Jun 30, 2026
+S25 Bank transaction classification enhancement & labor cost auto-sync from BankTransaction to P&L (Jun 30, 12:11 PM)
+S24 Session startup and project context initialization for SodamFN (restaurant management platform) (Jun 30, 12:11 PM)
+107 12:16p 🔵 Bank Transaction Classification & P/L Labor Cost Architecture Discovered
+S26 Bank transaction classification enhancement (세부분류) + labor cost auto-sync from BankTransaction to P&L system (Jun 30, 12:17 PM)
+S27 Comprehensive backend + frontend investigation for bank transaction classification enhancement and labor cost auto-sync feature design (Jun 30, 12:19 PM)
+S28 Full-stack investigation of bank transaction classification system architecture for design phase planning (Jun 30, 12:19 PM)
+S29 Code review and verification of bank transaction classification + P/L labor cost fallback feature implementation before commit (Jun 30, 12:20 PM)
+113 12:24p 🔴 Test fixtures missing hourly_wage field causing NOT NULL constraint violation
+114 " 🔵 Sed-based fixture patch failed to resolve hourly_wage constraint violation
+115 12:25p 🔵 Cascading NOT NULL constraint violations in test fixtures revealed
+116 " 🔴 Test fixtures patched with required Staff model fields
+117 " 🔵 Full test suite status: 272 passing, 15 failing (labor classification tests passing)
+118 12:26p 🔵 Test failures confirmed pre-existing; session changes validated
+119 " 🟣 Frontend: Added withdrawal transaction classification labels for P&L precision
+120 12:31p 🔵 Test failure in revenue channel migration: test_simple_rename_no_overlap
+121 " ✅ Active branch: bank sync, profit loss service, and AI classification updates
+122 12:32p 🔵 Bank sync classification + P/L labor fallback feature undergoing comprehensive code review
+S30 Comprehensive code review and verification of bank transaction auto-classification with withdrawal subcategories + P/L labor cost supplementation from bank withdrawals when Payroll records absent (Jun 30, 12:32 PM)
+S31 Comprehensive code review and commit of bank transaction withdrawal subcategories (labor/insurance_payment/tax_payment/rent/owner_withdraw) + P/L labor cost fallback from bank withdrawals when Payroll absent (Jun 30, 12:34 PM)
+123 12:37p 🔵 SodamFN Project Architecture and Coupang Eats Integration Pattern
+124 12:38p 🔵 Coupang Eats Auto-Reconnection Architecture with Fallback Mechanisms
+
+Access 473k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>
