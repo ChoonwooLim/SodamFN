@@ -27,6 +27,7 @@ export default function CoupangEatsModuleDetail() {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const ymd = (d) => d.toISOString().slice(0, 10);
+    const ymdLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const [cred, setCred] = useState(null);
     const [dashboard, setDashboard] = useState(null);
@@ -41,6 +42,7 @@ export default function CoupangEatsModuleDetail() {
     const [msg, setMsg] = useState('');
     const [err, setErr] = useState('');
     const [cookieResult, setCookieResult] = useState(null);  // manual-cookies 응답 + rawCookies
+    const [backfilling, setBackfilling] = useState(false);
 
     // 수동 동기화 폼
     const [startDate, setStartDate] = useState(ymd(yesterday));
@@ -206,6 +208,49 @@ export default function CoupangEatsModuleDetail() {
         }
     }
 
+    // ─── 쿠키 재등록 후 공백 백필 ───
+    async function handleBackfillGap() {
+        if (!cookieResult?.last_success_sync_date) return;
+        const start = new Date(cookieResult.last_success_sync_date + 'T00:00:00');
+        start.setDate(start.getDate() + 1);
+        const end = new Date();
+        end.setDate(end.getDate() - 1);
+        end.setHours(0, 0, 0, 0);
+        if (start > end) return;
+
+        setBackfilling(true);
+        setErr('');
+        try {
+            let totalOrders = 0;
+            let totalSales = 0;
+            let chunkStart = new Date(start);
+            while (chunkStart <= end) {
+                // sync/manual 은 최대 91일(inclusive) — 90일 더한 날짜까지 한 청크
+                const chunkEnd = new Date(Math.min(
+                    end.getTime(),
+                    chunkStart.getTime() + 90 * 24 * 3600 * 1000,
+                ));
+                const res = await api.post('/coupang-eats/sync/manual', {
+                    start_date: ymdLocal(chunkStart),
+                    end_date: ymdLocal(chunkEnd),
+                    sync_orders: true,
+                    sync_settlements: true,
+                });
+                totalOrders += res.data.orders?.fetched || 0;
+                totalSales += res.data.total_sales || 0;
+                chunkStart = new Date(chunkEnd.getTime() + 24 * 3600 * 1000);
+            }
+            showMsg(`백필 완료 — 주문 ${totalOrders}건, 매출 합계 ${fmtWon(totalSales)}원`);
+            setCookieResult(null);
+            await fetchAll();
+            await fetchDashboard();
+        } catch (e) {
+            showErr('백필 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setBackfilling(false);
+        }
+    }
+
     // ─── 대시보드 새로고침 ───
     async function handleRefreshDashboard() {
         await fetchDashboard();
@@ -355,8 +400,8 @@ export default function CoupangEatsModuleDetail() {
                     result={cookieResult}
                     onSelectStore={(s) => handleSubmitCookies(
                         cookieResult.rawCookies, s.store_id, s.store_name)}
-                    onBackfill={null}
-                    backfilling={false}
+                    onBackfill={handleBackfillGap}
+                    backfilling={backfilling}
                     onDismiss={() => setCookieResult(null)}
                 />
             )}
