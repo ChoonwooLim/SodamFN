@@ -13,6 +13,8 @@ from typing import Optional
 
 from sqlmodel import Session, select, func
 
+from .cookie_expiry import effective_cookie_expiry
+
 log = logging.getLogger(__name__)
 
 
@@ -43,6 +45,9 @@ def _max_date(session: Session, col, model, business_id: int) -> Optional[dateti
     return v.date() if isinstance(v, datetime.datetime) else v
 
 
+EXPIRING_SOON_HOURS = 12
+
+
 def _eval_cookie_channel(session, business_id, now, *, cred, label, key,
                           data_col, data_model) -> ChannelHealth:
     """쿠팡/배민 — 쿠키 기반.
@@ -55,14 +60,22 @@ def _eval_cookie_channel(session, business_id, now, *, cred, label, key,
             (cred.consecutive_failures or 0) >= 3:
         return ChannelHealth(key, label, "failed",
                              f"인증 실패 ({cred.status}, 연속 {cred.consecutive_failures})")
-    # 쿠키 만료 임박 (≤12h)
-    expires_at = getattr(cred, "cookies_expires_at", None)
-    if expires_at is not None:
-        hours_left = (expires_at - now).total_seconds() / 3600
-        if 0 < hours_left <= 12:
+    # 쿠키 만료 임박 (≤12h). session 쿠키(만료 NULL)면 발급시각 기준 추정 폴백.
+    # 어드민 UI 상태와 동일 로직(services.cookie_expiry) — drift 방지.
+    eff_expiry, is_estimated = effective_cookie_expiry(
+        getattr(cred, "cookies_expires_at", None),
+        getattr(cred, "cookies_obtained_at", None),
+    )
+    if eff_expiry is not None:
+        hours_left = (eff_expiry - now).total_seconds() / 3600
+        if hours_left <= EXPIRING_SOON_HOURS:
+            suffix = " (추정)" if is_estimated else ""
+            if hours_left <= 0:
+                return ChannelHealth(key, label, "expiring_soon",
+                                     f"쿠키 만료됨 — 갱신 필요{suffix}")
             h = int(hours_left) or 1
             return ChannelHealth(key, label, "expiring_soon",
-                                 f"쿠키 {h}시간 후 만료 — 갱신 필요")
+                                 f"쿠키 {h}시간 후 만료 — 갱신 필요{suffix}")
     last = _max_date(session, data_col, data_model, business_id) if data_col is not None else None
     if last is None or (now.date() - last).days > STALE_DAYS:
         return ChannelHealth(key, label, "stale",

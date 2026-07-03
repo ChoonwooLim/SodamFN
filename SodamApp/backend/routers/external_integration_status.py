@@ -26,6 +26,7 @@ from sqlmodel import Session, select
 from database import engine
 from models import BaeminCredential, CoupangEatsCredential, User
 from routers.auth import get_admin_user
+from services.cookie_expiry import ESTIMATED_COOKIE_TTL_HOURS, effective_cookie_expiry
 from utils.datetime_utils import utc_iso
 
 
@@ -35,11 +36,9 @@ router = APIRouter(prefix="/api/external-integration", tags=["external-integrati
 EXPIRING_SOON_HOURS = 12.0
 FAILED_THRESHOLD = 3   # consecutive_failures ≥ 3 → failed
 
-# 휴리스틱: 쿠팡이츠/배민의 manual 쿠키 중 일부가 session cookie (expires=-1)
-# 라 cookies_expires_at 가 NULL 인 경우가 흔함. 그러면 만료를 추적 못해
-# 사전 알림이 안 됨. cookies_obtained_at 기준 보수적 TTL 로 추정.
-# 관찰: 쿠팡이츠 unify-token 은 통상 24~36시간, 배민도 비슷. 보수적 30h.
-ESTIMATED_COOKIE_TTL_HOURS = 30.0
+# 세션 쿠키(만료 NULL) 추정 TTL 및 만료계산은 services.cookie_expiry 로 단일화.
+# 알림 cron(collection_health) 과 동일 로직 — drift 방지. ESTIMATED_COOKIE_TTL_HOURS
+# 는 하위호환(테스트/외부참조)을 위해 재노출.
 
 
 def _resolve_bid(admin: User, x_view_as_business: Optional[int]) -> int:
@@ -74,13 +73,9 @@ def _classify_status(*,
     if consecutive_failures and consecutive_failures >= FAILED_THRESHOLD:
         return "failed", None, False
 
-    effective_expires = expires_at
-    is_estimated = False
-    if effective_expires is None and cookies_obtained_at is not None:
-        effective_expires = cookies_obtained_at + datetime.timedelta(
-            hours=ESTIMATED_COOKIE_TTL_HOURS
-        )
-        is_estimated = True
+    effective_expires, is_estimated = effective_cookie_expiry(
+        expires_at, cookies_obtained_at
+    )
 
     if effective_expires is None:
         return "unknown", None, False
