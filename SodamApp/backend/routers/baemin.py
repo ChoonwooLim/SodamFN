@@ -37,6 +37,7 @@ from services.baemin_service import (
     BaeminClient, BaeminError, CookieInvalidError,
     serialize_cookies, deserialize_cookies, earliest_cookie_expiry,
 )
+from services.cookie_expiry import effective_cookie_expiry
 from utils.datetime_utils import utc_iso
 
 log = logging.getLogger("baemin.router")
@@ -53,6 +54,9 @@ def _resolve_bid(admin: User, x_view_as_business: Optional[int]) -> int:
 
 
 def _cred_dto(row: BaeminCredential) -> dict:
+    # 세션 쿠키(만료 NULL)면 발급시각+TTL 추정 — 알림 cron 과 동일 로직(SSOT).
+    eff_expiry, expires_estimated = effective_cookie_expiry(
+        row.cookies_expires_at, row.cookies_obtained_at)
     return {
         "id": row.id,
         "login_id": row.login_id,
@@ -62,6 +66,8 @@ def _cred_dto(row: BaeminCredential) -> dict:
         "cookies_present": bool(row.cookies_encrypted),
         "cookies_obtained_at": utc_iso(row.cookies_obtained_at),
         "cookies_expires_at": utc_iso(row.cookies_expires_at),
+        "expires_at_effective": utc_iso(eff_expiry),
+        "expires_estimated": expires_estimated,
         "last_verified_at": utc_iso(row.last_verified_at),
         "last_failed_at": utc_iso(row.last_failed_at),
         "last_error_message": row.last_error_message,

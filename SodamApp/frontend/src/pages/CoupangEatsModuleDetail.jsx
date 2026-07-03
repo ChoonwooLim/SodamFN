@@ -286,8 +286,12 @@ export default function CoupangEatsModuleDetail() {
     const cookieAgeDays = cred?.cookies_obtained_at
         ? Math.floor((Date.now() - parseUtc(cred.cookies_obtained_at)?.getTime()) / (1000 * 60 * 60 * 24))
         : null;
-    const cookieExpiresIn = cred?.cookies_expires_at
-        ? Math.floor((parseUtc(cred.cookies_expires_at)?.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    // 세션 쿠키는 cookies_expires_at 이 NULL — 백엔드가 발급시각+TTL 로 추정한
+    // expires_at_effective 를 우선 사용해 "만료 임박"을 놓치지 않음.
+    const cookieExpiresAt = cred?.expires_at_effective || cred?.cookies_expires_at || null;
+    const cookieExpiresEstimated = !!cred?.expires_estimated;
+    const cookieExpiresIn = cookieExpiresAt
+        ? Math.floor((parseUtc(cookieExpiresAt)?.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : null;
 
     return (
@@ -427,10 +431,10 @@ export default function CoupangEatsModuleDetail() {
                             </div>
                         </div>
                         <div>
-                            <div className="text-slate-500 text-xs">쿠키 만료</div>
+                            <div className="text-slate-500 text-xs">쿠키 만료{cookieExpiresEstimated ? ' (추정)' : ''}</div>
                             <div className={cookieExpiresIn !== null && cookieExpiresIn < 1 ? 'text-amber-700' : 'text-slate-800'}>
-                                {cred.cookies_expires_at
-                                    ? `${formatUtcDateTime(cred.cookies_expires_at)}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
+                                {cookieExpiresAt
+                                    ? `${formatUtcDateTime(cookieExpiresAt)}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
                                     : '-'}
                             </div>
                         </div>

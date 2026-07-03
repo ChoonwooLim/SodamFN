@@ -252,8 +252,12 @@ export default function BaeminModuleDetail() {
     const cookieAgeDays = cred?.cookies_obtained_at
         ? Math.floor((Date.now() - parseUtc(cred.cookies_obtained_at)?.getTime()) / (1000 * 60 * 60 * 24))
         : null;
-    const cookieExpiresIn = cred?.cookies_expires_at
-        ? Math.floor((parseUtc(cred.cookies_expires_at)?.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    // 세션 쿠키는 cookies_expires_at 이 NULL — 백엔드 추정값(expires_at_effective)
+    // 을 우선 사용해야 배너/표시가 세션 쿠키에서도 동작.
+    const cookieExpiresAt = cred?.expires_at_effective || cred?.cookies_expires_at || null;
+    const cookieExpiresEstimated = !!cred?.expires_estimated;
+    const cookieExpiresIn = cookieExpiresAt
+        ? Math.floor((parseUtc(cookieExpiresAt)?.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         : null;
 
     // 쿠키 만료 임박 (3일 이내) 또는 만료됨 → 배너 노출
@@ -402,10 +406,10 @@ export default function BaeminModuleDetail() {
                             </div>
                         </div>
                         <div>
-                            <div className="text-slate-500 text-xs">쿠키 만료</div>
+                            <div className="text-slate-500 text-xs">쿠키 만료{cookieExpiresEstimated ? ' (추정)' : ''}</div>
                             <div className={cookieExpiresIn !== null && cookieExpiresIn < 3 ? 'text-amber-700' : 'text-slate-800'}>
-                                {cred.cookies_expires_at
-                                    ? `${formatUtcDateTime(cred.cookies_expires_at)}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
+                                {cookieExpiresAt
+                                    ? `${formatUtcDateTime(cookieExpiresAt)}` + (cookieExpiresIn !== null ? ` (${cookieExpiresIn}일 남음)` : '')
                                     : '-'}
                             </div>
                         </div>

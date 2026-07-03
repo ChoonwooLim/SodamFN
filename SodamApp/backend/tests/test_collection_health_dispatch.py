@@ -71,6 +71,29 @@ def test_resolves_when_recovered(db):
     assert row.status == "resolved"
 
 
+def test_telegram_gets_owner_friendly_message(db):
+    """텔레그램도 SMS와 동일한 사장님 친화 한국어 문구를 받아야 (개발자 암호문 X).
+
+    회귀 방지: 과거엔 tg 로 'coupang_eats: stale — ...' 같은 암호문을 보냈음.
+    SMS 발신번호가 막혀 텔레그램이 실질 1차 채널이므로 사장님이 읽을 수 있어야.
+    """
+    from models import CoupangEatsCredential
+    from services import collection_health
+    now = datetime.datetime(2026, 6, 22, 0, 0)
+    sms, tg = [], []
+    with Session(db.engine) as s:
+        s.add(CoupangEatsCredential(business_id=1, status="failed", consecutive_failures=3))
+        s.commit()
+        collection_health.dispatch_alerts(
+            s, 1, now, sms_send=lambda p, t: sms.append(t),
+            tg_send=lambda t: tg.append(t))
+    assert len(tg) == 1
+    assert tg[0].startswith("[소담]")
+    assert "쿠팡이츠" in tg[0]
+    assert "coupang_eats" not in tg[0]   # 채널 key 노출 금지
+    assert tg[0] == sms[0]                # 두 채널 동일 문구
+
+
 def test_renotify_after_days(db):
     """RENOTIFY_DAYS(3일) 경과 후 리마인드 1회 재발송."""
     import datetime as dt

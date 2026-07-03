@@ -186,8 +186,7 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                 alert.resolved_at = None
                 alert.detail = f"{h.label}: {h.detail}"
                 session.add(alert)
-                _send_owner_sms(sms_send, owner_phone, h)
-                _safe_send(tg_send, f"{h.channel_key}: {h.status} — {h.detail}")
+                _notify_owner(sms_send, tg_send, owner_phone, _owner_message(h))
                 opened.append(h.channel_key)
             else:
                 # 이미 open — RENOTIFY_DAYS 경과 시만 리마인드
@@ -195,8 +194,8 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                         (now - alert.last_notified_at).days >= RENOTIFY_DAYS:
                     alert.last_notified_at = now
                     session.add(alert)
-                    _send_owner_sms(sms_send, owner_phone, h)
-                    _safe_send(tg_send, f"[리마인드] {h.channel_key}: {h.status} — {h.detail}")
+                    _notify_owner(sms_send, tg_send, owner_phone,
+                                  "[소담][리마인드] " + _owner_message(h, prefix=False))
                     renotified.append(h.channel_key)
         else:
             # healthy — open 이던 게 있으면 resolve
@@ -204,27 +203,37 @@ def dispatch_alerts(session, business_id, now, *, sms_send, tg_send,
                 alert.status = "resolved"
                 alert.resolved_at = now
                 session.add(alert)
-                _safe_send(sms_send, owner_phone,
-                           f"[소담] {h.label} 수집이 정상화되었습니다.")
-                _safe_send(tg_send, f"{h.channel_key}: resolved (정상화)")
+                _notify_owner(sms_send, tg_send, owner_phone,
+                              f"[소담] {h.label} 수집이 정상화되었습니다.")
                 resolved.append(h.channel_key)
 
     session.commit()
     return {"opened": opened, "resolved": resolved, "renotified": renotified}
 
 
-def _send_owner_sms(sms_send, owner_phone, h):
+def _owner_message(h, *, prefix: bool = True) -> str:
+    """사장님이 읽고 바로 행동할 수 있는 한국어 알림 문구.
+
+    SMS·텔레그램 공용. SMS 발신번호가 막혀 있어 텔레그램이 실질 1차 채널이므로
+    두 채널 모두 동일한 사장님 친화 문구를 쓴다 (개발자용 암호문 지양).
+    """
     if h.status == "expiring_soon":
-        msg = {
+        body = {
             "coupang_eats": "쿠팡이츠 쿠키가 곧 만료됩니다. 끊기기 전에 어드민 → 외부연동에서 미리 갱신해 주세요.",
             "baemin": "배민 쿠키가 곧 만료됩니다. 끊기기 전에 어드민 → 외부연동에서 미리 갱신해 주세요.",
         }.get(h.channel_key, f"{h.label} 쿠키가 곧 만료됩니다. 미리 갱신해 주세요.")
     else:
-        msg = {
+        body = {
             "coupang_eats": "쿠팡이츠 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
             "baemin": "배민 매출이 수집되지 않고 있어요. 어드민 → 외부연동에서 쿠키를 갱신해 주세요.",
             "easypos": "매장(POS) 매출 수집이 멈췄어요. 확인이 필요합니다.",
             "codef_card": "카드 매입내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
             "codef_bank": "은행 거래내역 수집이 밀렸어요. 어드민에서 동기화해 주세요.",
         }.get(h.channel_key, f"{h.label} 수집에 문제가 있어요.")
-    _safe_send(sms_send, owner_phone, f"[소담] {msg}")
+    return f"[소담] {body}" if prefix else body
+
+
+def _notify_owner(sms_send, tg_send, owner_phone, message: str):
+    """SMS + 텔레그램 동시 발송 (둘 중 하나 실패해도 계속)."""
+    _safe_send(sms_send, owner_phone, message)
+    _safe_send(tg_send, message)
