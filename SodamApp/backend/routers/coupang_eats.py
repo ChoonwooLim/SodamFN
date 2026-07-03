@@ -350,6 +350,7 @@ class ManualCookiesIn(BaseModel):
     cookies: list[dict] = Field(..., description="브라우저에서 추출한 쿠키 list (name/value/domain/path/expires)")
     store_id: Optional[int] = None
     shop_name: Optional[str] = None
+    skip_verify: bool = Field(False, description="쿠팡 API 장애 시 검증 생략 저장 (비상용)")
 
 
 class ManualSyncIn(BaseModel):
@@ -453,10 +454,16 @@ def submit_manual_cookies(
     admin: User = Depends(get_admin_user),
     x_view_as_business: Optional[int] = Header(None, alias="X-View-As-Business"),
 ):
-    """사장님이 브라우저 F12 로 추출한 쿠키를 직접 입력.
+    """사장님/개발자가 브라우저 F12 로 추출한 쿠키를 직접 입력.
 
     Akamai 가 Playwright 헤드리스를 차단하는 경우의 비상용. ID/PW 가 등록
-    안 되어 있어도 동작. 단, 쿠키 만료 시 다시 사장님이 갱신해야 함.
+    안 되어 있어도 동작.
+
+    저장 전 whoami 로 즉시 라이브 검증:
+      - 인증 거부(CookieInvalidError) → 422 + 미저장 (거짓 성공 방지)
+      - 통신 실패(CoupangEatsError)   → 저장 진행 + verified=false 경고
+      - 검증 성공 → list_stores 로 매장 자동 감지 (1개일 때)
+    skip_verify=true 면 검증 생략(쿠팡 API 장애 시 비상용).
     """
     bid = _resolve_bid(admin, x_view_as_business)
     if not body.cookies:
@@ -475,6 +482,43 @@ def submit_manual_cookies(
     if not has_auth:
         log.warning("manual cookies missing common auth names, names=%s", cookie_names_upper)
 
+    # ── 저장 전 라이브 검증 ──────────────────────────────
+    verified = False
+    verify_warning: Optional[str] = None
+    stores_out: list[dict] = []
+    save_store_id = body.store_id
+    save_shop_name = body.shop_name
+    cookies_to_save = body.cookies
+
+    if not body.skip_verify:
+        client = None
+        try:
+            client = CoupangEatsClient(body.cookies)
+            client.whoami()
+            verified = True
+            try:
+                stores_out = _normalize_stores(client.list_stores())
+            except CoupangEatsError as e:
+                verify_warning = f"인증은 성공했지만 매장 목록 조회 실패: {e}"
+            if not save_store_id and len(stores_out) == 1:
+                save_store_id = stores_out[0]["store_id"]
+                save_shop_name = save_shop_name or stores_out[0]["store_name"]
+            # whoami 중 서버가 회전시킨 쿠키가 있으면 최신본 저장
+            rotated = client.get_cookies()
+            if rotated:
+                cookies_to_save = rotated
+        except CookieInvalidError as e:
+            # CoupangEatsError 의 서브클래스 — 반드시 먼저 catch
+            raise HTTPException(
+                422,
+                f"이 쿠키는 이미 무효입니다 — 쿠팡이츠가 인증을 거부했습니다: {e}",
+            ) from e
+        except CoupangEatsError as e:
+            verify_warning = f"쿠팡이츠 통신 실패로 검증하지 못했습니다 (저장은 진행): {e}"
+        finally:
+            if client is not None:
+                client.close()
+
     with Session(engine) as s:
         row = s.exec(
             select(CoupangEatsCredential).where(
@@ -491,12 +535,21 @@ def submit_manual_cookies(
             s.commit()
             s.refresh(row)
 
-        _save_cookies(s, row, body.cookies,
+        _save_cookies(s, row, cookies_to_save,
                       login_method="manual",
-                      store_id=body.store_id or row.store_id,
-                      shop_name=body.shop_name or row.shop_name)
+                      store_id=save_store_id or row.store_id,
+                      shop_name=save_shop_name or row.shop_name)
         s.refresh(row)
-        return {"ok": True, **_cred_dto(row)}
+        last_success = _last_success_sync_date(s, bid)
+        return {
+            "ok": True,
+            "verified": verified,
+            "verify_warning": verify_warning,
+            "stores": stores_out,
+            "last_success_sync_date":
+                last_success.isoformat() if last_success else None,
+            **_cred_dto(row),
+        }
 
 
 # ──────────────────────────────────────────────────────────────────────────
