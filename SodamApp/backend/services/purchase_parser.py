@@ -497,6 +497,67 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
     return records
 
 
+def parse_kookmin_card(filepath: str) -> List[Dict]:
+    """Parse 국민카드(KB) 이용내역 (.xls).
+
+    구조: 상단 요약 블록(조회기간·정상/취소 건수·금액) 뒤에 헤더 행 —
+      이용일 / 이용시간 / 이용고객명 / 이용카드명 / 이용하신곳 /
+      국내이용금액(원) / 해외이용금액($) / 결제방법 / 가맹점정보 /
+      할인금액 / 적립(예상)포인트리 / 상태
+    헤더 셀에 줄바꿈이 섞여 있어 정규화 후 부분일치로 컬럼을 찾는다.
+    상태에 '취소' 포함 시 취소 건으로 처리.
+    """
+    df = _read_excel_auto(filepath, header=None)
+
+    header_idx = None
+    cols: list[str] = []
+    for i in range(min(15, len(df))):
+        row_vals = ["" if pd.isna(v) else str(v).replace("\n", "").strip()
+                    for v in df.iloc[i].values]
+        if any("이용일" in v for v in row_vals) and any("이용하신곳" in v for v in row_vals):
+            header_idx = i
+            cols = row_vals
+            break
+    if header_idx is None:
+        raise ValueError("국민카드 헤더 행(이용일/이용하신곳)을 찾지 못했습니다")
+
+    def _col(keyword):
+        for j, c in enumerate(cols):
+            if keyword in c:
+                return j
+        return None
+
+    c_date = _col("이용일")
+    c_vendor = _col("이용하신곳")
+    c_amount = _col("국내이용금액")
+    c_status = _col("상태")
+
+    records = []
+    for _, row in df.iloc[header_idx + 1:].iterrows():
+        use_date = _normalize_date(row.iloc[c_date])
+        if not use_date:
+            continue
+        vendor_name = str(row.iloc[c_vendor]).strip()
+        if not vendor_name or vendor_name == "nan":
+            continue
+        amount = _clean_amount(row.iloc[c_amount])
+        if amount == 0:
+            continue
+        status = "" if c_status is None else str(row.iloc[c_status])
+        records.append({
+            "date": use_date,
+            "vendor_name": vendor_name,
+            "amount": amount,
+            "category": classify_category(vendor_name, ""),
+            "card_company": "국민카드",
+            "approval_no": "",
+            "business_type": "",
+            "is_cancelled": "취소" in status,
+        })
+
+    return records
+
+
 def parse_hyundai(filepath: str) -> List[Dict]:
     """Parse 현대카드 이용내역 (HTML-as-xls format).
 
@@ -713,6 +774,8 @@ def detect_card_company(filepath: str, filename: str) -> str:
         return 'lotte'
     elif '삼성' in fn or 'samsung' in fn:
         return 'samsung'
+    elif '국민카드' in fn or 'kb카드' in fn or 'kbcard' in fn or 'kookmincard' in fn:
+        return 'kookmin_card'
     elif '국민은행' in fn or 'kb은행' in fn:
         return 'kookmin_bank'
     elif '수협' in fn or 'suhyup' in fn:
@@ -854,6 +917,7 @@ def parse_purchase_file(filepath: str, filename: str = None) -> List[Dict]:
         'shinhan_card': parse_shinhan_card,
         'shinhan_bank': parse_shinhan_bank,
         'shinhan_bank_pdf': parse_shinhan_bank_pdf,
+        'kookmin_card': parse_kookmin_card,
         'kookmin_bank': lambda fp: _parse_generic_bank(fp, '국민은행'),
         'suhyup_bank': lambda fp: _parse_generic_bank(fp, '수협은행'),
         'hyundai': parse_hyundai,
