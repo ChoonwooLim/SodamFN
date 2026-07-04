@@ -83,12 +83,15 @@ export default function ProfitLoss() {
 
     // 정식 재무제표 (손익·현금흐름·재무상태표)
     const [statements, setStatements] = useState(null);
+    const [stmtError, setStmtError] = useState(false);
+    const [stmtRetry, setStmtRetry] = useState(0);
     useEffect(() => {
         if (activeTab !== 'statements') return;
+        setStmtError(false);
         api.get(`/api/profitloss/statements?year=${year}`)
             .then(res => setStatements(res.data))
-            .catch(() => setStatements(null));
-    }, [activeTab, year]);
+            .catch(() => { setStatements(null); setStmtError(true); });
+    }, [activeTab, year, stmtRetry]);
 
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
@@ -993,7 +996,21 @@ export default function ProfitLoss() {
     // 정식 재무제표 — 손익계산서 · 현금흐름표 · 재무상태표
     // ═══════════════════════════════════════════
     const renderStatements = () => {
-        if (!statements) return <div className="pl-table-card"><div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>재무제표 산출 중…</div></div>;
+        if (!statements) return (
+            <div className="pl-table-card">
+                <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                    {stmtError ? (
+                        <>
+                            <div style={{ fontSize: 15, marginBottom: 16 }}>재무제표를 불러오지 못했습니다.<br />서버 업데이트 직후라면 잠시 후 다시 시도해 주세요.</div>
+                            <button
+                                onClick={() => setStmtRetry(n => n + 1)}
+                                style={{ padding: '12px 28px', fontSize: 15, fontWeight: 700, color: '#fff', background: '#334155', border: 'none', borderRadius: 12, cursor: 'pointer' }}
+                            >다시 불러오기</button>
+                        </>
+                    ) : '재무제표 산출 중…'}
+                </div>
+            </div>
+        );
         const IS = statements.income_statement || [];
         const CF = statements.cash_flow || [];
         const BS = statements.balance_sheet || [];
