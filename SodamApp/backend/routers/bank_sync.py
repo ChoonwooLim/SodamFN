@@ -1126,9 +1126,14 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
     if tx.classified_as in _OUT_CATEGORY and tx.out_amount > 0:
         vendor_name = tx.remark1 or tx.remark2 or "은행출금"
         category = _OUT_CATEGORY[tx.classified_as]
+        # 임대료 월초(1~7일) 이체 = 전월분 후불(말일 주말 밀림) — 전월 말일 귀속
+        # (purchase_parser [날짜조정]·normalizers/bank._accrual_date 와 동일 규칙)
+        expense_date = tx.trans_date
+        if category in ("임대료", "임차료") and expense_date.day <= 7:
+            expense_date = expense_date.replace(day=1) - timedelta(days=1)
         de = DailyExpense(
             business_id=tx.business_id,
-            date=tx.trans_date,
+            date=expense_date,
             vendor_name=vendor_name,
             vendor_id=tx.vendor_id,
             amount=tx.out_amount,

@@ -9,6 +9,22 @@ from models import BankTransaction
 from ..sync_event import SyncEvent
 
 
+def _accrual_date(session: Session, tx: BankTransaction) -> datetime.date:
+    """지출 귀속일 — 임대료/임차료 월초(1~7일) 이체는 전월 말일로 귀속.
+
+    임차료는 당월 말일 납부인데 말일이 주말/연휴면 다음달 1~3일로 밀려
+    (예: 5/31 일요일 → 6/1 이체) 달력월 기준으로 한 달은 0원, 다음 달은
+    두 달치가 잡힌다. purchase_parser 신한은행 업로드의 [날짜조정]과 동일 규칙.
+    """
+    d = tx.trans_date
+    if d.day <= 7 and (tx.out_amount or 0) > 0 and tx.vendor_id:
+        from models import Vendor
+        v = session.get(Vendor, tx.vendor_id)
+        if v and (v.category or "") in ("임대료", "임차료"):
+            return d.replace(day=1) - datetime.timedelta(days=1)
+    return d
+
+
 def normalize_bank(session: Session, business_id: int,
                     start: datetime.date, end: datetime.date):
     """기간 내 classified_as 가 설정된 BankTransaction 을 SyncEvent 로 변환.
@@ -49,7 +65,8 @@ def normalize_bank(session: Session, business_id: int,
             if not tx.vendor_id:
                 continue
             yield SyncEvent(
-                business_id=business_id, date=tx.trans_date,
+                business_id=business_id,
+                date=_accrual_date(session, tx),
                 event_type="expense",
                 vendor_lookup_key=f"_existing_vendor:{tx.vendor_id}",
                 payment_method="Bank",
