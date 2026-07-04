@@ -26,10 +26,15 @@ const EXPENSE_FIELDS = [
     { key: 'expense_rent', label: '임차료', group: 'expense-rent' },
     { key: 'expense_repair', label: '수선비', group: 'expense-facility' },
     { key: 'expense_depreciation', label: '감가상각비', group: 'expense-facility' },
-    { key: 'expense_tax', label: '세금과공과', group: 'expense-tax' },
-    { key: 'expense_card_fee', label: '카드수수료', group: 'expense-etc' },
+    { key: 'expense_card_fee', label: '카드수수료', auto: true, group: 'expense-etc' },
     { key: 'expense_delivery_fee', label: '배달앱수수료', auto: true, group: 'expense-etc' },
     { key: 'expense_other', label: '기타경비', group: 'expense-etc' },
+];
+
+// 정식 손익계산서 양식 (2026-07-04): 세금 납부(부가세·소득세·재산세 등)는
+// 영업비용이 아니라 영업이익 아래 별도 표시 — 순이익 = 영업이익 − 세금
+const TAX_FIELDS = [
+    { key: 'expense_tax', label: '세금과공과', group: 'expense-tax' },
 ];
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -196,10 +201,26 @@ export default function ProfitLoss() {
         return REVENUE_FIELDS.reduce((sum, f) => sum + (monthData[f.key] || 0), 0);
     };
 
-    const calcTotalExpense = (monthData) => {
+    // 영업비용 (세금 제외)
+    const calcOperatingExpense = (monthData) => {
         return EXPENSE_FIELDS.reduce((sum, f) => sum + (monthData[f.key] || 0), 0);
     };
 
+    const calcTax = (monthData) => {
+        return TAX_FIELDS.reduce((sum, f) => sum + (monthData[f.key] || 0), 0);
+    };
+
+    // 총 지출 = 영업비용 + 세금 (기존 의미 유지 — 대시보드/모바일 지출 합계)
+    const calcTotalExpense = (monthData) => {
+        return calcOperatingExpense(monthData) + calcTax(monthData);
+    };
+
+    // 영업이익 = 수입 − 영업비용
+    const calcOperatingProfit = (monthData) => {
+        return calcTotalRevenue(monthData) - calcOperatingExpense(monthData);
+    };
+
+    // 순이익 = 영업이익 − 세금
     const calcProfit = (monthData) => {
         return calcTotalRevenue(monthData) - calcTotalExpense(monthData);
     };
@@ -213,7 +234,7 @@ export default function ProfitLoss() {
         const count = MONTHS.filter(m => {
             const md = data.find(d => d.month === m) || {};
             const hasRevenue = REVENUE_FIELDS.some(f => (md[f.key] || 0) !== 0);
-            const hasExpense = EXPENSE_FIELDS.some(f => (md[f.key] || 0) !== 0);
+            const hasExpense = [...EXPENSE_FIELDS, ...TAX_FIELDS].some(f => (md[f.key] || 0) !== 0);
             return hasRevenue || hasExpense;
         }).length;
         return count || 1; // avoid division by zero
@@ -291,8 +312,8 @@ export default function ProfitLoss() {
         const prevProfit = prevRevenue - prevExpense;
         const prevMargin = prevRevenue > 0 ? ((prevProfit / prevRevenue) * 100).toFixed(1) : '0.0';
 
-        // Expense breakdown by category
-        const expenseBreakdown = EXPENSE_FIELDS.map(f => {
+        // Expense breakdown by category (세금 포함)
+        const expenseBreakdown = [...EXPENSE_FIELDS, ...TAX_FIELDS].map(f => {
             const total = data.reduce((sum, d) => sum + (d[f.key] || 0), 0);
             return { key: f.key, label: f.label, total };
         }).filter(e => e.total > 0).sort((a, b) => b.total - a.total);
@@ -527,7 +548,7 @@ export default function ProfitLoss() {
                         </tr>
                     </thead>
                     <tbody>
-                        {EXPENSE_FIELDS.map(field => {
+                        {[...EXPENSE_FIELDS, ...TAX_FIELDS].map(field => {
                             const yearTotal = calcYearTotal(field.key);
                             const totalExpense = data.reduce((s, d) => s + calcTotalExpense(d), 0);
                             const percentage = totalExpense > 0 ? ((yearTotal / totalExpense) * 100).toFixed(1) : 0;
@@ -622,7 +643,7 @@ export default function ProfitLoss() {
                                     ))}
                                 </tr>
                                 <tr className="profit-row">
-                                    <td>손익</td>
+                                    <td>순이익</td>
                                     {MONTHS.map(m => {
                                         const profit = calcProfit(getMonthData(m));
                                         return (
@@ -983,12 +1004,12 @@ export default function ProfitLoss() {
                     <div className="pl-kpi-sub">{formatNumber(yearExp)}원</div>
                 </div>
                 <div className={`pl-kpi-card ${yearProfit >= 0 ? 'pl-kpi-profit' : 'pl-kpi-loss'} card-animate`} style={{ animationDelay: '0.1s' }}>
-                    <div className="pl-kpi-label">영업이익</div>
+                    <div className="pl-kpi-label">순이익</div>
                     <div className="pl-kpi-value">{fmtShort(yearProfit)}<span className="pl-kpi-unit">원</span></div>
                     <div className="pl-kpi-sub">{formatNumber(yearProfit)}원</div>
                 </div>
                 <div className="pl-kpi-card pl-kpi-margin card-animate" style={{ animationDelay: '0.15s' }}>
-                    <div className="pl-kpi-label">영업이익률</div>
+                    <div className="pl-kpi-label">순이익률</div>
                     <div className="pl-kpi-value">{yearMargin.toFixed(1)}<span className="pl-kpi-unit">%</span></div>
                     <div className="pl-kpi-bar">
                         <div className="pl-kpi-bar-fill" style={{ width: `${Math.max(0, Math.min(100, yearMargin))}%` }} />
@@ -1051,9 +1072,9 @@ export default function ProfitLoss() {
                             <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / activeMonthCount))}</td>
                         </tr>
 
-                        {/* Expense Section */}
+                        {/* Operating Expense Section (세금 제외) */}
                         <tr className={`section-header expense-section-header ${EXPENSE_FIELDS[0].group}`}>
-                            <td className="pl-section-label" rowSpan={EXPENSE_FIELDS.length + 1}>지출</td>
+                            <td className="pl-section-label" rowSpan={EXPENSE_FIELDS.length + 1}>영업비용</td>
                             <td className="pl-item-label">{EXPENSE_FIELDS[0].label}</td>
                             {MONTHS.map(m => (
                                 <td key={m} className="pl-data">{renderCell(m, EXPENSE_FIELDS[0].key, getMonthData(m)[EXPENSE_FIELDS[0].key])}</td>
@@ -1074,15 +1095,44 @@ export default function ProfitLoss() {
                         <tr className="subtotal-row">
                             <td className="pl-item-label">합계</td>
                             {MONTHS.map(m => (
-                                <td key={m} className="pl-data">{formatNumber(calcTotalExpense(getMonthData(m)))}</td>
+                                <td key={m} className="pl-data">{formatNumber(calcOperatingExpense(getMonthData(m)))}</td>
                             ))}
-                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalExpense(d), 0))}</td>
-                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalExpense(d), 0) / activeMonthCount))}</td>
+                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcOperatingExpense(d), 0))}</td>
+                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcOperatingExpense(d), 0) / activeMonthCount))}</td>
                         </tr>
 
-                        {/* Profit Row */}
+                        {/* Operating Profit Row — 수입 − 영업비용 */}
                         <tr className="profit-row">
                             <td className="pl-section-label" colSpan="2">영업이익</td>
+                            {MONTHS.map(m => (
+                                <td key={m} className={`pl-data ${calcOperatingProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
+                                    {formatNumber(calcOperatingProfit(getMonthData(m)))}
+                                </td>
+                            ))}
+                            <td className="pl-data total profit-positive">
+                                {formatNumber(data.reduce((s, d) => s + calcOperatingProfit(d), 0))}
+                            </td>
+                            <td className="pl-data average profit-positive">
+                                {formatNumber(Math.round(data.reduce((s, d) => s + calcOperatingProfit(d), 0) / activeMonthCount))}
+                            </td>
+                        </tr>
+
+                        {/* Tax Section — 부가세·소득세·재산세 등 납부 (영업외) */}
+                        {TAX_FIELDS.map((field, i) => (
+                            <tr key={field.key} className={`expense-row ${field.group}`}>
+                                {i === 0 && <td className="pl-section-label" rowSpan={TAX_FIELDS.length}>세금</td>}
+                                <td className="pl-item-label">{field.label}</td>
+                                {MONTHS.map(m => (
+                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                                ))}
+                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
+                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
+                            </tr>
+                        ))}
+
+                        {/* Net Profit Row — 영업이익 − 세금 */}
+                        <tr className="profit-row">
+                            <td className="pl-section-label" colSpan="2">순이익</td>
                             {MONTHS.map(m => (
                                 <td key={m} className={`pl-data ${calcProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
                                     {formatNumber(calcProfit(getMonthData(m)))}
@@ -1128,7 +1178,7 @@ export default function ProfitLoss() {
         })).filter(e => e.total > 0);
 
         // Expense breakdown (annual)
-        const expBreakdown = EXPENSE_FIELDS.map(f => ({
+        const expBreakdown = [...EXPENSE_FIELDS, ...TAX_FIELDS].map(f => ({
             key: f.key, label: f.label,
             total: data.reduce((s, d) => s + (d[f.key] || 0), 0),
         })).filter(e => e.total > 0).sort((a, b) => b.total - a.total);
@@ -1189,7 +1239,7 @@ export default function ProfitLoss() {
 
                     {/* Hero: 순이익 */}
                     <div style={{ textAlign: 'center', marginTop: 20 }}>
-                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, letterSpacing: 1 }}>영업이익</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, letterSpacing: 1 }}>순이익</div>
                         <div className="num-animate" style={{
                             fontSize: 30, fontWeight: 900, marginTop: 4, letterSpacing: -1,
                             color: yearProfit >= 0 ? '#34d399' : '#f87171',
@@ -1297,7 +1347,7 @@ export default function ProfitLoss() {
                         {[
                             { label: '총 매출', value: yearRev, color: '#60a5fa' },
                             { label: '총 지출', value: yearExp, color: '#f97316' },
-                            { label: yearProfit >= 0 ? '영업이익' : '영업손실', value: yearProfit, color: yearProfit >= 0 ? '#34d399' : '#f87171', bold: true },
+                            { label: yearProfit >= 0 ? '순이익' : '순손실', value: yearProfit, color: yearProfit >= 0 ? '#34d399' : '#f87171', bold: true },
                         ].map((row, i) => (
                             <div key={i} style={{
                                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1325,7 +1375,7 @@ export default function ProfitLoss() {
                         // Revenue items for this month
                         const mRevItems = REVENUE_FIELDS.map(f => ({ label: f.label, value: md[f.key] || 0, icon: REV_ICONS[f.key] || '💰' })).filter(r => r.value > 0);
                         // Top expense items
-                        const mExpItems = EXPENSE_FIELDS.map(f => ({ label: f.label, value: md[f.key] || 0, icon: EXP_ICONS[f.key] || '📋' })).filter(e => e.value > 0).sort((a, b) => b.value - a.value);
+                        const mExpItems = [...EXPENSE_FIELDS, ...TAX_FIELDS].map(f => ({ label: f.label, value: md[f.key] || 0, icon: EXP_ICONS[f.key] || '📋' })).filter(e => e.value > 0).sort((a, b) => b.value - a.value);
 
                         return (
                             <div key={m.month} className="card-animate" style={{

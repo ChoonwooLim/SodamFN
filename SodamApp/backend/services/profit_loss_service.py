@@ -1,8 +1,16 @@
 from sqlmodel import Session, select, func
 from models import MonthlyProfitLoss, DailyExpense, Vendor, Payroll, DeliveryRevenue
 import datetime
+import os
 import calendar as _calendar
 from services.auto_collection_sync.calendar import is_business_day
+
+# 카드 가맹점 실효수수료율 — 카드수수료 = 당월 승인액 × 요율.
+# 자동수집 CardPayment 는 수수료 미제공(fees=0)이고 승인−입금 월차는 정산지연
+# 노이즈(주말 배치로 월별 ±15% 발산)라 사용 불가. 실측 정렬 분석(2026 1~6월,
+# 내부구간 중앙값 ~1.4%)이 여신협회 우대구간(연매출 5~10억: 신용 1.25%+VAT)과
+# 부합 → 기본 1.4%. 여신협회 통지 요율 확보 시 env CARD_FEE_RATE 로 교체.
+CARD_FEE_RATE = float(os.getenv("CARD_FEE_RATE", "0.014"))
 
 
 # 발생주의 귀속 — 임차료 등은 익월 1~4일에 휴일 사유로 미뤄 이체된 경우 전월로 귀속.
@@ -346,6 +354,45 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
     return delivery_totals
 
 
+def sync_card_fee_to_pl(year: int, month: int, session: Session, business_id: int = None):
+    """카드수수료 = 당월 카드 승인액(CardSalesApproval) × 실효요율(CARD_FEE_RATE).
+
+    승인 데이터가 없는 달은 기존 값 보존 (수동 입력/과거 업로드 값 유지).
+    """
+    from models import CardSalesApproval
+
+    start = datetime.date(year, month, 1)
+    end = (datetime.date(year + 1, 1, 1) if month == 12
+           else datetime.date(year, month + 1, 1))
+    stmt = select(func.sum(CardSalesApproval.amount)).where(
+        CardSalesApproval.approval_date >= start,
+        CardSalesApproval.approval_date < end,
+    )
+    if business_id is not None:
+        stmt = stmt.where(CardSalesApproval.business_id == business_id)
+    approvals = session.exec(stmt).one() or 0
+
+    pl_stmt = select(MonthlyProfitLoss).where(
+        MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+    pl_record = session.exec(pl_stmt).first()
+
+    if approvals <= 0:
+        return (pl_record.expense_card_fee if pl_record else 0)
+
+    fee = int(round(approvals * CARD_FEE_RATE))
+    if pl_record:
+        pl_record.expense_card_fee = fee
+        session.add(pl_record)
+    else:
+        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id,
+                                      expense_card_fee=fee)
+        session.add(pl_record)
+    session.commit()
+    return fee
+
+
 def sync_summary_material_cost(year: int, month: int, session: Session, business_id: int = None):
     """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
     start_date = datetime.date(year, month, 1)
@@ -566,6 +613,8 @@ def recalc_all_businesses(session: Session) -> dict:
                 # sync_revenue_to_pl 은 내부에서 sync_delivery_revenue_to_pl 도 호출.
                 sync_revenue_to_pl(yr, mo, session, biz.id)
                 sync_all_expenses(yr, mo, session, biz.id)
+                sync_labor_cost(yr, mo, session, biz.id)
+                sync_card_fee_to_pl(yr, mo, session, biz.id)
                 counts["months_recomputed"] += 1
             except Exception as e:  # noqa: BLE001
                 counts["errors"] += 1

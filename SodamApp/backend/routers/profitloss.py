@@ -12,6 +12,7 @@ from tenant_filter import get_bid_from_token, apply_bid_filter
 from services.profit_loss_service import (
     sync_all_expenses,
     sync_labor_cost,
+    sync_card_fee_to_pl,
     sync_summary_material_cost,
     sync_delivery_revenue_to_pl,
     sync_revenue_to_pl,
@@ -55,7 +56,8 @@ def _recompute_pl_months(year: int, months: list[int], session: Session, bid):
         try:
             sync_revenue_to_pl(year, m, session, bid)   # 내부에서 delivery 매출도 sync
             sync_all_expenses(year, m, session, bid)
-            sync_labor_cost(year, m, session, bid)      # 급여대장 or 은행 labor 출금 보완
+            sync_labor_cost(year, m, session, bid)      # 실송금(은행 labor) 우선, Payroll 폴백
+            sync_card_fee_to_pl(year, m, session, bid)  # 카드 승인액 × 실효요율
         except Exception as e:  # noqa: BLE001
             session.rollback()
             _autosync_log.warning("PL 자동 재집계 실패 %d-%02d bid=%s: %s", year, m, bid, e)
