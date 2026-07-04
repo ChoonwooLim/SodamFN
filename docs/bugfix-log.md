@@ -126,3 +126,4 @@
 | 2026-07-04 | P/L 인건비 1~3월 과소(-124만~-733만)+6월 보험·원천세 0 | Payroll 우선 정책이 실지급(가불·현금·퇴직금·미기재 이체) 미반영, 4대보험 사업주=직원공제 가정 | 실송금 우선(퇴직금 severance 분리)+4대보험·원천세=은행 실납부, 원천세 이중계상 제거 | services/profit_loss_service.py, routers/bank_sync.py |
 | 2026-07-04 | 신한카드 신형 .xlsx 업로드 XLRDError | engine='xlrd' 고정 + 신형 컬럼(거래일/매입구분) 미매핑 | 매직바이트 엔진 자동감지 + 신형 컬럼 fallback | services/purchase_parser.py |
 | 2026-07-04 | P/L vs 비용관리 화면 불일치 + 보험료 P/L 누락 | P/L=거래처분류·화면=행분류 이원화, 보험료→expense_insurance(4대보험 전용) 매핑돼 스킵 | 행 분류를 거래처 SSOT로 통일(개인가계부 표시 우선), 보험료→기타경비 재매핑 | services/profit_loss_service.py |
+| 2026-07-04 | 재무제표 탭 무한 "산출 중…" 프리즈 (프로덕션) | api.js baseURL에 /api 포함인데 statements 호출만 /api/ 접두 중복 → /api/api 404 + 조용한 catch | 경로 수정 + 에러 배너·재시도 버튼, 전 코드베이스 동일 패턴 0건 확인 | SodamApp/frontend/src/pages/ProfitLoss/index.jsx |
