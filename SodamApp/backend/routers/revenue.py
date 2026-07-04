@@ -307,6 +307,72 @@ def delete_daily_revenue(expense_id: int, _admin: AuthUser = Depends(get_admin_u
 
 # ─── GET delivery revenue summary ───
 
+import json as _json
+
+_LEGACY_CHANNEL_MAP = {
+    "Coupang": "쿠팡", "쿠팡이츠": "쿠팡", "쿠팡잇츠": "쿠팡", "쿠팡페이": "쿠팡", "쿠팡": "쿠팡",
+    "Baemin": "배민", "배달의민족": "배민", "우아한형제들": "배민", "음식배달": "배민", "배민": "배민",
+    "Yogiyo": "요기요", "요기요": "요기요", "위대한상상": "요기요",
+    "Ddangyo": "땡겨요", "땡겨요": "땡겨요",
+}
+_SRC_RANK = {"auto_coupang_excel": 3, "excel": 3, "manual": 2, "bank_sync": 0}
+_DISPLAY_CHANNELS = ("쿠팡", "배민", "요기요", "땡겨요")
+
+
+def _canon_channel(ch: str) -> str:
+    return _LEGACY_CHANNEL_MAP.get(ch, ch)
+
+
+def _consolidate_delivery(dr_rows, de_sales):
+    """(채널,월) 별 대표 레코드를 결정적으로 선택해 월별 요약 dict 생성.
+
+    대표 선택 키 = (매출>0, source_rank, total_fees, channel) 최댓값. channel
+    문자열로 tie-break 해 결정성 보장. 정산액은 그 슬롯 레코드들의
+    settlement_amount non-zero 최댓값. 매출은 대표.total_sales(>0) else de_sales.
+    """
+    slots = {}
+    for r in dr_rows:
+        ch = _canon_channel(r.channel)
+        if ch not in _DISPLAY_CHANNELS:
+            continue
+        slots.setdefault((r.year, r.month, ch), []).append(r)
+
+    monthly = {}
+    for (y, m, ch), rows in slots.items():
+        best = max(rows, key=lambda r: (
+            1 if (r.total_sales or 0) > 0 else 0,
+            _SRC_RANK.get(r.source, 1),
+            r.total_fees or 0,
+            r.channel,
+        ))
+        settle = max((r.settlement_amount or 0) for r in rows)
+        sales = best.total_sales if (best.total_sales or 0) > 0 else de_sales.get((y, m, ch), 0)
+        fees = best.total_fees or 0
+        try:
+            fee_bd = _json.loads(best.fee_breakdown) if best.fee_breakdown else {}
+        except Exception:
+            fee_bd = {}
+        mk = f"{y}-{m:02d}"
+        mm = monthly.setdefault(mk, {"year": y, "month": m, "channels": {},
+                                     "total_sales": 0, "total_fees": 0,
+                                     "total_settlement": 0, "total_orders": 0})
+        mm["channels"][ch] = {
+            "total_sales": sales, "total_fees": fees, "settlement_amount": settle,
+            "order_count": best.order_count or 0,
+            "fee_rate": round(fees / sales * 100, 1) if sales > 0 else 0,
+            "fee_breakdown": fee_bd, "source": best.source,
+        }
+        mm["total_sales"] += sales
+        mm["total_fees"] += fees
+        mm["total_settlement"] += settle
+        mm["total_orders"] += (best.order_count or 0)
+
+    for mm in monthly.values():
+        ts = mm["total_sales"]
+        mm["overall_fee_rate"] = round(mm["total_fees"] / ts * 100, 1) if ts > 0 else 0
+    return monthly
+
+
 @router.get("/delivery-summary")
 def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """
