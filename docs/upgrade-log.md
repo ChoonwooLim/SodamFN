@@ -148,3 +148,7 @@
 | 2026-07-04 | 쿠팡이츠 쿠키 재입력 UX (라이브 검증·cURL 붙여넣기·매장 자동감지·공백 원클릭 백필) | feat(coupang) | SodamApp/backend/routers/coupang_eats.py, frontend/CoupangEatsModuleDetail.jsx |
 | 2026-07-04 | 월별 매출내역서 엑셀 자동적재 cron(매월6일)+요기요·땡겨요 정산내역 엑셀 파서 | feat(revenue) | SodamApp/backend/services/yogiyo_excel_parser.py, ddangyo_excel_parser.py, /home/stevenlim/coupang-excel-cron.sh |
 | 2026-07-04 | 배달앱 매출 결정적 병합(총비용 우선)+business_id 필터 — 채널값 일관화 | feat(revenue) | SodamApp/backend/routers/revenue.py, scripts/cleanup_fake_delivery_revenue.py |
+| 2026-07-04 | 정식 재무제표 3종 (손익·현금흐름표·재무상태표, 통장잔액 1원 대조검증) + 재무제표 탭 | feat(fs) | services/financial_statements_service.py, routers/profitloss.py, frontend/ProfitLoss/index.jsx |
+| 2026-07-04 | 정식 손익 양식(영업이익/순이익 분리) + 카드수수료 실효요율 자동 산정(CARD_FEE_RATE 1.4%) | feat(pl) | services/profit_loss_service.py, frontend/ProfitLoss/index.jsx |
+| 2026-07-04 | 비유동자산 대장(FixedAsset)+감가상각 자동 반영 (개업 2021-05, 추가집기 2024-07) | feat(fs) | models.py, services/profit_loss_service.py, financial_statements_service.py |
+| 2026-07-04 | 국민카드 파서 + 은행 원장 분류 100%(withholding_tax·cash_deposit 등 신설) | feat(purchase) | services/purchase_parser.py, routers/bank_sync.py |

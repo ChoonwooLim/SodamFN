@@ -120,3 +120,9 @@
 | 2026-07-04 | 쿠팡 orders/settlements Akamai 403(인증은 됨) | _common_headers에 sec-fetch-site/mode/dest 누락→민감 endpoint만 차단, whoami/balance는 통과 | sec-fetch-* + sec-ch-ua Client Hints 추가, 라이브 baseline403→200 검증 | SodamApp/backend/services/coupang_eats_service.py |
 | 2026-07-04 | 쿠팡 6월 주문 과소수집(100건 vs 실411건) | 넓은범위 pageSize=10 순식간 순회가 Akamai 버스트판정→~90건 degrade | fetch_orders_by_day 하루단위 순회+요청간격+프로브재시도, 백필청크 3일 | SodamApp/backend/services/coupang_eats_service.py, routers/coupang_eats.py, frontend/CoupangEatsModuleDetail.jsx |
 | 2026-07-04 | 매출관리 배달앱 채널값이 월마다 랜덤·요기요 매출0 | delivery-summary에 business_id 필터 없어 타사업장 가짜 추정과 혼합 + 비결정 last-write-wins | apply_bid_filter + _consolidate_delivery(결정적, 총비용 우선) | SodamApp/backend/routers/revenue.py |
+| 2026-07-04 | 쿠팡 총비용 왜곡(월 ±26만~86만) | 결제수수료 기본/프로모션 페어 2배 계상+즉시할인 미계상+미수집 상계 누락 | 총비용=(매출−정산)+광고비(별도청구) 재정의, 검증식 매출−(비용−광고)==정산 | services/coupang_eats_service.py, coupang_eats_excel_parser.py |
+| 2026-07-04 | 요기요·땡겨요 정산액 2~3배 부풀림 | 과거 CODEF+팝빌 중복적재 시대 bank_sync 누적치가 원장 정리 후 잔존 | 엑셀 정산 upsert로 교체 + 병합 정산 excel 우선 선택 | routers/revenue.py, scripts/fix_delivery_revenue_accuracy.py |
+| 2026-07-04 | 6월 비용 과대(임차료 두 달치) | 월말 임차료가 주말이면 익월 1~3일 이체 — 자동수집 경로에 발생주의 조정 없음 | 월초(1~7일)→전월말 귀속을 bank_sync·normalizer에 추가, 6행 이동 | routers/bank_sync.py, services/auto_collection_sync/normalizers/bank.py |
+| 2026-07-04 | P/L 인건비 1~3월 과소(-124만~-733만)+6월 보험·원천세 0 | Payroll 우선 정책이 실지급(가불·현금·퇴직금·미기재 이체) 미반영, 4대보험 사업주=직원공제 가정 | 실송금 우선(퇴직금 severance 분리)+4대보험·원천세=은행 실납부, 원천세 이중계상 제거 | services/profit_loss_service.py, routers/bank_sync.py |
+| 2026-07-04 | 신한카드 신형 .xlsx 업로드 XLRDError | engine='xlrd' 고정 + 신형 컬럼(거래일/매입구분) 미매핑 | 매직바이트 엔진 자동감지 + 신형 컬럼 fallback | services/purchase_parser.py |
+| 2026-07-04 | P/L vs 비용관리 화면 불일치 + 보험료 P/L 누락 | P/L=거래처분류·화면=행분류 이원화, 보험료→expense_insurance(4대보험 전용) 매핑돼 스킵 | 행 분류를 거래처 SSOT로 통일(개인가계부 표시 우선), 보험료→기타경비 재매핑 | services/profit_loss_service.py |
