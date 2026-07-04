@@ -490,8 +490,11 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
       - 세금대납 직원 (bonus_tax_support > 0): gross (공제 안 함)
       - 일반 직원: gross - 4대보험·세금 공제
 
-    퇴직금적립/4대보험/원천세 분해는 Payroll 이 있으면 Payroll 기준,
-    없으면 적립 = 인건비×10%, 보험/원천세 = 0 (은행내역만으로 분해 불가).
+    4대보험/원천세 = **은행 실납부** (사장님 공식 2026-07-04):
+      회사 총 인건비 = 실지급(net) + 4대보험 실납부총액 + 원천세 실납부.
+      직원 부담분은 실지급에서 이미 공제돼 있어 이중계상 없음.
+      (expense_insurance = 납부총액 표기, expense_insurance_employee = 0 폐기)
+    퇴직금적립 = Payroll gross×10%, Payroll 없으면 실지급×10%.
     """
     month_str = f"{year}-{month:02d}"
 
@@ -504,21 +507,28 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
 
     payrolls = session.exec(pay_stmt).all()
 
-    # ── 실송금: 은행 'labor' 출금 합 ──
+    # ── 은행 실측: 인건비 실지급 / 4대보험 실납부 / 원천세 실납부 ──
     from models import BankTransaction
-    labor_stmt = select(BankTransaction).where(
-        BankTransaction.classified_as == "labor",
-        BankTransaction.trans_date >= datetime.date(year, month, 1),
-        BankTransaction.trans_date < (
-            datetime.date(year + 1, 1, 1) if month == 12
-            else datetime.date(year, month + 1, 1)
-        ),
+    m_start = datetime.date(year, month, 1)
+    m_end = (datetime.date(year + 1, 1, 1) if month == 12
+             else datetime.date(year, month + 1, 1))
+    bank_stmt = select(BankTransaction).where(
+        BankTransaction.classified_as.in_(("labor", "insurance_payment", "withholding_tax")),
+        BankTransaction.trans_date >= m_start,
+        BankTransaction.trans_date < m_end,
     )
     if business_id is not None:
-        labor_stmt = labor_stmt.where(BankTransaction.business_id == business_id)
-    bank_labor = sum((t.out_amount or 0) for t in session.exec(labor_stmt).all())
+        bank_stmt = bank_stmt.where(BankTransaction.business_id == business_id)
+    bank_labor = insurance_paid = withholding_paid = 0
+    for t in session.exec(bank_stmt).all():
+        if t.classified_as == "labor":
+            bank_labor += t.out_amount or 0
+        elif t.classified_as == "insurance_payment":
+            insurance_paid += t.out_amount or 0
+        elif t.classified_as == "withholding_tax":
+            withholding_paid += t.out_amount or 0
 
-    if bank_labor > 0:
+    if bank_labor > 0 or insurance_paid > 0 or withholding_paid > 0:
         pl_stmt = select(MonthlyProfitLoss).where(
             MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
         if business_id is not None:
@@ -528,30 +538,24 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
         if payrolls:
             gross_sum = sum((p.base_pay or 0) + (p.bonus_holiday or 0) for p in payrolls)
             retirement = int(gross_sum * 0.1)
-            insurance = sum(
-                (p.deduction_np or 0) + (p.deduction_hi or 0) +
-                (p.deduction_lti or 0) + (p.deduction_ei or 0) for p in payrolls)
-            emp_tax = sum((p.deduction_it or 0) + (p.deduction_lit or 0) for p in payrolls)
         else:
             retirement = int(bank_labor * 0.1)
-            insurance = 0
-            emp_tax = 0
 
         if pl_record:
             pl_record.expense_labor = bank_labor
             pl_record.expense_retirement = retirement
-            pl_record.expense_insurance = insurance
-            pl_record.expense_insurance_employee = insurance
-            pl_record.expense_tax_employee = emp_tax
+            pl_record.expense_insurance = insurance_paid
+            pl_record.expense_insurance_employee = 0
+            pl_record.expense_tax_employee = withholding_paid
             session.add(pl_record)
         else:
             pl_record = MonthlyProfitLoss(
                 year=year, month=month, business_id=business_id,
                 expense_labor=bank_labor,
                 expense_retirement=retirement,
-                expense_insurance=insurance,
-                expense_insurance_employee=insurance,
-                expense_tax_employee=emp_tax,
+                expense_insurance=insurance_paid,
+                expense_insurance_employee=0,
+                expense_tax_employee=withholding_paid,
             )
             session.add(pl_record)
         session.commit()

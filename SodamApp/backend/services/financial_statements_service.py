@@ -62,8 +62,9 @@ _OUTFLOW_LINES = [
 _PL_REVENUE_FIELDS = ("revenue_store", "revenue_coupang", "revenue_baemin",
                       "revenue_yogiyo", "revenue_ddangyo")
 _PL_SGA_FIELDS = (  # 판매비와관리비 (매출원가·세금 제외 영업비용)
+    # 4대보험/원천세 = 은행 실납부 (insurance_employee 필드는 폐기 — 항상 0)
     "expense_labor", "expense_retirement", "expense_insurance",
-    "expense_insurance_employee", "expense_tax_employee",
+    "expense_tax_employee",
     "expense_material", "expense_utility", "expense_rent", "expense_repair",
     "expense_depreciation", "expense_card_fee", "expense_delivery_fee",
     "expense_other",

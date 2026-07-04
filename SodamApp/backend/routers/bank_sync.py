@@ -1120,6 +1120,7 @@ def _materialize_link(service: DatabaseService, tx: BankTransaction) -> None:
         "purchase": "매입",
         "expense": "기타비용",
         "tax_payment": "세금과공과",
+        "withholding_tax": "원천세납부",   # 인건비 성격 — P/L 원천세(납부) 행이 집계 (세금과공과 제외)
         "rent": "임대료",
         "labor": "인건비",
     }
@@ -1427,7 +1428,16 @@ INSURANCE_PAYMENT_KEYWORDS = [
     "국민건강보험", "건강보험공단", "국민연금", "연금공단", "고용보험",
     "산재보험", "근로복지공단", "장기요양", "4대보험", "사회보험",
 ]
+# 원천세(직원 근로·사업소득 원천징수 + 지방소득세 특별징수) — 인건비 성격.
+# 매월 10일경 납부되는 '국세_소담김밥'(원천징수 자동납부 표기) + '서울특징'
+# (서울특별시 지방소득세 특별징수) 페어. 부가세·종합소득세 등 일반 세금과
+# 구분해 손익 인건비 섹션 '원천세(납부)' 로 집계 (사장님 확인 2026-07-04).
+WITHHOLDING_TAX_KEYWORDS = [
+    "국세_소담김밥", "서울특징", "서울특지방소",
+]
 # 세금/공과금 — 관할 관청 + 세목.
+# (사장님 확인 2026-07-04: 국세 납부엔 부가세 + 대표 개인 연말정산 소득세 포함
+#  — 둘 다 영업이익 아래 '세금' 섹션 귀속)
 TAX_PAYMENT_KEYWORDS = [
     "세무서", "구청", "시청", "군청", "국세청", "지방소득세", "부가세",
     "부가가치세", "원천세", "법인세", "종합소득세", "주민세", "재산세",
@@ -1688,6 +1698,8 @@ def _classify_one_tx(
     if tx.out_amount > 0:
         if any(k in remark for k in INSURANCE_PAYMENT_KEYWORDS):
             return "insurance_payment"
+        if any(k in remark for k in WITHHOLDING_TAX_KEYWORDS):
+            return "withholding_tax"
         if any(k in remark for k in TAX_PAYMENT_KEYWORDS):
             return "tax_payment"
         if any(k in remark for k in RENT_KEYWORDS):
