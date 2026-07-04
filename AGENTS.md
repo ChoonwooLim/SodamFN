@@ -348,36 +348,76 @@ UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니�
 <claude-mem-context>
 # Memory Context
 
-# [SodamFN] recent context, 2026-06-30 1:37pm GMT+9
+# [SodamFN] recent context, 2026-07-04 9:25am GMT+9
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 13 obs (6,591t read) | 473,222t work | 99% savings
+Stats: 50 obs (22,616t read) | 350,266t work | 94% savings
 
 ### Jun 30, 2026
-S25 Bank transaction classification enhancement & labor cost auto-sync from BankTransaction to P&L (Jun 30, 12:11 PM)
-S24 Session startup and project context initialization for SodamFN (restaurant management platform) (Jun 30, 12:11 PM)
-107 12:16p 🔵 Bank Transaction Classification & P/L Labor Cost Architecture Discovered
-S26 Bank transaction classification enhancement (세부분류) + labor cost auto-sync from BankTransaction to P&L system (Jun 30, 12:17 PM)
-S27 Comprehensive backend + frontend investigation for bank transaction classification enhancement and labor cost auto-sync feature design (Jun 30, 12:19 PM)
-S28 Full-stack investigation of bank transaction classification system architecture for design phase planning (Jun 30, 12:19 PM)
 S29 Code review and verification of bank transaction classification + P/L labor cost fallback feature implementation before commit (Jun 30, 12:20 PM)
-113 12:24p 🔴 Test fixtures missing hourly_wage field causing NOT NULL constraint violation
-114 " 🔵 Sed-based fixture patch failed to resolve hourly_wage constraint violation
-115 12:25p 🔵 Cascading NOT NULL constraint violations in test fixtures revealed
-116 " 🔴 Test fixtures patched with required Staff model fields
-117 " 🔵 Full test suite status: 272 passing, 15 failing (labor classification tests passing)
-118 12:26p 🔵 Test failures confirmed pre-existing; session changes validated
-119 " 🟣 Frontend: Added withdrawal transaction classification labels for P&L precision
-120 12:31p 🔵 Test failure in revenue channel migration: test_simple_rename_no_overlap
-121 " ✅ Active branch: bank sync, profit loss service, and AI classification updates
-122 12:32p 🔵 Bank sync classification + P/L labor fallback feature undergoing comprehensive code review
 S30 Comprehensive code review and verification of bank transaction auto-classification with withdrawal subcategories + P/L labor cost supplementation from bank withdrawals when Payroll records absent (Jun 30, 12:32 PM)
 S31 Comprehensive code review and commit of bank transaction withdrawal subcategories (labor/insurance_payment/tax_payment/rent/owner_withdraw) + P/L labor cost fallback from bank withdrawals when Payroll absent (Jun 30, 12:34 PM)
-123 12:37p 🔵 SodamFN Project Architecture and Coupang Eats Integration Pattern
-124 12:38p 🔵 Coupang Eats Auto-Reconnection Architecture with Fallback Mechanisms
+S33 Session initialization and infrastructure status check for SodamFN project (Jun 30, 12:34 PM)
+### Jul 4, 2026
+S34 Session initialization and project status verification for SodamFN (셈하나) (Jul 4, 6:19 AM)
+S56 Add 2026소득분석 folder to .gitignore to protect sensitive salary and income data from version control (Jul 4, 6:29 AM)
+S72 Start session and review SodamFN project status, infrastructure health, and roadmap priorities (Jul 4, 8:21 AM)
+S73 Complete the Coupang data fix work ("쿠팡데이터 수지 수정 작업중 오류 났었어. 진현상황 체크하고 마무리 해줘") — resolve remaining code review issues and deploy to production. (Jul 4, 8:51 AM)
+323 8:55a 🔴 Async code review agent completed but API overload prevented result processing
+324 " 🔵 Code review agent output file empty or missing
+325 8:57a 🔴 Systemic failure: all 14 async agents produced empty output files
+326 " 🔵 Code review agent produced detailed comprehensive review despite empty output file
+327 " 🔵 Code review Issue #1 verified: modal error display only shows parseErr, not submission errors
+328 8:58a 🔵 Code review Issue #2 verified: 90-day backfill chunk size hardcoded, causing timeout exposure
+329 " 🔵 CookieInputModal lacks submission error state—only captures parse errors
+330 " ✅ Partial implementation of Code Review Issue #1 fix: handleSubmitCookies now returns error details
+S74 Complete Coupang data collection fix work ("쿠팡데이터 수지 수정 작업중 오류 났었어. 진현상황 체크하고 마무리 해줘") — resolve blocking code review issues, merge to main, and deploy to production. (Jul 4, 9:05 AM)
+S75 Complete Coupang cookie data collection fix and provide operational instructions for using the newly deployed cookie input UX feature. (Jul 4, 9:07 AM)
+339 9:12a 🔵 Dashboard and Settlement Endpoints Identified in Coupang Eats Router
+340 " 🔵 Coupang Eats API Endpoints and Settlement Detail URL Discovery Mechanism
+341 9:13a 🔵 Dashboard Endpoint Implementation with Error Handling
+342 " 🔵 API Request Header and Error Handling Implementation
+343 " 🔵 Production Log Analysis: Dashboard Endpoint Working, Other Endpoints Return 422
+344 " 🔵 Consistent 422 Validation Failures on Coupang Eats Endpoints
+345 9:14a 🔵 Error Handling Strategy: 422 Returned for Auth/Cookie Failures and Business Logic Errors
+346 " 🔵 Dual Authentication Modes: Auto-Login (ID/PW) vs Manual Cookies
+347 9:15a 🔵 Manual Cookies Upload: Auth Sanity Check, Optional Verification, Auto-Detection
+348 " 🔵 CoupangEatsClient: curl_cffi Browser Fingerprinting with Cookie Bidirectional Conversion
+349 " 🔵 Cookie Storage: Encryption, Expiry Tracking, and Automatic Serialization
+350 9:16a ⚖️ Created Cookie State Diagnostic Script for Database Inspection
+351 " 🔵 Root Cause Found: Credential Status "failed" with Expired Akamai Cookie (_abck)
+352 " 🔵 Windows sandbox access denied for .codex plugin cache reads
+353 9:17a 🔵 Windows sandbox blocks file reads to project skill directories with deny ACLs
+354 " 🔵 SodamFN project session initialization workflow and database schema discovered
+355 " 🔵 Status="failed" Flag Set by _record_failure() But Never Checked Before Operations
+356 " 🔵 Project audit skill defines systematic quality review across 5 technical dimensions
+357 " 🔵 Frontend design skill enforces context gathering protocol before any design work
+358 9:18a 🔵 earliest_cookie_expiry() Finds Minimum Expiry; Mixed-Validity Cookies Cause Auth Failures
+359 " 🔵 Project design context and accessibility standards established in .impeccable.md
+361 " 🔵 Backend infrastructure integrations and external service dependencies mapped
+362 9:19a 🔵 Windows Korean locale encoding incompatibility blocks DevWorkLog queries
+364 " ✅ Added Cookie Merge Logic with Poison Detection Tests
+363 " 🔵 Comprehensive architectural documentation and recent operational progress retrieved
+366 " 🔵 Uncommitted changes for Coupang Eats cookie re-entry feature with expanded test coverage
+365 " ✅ Test-Driven Fix: 4 New Tests Added and Failing (RED Phase)
+367 9:20a ✅ Implemented merge_rotated_cookies() Function with Poison Detection
+368 " 🔴 Coupang Eats cookie merge logic prevents server-side invalidation poison from corrupting stored credentials
+369 " ✅ Integrated merge_rotated_cookies() into Manual-Cookies Endpoint
+370 " 🔵 Backend and frontend security patterns follow industry standards with encrypted credentials and JWT authentication
+371 " 🔵 Cookie merge fix validated: all 13 test cases passing including poison-prevention tests
+372 " 🔵 JWT and environment configuration present; production safety concern: uvicorn reload=True in main.py
+373 9:21a 🔵 Production deployment uses gunicorn with auto-generated SECRET_KEY; uvicorn reload=True only in development
+375 " 🔵 JWT_SECRET_KEY configuration inconsistency: auth.py warns on default, tenant_filter.py silently uses default
+377 " 🔵 CORS configured with origin whitelist (good), but allow_methods and allow_headers use wildcard permissiveness
+378 9:22a 🔵 Cron schedule: well-designed staggered batch collection with dual health watch monitoring (KST)
+379 " 🔵 Frontend and staff app use Vite with React 19; concurrent dev enables full-stack testing; no frontend test suite configured
+382 " 🔵 Test suite collection partially blocked: 5 tests fail to import due to missing optional dependencies (boto3, easycodefpy)
+385 9:23a 🔵 Frontend and staff app builds complete successfully; opportunity for code-splitting to reduce chunk sizes >500kB
+387 " 🔵 Test collection failures due to uninstalled optional dependencies declared in requirements.txt
+390 " 🔵 Test suite: 298/308 pass (96.8%); 10 failures due to database state pollution and test isolation issues
 
-Access 473k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 350k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

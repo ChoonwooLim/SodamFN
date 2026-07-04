@@ -240,7 +240,8 @@ def test_response_includes_last_success_sync_date(monkeypatch):
     assert res["last_success_sync_date"] == "2026-06-21"
 
 
-def test_rotated_cookies_are_saved(monkeypatch):
+def test_rotated_cookies_are_merged_not_replaced(monkeypatch):
+    """회전본은 원본에 병합 — 원본에만 있는 쿠키(bm_sz)가 유실되면 안 됨."""
     from models import CoupangEatsCredential
     from services.crypto_util import decrypt_text
     from services.coupang_eats_service import deserialize_cookies
@@ -255,5 +256,118 @@ def test_rotated_cookies_are_saved(monkeypatch):
     with Session(engine) as s:
         cred = s.exec(select(CoupangEatsCredential).where(
             CoupangEatsCredential.business_id == 1)).one()
-        stored = deserialize_cookies(decrypt_text(cred.cookies_encrypted))
-        assert stored == rotated                  # 회전본이 저장됨
+        stored = {c["name"]: c for c in
+                  deserialize_cookies(decrypt_text(cred.cookies_encrypted))}
+        assert stored["unify-token"]["value"] == "rotated-tok"   # 갱신 반영
+        assert stored["bm_sz"]["value"] == "aka"                 # 원본 유지
+
+
+# ─── 회전 쿠키 오염 방지 (2026-07-04 운영 장애 재현) ──────────
+#
+# whoami 응답의 Set-Cookie 가 _abck 를 즉시만료로 회전시키고 access-token 을
+# 빈 값으로 지움. 이를 통째로 저장하면 브라우저에서 복사한 검증된 원본이
+# 오염되어 바로 다음 sync 부터 401/403.
+
+def test_merge_rotated_cookies_drops_poison():
+    from services.coupang_eats_service import merge_rotated_cookies
+
+    now = 1_751_000_000.0
+    original = [
+        {"name": "_abck", "value": "GOOD", "domain": ".coupangeats.com",
+         "path": "/", "expires": -1},
+        {"name": "access-token", "value": "orig-at",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+        {"name": "unify-token", "value": "old-tok",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+    ]
+    rotated = [
+        # 서버가 즉시만료로 무효화한 _abck → 스킵, 원본 유지
+        {"name": "_abck", "value": "CHALLENGE", "domain": ".coupangeats.com",
+         "path": "/", "expires": now - 1},
+        # 서버가 빈 값으로 지운 access-token → 스킵, 원본 유지
+        {"name": "access-token", "value": "", "domain": ".coupangeats.com",
+         "path": "/", "expires": -1},
+        # 정상 회전된 인증 토큰 → 값 갱신
+        {"name": "unify-token", "value": "new-tok",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+        # 원본에 없던 미래 만료 쿠키 → 추가
+        {"name": "ak_bmsc", "value": "fresh", "domain": ".coupangeats.com",
+         "path": "/", "expires": now + 7200},
+    ]
+
+    merged = {c["name"]: c for c in
+              merge_rotated_cookies(original, rotated, now=now)}
+
+    assert merged["_abck"]["value"] == "GOOD"
+    assert merged["access-token"]["value"] == "orig-at"
+    assert merged["unify-token"]["value"] == "new-tok"
+    assert merged["ak_bmsc"]["value"] == "fresh"
+
+
+def test_merge_rotated_cookies_empty_original_returns_rotated():
+    from services.coupang_eats_service import merge_rotated_cookies
+
+    rotated = [{"name": "unify-token", "value": "tok",
+                "domain": ".coupangeats.com", "path": "/", "expires": -1}]
+    assert merge_rotated_cookies([], rotated) == rotated
+    assert merge_rotated_cookies(rotated, []) == rotated
+
+
+def test_earliest_expiry_ignores_akamai_infra_cookies():
+    """Akamai 회전 쿠키(2~4h TTL)가 세션 만료 추정을 오염시키면 안 됨."""
+    from services.coupang_eats_service import earliest_cookie_expiry
+
+    cookies = [
+        {"name": "ak_bmsc", "expires": 1_751_000_000},      # 곧 만료 (제외 대상)
+        {"name": "bm_sv", "expires": 1_751_000_000},
+        {"name": "_abck", "expires": 1_751_000_000},
+        {"name": "account-id", "expires": 1_753_600_000},   # 인증 쿠키 (+30일)
+        {"name": "unify-token", "expires": -1},             # 세션 쿠키
+    ]
+    result = earliest_cookie_expiry(cookies)
+    assert result == datetime.datetime.utcfromtimestamp(1_753_600_000)
+
+    # 인증 쿠키에 만료가 없으면 None → cookie_expiry.py 의 보수적 추정 폴백
+    assert earliest_cookie_expiry([
+        {"name": "bm_sz", "expires": 1_751_000_000},
+        {"name": "unify-token", "expires": -1},
+    ]) is None
+
+
+def test_registration_survives_server_side_cookie_invalidation(monkeypatch):
+    """등록 시 whoami 가 _abck 즉시만료 + access-token 삭제를 회전시켜도
+    저장본은 브라우저 원본을 유지해야 한다 (오늘 운영 장애 시나리오)."""
+    import datetime as _dt
+    from models import CoupangEatsCredential
+    from services.crypto_util import decrypt_text
+    from services.coupang_eats_service import deserialize_cookies
+
+    engine = _setup_engine(monkeypatch)
+    now = _dt.datetime.now(_dt.timezone.utc).timestamp()
+    pasted = [
+        {"name": "_abck", "value": "BROWSER-VALID",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+        {"name": "access-token", "value": "browser-at",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+        {"name": "unify-token", "value": "browser-tok",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+    ]
+    rotated = [
+        {"name": "_abck", "value": "DEAD", "domain": ".coupangeats.com",
+         "path": "/", "expires": now},            # 즉시만료 회전
+        {"name": "access-token", "value": "",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+        {"name": "unify-token", "value": "browser-tok",
+         "domain": ".coupangeats.com", "path": "/", "expires": -1},
+    ]
+    fake = _make_fake_client(stores=[], rotated=rotated)
+
+    _call(monkeypatch, fake, cookies=pasted)
+
+    with Session(engine) as s:
+        cred = s.exec(select(CoupangEatsCredential).where(
+            CoupangEatsCredential.business_id == 1)).one()
+        stored = {c["name"]: c for c in
+                  deserialize_cookies(decrypt_text(cred.cookies_encrypted))}
+        assert stored["_abck"]["value"] == "BROWSER-VALID"
+        assert stored["access-token"]["value"] == "browser-at"

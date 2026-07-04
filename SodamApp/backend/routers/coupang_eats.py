@@ -40,6 +40,7 @@ from services.coupang_eats_service import (
     serialize_cookies,
     deserialize_cookies,
     earliest_cookie_expiry,
+    merge_rotated_cookies,
     upsert_orders,
     upsert_settlements,
     upsert_revenue_from_orders,
@@ -189,15 +190,21 @@ def _last_success_sync_date(session: Session,
     return row.target_end if row else None
 
 
-def _persist_client_cookies(business_id: int, client: CoupangEatsClient) -> None:
-    """성공한 API 호출 뒤 서버가 회전/연장한 쿠키를 DB에 보존."""
+def _persist_client_cookies(business_id: int, client: CoupangEatsClient,
+                            base_cookies: Optional[list[dict]] = None) -> None:
+    """성공한 API 호출 뒤 서버가 회전/연장한 쿠키를 원본에 병합해 DB에 보존.
+
+    base_cookies(호출 전 로드했던 원본)에 회전본을 선별 병합한다 —
+    통째 교체하면 서버가 무효화시킨 _abck/빈 access-token 이 원본을 오염.
+    """
     try:
-        cookies = client.get_cookies()
+        snapshot = client.get_cookies()
     except Exception as e:  # noqa: BLE001
         log.warning("coupang cookie snapshot failed bid=%s: %s", business_id, e)
         return
-    if not cookies:
+    if not snapshot:
         return
+    cookies = merge_rotated_cookies(base_cookies or [], snapshot)
 
     with Session(engine) as s:
         cred = s.exec(
@@ -288,7 +295,7 @@ def _execute_with_refresh(business_id: int,
         client = CoupangEatsClient(cookies)
         try:
             result = action(client)
-            _persist_client_cookies(business_id, client)
+            _persist_client_cookies(business_id, client, base_cookies=cookies)
             return result, auth_refreshed
         except CookieInvalidError as e:
             client.close()
@@ -503,10 +510,12 @@ def submit_manual_cookies(
             if not save_store_id and len(stores_out) == 1:
                 save_store_id = stores_out[0]["store_id"]
                 save_shop_name = save_shop_name or stores_out[0]["store_name"]
-            # whoami 중 서버가 회전시킨 쿠키가 있으면 최신본 저장
+            # whoami 중 서버가 회전시킨 쿠키를 원본에 선별 병합.
+            # 통째 교체 금지 — 서버가 _abck 즉시만료/access-token 삭제를
+            # 회전시켜 원본을 오염시킴 (2026-07-04 장애)
             rotated = client.get_cookies()
             if rotated:
-                cookies_to_save = rotated
+                cookies_to_save = merge_rotated_cookies(body.cookies, rotated)
         except CookieInvalidError as e:
             # CoupangEatsError 의 서브클래스 — 반드시 먼저 catch
             raise HTTPException(

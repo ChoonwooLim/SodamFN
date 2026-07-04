@@ -166,6 +166,9 @@ export default function CoupangEatsModuleDetail() {
             } else {
                 showMsg(`쿠키 ${cookies.length}개 등록 (검증 보류 — 아래 경고 확인)`);
             }
+            // 등록 전 죽은 쿠키로 조회된 정산 위젯의 스테일 401/403 표시 제거
+            fetchAll();
+            fetchDashboard();
             return { ok: true };
         } catch (e) {
             const detail = e.response?.data?.detail || e.message;

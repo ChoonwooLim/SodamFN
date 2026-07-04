@@ -28,6 +28,7 @@ import base64
 import datetime
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -104,14 +105,22 @@ def deserialize_cookies(blob: str) -> list[dict]:
         return []
 
 
+# Akamai 봇 탐지 인프라 쿠키 — 요청마다 짧은 TTL(2~4h)로 회전되므로
+# 세션 수명 추정에 포함하면 "만료 임박" 오경보가 난다.
+_AKAMAI_INFRA_COOKIE_RE = re.compile(r"^(_abck|ak_bmsc|bm_\w+)$", re.IGNORECASE)
+
+
 def earliest_cookie_expiry(cookies: list[dict]) -> Optional[datetime.datetime]:
     """쿠키 list 에서 가장 빠른 만료 시간 반환 (UTC).
 
     Playwright cookie 형식: {expires: float (epoch seconds, -1 = session)}.
     Chrome DevTools 형식: 동일.
+    Akamai 인프라 쿠키(_abck/ak_bmsc/bm_*)는 제외 — 인증 세션 수명과 무관.
     """
     candidates: list[float] = []
     for c in cookies:
+        if _AKAMAI_INFRA_COOKIE_RE.match(c.get("name") or ""):
+            continue
         exp = c.get("expires")
         if exp is None or exp == -1:
             continue
@@ -126,6 +135,51 @@ def earliest_cookie_expiry(cookies: list[dict]) -> Optional[datetime.datetime]:
         return datetime.datetime.utcfromtimestamp(earliest)
     except (OSError, OverflowError, ValueError):
         return None
+
+
+def merge_rotated_cookies(original: list[dict], rotated: list[dict],
+                          *, now: Optional[float] = None) -> list[dict]:
+    """서버가 회전시킨 쿠키를 원본 쿠키에 선별 병합.
+
+    회전본을 통째로 저장하면 안 된다 (2026-07-04 운영 장애 실증):
+    whoami 응답의 Set-Cookie 가 Akamai `_abck` 를 즉시만료 값으로 회전시키고
+    `access-token` 을 빈 값으로 지운다. 이를 그대로 저장하면 브라우저에서
+    복사한 검증된 원본이 오염되어 바로 다음 호출부터 401/403 이 난다.
+
+    규칙:
+      - 빈 값 회전(서버 삭제 지시) → 스킵, 원본 유지
+      - 이미 만료된 회전(expires <= now) → 스킵, 원본 유지
+      - 그 외 → 값/만료 갱신 (원본 domain/path 유지)
+      - 원본에 없던 이름 → 추가
+    """
+    if not original:
+        return list(rotated or [])
+    if now is None:
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    merged = [dict(c) for c in original]
+    index = {c.get("name"): i for i, c in enumerate(merged) if c.get("name")}
+    for rc in rotated or []:
+        name = rc.get("name")
+        if not name:
+            continue
+        value = rc.get("value")
+        if value is None or value == "":
+            continue
+        exp = rc.get("expires")
+        try:
+            if exp is not None and float(exp) != -1 and float(exp) <= now:
+                continue
+        except (TypeError, ValueError):
+            pass
+        if name in index:
+            cur = merged[index[name]]
+            cur["value"] = value
+            if exp is not None:
+                cur["expires"] = exp
+        else:
+            merged.append(dict(rc))
+            index[name] = len(merged) - 1
+    return merged
 
 
 # ──────────────────────────────────────────────────────────────────────────
