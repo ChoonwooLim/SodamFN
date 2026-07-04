@@ -313,6 +313,69 @@ def test_merge_rotated_cookies_empty_original_returns_rotated():
     assert merge_rotated_cookies(rotated, []) == rotated
 
 
+def test_fetch_orders_by_day_chunks_and_aggregates(monkeypatch):
+    """하루 단위 순회가 각 날짜를 개별 조회해 합산하는지 + degrade 재시도 검증."""
+    import datetime as _dt
+    from services.coupang_eats_service import CoupangEatsClient, OrderFetchResult
+
+    client = CoupangEatsClient(COOKIES)
+    try:
+        # 날짜별 주문 수 (6/1=2건, 6/2=0건, 6/3=1건)
+        per_day = {
+            _dt.date(2026, 6, 1): [{"orderId": "a"}, {"orderId": "b"}],
+            _dt.date(2026, 6, 2): [],
+            _dt.date(2026, 6, 3): [{"orderId": "c"}],
+        }
+
+        def fake_fetch_orders(store_id, start, end, *, page_number=0, page_size=10):
+            day = start.date()
+            n = len(per_day.get(day, []))
+            return OrderFetchResult(0, n, 0, [], {})   # page0: 총건수 보고용
+
+        def fake_fetch_all(store_id, start, end, *, page_size=10, request_delay=0.0):
+            return list(per_day.get(start.date(), []))
+
+        monkeypatch.setattr(client, "fetch_orders", fake_fetch_orders)
+        monkeypatch.setattr(client, "fetch_all_orders", fake_fetch_all)
+
+        out = client.fetch_orders_by_day(
+            823245, _dt.date(2026, 6, 1), _dt.date(2026, 6, 3),
+            page_delay=0, day_delay=0)
+        assert [o["orderId"] for o in out] == ["a", "b", "c"]
+    finally:
+        client.close()
+
+
+def test_fetch_orders_by_day_retries_on_undercollection(monkeypatch):
+    """중간 degrade(총건수 미달) 시 1회 재시도로 완전 수집."""
+    import datetime as _dt
+    from services.coupang_eats_service import CoupangEatsClient, OrderFetchResult
+
+    client = CoupangEatsClient(COOKIES)
+    try:
+        calls = {"n": 0}
+
+        def fake_fetch_orders(store_id, start, end, *, page_number=0, page_size=10):
+            return OrderFetchResult(0, 3, 0, [], {})   # 총 3건이라 보고
+
+        def fake_fetch_all(store_id, start, end, *, page_size=10, request_delay=0.0):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return [{"orderId": "x"}]               # 1차: 3건 중 1건만 (degrade)
+            return [{"orderId": "x"}, {"orderId": "y"}, {"orderId": "z"}]  # 재시도: 완전
+
+        monkeypatch.setattr(client, "fetch_orders", fake_fetch_orders)
+        monkeypatch.setattr(client, "fetch_all_orders", fake_fetch_all)
+
+        out = client.fetch_orders_by_day(
+            823245, _dt.date(2026, 6, 1), _dt.date(2026, 6, 1),
+            page_delay=0, day_delay=0)
+        assert len(out) == 3
+        assert calls["n"] == 2                          # 재시도 발생
+    finally:
+        client.close()
+
+
 def test_common_headers_include_fetch_metadata():
     """민감 endpoint(orders/settlements) Akamai 통과에 필수인 sec-fetch-* 헤더 검증.
     2026-07-04: 이 헤더 누락으로 order/condition 이 403 Access Denied 되던 회귀 방지."""

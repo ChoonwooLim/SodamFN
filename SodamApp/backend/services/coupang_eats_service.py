@@ -29,6 +29,7 @@ import datetime
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -479,14 +480,20 @@ class CoupangEatsClient:
                          end: datetime.datetime,
                          *,
                          page_size: int = 10,
-                         max_pages: int = 500) -> list[dict]:
+                         max_pages: int = 500,
+                         request_delay: float = 0.0) -> list[dict]:
         """모든 페이지 순회 — orders list 만 평탄화.
 
         page_size 기본 10 — HAR 캡처 기준 쿠팡이츠가 큰 page_size 거부 (빈 응답).
         max_pages 안전장치 (10*500 = 5000건 한도).
+        request_delay: 페이지 요청 간 지연(초). Akamai 속도제한(버스트) 회피용 —
+          넓은 범위를 지연 없이 40+회 순식간에 쏘면 응답이 degrade 되어
+          ~90건에서 잘림. 하루 단위 조회(fetch_orders_by_day)와 병용 권장.
         """
         all_orders: list[dict] = []
         for page in range(max_pages):
+            if page > 0 and request_delay > 0:
+                time.sleep(request_delay)
             res = self.fetch_orders(store_id, start, end,
                                     page_number=page, page_size=page_size)
             log.info(
@@ -517,6 +524,65 @@ class CoupangEatsClient:
                     pass
             if total_elem > 0 and len(all_orders) >= total_elem:
                 break
+        return all_orders
+
+    def fetch_orders_by_day(self,
+                            store_id: int,
+                            start_date: datetime.date,
+                            end_date: datetime.date,
+                            *,
+                            page_size: int = 10,
+                            page_delay: float = 2.5,
+                            day_delay: float = 2.5,
+                            max_retries: int = 2) -> list[dict]:
+        """날짜 범위를 하루 단위로 쪼개 순회 — Akamai 속도제한 회피용.
+
+        order/condition 은 넓은 범위를 pageSize=10 으로 빠르게 순회하면
+        Akamai 가 버스트로 판단해 빈 응답을 반환(과소수집). 하루씩(주문 소량)
+        + 요청 간 지연을 두면 버스트가 사라져 전 주문이 완전 수집된다
+        (2026-07-04 라이브 검증).
+
+        degrade 는 두 형태로 온다:
+          (1) page0 프로브가 총건수 0 을 반환 (그 날이 통째로 빈 것처럼 보임)
+          (2) totalOrderCount 는 맞는데 페이지 순회가 중간에 끊김(미달)
+        두 경우 모두 지연을 늘려 재시도한다. 진짜 빈 날(주문 0)과 구분하기
+        위해, 프로브 0 은 재확인 후에도 0 이면 빈 날로 확정한다.
+        """
+        all_orders: list[dict] = []
+        day = start_date
+        first = True
+        while day <= end_date:
+            if not first and day_delay > 0:
+                time.sleep(day_delay)
+            first = False
+            s_dt = datetime.datetime.combine(day, datetime.time.min)
+            e_dt = datetime.datetime.combine(day, datetime.time.max)
+
+            got: list[dict] = []
+            expected = 0
+            for attempt in range(max_retries + 1):
+                if attempt > 0 and day_delay > 0:
+                    time.sleep(3.0 + attempt * 3.0)   # 재시도마다 지연 증가
+                probe = self.fetch_orders(store_id, s_dt, e_dt,
+                                          page_number=0, page_size=page_size)
+                expected = probe.total_order_count
+                if expected <= 0:
+                    # 프로브가 0 — degrade 인지 진짜 빈 날인지 재확인
+                    if attempt < max_retries:
+                        continue
+                    got = list(probe.orders)
+                    break
+                pd = page_delay + attempt * 1.5       # 재시도마다 페이지 지연 증가
+                got = self.fetch_all_orders(store_id, s_dt, e_dt,
+                                            page_size=page_size, request_delay=pd)
+                if len(got) >= expected:
+                    break
+                log.warning("fetch_orders_by_day: %s 미달 %d/%d — 재시도(%d)",
+                            day, len(got), expected, attempt + 1)
+            log.info("fetch_orders_by_day: %s expected=%d got=%d",
+                     day, expected, len(got))
+            all_orders.extend(got)
+            day += datetime.timedelta(days=1)
         return all_orders
 
     # ───── 정산 조회 ────────────────────────────────────────

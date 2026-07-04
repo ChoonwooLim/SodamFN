@@ -232,11 +232,12 @@ export default function CoupangEatsModuleDetail() {
             let totalSales = 0;
             let chunkStart = new Date(start);
             while (chunkStart <= end) {
-                // 백엔드 한도는 91일이지만, pageSize=10 순차 요청이 길어지면
-                // 프록시 타임아웃(nginx/CF)에 걸리므로 검증된 1개월 단위(30일 inclusive)로 분할
+                // 백엔드가 주문을 하루 단위로 순회(Akamai 속도제한 회피)하므로
+                // 한 청크가 길면 프록시 타임아웃 + Akamai 재차단 → 3일 단위(inclusive)로 분할.
+                // Akamai 가 약 4일치 지속 요청 후 조이므로, 대량 백필은 정식 엑셀 권장.
                 const chunkEnd = new Date(Math.min(
                     end.getTime(),
-                    chunkStart.getTime() + 29 * 24 * 3600 * 1000,
+                    chunkStart.getTime() + 2 * 24 * 3600 * 1000,
                 ));
                 const res = await api.post('/coupang-eats/sync/manual', {
                     start_date: ymdLocal(chunkStart),

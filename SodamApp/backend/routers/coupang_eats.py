@@ -1295,13 +1295,11 @@ def _run_sync(business_id: int,
         log_id = sl.id
 
     try:
-        # 1) 주문 — 호출 시점 단위 ms 범위
+        # 1) 주문 — 하루 단위로 쪼개 순회 (Akamai 속도제한 회피).
+        #    넓은 범위를 한 번에 순회하면 버스트로 ~90건에서 잘림 → 과소수집.
         if sync_orders:
-            start_dt = datetime.datetime.combine(start_date, datetime.time.min)
-            end_dt = datetime.datetime.combine(end_date, datetime.time.max)
-
             def _fetch_orders(client: CoupangEatsClient):
-                return client.fetch_all_orders(store_id, start_dt, end_dt)
+                return client.fetch_orders_by_day(store_id, start_date, end_date)
 
             (orders, refreshed) = _execute_with_refresh(business_id, _fetch_orders)
             summary["auth_refreshed"] = summary["auth_refreshed"] or refreshed
