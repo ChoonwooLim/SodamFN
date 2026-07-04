@@ -166,8 +166,12 @@ export default function CoupangEatsModuleDetail() {
             } else {
                 showMsg(`쿠키 ${cookies.length}개 등록 (검증 보류 — 아래 경고 확인)`);
             }
+            return { ok: true };
         } catch (e) {
-            showErr('쿠키 등록 실패: ' + (e.response?.data?.detail || e.message));
+            const detail = e.response?.data?.detail || e.message;
+            showErr('쿠키 등록 실패: ' + detail);
+            // 모달이 열려 있으면 페이지 배너가 오버레이에 가려지므로 모달에도 표시
+            return { ok: false, error: detail };
         }
     }
 
@@ -225,10 +229,11 @@ export default function CoupangEatsModuleDetail() {
             let totalSales = 0;
             let chunkStart = new Date(start);
             while (chunkStart <= end) {
-                // sync/manual 은 최대 91일(inclusive) — 90일 더한 날짜까지 한 청크
+                // 백엔드 한도는 91일이지만, pageSize=10 순차 요청이 길어지면
+                // 프록시 타임아웃(nginx/CF)에 걸리므로 검증된 1개월 단위(30일 inclusive)로 분할
                 const chunkEnd = new Date(Math.min(
                     end.getTime(),
-                    chunkStart.getTime() + 90 * 24 * 3600 * 1000,
+                    chunkStart.getTime() + 29 * 24 * 3600 * 1000,
                 ));
                 const res = await api.post('/coupang-eats/sync/manual', {
                     start_date: ymdLocal(chunkStart),
@@ -1085,6 +1090,7 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
     const [shopName, setShopName] = useState(initialShopName || '');
     const [parsed, setParsed] = useState(null);
     const [parseErr, setParseErr] = useState('');
+    const [submitErr, setSubmitErr] = useState('');
     const [saving, setSaving] = useState(false);
 
     function tryParse(text) {
@@ -1163,10 +1169,14 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
         e?.preventDefault();
         if (!parsed || parsed.length === 0) return;
         setSaving(true);
+        setSubmitErr('');
         try {
-            await onSave(parsed,
-                         storeId ? parseInt(storeId) : null,
-                         shopName || null);
+            const result = await onSave(parsed,
+                                        storeId ? parseInt(storeId) : null,
+                                        shopName || null);
+            if (result && result.ok === false) {
+                setSubmitErr(result.error || '쿠키 등록에 실패했습니다.');
+            }
         } finally {
             setSaving(false);
         }
@@ -1247,6 +1257,12 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                         />
                     </label>
                 </div>
+
+                {submitErr && (
+                    <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                        ⚠ 쿠키 등록 실패: {submitErr}
+                    </div>
+                )}
 
                 <div className="flex gap-2 justify-end">
                     <button
