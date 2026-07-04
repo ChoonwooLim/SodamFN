@@ -71,6 +71,22 @@ def _is_html_file(filepath: str) -> bool:
             or b'<table' in header.lower() or header.startswith(b'\r\n\r\n'))
 
 
+def _read_excel_auto(filepath: str, header=None) -> pd.DataFrame:
+    """엑셀 포맷(xls/xlsx)을 매직바이트로 판별해 알맞은 엔진으로 읽기.
+
+    카드사/은행 사이트가 같은 다운로드 메뉴에서 시기에 따라 .xls(구형 OLE2)와
+    .xlsx(zip)를 섞어 내보내고 확장자도 신뢰할 수 없어서(xlsx 내용의 .xls 등)
+    파일 내용으로 판별한다. engine 고정 시 반대 포맷에서 XLRDError 발생.
+    """
+    with open(filepath, 'rb') as f:
+        head = f.read(8)
+    if head[:4] == b'PK\x03\x04':                            # xlsx (zip)
+        return pd.read_excel(filepath, header=header, engine='openpyxl')
+    if head == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':          # xls (OLE2)
+        return pd.read_excel(filepath, header=header, engine='xlrd')
+    return pd.read_excel(filepath, header=header)             # pandas 추론
+
+
 def _normalize_date(date_str: str) -> Optional[date]:
     """Parse various Korean date formats into a date object."""
     if pd.isna(date_str) or not date_str:
@@ -202,8 +218,13 @@ def parse_samsung(filepath: str) -> List[Dict]:
 
 
 def parse_shinhan_card(filepath: str) -> List[Dict]:
-    """Parse 신한카드 이용내역 (real xls format)."""
-    df = pd.read_excel(filepath, header=None, engine='xlrd')
+    """Parse 신한카드 이용내역.
+
+    두 가지 export 포맷 지원:
+      - 구형 .xls: 이용일자 / 가맹점명 / 금액 / 취소상태 / 업종 / 승인번호
+      - 신형 .xlsx(2026-07~): 거래일 / 가맹점명 / 금액 / 매입구분(취소 표기) / 업종 / 승인번호
+    """
+    df = _read_excel_auto(filepath, header=None)
 
     # Find header row
     header_idx = 0
@@ -218,7 +239,8 @@ def parse_shinhan_card(filepath: str) -> List[Dict]:
 
     records = []
     for _, row in df.iterrows():
-        use_date = _normalize_date(row.get('이용일자'))
+        use_date = _normalize_date(row.get('이용일자') if row.get('이용일자') is not None
+                                   else row.get('거래일'))
         if not use_date:
             continue
 
@@ -232,6 +254,10 @@ def parse_shinhan_card(filepath: str) -> List[Dict]:
 
         cancel_status = str(row.get('취소상태', '')).strip()
         is_cancelled = cancel_status not in ['', 'nan', 'NaN']
+        if not is_cancelled:
+            # 신형 xlsx: 매입구분/이용구분에 '취소' 표기 (예: 취소매입, 승인취소)
+            status_text = f"{row.get('매입구분', '')}{row.get('이용구분', '')}"
+            is_cancelled = '취소' in status_text
 
         business_type = str(row.get('업종', ''))
 
@@ -359,7 +385,7 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
     - 카드대금 결제 (삼성카드, 현대카드, 롯데카드 등 — 카드 명세서로 별도 업로드)
     - 직원 급여 이체 (Staff 테이블 기반 동적 감지)
     """
-    df = pd.read_excel(filepath, header=None, engine='xlrd')
+    df = _read_excel_auto(filepath, header=None)
 
     # Find header row (contains '거래일자')
     header_idx = 0
@@ -446,11 +472,12 @@ def parse_shinhan_bank(filepath: str) -> List[Dict]:
             else:
                 d = use_date
             if d.day <= 7:  # 월초 1~7일
-                # 전월 말일로 이동
+                # 전월 말일로 이동 — 다른 레코드와 동일하게 date 객체 유지
+                # (str 로 바꾸면 타입이 섞여 정렬/중복판정이 깨짐)
                 first_of_month = d.replace(day=1)
                 last_of_prev = first_of_month - timedelta(days=1)
                 original_date = str(use_date)
-                use_date = str(last_of_prev)
+                use_date = last_of_prev
                 print(f"  [날짜조정] {vendor_name}: {original_date} → {use_date} (임차료 발생주의)")
 
         records.append({
@@ -578,10 +605,7 @@ def _parse_generic_bank(filepath: str, bank_name: str) -> List[Dict]:
     - 카드대금 결제 (삼성카드, 현대카드, 롯데카드 등 — 카드 명세서로 별도 업로드)
     - 직원 급여 이체 (Staff 테이블 기반 동적 감지)
     """
-    try:
-        df = pd.read_excel(filepath, header=None, engine='xlrd')
-    except Exception:
-        df = pd.read_excel(filepath, header=None, engine='openpyxl')
+    df = _read_excel_auto(filepath, header=None)
 
     # Find header row (contains '거래일자')
     header_idx = 0
