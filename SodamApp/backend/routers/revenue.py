@@ -376,157 +376,43 @@ def _consolidate_delivery(dr_rows, de_sales):
 @router.get("/delivery-summary")
 def get_delivery_summary(year: int = 0, _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
     """
-    Returns delivery app revenue summary.
-    Sources: DailyExpense (primary, single source of truth) + DeliveryRevenue (legacy detail).
-    Groups by year-month and provides per-channel data + monthly totals.
+    Returns delivery app revenue summary — 결정적 병합(총비용 우선).
+    매출은 DeliveryRevenue 대표 레코드(엔진 있으면), 없으면 DailyExpense.
+    정산/수수료/분해는 (채널,월) 대표 레코드 기준. `_consolidate_delivery` 참조.
     """
-    import json as json_lib
-    import calendar
-
-    # Vendor name keyword → channel mapping
-    VENDOR_TO_CHANNEL = {
-        "쿠팡": "쿠팡",
-        "배민": "배민",
-        "배달의민족": "배민",
-        "요기요": "요기요",
-        "땡겨요": "땡겨요",
-    }
-
-    def _match_channel(vendor_name: str) -> str:
-        for keyword, channel in VENDOR_TO_CHANNEL.items():
-            if keyword in (vendor_name or ""):
-                return channel
-        return None
-
-    monthly = {}
-
-    # ── 1. Aggregate from DailyExpense (primary source) ──
-    de_query = apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.category == "delivery")
+    # 1) DailyExpense delivery 매출 (fallback)
+    de_q = apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(DailyExpense.category == "delivery")
     if year > 0:
-        start = date(year, 1, 1)
-        end = date(year + 1, 1, 1)
-        de_query = de_query.where(DailyExpense.date >= start, DailyExpense.date < end)
+        de_q = de_q.where(DailyExpense.date >= date(year, 1, 1), DailyExpense.date < date(year + 1, 1, 1))
+    de_sales = {}
+    for r in session.exec(de_q).all():
+        ch = _canon_channel(r.vendor_name or "")
+        if ch in _DISPLAY_CHANNELS:
+            de_sales[(r.date.year, r.date.month, ch)] = de_sales.get((r.date.year, r.date.month, ch), 0) + (r.amount or 0)
 
-    de_records = session.exec(de_query).all()
-
-    # Group by (year, month, channel)
-    de_grouped = {}
-    for r in de_records:
-        ch = _match_channel(r.vendor_name)
-        if not ch:
-            continue
-        key = (r.date.year, r.date.month, ch)
-        de_grouped[key] = de_grouped.get(key, 0) + (r.amount or 0)
-
-    for (y, m, ch), total in de_grouped.items():
-        month_key = f"{y}-{m:02d}"
-        if month_key not in monthly:
-            monthly[month_key] = {
-                "year": y, "month": m, "channels": {},
-                "total_sales": 0, "total_fees": 0, "total_settlement": 0, "total_orders": 0,
-            }
-        mm = monthly[month_key]
-        if ch not in mm["channels"]:
-            mm["channels"][ch] = {
-                "total_sales": total,  # DailyExpense now stores gross sales
-                "total_fees": 0,
-                "settlement_amount": 0,  # Will be filled from DeliveryRevenue
-                "order_count": 0,
-                "fee_rate": 0,
-                "fee_breakdown": {},
-                "source": "daily_expense",
-            }
-            mm["total_sales"] += total
-
-    # ── 2. Merge DeliveryRevenue (has fee details) ──
-    dr_query = select(DeliveryRevenue)
+    # 2) DeliveryRevenue 로드
+    dr_q = apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid)
     if year > 0:
-        dr_query = dr_query.where(DeliveryRevenue.year == year)
-    dr_query = dr_query.order_by(DeliveryRevenue.year.desc(), DeliveryRevenue.month.desc())
+        dr_q = dr_q.where(DeliveryRevenue.year == year)
+    dr_rows = session.exec(dr_q).all()
 
-    records = session.exec(dr_query).all()
+    # 3) 결정적 병합
+    monthly_map = _consolidate_delivery(dr_rows, de_sales)
+    result = [monthly_map[k] for k in sorted(monthly_map.keys(), reverse=True)]
 
-    for r in records:
-        key = f"{r.year}-{r.month:02d}"
-        if key not in monthly:
-            monthly[key] = {
-                "year": r.year, "month": r.month, "channels": {},
-                "total_sales": 0, "total_fees": 0, "total_settlement": 0, "total_orders": 0,
-            }
-        mm = monthly[key]
-        fee_bd = {}
-        try:
-            if r.fee_breakdown:
-                fee_bd = json_lib.loads(r.fee_breakdown)
-        except:
-            pass
-
-        # 영문 + 한국어 alias 모두 화면 channel id (쿠팡/배민/요기요/땡겨요) 로 정규화.
-        # DeliveryRevenue.channel 이 '쿠팡이츠' 등 한국어 정식명으로 저장되는 케이스가 있어
-        # 화면 lookup ('쿠팡') 과 불일치하면 channel_totals 에 0 원으로 표시되는 버그 방지.
-        LEGACY_CHANNEL_MAP = {
-            "Coupang": "쿠팡", "Baemin": "배민", "Yogiyo": "요기요", "Ddangyo": "땡겨요",
-            "쿠팡이츠": "쿠팡", "쿠팡잇츠": "쿠팡", "쿠팡페이": "쿠팡",
-            "배달의민족": "배민", "우아한형제들": "배민", "음식배달": "배민",
-            "위대한상상": "요기요",
-        }
-        ch_name = LEGACY_CHANNEL_MAP.get(r.channel, r.channel)
-
-        if ch_name in mm["channels"] and mm["channels"][ch_name].get("source") == "daily_expense":
-            # Merge fee details into existing DailyExpense entry
-            existing = mm["channels"][ch_name]
-            existing["total_sales"] = r.total_sales if r.total_sales > 0 else existing["total_sales"]
-            existing["total_fees"] = r.total_fees
-            existing["settlement_amount"] = r.settlement_amount
-            existing["order_count"] = r.order_count
-            existing["fee_rate"] = round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0
-            existing["fee_breakdown"] = fee_bd
-            # Update monthly totals
-            mm["total_fees"] += r.total_fees
-            mm["total_settlement"] += r.settlement_amount
-            mm["total_orders"] += r.order_count
-            continue
-
-        mm["channels"][ch_name] = {
-            "total_sales": r.total_sales,
-            "total_fees": r.total_fees,
-            "settlement_amount": r.settlement_amount,
-            "order_count": r.order_count,
-            "fee_rate": round(r.total_fees / r.total_sales * 100, 1) if r.total_sales > 0 else 0,
-            "fee_breakdown": fee_bd,
-        }
-        mm["total_sales"] += r.total_sales
-        mm["total_fees"] += r.total_fees
-        mm["total_settlement"] += r.settlement_amount
-        mm["total_orders"] += r.order_count
-
-    # Convert to list & compute overall fee rate
-    result = []
-    for key in sorted(monthly.keys(), reverse=True):
-        m = monthly[key]
-        m["overall_fee_rate"] = round(m["total_fees"] / m["total_sales"] * 100, 1) if m["total_sales"] > 0 else 0
-        result.append(m)
-
-    # Channel summary totals across all months
+    # 4) 채널 총계
     channel_totals = {}
-    for m in monthly.values():
-        for ch, cd in m["channels"].items():
-            if ch not in channel_totals:
-                channel_totals[ch] = {"total_sales": 0, "total_fees": 0, "settlement_amount": 0, "order_count": 0}
-            ct = channel_totals[ch]
-            ct["total_sales"] += cd.get("total_sales", 0)
-            ct["total_fees"] += cd.get("total_fees", 0)
-            ct["settlement_amount"] += cd.get("settlement_amount", 0)
-            ct["order_count"] += cd.get("order_count", 0)
-
-    for ch, ct in channel_totals.items():
+    for mm in monthly_map.values():
+        for ch, cd in mm["channels"].items():
+            ct = channel_totals.setdefault(ch, {"total_sales": 0, "total_fees": 0, "settlement_amount": 0, "order_count": 0})
+            ct["total_sales"] += cd["total_sales"]
+            ct["total_fees"] += cd["total_fees"]
+            ct["settlement_amount"] += cd["settlement_amount"]
+            ct["order_count"] += cd["order_count"]
+    for ct in channel_totals.values():
         ct["fee_rate"] = round(ct["total_fees"] / ct["total_sales"] * 100, 1) if ct["total_sales"] > 0 else 0
 
-    return {
-        "monthly": result,
-        "channel_totals": channel_totals,
-        "record_count": len(result),
-    }
+    return {"monthly": result, "channel_totals": channel_totals, "record_count": len(result)}
 
 
 # ─── DELETE delivery revenue by month ───
