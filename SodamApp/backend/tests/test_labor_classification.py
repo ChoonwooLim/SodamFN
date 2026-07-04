@@ -137,8 +137,12 @@ def test_labor_fallback_when_no_payroll(session):
     assert pl.expense_labor == 510_580 + 1_801_910
 
 
-def test_payroll_takes_priority_no_double_count(session):
-    """Payroll 있으면 Payroll 우선 — 은행 labor 출금은 무시 (이중계상 방지)."""
+def test_bank_labor_takes_priority_over_payroll(session):
+    """실송금(은행 labor 출금) 우선 — 사장님 정책 확정 2026-07-04.
+
+    은행 labor 출금이 있으면 그것이 인건비(실제 나간 돈). Payroll 은 퇴직금
+    적립·보험 분해용으로만 쓰이고 인건비 본값에 더해지지 않음 (이중계상 방지).
+    """
     from services.profit_loss_service import sync_labor_cost
     session.add(Business(id=1, name="X"))
     session.add(Staff(id=1, business_id=1, name="이소윤", role="직원", hourly_wage=0, start_date=datetime.date(2026,1,1)))
@@ -153,8 +157,12 @@ def test_payroll_takes_priority_no_double_count(session):
     session.commit()
 
     total = sync_labor_cost(2026, 5, session, business_id=1)
-    # Payroll 기반(3,000,000)만 — 은행 출금 510,580 더해지지 않음
-    assert total == 3_000_000
+    # 실송금(510,580)이 인건비 — Payroll 3,000,000 이 덮어쓰지 않음
+    assert total == 510_580
+    pl = session.exec(select(MonthlyProfitLoss).where(
+        MonthlyProfitLoss.year == 2026, MonthlyProfitLoss.month == 5)).first()
+    # 퇴직금적립은 Payroll gross(3,000,000)×10% 기준
+    assert pl.expense_retirement == 300_000
 
 
 def test_no_payroll_no_bank_labor_preserves_manual(session):

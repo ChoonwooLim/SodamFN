@@ -40,7 +40,10 @@ CATEGORY_TO_PL_FIELD = {
     "수선비": "expense_repair",
     "감가상각비": "expense_depreciation",
     "세금과공과": "expense_tax",
-    "보험료": "expense_insurance",
+    # 보험료(민간 화재/배상 등)는 expense_insurance 가 아니라 기타경비로 —
+    # expense_insurance 는 4대보험(사업주) 전용 필드라 sync_all_expenses 가
+    # 건너뛰어 보험료가 P/L 에서 통째로 누락되던 버그 (2026-07-04 수정).
+    "보험료": "expense_other",
     # "인건비"는 sync_all_expenses에서 제외 — expense_labor는 급여대장/수동입력으로만 관리
     "카드수수료": "expense_card_fee",
     "배달앱수수료": "expense_delivery_fee",
@@ -115,6 +118,10 @@ def sync_all_expenses(year: int, month: int, session: Session, business_id: int 
 
     category_totals = {}
     for expense in expenses:
+        # 행이 명시적으로 개인가계부면 거래처 분류와 무관하게 사업 비용 제외
+        # (개인 표시는 행/거래처 어느 쪽에 있든 우선 — 사업비용 과대 방지)
+        if expense.category == "개인가계부":
+            continue
         category = None
         if expense.vendor_id and vendor_category_map.get(expense.vendor_id):
             category = vendor_category_map[expense.vendor_id]
@@ -374,15 +381,21 @@ def sync_summary_material_cost(year: int, month: int, session: Session, business
     session.commit()
 
 def sync_labor_cost(year: int, month: int, session: Session, business_id: int = None):
-    """Aggregate Payroll into MonthlyProfitLoss — 옵션 A (사장님 정책 2026-05-13).
+    """Aggregate labor into MonthlyProfitLoss — 옵션 A (사장님 정책 2026-05-13).
 
-    인건비 = "직원 통장에 실제 송금된 금액". 즉:
+    인건비 = "직원 통장에 실제 송금된 금액".
+
+    **실송금(은행 labor 출금) 우선 — 사장님 확정 2026-07-04**:
+      은행 'labor' 분류 출금 합이 있으면 그것이 인건비. 급여대장에 없는
+      가불·알바·현금인출 지급분까지 실제 나간 돈 전부 반영.
+      (퇴직금 실지급은 'severance' 분류 — labor 아님. 퇴직금적립 행으로
+      매월 비용화되므로 실지급을 또 넣으면 이중계상.)
+    은행 labor 가 0인 달만 Payroll(완료) 이체액 합으로 폴백:
       - 세금대납 직원 (bonus_tax_support > 0): gross (공제 안 함)
       - 일반 직원: gross - 4대보험·세금 공제
-    transfer_status == "완료" 인 Payroll 만 카운트 (미지급 직원 미반영).
 
-    세금대납액 + 4대보험·세금 (사업주 대납분) 은 별도 expense_insurance / expense_tax_employee
-    행에 표시되므로 인건비에 중복 합산하지 않음.
+    퇴직금적립/4대보험/원천세 분해는 Payroll 이 있으면 Payroll 기준,
+    없으면 적립 = 인건비×10%, 보험/원천세 = 0 (은행내역만으로 분해 불가).
     """
     month_str = f"{year}-{month:02d}"
 
@@ -395,51 +408,67 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
 
     payrolls = session.exec(pay_stmt).all()
 
-    # ── 인건비 보완 (2026-06-30 사장님 정책) ──
-    # Payroll(완료)이 한 건도 없는 달은 은행 출금 중 '직원급여(labor)' 로 분류된
-    # 금액 합계로 인건비를 채운다. Payroll 이 있으면 Payroll 이 우선(SSOT) —
-    # 은행 labor 출금을 더하지 않아 이중계상을 방지한다.
-    if not payrolls:
-        from models import BankTransaction
-        labor_stmt = select(BankTransaction).where(
-            BankTransaction.classified_as == "labor",
-            BankTransaction.trans_date >= datetime.date(year, month, 1),
-            BankTransaction.trans_date < (
-                datetime.date(year + 1, 1, 1) if month == 12
-                else datetime.date(year, month + 1, 1)
-            ),
-        )
-        if business_id is not None:
-            labor_stmt = labor_stmt.where(BankTransaction.business_id == business_id)
-        bank_labor = sum((t.out_amount or 0) for t in session.exec(labor_stmt).all())
+    # ── 실송금: 은행 'labor' 출금 합 ──
+    from models import BankTransaction
+    labor_stmt = select(BankTransaction).where(
+        BankTransaction.classified_as == "labor",
+        BankTransaction.trans_date >= datetime.date(year, month, 1),
+        BankTransaction.trans_date < (
+            datetime.date(year + 1, 1, 1) if month == 12
+            else datetime.date(year, month + 1, 1)
+        ),
+    )
+    if business_id is not None:
+        labor_stmt = labor_stmt.where(BankTransaction.business_id == business_id)
+    bank_labor = sum((t.out_amount or 0) for t in session.exec(labor_stmt).all())
 
+    if bank_labor > 0:
         pl_stmt = select(MonthlyProfitLoss).where(
             MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
         if business_id is not None:
             pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
         pl_record = session.exec(pl_stmt).first()
 
-        # 은행 labor 도 없으면(0) 수동 입력값을 0 으로 덮어쓰지 않는다 —
-        # 조회 시 자동 재집계가 사용자가 직접 넣은 인건비를 지우는 사고 방지.
-        if bank_labor == 0:
-            return (pl_record.expense_labor if pl_record else 0)
+        if payrolls:
+            gross_sum = sum((p.base_pay or 0) + (p.bonus_holiday or 0) for p in payrolls)
+            retirement = int(gross_sum * 0.1)
+            insurance = sum(
+                (p.deduction_np or 0) + (p.deduction_hi or 0) +
+                (p.deduction_lti or 0) + (p.deduction_ei or 0) for p in payrolls)
+            emp_tax = sum((p.deduction_it or 0) + (p.deduction_lit or 0) for p in payrolls)
+        else:
+            retirement = int(bank_labor * 0.1)
+            insurance = 0
+            emp_tax = 0
 
-        # 퇴직금/보험/원천세는 은행내역만으로 분해 불가 → 인건비 본값만 채우고 0.
         if pl_record:
             pl_record.expense_labor = bank_labor
-            pl_record.expense_retirement = 0
-            pl_record.expense_insurance = 0
-            pl_record.expense_insurance_employee = 0
-            pl_record.expense_tax_employee = 0
+            pl_record.expense_retirement = retirement
+            pl_record.expense_insurance = insurance
+            pl_record.expense_insurance_employee = insurance
+            pl_record.expense_tax_employee = emp_tax
             session.add(pl_record)
         else:
             pl_record = MonthlyProfitLoss(
                 year=year, month=month, business_id=business_id,
                 expense_labor=bank_labor,
+                expense_retirement=retirement,
+                expense_insurance=insurance,
+                expense_insurance_employee=insurance,
+                expense_tax_employee=emp_tax,
             )
             session.add(pl_record)
         session.commit()
         return bank_labor
+
+    # ── 은행 labor 없음 → Payroll(완료) 폴백. 둘 다 없으면 수동값 보존 ──
+    if not payrolls:
+        pl_stmt = select(MonthlyProfitLoss).where(
+            MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+        if business_id is not None:
+            pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+        pl_record = session.exec(pl_stmt).first()
+        return (pl_record.expense_labor if pl_record else 0)
 
     employee_insurance = sum(
         (p.deduction_np or 0) + (p.deduction_hi or 0) +
