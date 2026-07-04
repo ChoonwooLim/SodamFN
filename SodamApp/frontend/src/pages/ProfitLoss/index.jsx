@@ -45,6 +45,7 @@ import { EXPENSE_CATEGORIES } from '../../utils/constants';
 const MAIN_TABS = [
     { id: 'dashboard', label: '🏠 대시보드' },
     { id: 'summary', label: '📊 손익계산서' },
+    { id: 'statements', label: '📑 재무제표' },
     { id: 'expenses', label: '💰 세부지출' },
 ];
 
@@ -80,6 +81,15 @@ export default function ProfitLoss() {
 
     // Dropdown group state
     const [openDropdown, setOpenDropdown] = useState(null); // 'monthly'
+
+    // 정식 재무제표 (손익·현금흐름·재무상태표)
+    const [statements, setStatements] = useState(null);
+    useEffect(() => {
+        if (activeTab !== 'statements') return;
+        api.get(`/api/profitloss/statements?year=${year}`)
+            .then(res => setStatements(res.data))
+            .catch(() => setStatements(null));
+    }, [activeTab, year]);
 
     // Monthly expense data
     const [monthlyExpenses, setMonthlyExpenses] = useState({});
@@ -979,6 +989,153 @@ export default function ProfitLoss() {
     };
 
     // Render the summary table (existing)
+
+    // ═══════════════════════════════════════════
+    // 정식 재무제표 — 손익계산서 · 현금흐름표 · 재무상태표
+    // ═══════════════════════════════════════════
+    const renderStatements = () => {
+        if (!statements) return <div className="pl-table-card"><div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>재무제표 산출 중…</div></div>;
+        const IS = statements.income_statement || [];
+        const CF = statements.cash_flow || [];
+        const BS = statements.balance_sheet || [];
+        const activeIS = IS.filter(r => r.active);
+        const lastBS = [...BS].reverse().find(r => r.active) || {};
+        const sumIS = (k) => activeIS.reduce((s, r) => s + (r[k] || 0), 0);
+
+        const IS_ROWS = [
+            { k: 'revenue', label: '매출액' },
+            { k: 'cogs', label: '매출원가 (원재료비)' },
+            { k: 'gross_profit', label: '매출총이익', bold: true },
+            { k: 'sga', label: '판매비와관리비' },
+            { k: 'operating_profit', label: '영업이익', bold: true },
+            { k: 'non_operating', label: '영업외수익' },
+            { k: 'ordinary_profit', label: '경상이익', bold: true },
+            { k: 'tax', label: '세금 (부가세·소득세 등)' },
+            { k: 'net_profit', label: '당기순이익', bold: true },
+        ];
+
+        const FsTable = ({ title, note, children }) => (
+            <div className="pl-table-card" style={{ marginBottom: 24 }}>
+                <div className="pl-table-header">
+                    <div className="pl-table-title-group">
+                        <span className="pl-table-badge">FS</span>
+                        <span className="pl-table-title">{title} <span className="pl-table-year">{year}년</span></span>
+                    </div>
+                    {note && <span className="pl-table-meta">{note}</span>}
+                </div>
+                <div className="pl-table-scroll">
+                    <table className="pl-table">
+                        <thead>
+                            <tr>
+                                <th style={{ minWidth: 150 }}>구분</th>
+                                {MONTHS.map(m => <th key={m}>{m}월</th>)}
+                                <th>합계</th>
+                            </tr>
+                        </thead>
+                        <tbody>{children}</tbody>
+                    </table>
+                </div>
+            </div>
+        );
+
+        const FsRow = ({ label, values, total, bold, signed }) => (
+            <tr className={bold ? 'subtotal-row' : 'expense-row'}>
+                <td className="pl-item-label" style={bold ? { fontWeight: 800 } : {}}>{label}</td>
+                {values.map((v, i) => (
+                    <td key={i} className={'pl-data' + (signed && v !== null && v < 0 ? ' profit-negative' : '')}>
+                        {v === null || v === undefined ? '' : formatNumber(v)}
+                    </td>
+                ))}
+                <td className="pl-data total">{total === null || total === undefined ? '' : formatNumber(total)}</td>
+            </tr>
+        );
+
+        const cfFirst = CF.find(r => r.active) || {};
+        const cfLast = [...CF].reverse().find(r => r.active) || {};
+
+        return (
+            <>
+                <FsTable title="손익계산서" note="발생주의 · 주문 기준 매출 · 임차료 귀속조정">
+                    {IS_ROWS.map(row => (
+                        <FsRow key={row.k} label={row.label} bold={row.bold} signed
+                            values={IS.map(r => r.active ? r[row.k] : null)}
+                            total={sumIS(row.k)} />
+                    ))}
+                </FsTable>
+
+                <FsTable title="현금흐름표" note="신한은행 원장 전량 매핑 — 월말 실제 잔액과 자동 대조">
+                    <FsRow label="기초 현금" bold
+                        values={CF.map(r => r.active ? r.beginning_cash : null)}
+                        total={cfFirst.beginning_cash} />
+                    {(statements.inflow_lines || []).map(([k, label]) => (
+                        <FsRow key={k} label={'(+) ' + label}
+                            values={CF.map(r => r.active ? (r.inflows[k] || 0) : null)}
+                            total={CF.reduce((s, r) => s + (r.active ? (r.inflows[k] || 0) : 0), 0)} />
+                    ))}
+                    <FsRow label="현금 유입 합계" bold
+                        values={CF.map(r => r.active ? r.total_inflow : null)}
+                        total={CF.reduce((s, r) => s + (r.active ? r.total_inflow : 0), 0)} />
+                    {(statements.outflow_lines || []).map(([k, label]) => (
+                        <FsRow key={k} label={'(−) ' + label}
+                            values={CF.map(r => r.active ? (r.outflows[k] || 0) : null)}
+                            total={CF.reduce((s, r) => s + (r.active ? (r.outflows[k] || 0) : 0), 0)} />
+                    ))}
+                    <FsRow label="현금 유출 합계" bold
+                        values={CF.map(r => r.active ? r.total_outflow : null)}
+                        total={CF.reduce((s, r) => s + (r.active ? r.total_outflow : 0), 0)} />
+                    <FsRow label="기말 현금" bold signed
+                        values={CF.map(r => r.active ? r.ending_cash : null)}
+                        total={cfLast.ending_cash} />
+                    <tr className="expense-row">
+                        <td className="pl-item-label">통장 잔액 대조</td>
+                        {CF.map((r, i) => (
+                            <td key={i} className="pl-data" style={{ textAlign: 'center' }}>
+                                {r.active ? (r.verified ? '✅' : '⚠️') : ''}
+                            </td>
+                        ))}
+                        <td className="pl-data total" style={{ textAlign: 'center' }}>
+                            {CF.filter(r => r.active).every(r => r.verified) ? '✅ 전체 일치' : '⚠️ 확인 필요'}
+                        </td>
+                    </tr>
+                </FsTable>
+
+                <FsTable title="재무상태표 (대차대조표)" note="월말 기준 · 합계 열 = 최근 월말">
+                    <FsRow label="현금및현금성자산"
+                        values={BS.map(r => r.active ? r.cash : null)} total={lastBS.cash} />
+                    <FsRow label="매출채권 (카드 미정산)"
+                        values={BS.map(r => r.active ? r.card_receivable : null)} total={lastBS.card_receivable} />
+                    <FsRow label="자산총계" bold
+                        values={BS.map(r => r.active ? r.total_assets : null)} total={lastBS.total_assets} />
+                    <FsRow label="퇴직급여충당부채"
+                        values={BS.map(r => r.active ? r.retirement_liability : null)} total={lastBS.retirement_liability} />
+                    <FsRow label="부채총계" bold
+                        values={BS.map(r => r.active ? r.total_liabilities : null)} total={lastBS.total_liabilities} />
+                    <FsRow label="자본총계 (자산−부채)" bold signed
+                        values={BS.map(r => r.active ? r.total_equity : null)} total={lastBS.total_equity} />
+                    <FsRow label="· 기초자본 (연초 현금)"
+                        values={BS.map(r => r.active ? r.equity_detail.opening_capital : null)}
+                        total={lastBS.equity_detail ? lastBS.equity_detail.opening_capital : null} />
+                    <FsRow label="· 누적 당기순이익" signed
+                        values={BS.map(r => r.active ? r.equity_detail.cumulative_net_profit : null)}
+                        total={lastBS.equity_detail ? lastBS.equity_detail.cumulative_net_profit : null} />
+                    <FsRow label="· 사장님 순불입" signed
+                        values={BS.map(r => r.active ? r.equity_detail.owner_net_contribution : null)}
+                        total={lastBS.equity_detail ? lastBS.equity_detail.owner_net_contribution : null} />
+                    <FsRow label="· 가계 지출 (개인가계부)" signed
+                        values={BS.map(r => r.active ? r.equity_detail.personal_spending : null)}
+                        total={lastBS.equity_detail ? lastBS.equity_detail.personal_spending : null} />
+                    <FsRow label="· 조정 (현금매출 미예치·시차 등)" signed
+                        values={BS.map(r => r.active ? r.equity_detail.adjustment : null)}
+                        total={lastBS.equity_detail ? lastBS.equity_detail.adjustment : null} />
+                </FsTable>
+
+                <div className="pl-table-tip">
+                    {(statements.notes || []).map((n, i) => <div key={i}>💡 {n}</div>)}
+                </div>
+            </>
+        );
+    };
+
     const renderSummaryTable = () => {
         const yearRev = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
         const yearExp = data.reduce((s, d) => s + calcTotalExpense(d), 0);
@@ -1479,7 +1636,7 @@ export default function ProfitLoss() {
     // ═══════════════════════════════════════════
     // DESKTOP LAYOUT
     // ═══════════════════════════════════════════
-    const wideTab = activeTab === 'summary';
+    const wideTab = activeTab === 'summary' || activeTab === 'statements';
     return (
         <div className="min-h-screen bg-slate-50">
             <div className={`${wideTab ? 'max-w-screen-2xl' : 'max-w-6xl'} mx-auto px-6 pt-8 pb-32`}>
@@ -1522,6 +1679,7 @@ export default function ProfitLoss() {
                 <div className="animate-fadeIn">
                     {activeTab === 'dashboard' && renderDashboard()}
                     {activeTab === 'summary' && renderSummaryTable()}
+                    {activeTab === 'statements' && renderStatements()}
                     {activeTab === 'expenses' && renderExpenseDetail()}
                     {activeTab === 'analysis' && renderAnalysis()}
                     {activeTab.startsWith('month_') && renderMonthlyExpense(parseInt(activeTab.split('_')[1]))}

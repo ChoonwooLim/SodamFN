@@ -195,6 +195,18 @@ def get_monthly_profitloss(year: Optional[int] = None, session: Session = Depend
         })
     return output
 
+@router.get("/statements")
+def get_financial_statements(year: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
+    """정식 재무제표 3종 — 손익계산서(정식 단계)·현금흐름표·재무상태표.
+
+    조회 직전 해당 연도 P/L 을 자동 재집계해 항상 최신값 기준으로 산출.
+    현금흐름표는 은행 원장 전량 매핑 + 실제 월말 잔액 대조 검증 포함.
+    """
+    from services.financial_statements_service import build_statements
+    _recompute_pl_months(year, _months_with_data(year, session, bid), session, bid)
+    return build_statements(year, session, bid)
+
+
 @router.get("/monthly/{year}/{month}")
 def get_monthly_profitloss_single(year: int, month: int, session: Session = Depends(get_session), _admin: AuthUser = Depends(get_admin_user), bid = Depends(get_bid_from_token)):
     """Get a specific month's P/L record (조회 직전 자동 재집계)"""
