@@ -306,6 +306,18 @@ class CoupangEatsClient:
             "user-agent": self._user_agent,
             "x-request-meta": self._build_request_meta(referer),
             "x-requested-with": "XMLHttpRequest",
+            # Fetch Metadata + Client Hints — 브라우저 XHR 이 항상 붙이는 헤더.
+            # 누락 시 Akamai 가 order/condition·settlement-management-data 등
+            # 민감 endpoint 를 403 Access Denied 로 차단 (whoami/balance 는 통과).
+            # 2026-07-04 실증: 이 3개(sec-fetch-*) 추가만으로 orders 200 복구.
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-dest": "empty",
+            "sec-ch-ua": ('"Chromium";v="148", "Google Chrome";v="148", '
+                          '"Not?A_Brand";v="24"'),
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "priority": "u=1, i",
         }
         if content_type:
             h["content-type"] = content_type

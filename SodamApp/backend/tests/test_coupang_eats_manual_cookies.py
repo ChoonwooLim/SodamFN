@@ -313,6 +313,24 @@ def test_merge_rotated_cookies_empty_original_returns_rotated():
     assert merge_rotated_cookies(rotated, []) == rotated
 
 
+def test_common_headers_include_fetch_metadata():
+    """민감 endpoint(orders/settlements) Akamai 통과에 필수인 sec-fetch-* 헤더 검증.
+    2026-07-04: 이 헤더 누락으로 order/condition 이 403 Access Denied 되던 회귀 방지."""
+    from services.coupang_eats_service import CoupangEatsClient
+
+    client = CoupangEatsClient(COOKIES)
+    try:
+        h = client._common_headers("https://store.coupangeats.com/x",
+                                   content_type="application/json;charset=UTF-8")
+    finally:
+        client.close()
+    assert h["sec-fetch-site"] == "same-origin"
+    assert h["sec-fetch-mode"] == "cors"
+    assert h["sec-fetch-dest"] == "empty"
+    assert "sec-ch-ua" in h
+    assert h["content-type"] == "application/json;charset=UTF-8"
+
+
 def test_earliest_expiry_ignores_akamai_infra_cookies():
     """Akamai 회전 쿠키(2~4h TTL)가 세션 만료 추정을 오염시키면 안 됨."""
     from services.coupang_eats_service import earliest_cookie_expiry
