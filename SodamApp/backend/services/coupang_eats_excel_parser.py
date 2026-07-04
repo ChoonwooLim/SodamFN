@@ -552,7 +552,8 @@ def aggregate_by_date(orders: list[ParsedOrderFee]
         agg.order_amount += o.order_amount
         agg.payment_amount += o.payment_amount
         agg.fee_brokerage += o.brokerage_final
-        agg.fee_payment += o.payment_fee_basic + o.payment_fee_promo
+        # (기본요금, 프로모션) 페어 동일값 — 합산 시 2배 계상, 적용후 하나만
+        agg.fee_payment += o.payment_fee_promo or o.payment_fee_basic
         agg.fee_delivery += o.delivery_final
         agg.fee_advertising += o.ad_total
         agg.fee_membership += o.service_after_total

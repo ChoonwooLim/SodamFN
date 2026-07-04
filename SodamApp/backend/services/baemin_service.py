@@ -622,7 +622,7 @@ def upsert_revenue_from_orders(session: "Session", business_id: int,
 # ──────────────────────────────────────────────────────────────────────────
 
 
-def _build_fee_breakdown(detail_rows) -> dict:
+def _build_fee_breakdown(detail_rows, total_fees: int | None = None) -> dict:
     """배민 BaeminSettlementDetail rows → 수수료 9 카테고리 분해 dict.
 
     입금완료 row 만 합산. 음수는 양수로 정규화 (점주 부담 = 양수).
@@ -637,7 +637,8 @@ def _build_fee_breakdown(detail_rows) -> dict:
       - 배민클럽할인(점주): 배민클럽 할인 — 지원금 차감 후 점주 순부담분
       - 고객할인: 주문금액 즉시할인 (점주 부담)
       - 부가세: (E) 부가세
-      - 기타조정: (D) 기타 + 조정금액
+      - 기타조정: total_fees 제공 시 잔차(환불·조정·지원금 흡수, 음수=환급),
+                  미제공 시 (D) 기타 + 조정금액 (레거시)
     """
     completed = [r for r in detail_rows if (r.status or '') == '입금완료']
     if not completed:
@@ -655,10 +656,7 @@ def _build_fee_breakdown(detail_rows) -> dict:
         net_smart = abs(r.club_smart_discount or 0) - abs(r.club_smart_subsidy or 0)
         club_owner += max(net_single, 0) + max(net_smart, 0)
 
-    # 기타조정 — 부호 그대로 (음수 = 점주 부담, 양수 = 환급)
-    etc_net = sum((r.etc_amount or 0) + (r.adjustment_amount or 0) for r in completed)
-
-    return {
+    bd = {
         "중개수수료": s("brokerage_baemin1") + s("brokerage_smart") + s("brokerage_pickup"),
         "결제수수료": s("payment_fee_base") + s("payment_fee_preferred"),
         "배달비":     s("delivery_fee_single") + s("delivery_fee_smart"),
@@ -667,8 +665,16 @@ def _build_fee_breakdown(detail_rows) -> dict:
         "배민클럽할인(점주)": club_owner,
         "고객할인":   s("customer_discount"),
         "부가세":     s("vat"),
-        "기타조정":   abs(etc_net) if etc_net < 0 else 0,  # 점주 부담일 때만 표시
     }
+    if total_fees is not None:
+        # breakdown 합계 == total_fees(매출−입금) 를 항상 보장.
+        # 잔차 = 환불·조정·배민클럽 지원금 초과분 등 (음수 = 환급이 점주에게 유리)
+        bd["기타조정"] = total_fees - sum(bd.values())
+    else:
+        # 레거시 호환 — 부호 그대로 (음수 = 점주 부담, 양수 = 환급)
+        etc_net = sum((r.etc_amount or 0) + (r.adjustment_amount or 0) for r in completed)
+        bd["기타조정"] = abs(etc_net) if etc_net < 0 else 0
+    return bd
 
 
 def upsert_excel_settlement(session: "Session", business_id: int,
@@ -795,8 +801,8 @@ def upsert_excel_settlement(session: "Session", business_id: int,
     total_fees = total_sales - settlement_amount         # 총 차감액 (수수료+배달비+VAT+광고 등)
 
     # fee_breakdown — 매출관리 페이지 "수수료 구성 내역" 표시용. 9 카테고리.
-    # 입금완료 row 만 합산. 음수는 양수로 정규화 (수수료 = 점주 부담 양).
-    fee_breakdown = _build_fee_breakdown(parsed.detail_rows)
+    # total_fees 를 넘겨 breakdown 합계 == 총비용 정합을 보장 (기타조정=잔차).
+    fee_breakdown = _build_fee_breakdown(parsed.detail_rows, total_fees=total_fees)
 
     dr = session.exec(
         select(DeliveryRevenue).where(

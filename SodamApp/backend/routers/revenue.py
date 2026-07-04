@@ -327,8 +327,11 @@ def _consolidate_delivery(dr_rows, de_sales):
     """(채널,월) 별 대표 레코드를 결정적으로 선택해 월별 요약 dict 생성.
 
     대표 선택 키 = (매출>0, source_rank, total_fees, channel) 최댓값. channel
-    문자열로 tie-break 해 결정성 보장. 정산액은 그 슬롯 레코드들의
-    settlement_amount non-zero 최댓값. 매출은 대표.total_sales(>0) else de_sales.
+    문자열로 tie-break 해 결정성 보장.
+    정산액: 엑셀류(excel/auto_coupang_excel/manual) 레코드 정산액이 있으면 그
+    최댓값(정산명세서가 진실의 출처), 없으면 전체 최댓값(bank_sync 실입금 근사).
+    — bank_sync 정산액엔 과거 중복적재 시대 누적치가 남을 수 있어 명세서 우선.
+    매출은 대표.total_sales(>0) else de_sales.
     """
     slots = {}
     for r in dr_rows:
@@ -345,7 +348,10 @@ def _consolidate_delivery(dr_rows, de_sales):
             r.total_fees or 0,
             r.channel,
         ))
-        settle = max((r.settlement_amount or 0) for r in rows)
+        excel_settles = [r.settlement_amount or 0 for r in rows
+                         if r.source in ("excel", "auto_coupang_excel", "manual")
+                         and (r.settlement_amount or 0) > 0]
+        settle = max(excel_settles) if excel_settles else max((r.settlement_amount or 0) for r in rows)
         sales = best.total_sales if (best.total_sales or 0) > 0 else de_sales.get((y, m, ch), 0)
         fees = best.total_fees or 0
         try:

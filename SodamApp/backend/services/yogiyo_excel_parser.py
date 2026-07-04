@@ -97,6 +97,13 @@ def parse_xlsx(file_bytes: bytes) -> ParsedYogiyoMonth:
         if code.startswith("C-") and _to_int(val) > 0:
             result.fee_breakdown[names.get(code) or code] = _to_int(val)
 
+    # C-x 항목 중 환급(양수 표기) 등이 절댓값 처리로 과대 합산될 수 있음 —
+    # 잔차를 기타조정으로 흡수해 breakdown 합계 == C 차감금액 을 항상 보장.
+    if result.fee_breakdown:
+        resid = result.total_fees - sum(result.fee_breakdown.values())
+        if resid != 0:
+            result.fee_breakdown["기타조정"] = resid
+
     # 상세 거래내역 시트에서 주문 건수
     for ws in wb.worksheets:
         if "상세" in ws.title:

@@ -87,3 +87,27 @@ def test_endpoint_consistent_and_total_cost(monkeypatch):
     assert coupang["total_sales"] == 9_343_800    # 진짜 엑셀
     assert coupang["fee_rate"] == 58.4            # 총비용
     assert "멤버십" in coupang["fee_breakdown"]
+
+
+def test_settlement_prefers_excel_over_inflated_bank_sync():
+    """bank_sync 정산액은 과거 중복적재 누적으로 부풀 수 있음 — 엑셀(명세서) 정산 우선."""
+    from routers.revenue import _consolidate_delivery
+    rows = [
+        _dr(channel="요기요", total_sales=1_386_000, total_fees=591_029,
+            settlement_amount=794_971, source="excel", month=4),
+        _dr(channel="요기요", total_sales=0, total_fees=0,
+            settlement_amount=2_420_274, source="bank_sync", month=4),  # 3중 누적 부풀림
+    ]
+    out = _consolidate_delivery(rows, de_sales={})
+    ch = out["2026-04"]["channels"]["요기요"]
+    assert ch["settlement_amount"] == 794_971    # 명세서 정산이 진실
+
+
+def test_settlement_falls_back_to_bank_sync_when_no_excel():
+    from routers.revenue import _consolidate_delivery
+    rows = [
+        _dr(channel="요기요", total_sales=0, total_fees=0,
+            settlement_amount=590_518, source="bank_sync", month=6),
+    ]
+    out = _consolidate_delivery(rows, de_sales={})
+    assert out["2026-06"]["channels"]["요기요"]["settlement_amount"] == 590_518

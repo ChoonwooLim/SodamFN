@@ -796,22 +796,35 @@ async def upload_revenue_excel(
                     dr_year = int(period_match.group(1))
                     dr_month = int(period_match.group(2))
                     
-                    # Map channel name to DeliveryRevenue channel key
-                    CHANNEL_KEY_MAP = {"쿠팡": "Coupang", "배민": "Baemin", "배달의민족": "Baemin", "요기요": "Yogiyo", "땡겨요": "Ddangyo"}
+                    # 표준 한글 채널명으로 저장 (영문명은 레거시 가짜 추정 데이터의
+                    # 흔적 — bank_sync/서비스 파서와 같은 이름을 써야 슬롯이 하나로 병합됨)
+                    CHANNEL_KEY_MAP = {"쿠팡": "쿠팡이츠", "쿠팡이츠": "쿠팡이츠",
+                                       "배민": "배달의민족", "배달의민족": "배달의민족",
+                                       "요기요": "요기요", "땡겨요": "땡겨요"}
                     dr_channel = CHANNEL_KEY_MAP.get(channel, channel)
-                    
+                    # 과거 영문/이형 채널명 레코드도 같은 슬롯으로 흡수
+                    CHANNEL_ALIASES = {
+                        "쿠팡이츠": ["쿠팡이츠", "쿠팡", "쿠팡잇츠", "쿠팡페이", "Coupang"],
+                        "배달의민족": ["배달의민족", "배민", "우아한형제들", "Baemin"],
+                        "요기요": ["요기요", "위대한상상", "Yogiyo"],
+                        "땡겨요": ["땡겨요", "Ddangyo"],
+                    }
+                    lookup_channels = CHANNEL_ALIASES.get(dr_channel, [dr_channel])
+
                     dr_session = session
                     if True:  # was: with Session(engine) as dr_session:
                         # Upsert: check if record already exists
                         existing_dr = dr_session.exec(
                             apply_bid_filter(select(DeliveryRevenue), DeliveryRevenue, bid).where(
-                                DeliveryRevenue.channel == dr_channel,
+                                DeliveryRevenue.channel.in_(lookup_channels),
                                 DeliveryRevenue.year == dr_year,
                                 DeliveryRevenue.month == dr_month,
                             )
                         ).first()
                         
                         if existing_dr:
+                            existing_dr.channel = dr_channel   # 이형/영문명 → 표준명 정규화
+                            existing_dr.source = "excel"
                             existing_dr.total_sales = summary.get("total_sales", 0)
                             existing_dr.total_fees = summary.get("total_fees", 0)
                             existing_dr.settlement_amount = summary.get("total_amount", 0)

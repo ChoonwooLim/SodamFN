@@ -1362,7 +1362,8 @@ def update_settlements_from_fees(session, business_id: int,
         agg["order_count"] += 1
         agg["total_amount"] += f.total_amount
         agg["fee_brokerage"] += f.brokerage_final
-        agg["fee_payment"] += f.payment_fee_basic + f.payment_fee_promo
+        # (기본요금, 프로모션) 페어 동일값 — 합산 시 2배 계상, 적용후 하나만
+        agg["fee_payment"] += f.payment_fee_promo or f.payment_fee_basic
         agg["fee_delivery"] += f.delivery_final
         agg["fee_advertising"] += f.ad_total
         agg["fee_membership"] += f.service_after_total
@@ -1452,6 +1453,7 @@ def update_delivery_revenue_from_fees(session, business_id: int,
     fee_advertising = 0
     fee_membership = 0
     coupon_store = 0       # 점주 부담 쿠폰 (매출에서 빠지는 추가 부담)
+    instant_discount = 0   # 즉시할인 (배달전용+음식전용, 점주 부담)
     settle_total = 0
     order_count = 0
     cancelled_count = 0
@@ -1463,25 +1465,36 @@ def update_delivery_revenue_from_fees(session, business_id: int,
         order_count += 1
         total_sales += f.total_amount
         fee_brokerage += f.brokerage_final
-        fee_payment += f.payment_fee_basic + f.payment_fee_promo
+        # 결제대행 수수료는 (기본요금, 프로모션[적용후]) 페어가 같은 값 —
+        # 합산하면 2배 계상 (2026-01 전 777행 동일값 확인). 적용후 하나만.
+        fee_payment += f.payment_fee_promo or f.payment_fee_basic
         fee_delivery += f.delivery_final
         fee_advertising += f.ad_total
         fee_membership += f.service_after_total
         coupon_store += f.coupon_store
+        instant_discount += (f.delivery_only or 0) + (f.food_only or 0)
         settle_total += f.settle_final
 
-    # total_fees = 점주가 실제로 부담한 모든 수수료 + 점주부담 쿠폰
-    # (쿠폰 쿠팡부담은 매출 인식엔 포함되지만 점주가 부담 안 하므로 fee 에서 제외)
-    total_fees = (fee_brokerage + fee_payment + fee_delivery + fee_advertising
-                  + fee_membership + coupon_store)
+    # total_fees(총비용) = 정산에서 실제 차감된 전액 + 광고비.
+    #  - (매출 − 정산) 이 정산 차감의 진실 — 고객부담배달비 상계·프로모션 지원
+    #    등 미수집 컬럼까지 반영되므로 항목합 방식보다 정확 (배민과 동일 철학).
+    #  - 광고비는 정산 미차감(별도 청구) — 총비용=배달앱에 나간 돈 전부 원칙에
+    #    따라 더한다. 검증식: 매출 − (총비용 − 광고비) == 정산.
+    total_fees = (total_sales - settle_total) + fee_advertising
 
+    # breakdown 합계 == total_fees 보장 — 잔차(고객부담배달비 상계·프로모션
+    # 지원 등)는 기타조정으로 흡수 (음수 = 점주에게 유리한 상계).
+    itemized = (fee_brokerage + fee_payment + fee_delivery + fee_advertising
+                + fee_membership + coupon_store + instant_discount)
     fee_breakdown_json = json.dumps({
         "중개수수료": fee_brokerage,
         "결제수수료": fee_payment,
         "배달비": fee_delivery,
-        "광고비": fee_advertising,
+        "광고비(별도청구)": fee_advertising,
         "멤버십": fee_membership,
         "쿠폰(점주부담)": coupon_store,
+        "즉시할인(점주부담)": instant_discount,
+        "기타조정": total_fees - itemized,
     }, ensure_ascii=False)
 
     # 기존 row 검색 — 한국어 alias 모두 (bank_sync 가 "쿠팡이츠" 로 저장, legacy 가 "쿠팡" 으로 저장)
