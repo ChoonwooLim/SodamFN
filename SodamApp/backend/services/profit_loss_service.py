@@ -355,13 +355,20 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
 
 
 def _monthly_depreciation(asset, year: int, month: int) -> int:
-    """해당 월의 정액 감가상각액 (상각 기간 밖이면 0)."""
-    if not asset.useful_life_months:
+    """해당 월의 정액 감가상각액 (상각 기간 밖이면 0).
+
+    마지막 상각월이 반올림 잔차를 흡수해 상각 완료 시 장부가가 정확히 0.
+    """
+    life = asset.useful_life_months
+    if not life:
         return 0
     idx = (year - asset.acquired.year) * 12 + (month - asset.acquired.month)
-    if 0 <= idx < asset.useful_life_months:
-        return int(round(asset.cost / asset.useful_life_months))
-    return 0
+    if not (0 <= idx < life):
+        return 0
+    per = int(round(asset.cost / life))
+    if idx == life - 1:
+        return asset.cost - per * (life - 1)
+    return per
 
 
 def sync_depreciation_to_pl(year: int, month: int, session: Session, business_id: int = None):

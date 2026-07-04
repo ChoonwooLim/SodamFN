@@ -31,7 +31,10 @@ def _asset_book_values(assets, as_of: datetime.date):
         cost_total += a.cost
         elapsed = (as_of.year - a.acquired.year) * 12 + (as_of.month - a.acquired.month) + 1
         elapsed = max(0, min(elapsed, a.useful_life_months))
-        accum += int(round(a.cost / a.useful_life_months)) * elapsed
+        if elapsed >= a.useful_life_months:
+            accum += a.cost           # 상각 완료 — 마지막 달이 잔차 흡수, 장부가 0
+        else:
+            accum += int(round(a.cost / a.useful_life_months)) * elapsed
     return deposit, cost_total, min(accum, cost_total), cost_total - min(accum, cost_total)
 
 # 현금흐름표 라인 매핑 — classified_as 전량 커버 (누락 시 '기타' 로 수집해
