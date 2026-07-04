@@ -145,3 +145,6 @@
 | 2026-06-23 | 상품관리 매장별 전환 — MenuItem 모델·/api/menu-items CRUD·기본메뉴 시드·이미지 업로드 | feat(product) | SodamApp/backend/models.py, routers/menu_items.py, services/default_menu.py, frontend RecipeBook/MenuBoard |
 | 2026-06-23 | 대시보드 전달/다음달 이동 버튼 | feat(dashboard) | SodamApp/frontend/src/pages/Dashboard.jsx |
 | 2026-07-04 | 수집 건강도 알림 텔레그램 사장님 승격 (SMS·텔레그램 동일 한국어 문구) + 봇 @semhana_alert_bot 연결 | feat(collection-health) | SodamApp/backend/services/collection_health.py, telegram_service.py |
+| 2026-07-04 | 쿠팡이츠 쿠키 재입력 UX (라이브 검증·cURL 붙여넣기·매장 자동감지·공백 원클릭 백필) | feat(coupang) | SodamApp/backend/routers/coupang_eats.py, frontend/CoupangEatsModuleDetail.jsx |
+| 2026-07-04 | 월별 매출내역서 엑셀 자동적재 cron(매월6일)+요기요·땡겨요 정산내역 엑셀 파서 | feat(revenue) | SodamApp/backend/services/yogiyo_excel_parser.py, ddangyo_excel_parser.py, /home/stevenlim/coupang-excel-cron.sh |
+| 2026-07-04 | 배달앱 매출 결정적 병합(총비용 우선)+business_id 필터 — 채널값 일관화 | feat(revenue) | SodamApp/backend/routers/revenue.py, scripts/cleanup_fake_delivery_revenue.py |

@@ -2028,3 +2028,30 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - **미완(운영)**: 쿠팡(6/21)·배민(5/14) 쿠키 만료로 수집중단 → 사장님 어드민 쿠키 재입력 필요.
 
 ---
+
+## 2026-07-04 (오후 세션)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| feat | 쿠팡이츠 쿠키 재입력 UX 완성 (라이브 검증·cURL 붙여넣기·매장 자동감지·원클릭 백필) | 완료 |
+| fix  | 쿠팡 회전 쿠키 오염 — 등록 직후 401/403 (선별 병합) | 완료 |
+| fix  | 쿠팡 orders/settlements Akamai 403 — sec-fetch 헤더 누락 | 완료 |
+| fix  | 쿠팡 6월 주문 과소수집 — Akamai 속도제한, 하루단위 순회 | 완료 |
+| infra| 월별 매출내역서 엑셀 자동적재 cron 등록 (매월 6일) | 완료 |
+| fix  | 매출관리 배달앱 화면 "알 수 없는 값" — business_id 필터 누락 + 결정적 병합 | 완료 |
+| feat | 요기요·땡겨요 정산내역 엑셀 파서 | 완료 |
+
+### 세부 내용
+
+- **쿠팡 쿠키 재입력 UX**(merge 6b2a4d51): 등록 시 whoami 라이브 검증, cURL 통째 붙여넣기, 매장 자동감지, 공백 원클릭 백필(30일 청크). 최종 리뷰 반영(422 모달내 표시).
+- **쿠팡 3연속 근본 픽스**: (1) 회전 쿠키 통째 저장이 브라우저 원본 오염→선별 병합 `merge_rotated_cookies`(26385b78). (2) `_common_headers`에 sec-fetch-* 누락→민감 endpoint 403, 헤더 추가로 orders/settlements 200 복구(0d6000c1). (3) 넓은범위 pageSize=10 버스트→Akamai가 ~90건 degrade, `fetch_orders_by_day` 하루단위+지연으로 개선(8dc17160). ⚠️ 월단위 대량백필은 Akamai 4일벽으로 API 한계 — 완전 데이터 SSOT는 정식 월엑셀.
+- **월엑셀 cron 등록**: 서버 crontab `30 3 6 * * /home/stevenlim/coupang-excel-cron.sh`(전월+전전월). 시크릿은 컨테이너 env에서 런타임 로드(평문 미보관). 스모크테스트로 5월 적재 성공(474건/934만원).
+- **매출 화면 버그 근본 수정**: `/revenue/delivery-summary`에 business_id 필터 없어 bid=1(진짜 엑셀)+bid=2(가짜 28% 추정) 혼합 비결정 표시. `_consolidate_delivery`(결정적 병합, 총비용 우선) + bid 필터로 해결. 쿠팡 매달 일관 58~69% 총비용. 파트1 배포.
+- **배달앱 매출 정의 결정 A**: 매출=주문기준(DailyExpense), 명세서는 정산기준이라 어긋남. 배민/요기요/땡겨요는 매출×명세서율. 스펙/플랜 문서화.
+- **요기요·땡겨요 파서**: 정산내역 엑셀에서 매출/총비용/정산 추출(요기요 요약 A/C/D+C-1~14, 땡겨요 A/D/E). 1~7월 실파일 검증.
+- **남음**: 파서→DeliveryRevenue 적재 + 업로드 UI + delivery-summary 결정A 통합 + 정산 대조(파트3). 스펙 `docs/superpowers/specs/2026-07-04-delivery-revenue-consolidation-reconciliation-design.md`.
+- ⚠️ **보안 유의**: `2026소득분석/` 폴더에 과거 커밋된 민감 파일(급여·매출·은행 raw)이 아직 git 추적 중. gitignore는 신규만 차단 — `git rm --cached -r` 정리 필요.
+
+---
