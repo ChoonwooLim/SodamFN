@@ -88,7 +88,7 @@ export default function ProfitLoss() {
     useEffect(() => {
         if (activeTab !== 'statements') return;
         setStmtError(false);
-        api.get(`/api/profitloss/statements?year=${year}`)
+        api.get(`/profitloss/statements?year=${year}`)
             .then(res => setStatements(res.data))
             .catch(() => { setStatements(null); setStmtError(true); });
     }, [activeTab, year, stmtRetry]);
