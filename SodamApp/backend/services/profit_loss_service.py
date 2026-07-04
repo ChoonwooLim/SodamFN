@@ -354,6 +354,48 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
     return delivery_totals
 
 
+def _monthly_depreciation(asset, year: int, month: int) -> int:
+    """해당 월의 정액 감가상각액 (상각 기간 밖이면 0)."""
+    if not asset.useful_life_months:
+        return 0
+    idx = (year - asset.acquired.year) * 12 + (month - asset.acquired.month)
+    if 0 <= idx < asset.useful_life_months:
+        return int(round(asset.cost / asset.useful_life_months))
+    return 0
+
+
+def sync_depreciation_to_pl(year: int, month: int, session: Session, business_id: int = None):
+    """감가상각비 = FixedAsset 대장 기준 정액 상각 합 (주방집기·인테리어 등).
+
+    자산 대장이 비어 있으면 기존 값 보존 (수동 입력 유지).
+    """
+    from models import FixedAsset
+    stmt = select(FixedAsset)
+    if business_id is not None:
+        stmt = stmt.where(FixedAsset.business_id == business_id)
+    assets = session.exec(stmt).all()
+
+    pl_stmt = select(MonthlyProfitLoss).where(
+        MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
+    if business_id is not None:
+        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
+    pl_record = session.exec(pl_stmt).first()
+
+    if not assets:
+        return (pl_record.expense_depreciation if pl_record else 0)
+
+    dep = sum(_monthly_depreciation(a, year, month) for a in assets)
+    if pl_record:
+        pl_record.expense_depreciation = dep
+        session.add(pl_record)
+    elif dep:
+        pl_record = MonthlyProfitLoss(year=year, month=month, business_id=business_id,
+                                      expense_depreciation=dep)
+        session.add(pl_record)
+    session.commit()
+    return dep
+
+
 def sync_card_fee_to_pl(year: int, month: int, session: Session, business_id: int = None):
     """카드수수료 = 당월 카드 승인액(CardSalesApproval) × 실효요율(CARD_FEE_RATE).
 
@@ -615,6 +657,7 @@ def recalc_all_businesses(session: Session) -> dict:
                 sync_all_expenses(yr, mo, session, biz.id)
                 sync_labor_cost(yr, mo, session, biz.id)
                 sync_card_fee_to_pl(yr, mo, session, biz.id)
+                sync_depreciation_to_pl(yr, mo, session, biz.id)
                 counts["months_recomputed"] += 1
             except Exception as e:  # noqa: BLE001
                 counts["errors"] += 1

@@ -1104,6 +1104,14 @@ export default function ProfitLoss() {
                         values={BS.map(r => r.active ? r.cash : null)} total={lastBS.cash} />
                     <FsRow label="매출채권 (카드 미정산)"
                         values={BS.map(r => r.active ? r.card_receivable : null)} total={lastBS.card_receivable} />
+                    <FsRow label="임대보증금"
+                        values={BS.map(r => r.active ? r.deposit : null)} total={lastBS.deposit} />
+                    <FsRow label="유형자산 취득원가 (집기·인테리어)"
+                        values={BS.map(r => r.active ? r.fixed_cost : null)} total={lastBS.fixed_cost} />
+                    <FsRow label="감가상각누계액" signed
+                        values={BS.map(r => r.active ? r.accum_depreciation : null)} total={lastBS.accum_depreciation} />
+                    <FsRow label="유형자산 장부가액"
+                        values={BS.map(r => r.active ? r.fixed_book : null)} total={lastBS.fixed_book} />
                     <FsRow label="자산총계" bold
                         values={BS.map(r => r.active ? r.total_assets : null)} total={lastBS.total_assets} />
                     <FsRow label="퇴직급여충당부채"

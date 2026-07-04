@@ -16,8 +16,23 @@ from collections import defaultdict
 from sqlmodel import Session, select
 
 from models import (
-    BankTransaction, CardSalesApproval, DailyExpense, MonthlyProfitLoss,
+    BankTransaction, CardSalesApproval, DailyExpense, FixedAsset, MonthlyProfitLoss,
 )
+
+
+def _asset_book_values(assets, as_of: datetime.date):
+    """as_of 시점의 (보증금 합, 상각자산 취득원가 합, 감가상각누계액, 장부가)."""
+    deposit = sum(a.cost for a in assets
+                  if not a.useful_life_months and a.acquired <= as_of)
+    cost_total = accum = 0
+    for a in assets:
+        if not a.useful_life_months or a.acquired > as_of:
+            continue
+        cost_total += a.cost
+        elapsed = (as_of.year - a.acquired.year) * 12 + (as_of.month - a.acquired.month) + 1
+        elapsed = max(0, min(elapsed, a.useful_life_months))
+        accum += int(round(a.cost / a.useful_life_months)) * elapsed
+    return deposit, cost_total, min(accum, cost_total), cost_total - min(accum, cost_total)
 
 # 현금흐름표 라인 매핑 — classified_as 전량 커버 (누락 시 '기타' 로 수집해
 # 항등식이 항상 성립하도록 한다. 숨겨지는 거래 없음.)
@@ -152,6 +167,13 @@ def build_statements(year: int, session: Session, business_id: int) -> dict:
         DailyExpense.category == "개인가계부",
         DailyExpense.date >= datetime.date(year, 1, 1),
         DailyExpense.date < datetime.date(year + 1, 1, 1))).all()
+    # 비유동자산 대장 (임대보증금·주방집기·인테리어 — 사장님 제공 2026-07-04)
+    fixed_assets = session.exec(select(FixedAsset).where(
+        FixedAsset.business_id == business_id)).all()
+    # 기초자본 = 연초 현금 + 연초 시점 비유동자산 장부가
+    ob_dep, _, _, ob_book = _asset_book_values(
+        fixed_assets, datetime.date(year - 1, 12, 31))
+    opening_capital = opening + ob_dep + ob_book
     balance_sheet = []
     for m in range(1, 13):
         _, month_end = _month_range(year, m)
@@ -165,7 +187,10 @@ def build_statements(year: int, session: Session, business_id: int) -> dict:
         dep_cum = sum((t.in_amount or 0) for t in txs
                       if t.classified_as == "card_settlement" and t.trans_date < month_end)
         card_receivable = max(0, appr_cum - dep_cum)
-        assets = cash + card_receivable
+        month_last = month_end - datetime.timedelta(days=1)
+        deposit_asset, fixed_cost, accum_dep, fixed_book = _asset_book_values(
+            fixed_assets, month_last)
+        assets = cash + card_receivable + deposit_asset + fixed_book
         # 퇴직급여충당부채 = 당해 적립 누적 − 퇴직금 실지급 누적
         retirement_cum = sum((pls[mm].expense_retirement or 0)
                              for mm in range(1, m + 1) if mm in pls)
@@ -183,15 +208,20 @@ def build_statements(year: int, session: Session, business_id: int) -> dict:
         personal_cum = sum(r.amount or 0 for r in personal_rows if r.date < month_end)
         balance_sheet.append({
             "month": m, "active": True,
-            "cash": cash, "card_receivable": card_receivable, "total_assets": assets,
+            "cash": cash, "card_receivable": card_receivable,
+            "deposit": deposit_asset,                 # 임대보증금
+            "fixed_cost": fixed_cost,                 # 유형자산 취득원가
+            "accum_depreciation": -accum_dep,         # 감가상각누계액 (음수 표기)
+            "fixed_book": fixed_book,                 # 유형자산 장부가액
+            "total_assets": assets,
             "retirement_liability": retirement_liability, "total_liabilities": liabilities,
             "total_equity": equity,
             "equity_detail": {
-                "opening_capital": opening,          # 연초 현금 = 기초 자본
+                "opening_capital": opening_capital,   # 연초 현금 + 비유동자산 장부가
                 "cumulative_net_profit": net_cum,
                 "owner_net_contribution": owner_net,
-                "personal_spending": -personal_cum,  # 사업 계좌 가계 지출 (인출 성격)
-                "adjustment": equity - opening - net_cum - owner_net + personal_cum,
+                "personal_spending": -personal_cum,   # 사업 계좌 가계 지출 (인출 성격)
+                "adjustment": equity - opening_capital - net_cum - owner_net + personal_cum,
             },
         })
 
@@ -203,9 +233,9 @@ def build_statements(year: int, session: Session, business_id: int) -> dict:
         "inflow_lines": [(k, label) for k, label, _ in _INFLOW_LINES],
         "outflow_lines": [(k, label) for k, label, _ in _OUTFLOW_LINES],
         "notes": [
-            "손익계산서: 발생주의(임차료 귀속조정·주문 기준 매출), 매출원가=원재료비.",
+            "손익계산서: 발생주의(임차료 귀속조정·주문 기준 매출), 매출원가=원재료비, 감가상각=자산대장 정액법(5년).",
             "현금흐름표: 신한은행 원장 전량 매핑 — 기초+유입−유출=기말이 실제 통장 잔액과 대조 검증됨.",
-            "재무상태표: 카드 미정산 채권 = 누적 승인−정산입금(D+2 지연분). 설비·재고·차입금은 미등록(입력 시 반영).",
-            "자본 조정 항목 = 개인 지출(사업 계좌 가계 지출)·현금매출 예입 등 손익 미반영 현금 이동.",
+            "재무상태표: 임대보증금 8,000만·주방집기 5,000만·인테리어 5,000만 (사장님 제공, 취득일 2025-06 가정). 차입금 0원 확인(사장님). 재고자산 미등록.",
+            "자본 조정 항목 = 현금매출 미예치·발생/현금 시차 등 손익 미반영 현금 이동.",
         ],
     }

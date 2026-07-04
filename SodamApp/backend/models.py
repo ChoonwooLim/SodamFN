@@ -728,6 +728,23 @@ class DeliveryRevenue(SQLModel, table=True):
     source: str = Field(default="excel", index=True)  # 'excel' | 'bank_sync' | 'manual'
 
 
+class FixedAsset(SQLModel, table=True):
+    """비유동자산 대장 — 재무상태표·감가상각비 산출용 (2026-07-04 사장님 제공).
+
+    - useful_life_months 가 None 이면 비상각 자산 (임대보증금 등)
+    - 감가상각: 정액법, acquired 월부터 useful_life_months 개월간
+    """
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: int = Field(foreign_key="business.id", index=True)
+    name: str                                    # 임대보증금 / 주방집기 / 인테리어
+    asset_type: str = Field(default="equipment", index=True)  # deposit | equipment | interior
+    cost: int = 0                                # 취득원가
+    acquired: datetime.date                      # 취득(개업)일
+    useful_life_months: Optional[int] = None     # 정액 상각 개월수 (None=비상각)
+    note: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
 class DeliveryFeeRate(SQLModel, table=True):
     """배달 채널별 수수료율 (사업장 단위, effective_from 단위로 버저닝)."""
     __table_args__ = (
