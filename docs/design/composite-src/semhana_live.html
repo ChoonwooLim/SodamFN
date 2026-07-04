@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>semhana infographic live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Noto+Sans+KR:wght@400;500;700;800;900&family=Noto+Serif+KR:wght@600;900&display=block" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F0F0EB;
+    --ink:#2E247E;
+    --ink-deep:#221473;
+    --duo-mid:#6461A7;
+    --duo-light:#A7A7CE;
+    --duo-pale:#C2C4DB;
+    --coral:#FF4B4F;
+    --coral-block:#F65340;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:1920px;height:1080px;overflow:hidden;}
+  body{
+    background:var(--paper);
+    font-family:'Noto Sans KR',sans-serif;
+    color:var(--ink);
+    position:relative;
+  }
+  .display{font-family:'Abril Fatface',serif;font-weight:400;}
+
+  /* ================= MOTION (8s master loop; every period divides 8s) ================= */
+  .hero-img{animation:heroFloat 8s ease-in-out infinite;}
+  @keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+
+  .sweep{
+    position:absolute;left:0;top:24px;width:756px;height:438px;pointer-events:none;z-index:3;
+    background:linear-gradient(100deg, rgba(255,255,255,0) 43%, rgba(255,252,242,.20) 50%, rgba(255,255,255,0) 57%);
+    background-size:300% 100%;
+    animation:sweep 8s ease-in-out infinite;
+  }
+  @keyframes sweep{0%{background-position:140% 0}55%{background-position:-40% 0}100%{background-position:-40% 0}}
+
+  .bg-ledger{animation:driftA 8s ease-in-out infinite;}
+  @keyframes driftA{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(6px) rotate(-.35deg)}}
+  .bg-coins{animation:driftB 8s ease-in-out infinite;}
+  @keyframes driftB{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+
+  .coin-wrap svg{animation:coinSway 8s ease-in-out infinite;transform-origin:50% 50%;}
+  @keyframes coinSway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2.4deg)}}
+
+  .grain{animation:grainJit 1s steps(1,end) infinite;}
+  @keyframes grainJit{
+    0%{transform:translate(0,0)}
+    12.5%{transform:translate(-1.6px,1.1px)}
+    25%{transform:translate(1.2px,-1.4px)}
+    37.5%{transform:translate(-1px,-1px)}
+    50%{transform:translate(1.5px,1.3px)}
+    62.5%{transform:translate(-1.4px,.4px)}
+    75%{transform:translate(.6px,-1.6px)}
+    87.5%{transform:translate(1px,1px)}
+    100%{transform:translate(0,0)}
+  }
+
+  .flow{animation:flowDash 4s linear infinite;}
+  @keyframes flowDash{to{stroke-dashoffset:-84px}}
+  .keystone{animation:kpulse 4s ease-in-out infinite;}
+  @keyframes kpulse{0%,100%{fill-opacity:.15}50%{fill-opacity:.4}}
+  .diag-dots circle{animation:dotp 2s ease-in-out infinite;}
+  .diag-dots circle:nth-child(2){animation-delay:-.4s}
+  .diag-dots circle:nth-child(3){animation-delay:-.8s}
+  .diag-dots circle:nth-child(4){animation-delay:-1.2s}
+  .diag-dots circle:nth-child(5){animation-delay:-1.6s}
+  @keyframes dotp{0%,100%{opacity:1}50%{opacity:.3}}
+
+  .sheetL,.sheetC,.sheetR{transform-box:fill-box;transform-origin:50% 88%;}
+  .sheetL{animation:sway 8s ease-in-out infinite;}
+  .sheetC{animation:sway 8s ease-in-out infinite;animation-delay:-2.667s;}
+  .sheetR{animation:sway 8s ease-in-out infinite;animation-delay:-5.333s;}
+  @keyframes sway{0%,100%{transform:rotate(0deg)}25%{transform:rotate(1.1deg)}75%{transform:rotate(-1.1deg)}}
+  .doc-tick{animation:tickp 4s ease-in-out infinite;}
+  @keyframes tickp{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .conn::before{
+    content:'';position:absolute;width:5px;height:5px;border-radius:50%;
+    background:var(--coral);top:-1.75px;left:0;
+    animation:packet 4s ease-in-out infinite;
+  }
+  .conn2::before{animation-delay:-2s;}
+  @keyframes packet{
+    0%{left:0;opacity:0}
+    12%{opacity:1}
+    82%{opacity:1}
+    100%{left:calc(100% - 5px);opacity:0}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;}
+  }
+
+  /* ---------- background layers ---------- */
+  .bg-tex{position:absolute;inset:0;pointer-events:none;z-index:0;}
+  .bg-tex svg{position:absolute;inset:0;}
+  .bg-ledger{position:absolute;left:-36px;top:792px;width:545px;opacity:.6;z-index:0;}
+  .bg-coins{position:absolute;right:-58px;top:412px;width:252px;opacity:.55;z-index:0;}
+
+  /* ---------- grain ---------- */
+  .grain{position:absolute;left:-6px;top:-6px;opacity:.05;mix-blend-mode:multiply;pointer-events:none;z-index:60;}
+
+  /* ---------- left column ---------- */
+  .col-left{position:absolute;left:64px;top:64px;width:396px;z-index:2;}
+  .intro-block{
+    background:var(--coral-block);
+    padding:30px 32px 28px;
+    color:var(--ink-deep);
+  }
+  .intro-block .kicker{
+    font-size:13px;font-weight:900;letter-spacing:.32em;color:var(--paper);
+    margin-bottom:12px;
+  }
+  .intro-block p{
+    font-size:14.5px;line-height:1.62;font-weight:500;color:#2A1E6E;
+  }
+  .intro-block p b{font-weight:900;}
+
+  .sec{margin-top:34px;}
+  .sec h2{
+    font-size:23px;font-weight:900;color:var(--ink);letter-spacing:-.01em;
+    margin-bottom:6px;
+  }
+  .sec .sub{
+    font-size:11.5px;font-weight:700;letter-spacing:.22em;color:var(--coral);
+    margin-bottom:14px;
+  }
+  .chan{border-top:1.5px solid var(--ink);}
+  .chan-row{
+    display:flex;align-items:baseline;justify-content:space-between;
+    padding:8.5px 2px;border-bottom:1px solid rgba(46,36,126,.28);
+  }
+  .chan-row .n{font-size:14.5px;font-weight:700;color:var(--ink);}
+  .chan-row .t{font-size:11px;font-weight:500;color:var(--duo-mid);letter-spacing:.06em;}
+  .chan-row .t em{font-style:normal;color:var(--coral);font-weight:700;}
+  .fuente{
+    margin-top:12px;font-size:10.5px;font-weight:700;color:var(--coral);
+    line-height:1.5;letter-spacing:.02em;
+  }
+  .fuente span{font-weight:500;font-style:italic;}
+
+  .coin-wrap{margin-top:26px;display:flex;align-items:center;gap:18px;}
+  .coin-cap{font-size:11.5px;line-height:1.55;font-weight:700;color:var(--ink);}
+  .coin-cap .red{color:var(--coral);display:block;font-size:10.5px;letter-spacing:.14em;margin-top:3px;font-weight:800;}
+
+  /* ---------- vertical credit ---------- */
+  .credit{
+    position:absolute;left:18px;top:640px;
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    font-size:10px;font-weight:800;letter-spacing:.34em;color:var(--ink);
+    opacity:.85;z-index:2;
+  }
+
+  /* ---------- center hero (AI artwork) ---------- */
+  .hero{position:absolute;left:500px;top:40px;width:756px;height:560px;z-index:2;}
+  .hero-img{
+    position:absolute;left:0;top:24px;width:756px;
+    -webkit-mask-image:
+      linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%),
+      linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    -webkit-mask-composite: destination-in;
+    mask-image:
+      linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%),
+      linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+    mask-composite: intersect;
+  }
+  .circle-cap{
+    position:absolute;right:30px;top:254px;font-size:10.5px;font-weight:800;
+    color:var(--ink);text-align:right;line-height:1.45;
+  }
+  .circle-cap .red{color:var(--coral);}
+  .tagline{
+    position:absolute;left:0;top:474px;width:756px;text-align:center;z-index:5;
+  }
+  .tagline .ko{
+    font-size:15px;font-weight:900;letter-spacing:.42em;color:var(--coral);
+    text-indent:.42em;
+  }
+  .tagline .en{
+    margin-top:7px;font-size:10.5px;font-weight:700;letter-spacing:.30em;
+    color:var(--ink);text-indent:.30em;
+  }
+
+  /* ---------- anatomy diagram ---------- */
+  .anatomy{position:absolute;left:500px;top:610px;width:756px;z-index:2;}
+  .anatomy h3{
+    font-size:22px;font-weight:900;color:var(--ink);margin-bottom:2px;
+  }
+  .anatomy .sub{
+    font-size:11px;font-weight:700;letter-spacing:.2em;color:var(--coral);margin-bottom:8px;
+  }
+
+  /* ---------- right column ---------- */
+  .col-right{position:absolute;left:1296px;top:64px;width:560px;z-index:2;}
+  .col-right h2{
+    font-size:23px;font-weight:900;color:var(--ink);margin-bottom:4px;
+  }
+  .col-right .sub{
+    font-size:11.5px;font-weight:700;letter-spacing:.22em;color:var(--coral);margin-bottom:16px;
+  }
+  .stats{
+    display:grid;grid-template-columns:1fr 1fr;border-top:1.5px solid var(--ink);
+  }
+  .stat{
+    padding:16px 6px 14px 2px;border-bottom:1px solid rgba(46,36,126,.28);
+  }
+  .stat:nth-child(odd){border-right:1px solid rgba(46,36,126,.28);padding-left:0;}
+  .stat:nth-child(even){padding-left:20px;}
+  .stat .v{
+    font-family:'Abril Fatface',serif;font-size:52px;line-height:1.02;color:var(--ink);
+  }
+  .stat .v em{font-style:normal;color:var(--coral);}
+  .stat .v .unit{font-family:'Noto Sans KR';font-size:20px;font-weight:900;letter-spacing:-.02em;}
+  .stat .k{margin-top:6px;font-size:12px;font-weight:700;color:var(--duo-mid);letter-spacing:.05em;}
+
+  .pay{margin-top:22px;}
+  .pay h4{font-size:16px;font-weight:900;color:var(--ink);margin-bottom:6px;}
+  .pay p{font-size:12.5px;line-height:1.62;font-weight:500;color:var(--ink);}
+  .pay p b{color:var(--coral);font-weight:800;}
+
+  .navy-block{
+    position:absolute;left:1296px;top:596px;width:560px;height:420px;
+    background:var(--ink-deep);padding:36px 38px;color:var(--paper);z-index:2;
+  }
+  .navy-block h3{
+    font-size:26px;font-weight:900;letter-spacing:-.01em;color:#F3F2EC;margin-bottom:10px;
+  }
+  .navy-block p{
+    font-size:12.5px;line-height:1.66;font-weight:400;color:var(--duo-pale);
+  }
+  .navy-block p b{color:#fff;font-weight:700;}
+  .navy-block .docs{margin-top:18px;}
+  .navy-block .cap{
+    margin-top:12px;text-align:center;font-size:11px;font-weight:700;
+    letter-spacing:.18em;color:var(--duo-light);
+  }
+
+  /* ---------- red connector hairlines ---------- */
+  .conn{position:absolute;background:var(--coral);z-index:4;}
+</style>
+</head>
+<body>
+
+<!-- ============ BACKGROUND TEXTURE ============ -->
+<div class="bg-tex">
+  <svg width="1920" height="1080" viewBox="0 0 1920 1080">
+    <g stroke="#2E247E" stroke-width="1" opacity=".07">
+      <line x1="1180" y1="52"  x2="1902" y2="52"/>
+      <line x1="1180" y1="82"  x2="1902" y2="82"/>
+      <line x1="1180" y1="112" x2="1902" y2="112"/>
+      <line x1="1180" y1="142" x2="1902" y2="142"/>
+      <line x1="1180" y1="172" x2="1902" y2="172"/>
+      <line x1="1180" y1="202" x2="1902" y2="202"/>
+      <line x1="1180" y1="232" x2="1902" y2="232"/>
+      <line x1="1655" y1="38" x2="1655" y2="246"/>
+      <line x1="1790" y1="38" x2="1790" y2="246"/>
+    </g>
+    <g fill="#2E247E" opacity=".075" font-family="'Noto Serif KR',serif">
+      <text x="1230" y="105" font-size="26" font-weight="600">合計 三,七九一,九五〇</text>
+      <text x="1230" y="165" font-size="22" font-weight="600">收入 貳阡陸百圓 · 支出 壹阡參百圓</text>
+    </g>
+    <text x="878" y="880" font-family="'Noto Serif KR',serif" font-weight="900"
+          font-size="560" fill="none" stroke="#2E247E" stroke-width="1.6" opacity=".05">셈</text>
+  </svg>
+</div>
+<img class="bg-ledger" src="crop_ledger.png" alt="">
+<img class="bg-coins" src="crop_coins_bg2.png" alt="">
+
+<!-- ============ LEFT COLUMN ============ -->
+<div class="col-left">
+  <div class="intro-block">
+    <div class="kicker">셈하나 — SEMHANA</div>
+    <p><b>셈하나</b>는 김밥가게 <b>‘소담’</b>의 주방 옆에서 태어난
+    자동 경리 시스템입니다. 배달앱 정산·POS·은행·세금으로 흩어진
+    가게의 숫자를 <b>하나의 장부</b>로 모아, 사장님이 셈이 아니라
+    장사에 집중하도록 돕습니다.</p>
+  </div>
+
+  <div class="sec">
+    <h2>자동 수집 채널</h2>
+    <div class="sub">밤사이 일곱 갈래의 숫자가 모인다</div>
+    <div class="chan">
+      <div class="chan-row"><span class="n">배달의민족</span><span class="t">배달 매출 <em>·API</em></span></div>
+      <div class="chan-row"><span class="n">쿠팡이츠</span><span class="t">배달 매출 <em>·API</em></span></div>
+      <div class="chan-row"><span class="n">요기요 · 땡겨요</span><span class="t">배달 매출 <em>·정산서</em></span></div>
+      <div class="chan-row"><span class="n">이지포스 POS</span><span class="t">홀 매출 <em>·API</em></span></div>
+      <div class="chan-row"><span class="n">신한은행</span><span class="t">입출금 <em>·팝빌</em></span></div>
+      <div class="chan-row"><span class="n">홈택스</span><span class="t">세금계산서 <em>·전자문서</em></span></div>
+    </div>
+    <div class="fuente">기준: <span>소담김밥 운영 데이터, 2026-07 현재 · 41개월 정산 이력</span></div>
+  </div>
+
+  <div class="coin-wrap">
+    <svg width="118" height="118" viewBox="0 0 118 118">
+      <defs>
+        <radialGradient id="coinG" cx="38%" cy="32%" r="80%">
+          <stop offset="0%" stop-color="#C2C4DB"/>
+          <stop offset="55%" stop-color="#9698CB"/>
+          <stop offset="100%" stop-color="#54519A"/>
+        </radialGradient>
+      </defs>
+      <circle cx="59" cy="59" r="57" fill="url(#coinG)"/>
+      <circle cx="59" cy="59" r="40" fill="none" stroke="#3D3985" stroke-width="2" opacity=".65"/>
+      <rect x="46" y="46" width="26" height="26" fill="#F0F0EB" stroke="#3D3985" stroke-width="2"/>
+      <text x="59" y="34" text-anchor="middle" font-family="'Noto Serif KR',serif" font-size="15" font-weight="900" fill="#221473">常</text>
+      <text x="59" y="98" text-anchor="middle" font-family="'Noto Serif KR',serif" font-size="15" font-weight="900" fill="#221473">通</text>
+      <text x="26" y="65" text-anchor="middle" font-family="'Noto Serif KR',serif" font-size="15" font-weight="900" fill="#221473">寶</text>
+      <text x="92" y="65" text-anchor="middle" font-family="'Noto Serif KR',serif" font-size="15" font-weight="900" fill="#221473">平</text>
+    </svg>
+    <div class="coin-cap">
+      매일 새벽 03:00,<br>사람 손 없이 수집되는 하루치 장부
+      <span class="red">CRON 03:00 · 자동 오케스트레이션</span>
+    </div>
+  </div>
+</div>
+
+<div class="credit">SEMHANA · 소담김밥 · 자동 경리 시스템 · MMXXVI</div>
+
+<!-- ============ CENTER HERO ============ -->
+<div class="hero">
+  <img class="hero-img" src="crop_abacus2.png" alt="">
+  <div class="sweep"></div>
+  <div class="circle-cap">전표 한 장까지<br><span class="red">± 1원 검산</span></div>
+  <div class="tagline">
+    <div class="ko">소상공인 자동 경리 · 회계 비서</div>
+    <div class="en">EVERY NUMBER OF YOUR STORE, IN ONE LEDGER</div>
+  </div>
+</div>
+
+<!-- ============ ANATOMY DIAGRAM ============ -->
+<div class="anatomy">
+  <h3>셈하나의 구조 — 회계의 아치</h3>
+  <div class="sub">키스톤이 빠지면 아치는 무너진다 · 분류 엔진이 빠지면 장부도 무너진다</div>
+  <svg width="756" height="340" viewBox="0 0 756 340" style="overflow:visible">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L7,3 L0,6 z" fill="#FF4B4F"/>
+      </marker>
+    </defs>
+    <g stroke="#FF4B4F" fill="none" stroke-width="2">
+      <line x1="150" y1="308" x2="606" y2="308" stroke-width="2.5"/>
+      <rect x="176" y="30" width="404" height="18"/>
+      <line x1="176" y1="39" x2="580" y2="39" stroke-width="1" opacity=".6"/>
+      <rect x="216" y="196" width="64" height="112"/>
+      <rect x="476" y="196" width="64" height="112"/>
+      <g stroke-width="1.4">
+        <line x1="216" y1="224" x2="280" y2="224"/><line x1="248" y1="196" x2="248" y2="224"/>
+        <line x1="216" y1="252" x2="280" y2="252"/><line x1="232" y1="224" x2="232" y2="252"/><line x1="264" y1="224" x2="264" y2="252"/>
+        <line x1="216" y1="280" x2="280" y2="280"/><line x1="248" y1="252" x2="248" y2="280"/>
+        <line x1="232" y1="280" x2="232" y2="308"/><line x1="264" y1="280" x2="264" y2="308"/>
+        <line x1="476" y1="224" x2="540" y2="224"/><line x1="508" y1="196" x2="508" y2="224"/>
+        <line x1="476" y1="252" x2="540" y2="252"/><line x1="492" y1="224" x2="492" y2="252"/><line x1="524" y1="224" x2="524" y2="252"/>
+        <line x1="476" y1="280" x2="540" y2="280"/><line x1="508" y1="252" x2="508" y2="280"/>
+        <line x1="492" y1="280" x2="492" y2="308"/><line x1="524" y1="280" x2="524" y2="308"/>
+      </g>
+      <rect x="208" y="182" width="80" height="14"/>
+      <rect x="468" y="182" width="80" height="14"/>
+      <g stroke-width="2">
+        <path d="M 280 196 A 98 98 0 0 1 476 196" />
+        <path d="M 236 196 A 142 142 0 0 1 520 196" />
+        <line x1="285.9" y1="162.5" x2="244.6" y2="147.4"/>
+        <line x1="302.8" y1="132.9" x2="269.1" y2="104.8"/>
+        <line x1="328.7" y1="110.9" x2="306.6" y2="72.6"/>
+        <line x1="361.0" y1="99.5"  x2="353.3" y2="56.2"/>
+        <line x1="395.0" y1="99.5"  x2="402.7" y2="56.2"/>
+        <line x1="427.3" y1="110.9" x2="449.4" y2="72.6"/>
+        <line x1="453.2" y1="132.9" x2="486.9" y2="104.8"/>
+        <line x1="470.1" y1="162.5" x2="511.4" y2="147.4"/>
+      </g>
+      <path class="keystone" d="M 361.0 99.5 L 353.3 56.2 A 142 142 0 0 1 402.7 56.2 L 395.0 99.5 A 98 98 0 0 0 361.0 99.5 Z"
+            fill="#FF4B4F" fill-opacity=".2" stroke-width="3"/>
+      <line x1="286" y1="292" x2="470" y2="292" stroke-width="1.6" marker-start="url(#arr)" marker-end="url(#arr)"/>
+    </g>
+
+    <!-- data pulse flowing through the arch -->
+    <path class="flow" d="M 248 312 L 248 200 L 280 196 A 110 110 0 0 1 476 196 L 508 200 L 508 312"
+          fill="none" stroke="#FF4B4F" stroke-width="2.5" stroke-linecap="round"
+          opacity=".45" stroke-dasharray="10 32"/>
+
+    <g stroke="#FF4B4F" stroke-width="1.2">
+      <line x1="378" y1="52"  x2="378" y2="22"/><line x1="378" y1="22" x2="586" y2="22"/>
+      <line x1="262" y1="120" x2="140" y2="120"/>
+      <line x1="248" y1="250" x2="140" y2="250"/>
+      <line x1="508" y1="250" x2="616" y2="250"/>
+      <line x1="580" y1="39"  x2="616" y2="60"/><line x1="616" y1="60" x2="640" y2="60"/>
+      <line x1="378" y1="292" x2="378" y2="318"/>
+    </g>
+    <g class="diag-dots" fill="#FF4B4F">
+      <circle cx="378" cy="52" r="2.6"/><circle cx="262" cy="120" r="2.6"/>
+      <circle cx="248" cy="250" r="2.6"/><circle cx="508" cy="250" r="2.6"/>
+      <circle cx="580" cy="39" r="2.6"/>
+    </g>
+    <g font-family="'Noto Sans KR'" fill="#2E247E">
+      <text x="592" y="19" font-size="13.5" font-weight="800">키스톤 — 자동 분류 엔진</text>
+      <text x="592" y="35" font-size="10.5" font-weight="500" fill="#6461A7">거래처·키워드 우선순위 분류</text>
+      <text x="134" y="112" font-size="13.5" font-weight="800" text-anchor="end">홍예석 — 거래 데이터</text>
+      <text x="134" y="127" font-size="10.5" font-weight="500" fill="#6461A7" text-anchor="end">하루 300여 건, 블록처럼 쌓인다</text>
+      <text x="134" y="243" font-size="13.5" font-weight="800" text-anchor="end">왼쪽 기둥 — 매출 수집</text>
+      <text x="134" y="258" font-size="10.5" font-weight="500" fill="#6461A7" text-anchor="end">배달앱 4채널 · POS 홀매출</text>
+      <text x="622" y="243" font-size="13.5" font-weight="800">오른쪽 기둥 — 지출 수집</text>
+      <text x="622" y="258" font-size="10.5" font-weight="500" fill="#6461A7">은행·카드·세금·급여</text>
+      <text x="646" y="64" font-size="13.5" font-weight="800">상판 — 재무 3표</text>
+      <text x="646" y="79" font-size="10.5" font-weight="500" fill="#6461A7">아치가 떠받치는 최종 산출물</text>
+      <text x="378" y="333" font-size="11.5" font-weight="800" text-anchor="middle" fill="#FF4B4F">스팬 — 은행 정산 대조 ±1원</text>
+    </g>
+  </svg>
+</div>
+
+<!-- ============ RIGHT COLUMN ============ -->
+<div class="col-right">
+  <h2>숫자로 보는 셈하나</h2>
+  <div class="sub">소담김밥 한 곳에서 실측된 값</div>
+  <div class="stats">
+    <div class="stat">
+      <div class="v"><em>7</em><span class="unit"> 채널</span></div>
+      <div class="k">매출·지출 자동 수집원</div>
+    </div>
+    <div class="stat">
+      <div class="v">41<span class="unit"> 개월</span></div>
+      <div class="k">축적된 정산 데이터</div>
+    </div>
+    <div class="stat">
+      <div class="v"><em>±1</em><span class="unit"> 원</span></div>
+      <div class="k">은행 실입금 대조 정밀도</div>
+    </div>
+    <div class="stat">
+      <div class="v">03:00</div>
+      <div class="k">매일 새벽 자동 수집</div>
+    </div>
+  </div>
+
+  <div class="pay">
+    <h4>급여와 세금까지, 같은 장부 안에서</h4>
+    <p>4대보험·원천세는 고지서가 아니라 <b>은행 실납부</b> 기준으로 잡히고,
+    세금대납 직원의 <b>총 보상액</b>과 계좌이체액은 자동으로 구분됩니다.
+    급여명세서 한 장까지 검산이 끝난 숫자만 남습니다.</p>
+  </div>
+</div>
+
+<!-- navy block bottom-right -->
+<div class="navy-block">
+  <h3>재무 3표, 아침이면 완성</h3>
+  <p>모인 숫자는 매일 아침 <b>손익계산서 · 현금흐름표 · 재무상태표</b>의
+  정식 양식으로 다시 태어납니다. 세무사 없이도 우리 가게의 영업이익과
+  순이익을 그날그날 확인할 수 있습니다.</p>
+  <div class="docs">
+    <svg width="484" height="196" viewBox="0 0 484 196">
+      <g fill="rgba(167,167,206,.07)" stroke="#A7A7CE" stroke-width="2">
+        <g class="sheetL">
+        <g transform="rotate(-5 110 108)">
+          <rect x="40" y="30" width="140" height="156" rx="4"/>
+          <line x1="56" y1="62" x2="164" y2="62"/>
+          <line x1="56" y1="86" x2="164" y2="86"/>
+          <line x1="56" y1="110" x2="146" y2="110"/>
+          <line x1="56" y1="134" x2="164" y2="134"/>
+        </g>
+        </g>
+        <g class="sheetC">
+        <g>
+          <rect x="172" y="18" width="140" height="168" rx="4"/>
+          <line x1="188" y1="52" x2="296" y2="52"/>
+          <line x1="188" y1="78" x2="296" y2="78"/>
+          <line x1="188" y1="104" x2="272" y2="104"/>
+          <line x1="188" y1="130" x2="296" y2="130"/>
+          <line x1="188" y1="156" x2="252" y2="156"/>
+        </g>
+        </g>
+        <g class="sheetR">
+        <g transform="rotate(5 374 108)">
+          <rect x="304" y="30" width="140" height="156" rx="4"/>
+          <line x1="320" y1="62" x2="428" y2="62"/>
+          <line x1="320" y1="86" x2="428" y2="86"/>
+          <line x1="320" y1="110" x2="410" y2="110"/>
+          <line x1="320" y1="134" x2="428" y2="134"/>
+        </g>
+        </g>
+      </g>
+      <line class="doc-tick" x1="188" y1="40" x2="240" y2="40" stroke="#FF4B4F" stroke-width="3"/>
+    </svg>
+  </div>
+  <div class="cap">손익계산서 · 현금흐름표 · 재무상태표</div>
+</div>
+
+<!-- red connector hairlines -->
+<div class="conn" style="left:460px;top:150px;width:44px;height:1.5px;"></div>
+<div class="conn conn2" style="left:1258px;top:700px;width:38px;height:1.5px;"></div>
+
+<!-- ============ GRAIN ============ -->
+<svg class="grain" width="1932" height="1092">
+  <filter id="n">
+    <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="2" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+  </filter>
+  <rect width="1932" height="1092" filter="url(#n)"/>
+</svg>
+
+</body>
+</html>
