@@ -27,6 +27,7 @@ export default function CoupangEatsModuleDetail() {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const ymd = (d) => d.toISOString().slice(0, 10);
+    const ymdLocal = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const [cred, setCred] = useState(null);
     const [dashboard, setDashboard] = useState(null);
@@ -40,6 +41,8 @@ export default function CoupangEatsModuleDetail() {
     const [testResult, setTestResult] = useState(null);
     const [msg, setMsg] = useState('');
     const [err, setErr] = useState('');
+    const [cookieResult, setCookieResult] = useState(null);  // manual-cookies 응답 + rawCookies
+    const [backfilling, setBackfilling] = useState(false);
 
     // 수동 동기화 폼
     const [startDate, setStartDate] = useState(ymd(yesterday));
@@ -154,11 +157,21 @@ export default function CoupangEatsModuleDetail() {
                 store_id: storeId || undefined,
                 shop_name: shopName || undefined,
             });
-            setCred({ registered: true, ...res.data });
+            const d = res.data;
+            setCred({ registered: true, ...d });
             setCookieModalOpen(false);
-            showMsg(`쿠키 ${cookies.length}개를 등록했습니다.`);
+            setCookieResult({ ...d, rawCookies: cookies });
+            if (d.verified) {
+                showMsg(`✓ 쿠키 인증 확인 — ${cookies.length}개 등록${d.shop_name ? `, 매장: ${d.shop_name}` : ''}`);
+            } else {
+                showMsg(`쿠키 ${cookies.length}개 등록 (검증 보류 — 아래 경고 확인)`);
+            }
+            return { ok: true };
         } catch (e) {
-            showErr('쿠키 등록 실패: ' + (e.response?.data?.detail || e.message));
+            const detail = e.response?.data?.detail || e.message;
+            showErr('쿠키 등록 실패: ' + detail);
+            // 모달이 열려 있으면 페이지 배너가 오버레이에 가려지므로 모달에도 표시
+            return { ok: false, error: detail };
         }
     }
 
@@ -196,6 +209,50 @@ export default function CoupangEatsModuleDetail() {
             showErr('동기화 실패: ' + (e.response?.data?.detail || e.message));
         } finally {
             setSyncing(false);
+        }
+    }
+
+    // ─── 쿠키 재등록 후 공백 백필 ───
+    async function handleBackfillGap() {
+        if (!cookieResult?.last_success_sync_date) return;
+        const start = new Date(cookieResult.last_success_sync_date + 'T00:00:00');
+        start.setDate(start.getDate() + 1);
+        const end = new Date();
+        end.setDate(end.getDate() - 1);
+        end.setHours(0, 0, 0, 0);
+        if (start > end) return;
+
+        setBackfilling(true);
+        setErr('');
+        try {
+            let totalOrders = 0;
+            let totalSales = 0;
+            let chunkStart = new Date(start);
+            while (chunkStart <= end) {
+                // 백엔드 한도는 91일이지만, pageSize=10 순차 요청이 길어지면
+                // 프록시 타임아웃(nginx/CF)에 걸리므로 검증된 1개월 단위(30일 inclusive)로 분할
+                const chunkEnd = new Date(Math.min(
+                    end.getTime(),
+                    chunkStart.getTime() + 29 * 24 * 3600 * 1000,
+                ));
+                const res = await api.post('/coupang-eats/sync/manual', {
+                    start_date: ymdLocal(chunkStart),
+                    end_date: ymdLocal(chunkEnd),
+                    sync_orders: true,
+                    sync_settlements: true,
+                });
+                totalOrders += res.data.orders?.fetched || 0;
+                totalSales += res.data.total_sales || 0;
+                chunkStart = new Date(chunkEnd.getTime() + 24 * 3600 * 1000);
+            }
+            showMsg(`백필 완료 — 주문 ${totalOrders}건, 매출 합계 ${fmtWon(totalSales)}원`);
+            setCookieResult(null);
+            await fetchAll();
+            await fetchDashboard();
+        } catch (e) {
+            showErr('백필 실패: ' + (e.response?.data?.detail || e.message));
+        } finally {
+            setBackfilling(false);
         }
     }
 
@@ -341,6 +398,17 @@ export default function CoupangEatsModuleDetail() {
                     <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <div>{err}</div>
                 </div>
+            )}
+
+            {cookieResult && (
+                <CookieResultBanner
+                    result={cookieResult}
+                    onSelectStore={(s) => handleSubmitCookies(
+                        cookieResult.rawCookies, s.store_id, s.store_name)}
+                    onBackfill={handleBackfillGap}
+                    backfilling={backfilling}
+                    onDismiss={() => setCookieResult(null)}
+                />
             )}
 
             {/* 자격증명 상태 카드 */}
@@ -998,6 +1066,22 @@ function CredentialModal({ initial, initialStoreId, onSave, onClose }) {
 }
 
 
+// ─── cURL 텍스트 파서 ───────────────────────────────────
+
+/** Chrome "Copy as cURL" (bash/cmd) 텍스트에서 cookie 헤더 값 추출. */
+function extractCookieFromCurl(text) {
+    // cmd 형식: ^" ^% 등 캐럿 이스케이프 + ^ 줄연속 제거
+    const cleaned = text.replace(/\^(\r?\n)/g, ' ').replace(/\^(.)/g, '$1');
+    // -H 'cookie: ...' / -H "cookie: ..." / --header 'cookie: ...'
+    const hMatch = cleaned.match(/(?:-H|--header)\s+(['"])cookie:\s*([\s\S]*?)\1/i);
+    if (hMatch) return hMatch[2].trim();
+    // -b '...' / --cookie '...'
+    const bMatch = cleaned.match(/(?:-b|--cookie)\s+(['"])([\s\S]*?)\1/i);
+    if (bMatch) return bMatch[2].trim();
+    return null;
+}
+
+
 // ─── 수동 쿠키 입력 모달 ─────────────────────────────────
 
 function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) {
@@ -1006,6 +1090,7 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
     const [shopName, setShopName] = useState(initialShopName || '');
     const [parsed, setParsed] = useState(null);
     const [parseErr, setParseErr] = useState('');
+    const [submitErr, setSubmitErr] = useState('');
     const [saving, setSaving] = useState(false);
 
     function tryParse(text) {
@@ -1013,9 +1098,19 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
         setParsed(null);
         const trimmed = (text || '').trim();
         if (!trimmed) return;
+        // 0) cURL 텍스트 (Chrome "Copy as cURL" bash/cmd)
+        let effective = trimmed;
+        if (/^curl[\s^]/i.test(trimmed)) {
+            const cookieStr = extractCookieFromCurl(trimmed);
+            if (!cookieStr) {
+                setParseErr("cURL 텍스트에서 cookie 헤더를 찾지 못했습니다 — 로그인 후의 요청에서 Copy as cURL 했는지 확인하세요.");
+                return;
+            }
+            effective = cookieStr;
+        }
         // 1) JSON array
         try {
-            const arr = JSON.parse(trimmed);
+            const arr = JSON.parse(effective);
             if (Array.isArray(arr) && arr.length > 0 && arr[0].name && arr[0].value !== undefined) {
                 setParsed(arr);
                 return;
@@ -1026,7 +1121,7 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
         // 2) Cookie header format "name1=value1; name2=value2"
         //    Application 탭 테이블에서 탭/줄바꿈으로 복사된 경우도 best-effort 처리
         try {
-            const cookies = trimmed
+            const cookies = effective
                 // 줄바꿈 + 탭 → 세미콜론 통일
                 .replace(/\r?\n/g, ';')
                 .replace(/\t+/g, '=')
@@ -1067,17 +1162,21 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
             setParseErr('파싱 실패: ' + (e?.message || e));
             return;
         }
-        setParseErr('인식되는 쿠키 형식이 없습니다. JSON 배열 또는 "name=value; name=value" 형식 필요.');
+        setParseErr('인식되는 쿠키 형식이 없습니다. cURL 텍스트 또는 JSON 배열, "name=value; name=value" 형식 필요.');
     }
 
     async function submit(e) {
         e?.preventDefault();
         if (!parsed || parsed.length === 0) return;
         setSaving(true);
+        setSubmitErr('');
         try {
-            await onSave(parsed,
-                         storeId ? parseInt(storeId) : null,
-                         shopName || null);
+            const result = await onSave(parsed,
+                                        storeId ? parseInt(storeId) : null,
+                                        shopName || null);
+            if (result && result.ok === false) {
+                setSubmitErr(result.error || '쿠키 등록에 실패했습니다.');
+            }
         } finally {
             setSaving(false);
         }
@@ -1109,12 +1208,11 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                         <li>크롬에서 <a href="https://store.coupangeats.com" target="_blank" rel="noopener" className="text-blue-700 underline inline-flex items-center gap-0.5">store.coupangeats.com<ExternalLink className="w-3 h-3" /></a> 에 로그인</li>
                         <li>F12 → <strong>Network</strong> 탭 → <strong>Preserve log</strong> ✅ 체크 → F5 새로고침</li>
                         <li>요청 list 에서 아무 <code>coupangeats.com</code> 요청 1개 클릭 (예: <code>whoami</code>, <code>home-banner</code>)</li>
-                        <li>우측 <strong>Headers</strong> 탭 → 아래로 스크롤 → <strong>Request Headers</strong> 섹션</li>
-                        <li><code>cookie:</code> 로 시작하는 줄의 값 전체 (보통 2000~5000자) 마우스 드래그 → <strong>Ctrl+C</strong></li>
-                        <li>아래 텍스트박스에 그대로 붙여넣기 → "쿠키 N개 인식" 표시 (15~30개 정상)</li>
+                        <li>요청 <strong>우클릭</strong> → <strong>Copy</strong> → <strong>Copy as cURL</strong> (bash 또는 cmd)</li>
+                        <li>아래 텍스트박스에 통째로 붙여넣기 → "쿠키 N개 인식" 표시 (15~30개 정상)</li>
                     </ol>
-                    <p className="mt-2 text-amber-800 font-semibold">
-                        ⚠️ Application 탭의 Cookies 테이블을 직접 복사하지 마세요 — 탭으로 깨진 형식이라 인식 실패합니다.
+                    <p className="mt-1 text-amber-800">
+                        또는 Headers 탭에서 <code>cookie:</code> 줄의 값만 드래그 복사해도 됩니다.
                     </p>
                 </div>
 
@@ -1139,12 +1237,12 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                     <label className="block">
-                        <span className="text-sm text-slate-700">매장 ID</span>
+                        <span className="text-sm text-slate-700">매장 ID (선택)</span>
                         <input
                             type="text"
                             value={storeId}
                             onChange={(e) => setStoreId(e.target.value.replace(/\D/g, ''))}
-                            placeholder="예: 823245"
+                            placeholder="비워두면 자동 감지"
                             className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg font-mono"
                         />
                     </label>
@@ -1159,6 +1257,12 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                         />
                     </label>
                 </div>
+
+                {submitErr && (
+                    <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                        ⚠ 쿠키 등록 실패: {submitErr}
+                    </div>
+                )}
 
                 <div className="flex gap-2 justify-end">
                     <button
@@ -1178,6 +1282,79 @@ function CookieInputModal({ initialStoreId, initialShopName, onSave, onClose }) 
                     </button>
                 </div>
             </form>
+        </div>
+    );
+}
+
+
+// ─── 쿠키 등록 결과 배너 ─────────────────────────────────
+
+function CookieResultBanner({ result, onSelectStore, onBackfill, backfilling, onDismiss }) {
+    const needStoreChoice = !result.store_id && (result.stores?.length || 0) > 1;
+
+    // 수집 공백: 마지막 성공일 다음날 ~ 어제
+    let gapStart = null;
+    let gapEnd = null;
+    if (result.last_success_sync_date) {
+        const s = new Date(result.last_success_sync_date + 'T00:00:00');
+        s.setDate(s.getDate() + 1);
+        const e = new Date();
+        e.setDate(e.getDate() - 1);
+        e.setHours(0, 0, 0, 0);
+        if (s <= e) { gapStart = s; gapEnd = e; }
+    }
+    const fmtD = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+    return (
+        <div className={`rounded-xl border p-4 mb-4 ${result.verified
+            ? 'bg-emerald-50 border-emerald-200'
+            : 'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2 font-semibold text-slate-800">
+                    {result.verified
+                        ? <><CheckCircle2 className="w-5 h-5 text-emerald-600" /> 쿠키 인증 확인됨</>
+                        : <><AlertCircle className="w-5 h-5 text-amber-600" /> 쿠키 등록됨 (검증 보류)</>}
+                </div>
+                <button type="button" onClick={onDismiss}
+                        className="p-1 hover:bg-black/5 rounded-md">
+                    <XIcon className="w-4 h-4 text-slate-500" />
+                </button>
+            </div>
+
+            {result.verify_warning && (
+                <p className="mt-2 text-sm text-amber-800">⚠ {result.verify_warning}</p>
+            )}
+
+            {needStoreChoice && (
+                <div className="mt-3">
+                    <p className="text-sm text-slate-700 mb-2">
+                        매장이 여러 개입니다 — 수집할 매장을 선택하세요:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {result.stores.map((s) => (
+                            <button key={s.store_id} type="button"
+                                    onClick={() => onSelectStore(s)}
+                                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm hover:bg-slate-50">
+                                {s.store_name || `매장 ${s.store_id}`} <span className="text-slate-400 font-mono">#{s.store_id}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {result.verified && !needStoreChoice && gapStart && onBackfill && (
+                <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <span className="text-sm text-slate-700">
+                        📅 <strong>{fmtD(gapStart)} ~ {fmtD(gapEnd)}</strong> 수집 공백 감지
+                    </span>
+                    <button type="button" onClick={onBackfill} disabled={backfilling}
+                            className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 flex items-center gap-1.5">
+                        {backfilling
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> 백필 중...</>
+                            : <><Download className="w-4 h-4" /> 지금 백필</>}
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
