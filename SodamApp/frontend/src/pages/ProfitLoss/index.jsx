@@ -64,6 +64,8 @@ export default function ProfitLoss() {
     const [editValue, setEditValue] = useState('');
     const [year, setYear] = useState(new Date().getFullYear());
     const [activeTab, setActiveTab] = useState('dashboard');
+    // 손익계산서 기간 모드: 연간 | 반기별 | 분기별
+    const [plMode, setPlMode] = useState('year');
     // 현재 매장(View-As 포함)명 — API에서 가져옴 (localStorage 폴백)
     const [businessName, setBusinessName] = useState(localStorage.getItem('business_name') || '');
     useEffect(() => {
@@ -1160,182 +1162,280 @@ export default function ProfitLoss() {
         );
     };
 
-    const renderSummaryTable = () => {
-        const yearRev = data.reduce((s, d) => s + calcTotalRevenue(d), 0);
-        const yearExp = data.reduce((s, d) => s + calcTotalExpense(d), 0);
-        const yearProfit = yearRev - yearExp;
-        const yearMargin = yearRev > 0 ? ((yearProfit / yearRev) * 100) : 0;
-        const fmtShort = (v) => {
-            if (Math.abs(v) >= 100000000) return `${(v / 100000000).toFixed(1)}억`;
-            if (Math.abs(v) >= 10000) return `${(v / 10000).toFixed(0)}만`;
-            return formatNumber(v);
+    // ═══════════════════════════════════════════
+    // 손익계산서 (결산 보고서) — 연간 · 반기별 · 분기별
+    // ═══════════════════════════════════════════
+    const PL_MODES = [
+        { id: 'year', label: '연간' },
+        { id: 'half', label: '반기별' },
+        { id: 'quarter', label: '분기별' },
+    ];
+    const HALF_DEFS = [
+        { id: 'h1', title: '상반기', range: '1월 1일 – 6월 30일', months: [1, 2, 3, 4, 5, 6] },
+        { id: 'h2', title: '하반기', range: '7월 1일 – 12월 31일', months: [7, 8, 9, 10, 11, 12] },
+    ];
+    const QUARTER_DEFS = [
+        { id: 'q1', title: '1분기', range: '1월 – 3월', months: [1, 2, 3] },
+        { id: 'q2', title: '2분기', range: '4월 – 6월', months: [4, 5, 6] },
+        { id: 'q3', title: '3분기', range: '7월 – 9월', months: [7, 8, 9] },
+        { id: 'q4', title: '4분기', range: '10월 – 12월', months: [10, 11, 12] },
+    ];
+
+    const monthHasData = (m) => {
+        const md = getMonthData(m);
+        return [...REVENUE_FIELDS, ...EXPENSE_FIELDS, ...TAX_FIELDS].some(f => (md[f.key] || 0) !== 0);
+    };
+
+    // 기간 집계 — 합계·월평균·마진 (월평균은 데이터가 있는 달 기준)
+    const periodStats = (months) => {
+        const act = months.filter(monthHasData).length;
+        const div = act || 1;
+        const sum = (fn) => months.reduce((s, m) => s + fn(getMonthData(m)), 0);
+        const rev = sum(calcTotalRevenue);
+        const opex = sum(calcOperatingExpense);
+        const tax = sum(calcTax);
+        const op = rev - opex;
+        const net = op - tax;
+        return {
+            act, rev, opex, tax, op, net,
+            avgRev: Math.round(rev / div), avgOpex: Math.round(opex / div),
+            avgOp: Math.round(op / div), avgNet: Math.round(net / div),
+            margin: rev > 0 ? (net / rev) * 100 : 0,
         };
+    };
+
+    const periodFieldTotal = (months, key) => months.reduce((s, m) => s + (getMonthData(m)[key] || 0), 0);
+
+    const deltaPct = (cur, prev) => {
+        if (prev === 0 || prev === null || prev === undefined) return null;
+        return ((cur - prev) / Math.abs(prev)) * 100;
+    };
+
+    const Amount = ({ v, strong }) => (
+        <span className={`plr-num${v < 0 ? ' plr-neg' : ''}${strong ? ' plr-strong' : ''}`}>{formatNumber(v)}</span>
+    );
+
+    // 직전 기간 대비 증감 배지 — 진행 중 기간 왜곡을 막기 위해 월평균 기준 비교
+    const DeltaBadge = ({ cur, prev, vsLabel }) => {
+        const d = deltaPct(cur, prev);
+        if (d === null) return null;
+        const up = d >= 0;
         return (
-        <>
-            {/* KPI Hero — 4 cards */}
-            <div className="pl-kpi-grid">
-                <div className="pl-kpi-card pl-kpi-rev card-animate">
-                    <div className="pl-kpi-label">연간 매출</div>
-                    <div className="pl-kpi-value">{fmtShort(yearRev)}<span className="pl-kpi-unit">원</span></div>
-                    <div className="pl-kpi-sub">{formatNumber(yearRev)}원</div>
-                </div>
-                <div className="pl-kpi-card pl-kpi-exp card-animate" style={{ animationDelay: '0.05s' }}>
-                    <div className="pl-kpi-label">연간 비용</div>
-                    <div className="pl-kpi-value">{fmtShort(yearExp)}<span className="pl-kpi-unit">원</span></div>
-                    <div className="pl-kpi-sub">{formatNumber(yearExp)}원</div>
-                </div>
-                <div className={`pl-kpi-card ${yearProfit >= 0 ? 'pl-kpi-profit' : 'pl-kpi-loss'} card-animate`} style={{ animationDelay: '0.1s' }}>
-                    <div className="pl-kpi-label">순이익</div>
-                    <div className="pl-kpi-value">{fmtShort(yearProfit)}<span className="pl-kpi-unit">원</span></div>
-                    <div className="pl-kpi-sub">{formatNumber(yearProfit)}원</div>
-                </div>
-                <div className="pl-kpi-card pl-kpi-margin card-animate" style={{ animationDelay: '0.15s' }}>
-                    <div className="pl-kpi-label">순이익률</div>
-                    <div className="pl-kpi-value">{yearMargin.toFixed(1)}<span className="pl-kpi-unit">%</span></div>
-                    <div className="pl-kpi-bar">
-                        <div className="pl-kpi-bar-fill" style={{ width: `${Math.max(0, Math.min(100, yearMargin))}%` }} />
-                    </div>
-                </div>
-            </div>
-
-            <div className="pl-table-wrapper card-animate" style={{ animationDelay: '0.2s' }}>
-                <div className="pl-table-header">
-                    <div className="pl-table-title-group">
-                        <span className="pl-table-badge">P/L</span>
-                        <span className="pl-table-title">{businessName} <span className="pl-table-year">{year}년</span> 월별 손익계산서</span>
-                    </div>
-                    <span className="pl-table-meta">활성 {activeMonthCount}개월 · 자동 업데이트</span>
-                </div>
-                <div className="pl-table-scroll">
-                <table className="pl-table">
-                    <colgroup>
-                        <col style={{ width: '52px' }} />
-                        <col style={{ width: '120px' }} />
-                        {MONTHS.map(m => <col key={m} style={{ width: 'calc((100% - 172px) / 14)' }} />)}
-                        <col style={{ width: 'calc((100% - 172px) / 14)' }} />
-                        <col style={{ width: 'calc((100% - 172px) / 14)' }} />
-                    </colgroup>
-                    <thead>
-                        <tr>
-                            <th colSpan="2">{businessName} 월별손익계산서</th>
-                            {MONTHS.map(m => <th key={m}>{m}월</th>)}
-                            <th>합계</th>
-                            <th>월평균</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {/* Revenue Section */}
-                        <tr className={`section-header ${REVENUE_FIELDS[0].group}`}>
-                            <td className="pl-section-label" rowSpan={REVENUE_FIELDS.length + 1}>수입</td>
-                            <td className="pl-item-label">{REVENUE_FIELDS[0].label}</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className="pl-data">{renderCell(m, REVENUE_FIELDS[0].key, getMonthData(m)[REVENUE_FIELDS[0].key])}</td>
-                            ))}
-                            <td className="pl-data total">{formatNumber(calcYearTotal(REVENUE_FIELDS[0].key))}</td>
-                            <td className="pl-data average">{formatNumber(calcYearAverage(REVENUE_FIELDS[0].key))}</td>
-                        </tr>
-                        {REVENUE_FIELDS.slice(1).map(field => (
-                            <tr key={field.key} className={`revenue-row ${field.group}`}>
-                                <td className="pl-item-label">{field.label}</td>
-                                {MONTHS.map(m => (
-                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
-                                ))}
-                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
-                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
-                            </tr>
-                        ))}
-                        <tr className="subtotal-row">
-                            <td className="pl-item-label">합계</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className="pl-data">{formatNumber(calcTotalRevenue(getMonthData(m)))}</td>
-                            ))}
-                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcTotalRevenue(d), 0))}</td>
-                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcTotalRevenue(d), 0) / activeMonthCount))}</td>
-                        </tr>
-
-                        {/* Operating Expense Section (세금 제외) */}
-                        <tr className={`section-header expense-section-header ${EXPENSE_FIELDS[0].group}`}>
-                            <td className="pl-section-label" rowSpan={EXPENSE_FIELDS.length + 1}>영업비용</td>
-                            <td className="pl-item-label">{EXPENSE_FIELDS[0].label}</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className="pl-data">{renderCell(m, EXPENSE_FIELDS[0].key, getMonthData(m)[EXPENSE_FIELDS[0].key])}</td>
-                            ))}
-                            <td className="pl-data total">{formatNumber(calcYearTotal(EXPENSE_FIELDS[0].key))}</td>
-                            <td className="pl-data average">{formatNumber(calcYearAverage(EXPENSE_FIELDS[0].key))}</td>
-                        </tr>
-                        {EXPENSE_FIELDS.slice(1).map(field => (
-                            <tr key={field.key} className={`expense-row ${field.group}`}>
-                                <td className="pl-item-label">{field.label}</td>
-                                {MONTHS.map(m => (
-                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
-                                ))}
-                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
-                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
-                            </tr>
-                        ))}
-                        <tr className="subtotal-row">
-                            <td className="pl-item-label">합계</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className="pl-data">{formatNumber(calcOperatingExpense(getMonthData(m)))}</td>
-                            ))}
-                            <td className="pl-data total">{formatNumber(data.reduce((s, d) => s + calcOperatingExpense(d), 0))}</td>
-                            <td className="pl-data average">{formatNumber(Math.round(data.reduce((s, d) => s + calcOperatingExpense(d), 0) / activeMonthCount))}</td>
-                        </tr>
-
-                        {/* Operating Profit Row — 수입 − 영업비용 */}
-                        <tr className="profit-row">
-                            <td className="pl-section-label" colSpan="2">영업이익</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className={`pl-data ${calcOperatingProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
-                                    {formatNumber(calcOperatingProfit(getMonthData(m)))}
-                                </td>
-                            ))}
-                            <td className="pl-data total profit-positive">
-                                {formatNumber(data.reduce((s, d) => s + calcOperatingProfit(d), 0))}
-                            </td>
-                            <td className="pl-data average profit-positive">
-                                {formatNumber(Math.round(data.reduce((s, d) => s + calcOperatingProfit(d), 0) / activeMonthCount))}
-                            </td>
-                        </tr>
-
-                        {/* Tax Section — 부가세·소득세·재산세 등 납부 (영업외) */}
-                        {TAX_FIELDS.map((field, i) => (
-                            <tr key={field.key} className={`expense-row ${field.group}`}>
-                                {i === 0 && <td className="pl-section-label" rowSpan={TAX_FIELDS.length}>세금</td>}
-                                <td className="pl-item-label">{field.label}</td>
-                                {MONTHS.map(m => (
-                                    <td key={m} className="pl-data">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
-                                ))}
-                                <td className="pl-data total">{formatNumber(calcYearTotal(field.key))}</td>
-                                <td className="pl-data average">{formatNumber(calcYearAverage(field.key))}</td>
-                            </tr>
-                        ))}
-
-                        {/* Net Profit Row — 영업이익 − 세금 */}
-                        <tr className="profit-row">
-                            <td className="pl-section-label" colSpan="2">순이익</td>
-                            {MONTHS.map(m => (
-                                <td key={m} className={`pl-data ${calcProfit(getMonthData(m)) >= 0 ? 'profit-positive' : 'profit-negative'}`}>
-                                    {formatNumber(calcProfit(getMonthData(m)))}
-                                </td>
-                            ))}
-                            <td className="pl-data total profit-positive">
-                                {formatNumber(data.reduce((s, d) => s + calcProfit(d), 0))}
-                            </td>
-                            <td className="pl-data average profit-positive">
-                                {formatNumber(Math.round(data.reduce((s, d) => s + calcProfit(d), 0) / activeMonthCount))}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                </div>
-            </div>
-            <div className="pl-table-tip">
-                💡 셀을 클릭하면 직접 수정할 수 있습니다. Enter로 저장, Esc로 취소
-            </div>
-        </>
+            <span className={`plr-delta ${up ? 'plr-delta-up' : 'plr-delta-down'}`} title={`${vsLabel} 월평균 순이익 대비`}>
+                월평균 {up ? '▲' : '▼'} {Math.abs(d).toFixed(1)}%
+            </span>
         );
     };
+
+    // 기간 비교 카드 (반기 2장 · 분기 4장)
+    const PeriodBoard = ({ defs }) => {
+        const stats = defs.map(d => ({ def: d, st: periodStats(d.months) }));
+        return (
+            <div className={`plr-board plr-board-${defs.length}`}>
+                {stats.map(({ def, st }, i) => {
+                    const prev = i > 0 ? stats[i - 1].st : null;
+                    const noData = st.act === 0;
+                    return (
+                        <div key={def.id} className={`plr-pcard card-animate${noData ? ' plr-pcard-empty' : ''}`} style={{ animationDelay: `${i * 0.06}s` }}>
+                            <div className="plr-pcard-head">
+                                <div>
+                                    <div className="plr-pcard-title">{def.title}</div>
+                                    <div className="plr-pcard-range">{year}년 {def.range}</div>
+                                </div>
+                                {!noData && (
+                                    <span className={`plr-stamp ${st.net >= 0 ? 'plr-stamp-profit' : 'plr-stamp-loss'}`}>
+                                        {st.net >= 0 ? '흑자' : '적자'}
+                                    </span>
+                                )}
+                            </div>
+                            {noData ? (
+                                <div className="plr-pcard-nodata">집계된 실적이 없습니다</div>
+                            ) : (
+                                <>
+                                    <div className="plr-pcard-net">
+                                        <span className="plr-pcard-net-label">순이익</span>
+                                        <span className={`plr-pcard-net-value${st.net < 0 ? ' plr-neg' : ''}`}>{formatNumber(st.net)}원</span>
+                                        {prev && prev.act > 0 && <DeltaBadge cur={st.avgNet} prev={prev.avgNet} vsLabel={defs[i - 1].title} />}
+                                    </div>
+                                    <table className="plr-pcard-table">
+                                        <tbody>
+                                            <tr>
+                                                <th scope="row">매출</th>
+                                                <td><Amount v={st.rev} /></td>
+                                                <td className="plr-pcard-avg">월평균 {formatNumber(st.avgRev)}</td>
+                                            </tr>
+                                            <tr>
+                                                <th scope="row">영업비용</th>
+                                                <td><Amount v={st.opex} /></td>
+                                                <td className="plr-pcard-avg">월평균 {formatNumber(st.avgOpex)}</td>
+                                            </tr>
+                                            <tr>
+                                                <th scope="row">영업이익</th>
+                                                <td><Amount v={st.op} strong /></td>
+                                                <td className="plr-pcard-avg">월평균 {formatNumber(st.avgOp)}</td>
+                                            </tr>
+                                            <tr>
+                                                <th scope="row">순이익률</th>
+                                                <td colSpan="2" className="plr-pcard-margin">
+                                                    {st.margin.toFixed(1)}%
+                                                    <span className="plr-pcard-months"> · 실적 {st.act}개월</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
+    // 연간 모드 상단 지표 4종 (합계 + 월평균)
+    const YearStatStrip = () => {
+        const st = periodStats(MONTHS);
+        const tiles = [
+            { label: '매출액', total: st.rev, avg: st.avgRev, tone: 'rev' },
+            { label: '영업비용', total: st.opex, avg: st.avgOpex, tone: 'exp' },
+            { label: '영업이익', total: st.op, avg: st.avgOp, tone: st.op >= 0 ? 'profit' : 'loss' },
+            { label: '당기순이익', total: st.net, avg: st.avgNet, tone: st.net >= 0 ? 'profit' : 'loss', margin: st.margin },
+        ];
+        return (
+            <div className="plr-stat-grid">
+                {tiles.map((t, i) => (
+                    <div key={t.label} className={`plr-stat plr-stat-${t.tone} card-animate`} style={{ animationDelay: `${i * 0.05}s` }}>
+                        <div className="plr-stat-label">{t.label}</div>
+                        <div className={`plr-stat-value${t.total < 0 ? ' plr-neg' : ''}`}>{formatNumber(t.total)}<span className="plr-stat-unit">원</span></div>
+                        <div className="plr-stat-sub">
+                            월평균 {formatNumber(t.avg)}원
+                            {t.margin !== undefined && <span className="plr-stat-margin"> · 순이익률 {t.margin.toFixed(1)}%</span>}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    // 결산 보고서 한 장 — 기간(months) 손익계산서: 월별 + 합계 + 월평균
+    const IncomeReport = ({ title, range, months, delay = 0 }) => {
+        const st = periodStats(months);
+        const div = st.act || 1;
+        const FieldRow = ({ field }) => (
+            <tr className="plr-row">
+                <td className="plr-label">{field.label}</td>
+                {months.map(m => (
+                    <td key={m} className="plr-cell">{renderCell(m, field.key, getMonthData(m)[field.key])}</td>
+                ))}
+                <td className="plr-cell plr-col-total"><Amount v={periodFieldTotal(months, field.key)} /></td>
+                <td className="plr-cell plr-col-avg"><Amount v={Math.round(periodFieldTotal(months, field.key) / div)} /></td>
+            </tr>
+        );
+        const CalcRow = ({ label, fn, cls }) => (
+            <tr className={cls}>
+                <td className="plr-label">{label}</td>
+                {months.map(m => {
+                    const v = fn(getMonthData(m));
+                    return <td key={m} className="plr-cell"><Amount v={v} strong /></td>;
+                })}
+                <td className="plr-cell plr-col-total"><Amount v={months.reduce((s, m) => s + fn(getMonthData(m)), 0)} strong /></td>
+                <td className="plr-cell plr-col-avg"><Amount v={Math.round(months.reduce((s, m) => s + fn(getMonthData(m)), 0) / div)} strong /></td>
+            </tr>
+        );
+        const SectionRow = ({ label }) => (
+            <tr className="plr-sec-row"><td colSpan={months.length + 3}>{label}</td></tr>
+        );
+        return (
+            <section className="plr-rp card-animate" style={{ animationDelay: `${delay}s` }}>
+                <header className="plr-rp-head">
+                    <div>
+                        <div className="plr-rp-kicker">INCOME STATEMENT</div>
+                        <h3 className="plr-rp-title">{businessName} 손익계산서 <span className="plr-rp-period">{title}</span></h3>
+                        <div className="plr-rp-range">{year}년 {range} · 단위: 원 · 실적 {st.act}개월</div>
+                    </div>
+                    <div className="plr-rp-headline">
+                        <span className={`plr-stamp ${st.net >= 0 ? 'plr-stamp-profit' : 'plr-stamp-loss'}`}>{st.net >= 0 ? '흑자' : '적자'}</span>
+                        <div className="plr-rp-headline-net">
+                            <span className="plr-rp-headline-label">순이익</span>
+                            <span className={`plr-rp-headline-value${st.net < 0 ? ' plr-neg' : ''}`}>{formatNumber(st.net)}원</span>
+                            <span className="plr-rp-headline-margin">순이익률 {st.margin.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                </header>
+                <div className="plr-rp-scroll">
+                    <table className="plr-rp-table">
+                        <thead>
+                            <tr>
+                                <th className="plr-label-head">과목</th>
+                                {months.map(m => <th key={m}>{m}월</th>)}
+                                <th className="plr-col-total">합계</th>
+                                <th className="plr-col-avg">월평균</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <SectionRow label="Ⅰ. 매출액" />
+                            {REVENUE_FIELDS.map(f => <FieldRow key={f.key} field={f} />)}
+                            <CalcRow label="매출액 합계" fn={calcTotalRevenue} cls="plr-subtotal" />
+                            <SectionRow label="Ⅱ. 영업비용" />
+                            {EXPENSE_FIELDS.map(f => <FieldRow key={f.key} field={f} />)}
+                            <CalcRow label="영업비용 합계" fn={calcOperatingExpense} cls="plr-subtotal" />
+                            <CalcRow label="Ⅲ. 영업이익 (Ⅰ−Ⅱ)" fn={calcOperatingProfit} cls="plr-keyrow" />
+                            <SectionRow label="Ⅳ. 세금" />
+                            {TAX_FIELDS.map(f => <FieldRow key={f.key} field={f} />)}
+                            <CalcRow label="Ⅴ. 당기순이익 (Ⅲ−Ⅳ)" fn={calcProfit} cls="plr-final" />
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        );
+    };
+
+    const renderSummaryTable = () => (
+        <div className="plr">
+            {/* 기간 모드 선택 */}
+            <div className="plr-toolbar">
+                <div className="plr-seg" role="tablist" aria-label="손익계산서 기간 단위">
+                    {PL_MODES.map(m => (
+                        <button
+                            key={m.id}
+                            role="tab"
+                            aria-selected={plMode === m.id}
+                            className={plMode === m.id ? 'active' : ''}
+                            onClick={() => setPlMode(m.id)}
+                        >{m.label}</button>
+                    ))}
+                </div>
+                <span className="plr-toolbar-note">셀을 클릭하면 직접 수정 · Enter 저장 · Esc 취소</span>
+            </div>
+
+            {plMode === 'year' && (
+                <>
+                    <YearStatStrip />
+                    <IncomeReport title="연간" range="1월 1일 – 12월 31일" months={MONTHS} delay={0.1} />
+                </>
+            )}
+
+            {plMode === 'half' && (
+                <>
+                    <PeriodBoard defs={HALF_DEFS} />
+                    {HALF_DEFS.map((d, i) => (
+                        <IncomeReport key={d.id} title={d.title} range={d.range} months={d.months} delay={0.1 + i * 0.06} />
+                    ))}
+                </>
+            )}
+
+            {plMode === 'quarter' && (
+                <>
+                    <PeriodBoard defs={QUARTER_DEFS} />
+                    <div className="plr-duo">
+                        {QUARTER_DEFS.map((d, i) => (
+                            <IncomeReport key={d.id} title={d.title} range={d.range} months={d.months} delay={0.1 + i * 0.06} />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
 
     // ═══════════════════════════════════════════
     // MOBILE: Single-scroll P/L (no tabs)

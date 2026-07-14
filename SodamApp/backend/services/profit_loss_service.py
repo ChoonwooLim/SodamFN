@@ -83,6 +83,17 @@ def is_four_insurance_payment(vendor_name: str, category: str = None) -> bool:
     n = vendor_name or ""
     return any(k in n for k in FOUR_INSURANCE_KEYWORDS)
 
+def _all_business_ids(session: Session):
+    """모든 사업장 id — sync 함수의 business_id=None(슈퍼어드민) fan-out 용.
+
+    business_id=None 으로 sync 를 실행하면 전 사업장 원천이 합산돼 임의
+    사업장 P/L 레코드(.first())에 기록되는 교차 오염이 발생한다 (2026-07-14
+    실측). None 이면 반드시 사업장별로 나눠 각자 원천→각자 P/L 로 처리할 것.
+    """
+    from models import Business
+    return list(session.exec(select(Business.id)).all())
+
+
 def sync_all_expenses(year: int, month: int, session: Session, business_id: int = None):
     """Aggregate DailyExpense by vendor category and update MonthlyProfitLoss.
 
@@ -91,6 +102,13 @@ def sync_all_expenses(year: int, month: int, session: Session, business_id: int 
     → 이번 달 sync 시 (a) 이번 달 expense 중 다른 달로 귀속될 것 제외 +
         (b) 다음 달 1~4일 expense 중 이번 달로 귀속될 것 포함.
     """
+    if business_id is None:
+        merged = {}
+        for b in _all_business_ids(session):
+            for k, v in (sync_all_expenses(year, month, session, b) or {}).items():
+                merged[k] = merged.get(k, 0) + v
+        return merged
+
     start_date = datetime.date(year, month, 1)
     if month == 12:
         end_date = datetime.date(year + 1, 1, 1)
@@ -244,6 +262,13 @@ def sync_delivery_revenue_to_pl(year: int, month: int, session: Session, busines
     Updates MonthlyProfitLoss delivery and store revenue fields.
     Source of truth: DailyExpense table via Vendor.vendor_type == "revenue".
     """
+    if business_id is None:
+        merged = {}
+        for b in _all_business_ids(session):
+            for k, v in (sync_delivery_revenue_to_pl(year, month, session, b) or {}).items():
+                merged[k] = merged.get(k, 0) + v
+        return merged
+
     import datetime as dt
 
     start_date = dt.date(year, month, 1)
@@ -412,6 +437,10 @@ def sync_card_fee_to_pl(year: int, month: int, session: Session, business_id: in
 
     승인 데이터가 없는 달은 기존 값 보존 (수동 입력/과거 업로드 값 유지).
     """
+    if business_id is None:
+        return sum(sync_card_fee_to_pl(year, month, session, b)
+                   for b in _all_business_ids(session))
+
     from models import CardSalesApproval
 
     start = datetime.date(year, month, 1)
@@ -448,6 +477,11 @@ def sync_card_fee_to_pl(year: int, month: int, session: Session, business_id: in
 
 def sync_summary_material_cost(year: int, month: int, session: Session, business_id: int = None):
     """Aggregate DailyExpense '재료비' for a given month and update MonthlyProfitLoss"""
+    if business_id is None:
+        for b in _all_business_ids(session):
+            sync_summary_material_cost(year, month, session, b)
+        return
+
     start_date = datetime.date(year, month, 1)
     if month == 12:
         end_date = datetime.date(year + 1, 1, 1)
@@ -500,6 +534,10 @@ def sync_labor_cost(year: int, month: int, session: Session, business_id: int = 
       (expense_insurance = 납부총액 표기, expense_insurance_employee = 0 폐기)
     퇴직금적립 = Payroll gross×10%, Payroll 없으면 실지급×10%.
     """
+    if business_id is None:
+        return sum(sync_labor_cost(year, month, session, b)
+                   for b in _all_business_ids(session))
+
     month_str = f"{year}-{month:02d}"
 
     pay_stmt = select(Payroll).where(

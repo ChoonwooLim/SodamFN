@@ -1815,3 +1815,426 @@
         height: 130px;
     }
 }
+/* ═══════════════════════════════════════════════════════════════
+   손익계산서 결산 보고서 (plr-*) — 연간 · 반기별 · 분기별
+   정식 재무 문서 미학: 로마숫자 계정, 회계 결산 이중선, 흑자/적자 스탬프
+   ═══════════════════════════════════════════════════════════════ */
+
+.plr {
+    --plr-ink: #0f172a;
+    --plr-teal: #0e7490;
+    --plr-teal-deep: #155e63;
+    --plr-red: #dc2626;
+    --plr-rule: #e2e8f0;
+    --plr-rule-strong: #94a3b8;
+    --plr-paper: #ffffff;
+}
+
+/* ── 기간 모드 세그먼트 ── */
+.plr-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.plr-seg {
+    display: inline-flex;
+    gap: 2px;
+    padding: 4px;
+    background: var(--plr-paper);
+    border: 1px solid var(--plr-rule);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.plr-seg button {
+    padding: 10px 26px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: #64748b;
+    font-size: 14.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    min-height: 44px;
+}
+
+.plr-seg button:hover { background: #f1f5f9; color: #334155; }
+.plr-seg button.active { background: var(--plr-ink); color: #fff; }
+.plr-seg button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
+.plr-toolbar-note { font-size: 12.5px; color: #94a3b8; }
+
+/* ── 공통 숫자 표기 ── */
+.plr-num { font-variant-numeric: tabular-nums; }
+.plr-neg { color: var(--plr-red) !important; }
+.plr-strong { font-weight: 800; }
+
+/* ── 연간 지표 4종 ── */
+.plr-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.plr-stat {
+    background: var(--plr-paper);
+    border: 1px solid var(--plr-rule);
+    border-top: 3px solid var(--plr-rule-strong);
+    border-radius: 14px;
+    padding: 18px 20px 16px;
+}
+
+.plr-stat-rev    { border-top-color: var(--plr-teal); }
+.plr-stat-exp    { border-top-color: #b45309; }
+.plr-stat-profit { border-top-color: #059669; }
+.plr-stat-loss   { border-top-color: var(--plr-red); }
+
+.plr-stat-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+
+.plr-stat-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--plr-ink);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.plr-stat-unit { font-size: 13px; font-weight: 600; color: #94a3b8; margin-left: 2px; }
+
+.plr-stat-sub {
+    margin-top: 6px;
+    font-size: 12.5px;
+    color: #94a3b8;
+    font-variant-numeric: tabular-nums;
+}
+
+.plr-stat-margin { color: #0d9488; font-weight: 700; }
+
+/* ── 기간 비교 보드 (반기 2장 · 분기 4장) ── */
+.plr-board {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.plr-board-2 { grid-template-columns: repeat(2, 1fr); }
+.plr-board-4 { grid-template-columns: repeat(4, 1fr); }
+
+.plr-pcard {
+    background: var(--plr-paper);
+    border: 1px solid var(--plr-rule);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.plr-pcard-empty { background: #f8fafc; border-style: dashed; }
+
+.plr-pcard-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--plr-rule);
+    margin-bottom: 12px;
+}
+
+.plr-pcard-title { font-size: 16.5px; font-weight: 800; color: var(--plr-ink); }
+.plr-pcard-range { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+.plr-pcard-nodata {
+    padding: 26px 0 18px;
+    text-align: center;
+    font-size: 13.5px;
+    color: #94a3b8;
+}
+
+.plr-pcard-net {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.plr-pcard-net-label { font-size: 12.5px; font-weight: 700; color: #64748b; }
+
+.plr-pcard-net-value {
+    font-size: 21px;
+    font-weight: 800;
+    color: #059669;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.plr-pcard-net-value.plr-neg { color: var(--plr-red); }
+
+.plr-pcard-table { width: 100%; border-collapse: collapse; }
+
+.plr-pcard-table th {
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #64748b;
+    padding: 5px 0;
+    white-space: nowrap;
+}
+
+.plr-pcard-table td {
+    text-align: right;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--plr-ink);
+    padding: 5px 0 5px 10px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.plr-pcard-avg { font-size: 11.5px !important; font-weight: 500 !important; color: #94a3b8 !important; }
+.plr-pcard-margin { color: #0d9488 !important; }
+.plr-pcard-months { font-size: 11px; font-weight: 500; color: #94a3b8; }
+
+/* 흑자/적자 스탬프 */
+.plr-stamp {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 6px;
+    border: 1.5px solid;
+    font-size: 12.5px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    transform: rotate(-2deg);
+    white-space: nowrap;
+}
+
+.plr-stamp-profit { color: #047857; border-color: #34d399; background: rgba(16, 185, 129, 0.06); }
+.plr-stamp-loss   { color: #b91c1c; border-color: #f87171; background: rgba(239, 68, 68, 0.06); }
+
+/* 증감 배지 */
+.plr-delta {
+    font-size: 12px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.plr-delta-up   { color: #047857; background: #ecfdf5; }
+.plr-delta-down { color: #b91c1c; background: #fef2f2; }
+
+/* ── 결산 보고서 시트 ── */
+.plr-rp {
+    background: var(--plr-paper);
+    border: 1px solid #dbe2ea;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+    margin-bottom: 28px;
+    overflow: hidden;
+}
+
+.plr-rp-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 22px 26px 18px;
+    border-bottom: 2px solid var(--plr-ink);
+}
+
+.plr-rp-kicker {
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    color: var(--plr-teal);
+    margin-bottom: 4px;
+}
+
+.plr-rp-title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    color: var(--plr-ink);
+    letter-spacing: -0.01em;
+}
+
+.plr-rp-period {
+    color: var(--plr-teal-deep);
+    margin-left: 4px;
+}
+
+.plr-rp-range { font-size: 12.5px; color: #64748b; margin-top: 4px; }
+
+.plr-rp-headline { display: flex; align-items: center; gap: 14px; }
+
+.plr-rp-headline-net { text-align: right; }
+.plr-rp-headline-label { display: block; font-size: 11.5px; font-weight: 700; color: #94a3b8; }
+
+.plr-rp-headline-value {
+    display: block;
+    font-size: 21px;
+    font-weight: 800;
+    color: #059669;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.plr-rp-headline-value.plr-neg { color: var(--plr-red); }
+.plr-rp-headline-margin { display: block; font-size: 11.5px; color: #64748b; font-variant-numeric: tabular-nums; }
+
+/* 보고서 테이블 */
+.plr-rp-scroll { overflow-x: auto; }
+
+.plr-rp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+
+.plr-rp-table th {
+    padding: 10px 14px;
+    background: #f8fafc;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+    text-align: right;
+    border-bottom: 1px solid var(--plr-rule-strong);
+    white-space: nowrap;
+}
+
+.plr-rp-table th.plr-label-head { text-align: left; }
+
+.plr-rp-table td {
+    padding: 8px 14px;
+    font-size: 13.5px;
+    color: #1e293b;
+    text-align: right;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+}
+
+.plr-rp-table .plr-label {
+    text-align: left;
+    font-weight: 600;
+    color: #334155;
+    min-width: 168px;
+}
+
+/* 과목 열 고정 (가로 스크롤 시) */
+.plr-rp-table th:first-child,
+.plr-rp-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--plr-paper);
+    z-index: 2;
+    box-shadow: inset -1px 0 0 var(--plr-rule);
+}
+
+.plr-rp-table th:first-child { background: #f8fafc; }
+
+.plr-rp-table tbody tr:hover td { background: #f8fafc; }
+
+/* 편집 가능 셀 — 우측 정렬 유지 */
+.plr-rp-table .cell-value { text-align: right; padding: 2px 4px; }
+.plr-rp-table .edit-input { min-width: 88px; font-size: 13px; }
+
+/* 섹션 구분 행 (Ⅰ. 매출액 …) */
+.plr-sec-row td {
+    background: #f1f5f9 !important;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #334155;
+    letter-spacing: 0.05em;
+    text-align: left;
+    padding: 7px 14px;
+    border-top: 1px solid var(--plr-rule);
+    position: sticky;
+    left: 0;
+}
+
+/* 소계 행 */
+.plr-subtotal td {
+    font-weight: 800;
+    background: #fafcfe;
+    border-top: 1px solid var(--plr-rule-strong);
+    border-bottom: 1px solid var(--plr-rule-strong);
+}
+
+.plr-subtotal td:first-child { background: #fafcfe; }
+
+/* 영업이익 행 */
+.plr-keyrow td {
+    font-weight: 800;
+    background: #f0fdfa;
+    border-top: 1px solid #99f6e4;
+    border-bottom: 1px solid #99f6e4;
+    color: var(--plr-teal-deep);
+}
+
+.plr-keyrow td:first-child { background: #f0fdfa; }
+
+/* 당기순이익 행 — 회계 결산 이중선 */
+.plr-final td {
+    font-size: 14.5px;
+    font-weight: 900;
+    color: var(--plr-ink);
+    background: #fff;
+    border-top: 3px double var(--plr-ink);
+    border-bottom: 3px double var(--plr-ink);
+    padding-top: 11px;
+    padding-bottom: 11px;
+}
+
+.plr-final td:first-child { background: #fff; }
+
+/* 합계·월평균 강조 열 */
+.plr-rp-table th.plr-col-total,
+.plr-rp-table td.plr-col-total {
+    background: #f8fafc;
+    font-weight: 800;
+    border-left: 1px solid var(--plr-rule-strong);
+}
+
+.plr-rp-table th.plr-col-avg,
+.plr-rp-table td.plr-col-avg {
+    background: #f0fdfa;
+    font-weight: 700;
+}
+
+.plr-subtotal td.plr-col-total, .plr-subtotal td.plr-col-avg,
+.plr-keyrow td.plr-col-total, .plr-keyrow td.plr-col-avg { background: #e6fbf6; }
+.plr-final td.plr-col-total, .plr-final td.plr-col-avg { background: #f8fafc; }
+
+/* 분기 보고서 — 월평균 열 잘림 방지를 위해 전폭 1열 유지 */
+.plr-duo { display: grid; grid-template-columns: 1fr; gap: 0; }
+
+/* 반응형 */
+@media (max-width: 1100px) {
+    .plr-stat-grid, .plr-board-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+    .plr-stat-grid, .plr-board-2, .plr-board-4 { grid-template-columns: 1fr; }
+    .plr-rp-head { padding: 16px 16px 14px; }
+    .plr-seg button { padding: 10px 16px; }
+}
+
+/* 모션 축소 존중 */
+@media (prefers-reduced-motion: reduce) {
+    .plr .card-animate { animation: none !important; }
+    .plr-seg button { transition: none; }
+}
