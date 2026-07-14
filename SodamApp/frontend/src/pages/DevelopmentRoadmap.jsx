@@ -394,22 +394,23 @@ const phases = [
         modules: [
             {
                 name: '복식부기 회계 시스템',
-                status: 'planned',
+                status: 'in_progress',
                 items: [
                     { text: '계정과목 체계 (중소기업 표준)', done: false },
                     { text: '매출/매입 자동 분개 (전표 생성)', done: false },
                     { text: '급여/보험료 자동 분개', done: false },
-                    { text: '감가상각 자동 계산', done: false },
+                    { text: '감가상각 자동 계산', done: true },
                 ],
             },
             {
                 name: '재무제표 자동 생성',
-                status: 'planned',
+                status: 'in_progress',
                 items: [
-                    { text: '재무상태표 (대차대조표)', done: false },
-                    { text: '손익계산서 (법정 서식)', done: false },
-                    { text: '현금흐름표', done: false },
+                    { text: '재무상태표 (대차대조표)', done: true },
+                    { text: '손익계산서 (법정 서식)', done: true },
+                    { text: '현금흐름표', done: true },
                     { text: '세무조정계산서', done: false },
+                    { text: '손익계산서 반기·분기 모니터링 (합계·월평균·증감 비교)', done: true },
                 ],
             },
             {

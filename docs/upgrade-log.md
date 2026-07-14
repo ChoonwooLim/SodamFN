@@ -152,3 +152,4 @@
 | 2026-07-04 | 정식 손익 양식(영업이익/순이익 분리) + 카드수수료 실효요율 자동 산정(CARD_FEE_RATE 1.4%) | feat(pl) | services/profit_loss_service.py, frontend/ProfitLoss/index.jsx |
 | 2026-07-04 | 비유동자산 대장(FixedAsset)+감가상각 자동 반영 (개업 2021-05, 추가집기 2024-07) | feat(fs) | models.py, services/profit_loss_service.py, financial_statements_service.py |
 | 2026-07-04 | 국민카드 파서 + 은행 원장 분류 100%(withholding_tax·cash_deposit 등 신설) | feat(purchase) | services/purchase_parser.py, routers/bank_sync.py |
+| 2026-07-14 | 손익계산서 반기·분기 모니터링 (연간\|반기별\|분기별 모드, 기간 비교 카드+합계·월평균, 월평균 기준 증감배지) + 정식 결산보고서 리디자인 (로마숫자 계정·회계 이중선·흑자/적자 스탬프) | feat(pl) | SodamApp/frontend/src/pages/ProfitLoss/index.jsx, ProfitLoss.css |

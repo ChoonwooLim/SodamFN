@@ -127,3 +127,5 @@
 | 2026-07-04 | 신한카드 신형 .xlsx 업로드 XLRDError | engine='xlrd' 고정 + 신형 컬럼(거래일/매입구분) 미매핑 | 매직바이트 엔진 자동감지 + 신형 컬럼 fallback | services/purchase_parser.py |
 | 2026-07-04 | P/L vs 비용관리 화면 불일치 + 보험료 P/L 누락 | P/L=거래처분류·화면=행분류 이원화, 보험료→expense_insurance(4대보험 전용) 매핑돼 스킵 | 행 분류를 거래처 SSOT로 통일(개인가계부 표시 우선), 보험료→기타경비 재매핑 | services/profit_loss_service.py |
 | 2026-07-04 | 재무제표 탭 무한 "산출 중…" 프리즈 (프로덕션) | api.js baseURL에 /api 포함인데 statements 호출만 /api/ 접두 중복 → /api/api 404 + 조용한 catch | 경로 수정 + 에러 배너·재시도 버튼, 전 코드베이스 동일 패턴 0건 확인 | SodamApp/frontend/src/pages/ProfitLoss/index.jsx |
+| 2026-07-14 | 감가상각비 과대 계상 (자산대장 취득원가 2배 추정) | 7/4 사장님 추정 취득가(5,000만×2+3,000만)가 실제의 2배 수준 | 취득원가 50% 정정(대장 note 이력 보존) + 2025-01~2026-07 백필 (월 217만→108만, 5월~ 50만→25만) | SodamApp/backend DB FixedAsset, services/financial_statements_service.py |
+| 2026-07-14 | P/L 사업장 교차 오염 — 슈퍼어드민 조회만으로 전 사업장 수치 뒤섞임 | sync 함수들이 business_id=None이면 전 사업장 원천 합산을 임의 사업장 P/L 레코드(.first())에 기록 (조회-시-재집계가 쓰기 유발) | 6개 sync 함수에 사업장별 fan-out 가드 + biz=1 재동기화(1~6월 기준값 일치 검증)·biz=2 시드 재생성·biz=3 오염필드 초기화 | services/profit_loss_service.py |
