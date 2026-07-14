@@ -375,18 +375,22 @@ def sync_depreciation_to_pl(year: int, month: int, session: Session, business_id
     """감가상각비 = FixedAsset 대장 기준 정액 상각 합 (주방집기·인테리어 등).
 
     자산 대장이 비어 있으면 기존 값 보존 (수동 입력 유지).
+    business_id=None(슈퍼어드민 조회)이면 사업장별로 각자 자산→각자 P/L에 반영.
+    타 사업장 자산 합산이 임의 레코드에 기록되던 교차 오염 방지 (2026-07-14).
     """
     from models import FixedAsset
-    stmt = select(FixedAsset)
-    if business_id is not None:
-        stmt = stmt.where(FixedAsset.business_id == business_id)
-    assets = session.exec(stmt).all()
 
-    pl_stmt = select(MonthlyProfitLoss).where(
-        MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month)
-    if business_id is not None:
-        pl_stmt = pl_stmt.where(MonthlyProfitLoss.business_id == business_id)
-    pl_record = session.exec(pl_stmt).first()
+    if business_id is None:
+        biz_ids = set(session.exec(select(FixedAsset.business_id)).all())
+        return sum(sync_depreciation_to_pl(year, month, session, bid)
+                   for bid in biz_ids)
+
+    assets = session.exec(select(FixedAsset).where(
+        FixedAsset.business_id == business_id)).all()
+
+    pl_record = session.exec(select(MonthlyProfitLoss).where(
+        MonthlyProfitLoss.year == year, MonthlyProfitLoss.month == month,
+        MonthlyProfitLoss.business_id == business_id)).first()
 
     if not assets:
         return (pl_record.expense_depreciation if pl_record else 0)
