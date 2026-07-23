@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 from database import get_session
 from models import (
     User as AuthUser, Business, Vendor, Product, Inventory,
-    PurchaseOrder, Receipt, DailyExpense,
+    PurchaseOrder, Receipt, DailyExpense, ProductPrice,
 )
 from routers.auth import get_admin_user
 from tenant_filter import get_bid_from_token, apply_bid_filter
@@ -116,7 +116,11 @@ def get_catalog(
                 "name": p.name,
                 "category": p.category,
                 "spec": p.spec,
+                "weight": p.weight,
+                "unit": p.unit,
+                "pack_qty": p.pack_qty,
                 "unit_price": p.unit_price,
+                "price_updated": p.price_updated.isoformat() if p.price_updated else None,
                 "tax_type": p.tax_type,
                 "note": p.note,
                 "current_stock": inv.current_stock if inv else 0.0,
@@ -389,6 +393,47 @@ def _find_or_create_vendor(session: Session, bid, name: str, category: Optional[
     return vendor
 
 
+def _record_item_prices(session: Session, bid, receipt: Receipt, vendor: Vendor):
+    """영수증 품목 라인을 거래처 품목과 이름 매칭 → 단가 이력 기록 + 최신 구매가 반영.
+
+    라인 금액은 (단가×수량)일 수 있으므로 완벽하지 않음 — 품목 화면에서 수동 보정 가능.
+    구매일자별 변동을 반영하기 위해 영수증 날짜가 기존 기준일보다 새로우면 단가 갱신."""
+    if not receipt.ocr_json:
+        return
+    try:
+        items = json.loads(receipt.ocr_json).get("items") or []
+    except Exception:
+        return
+    if not items:
+        return
+    products = session.exec(select(Product).where(Product.vendor_id == vendor.id)).all()
+    if not products:
+        return
+    d = receipt.receipt_date or datetime.date.today()
+
+    def norm(s):
+        return (s or "").replace(" ", "").lower()
+
+    for it in items:
+        iname = norm(it.get("name") if isinstance(it, dict) else None)
+        try:
+            amt = int(float(str(it.get("amount")).replace(",", "")))
+        except (TypeError, ValueError, AttributeError):
+            continue
+        if not iname or amt <= 0:
+            continue
+        for p in products:
+            pname = norm(p.name)
+            if pname and (pname in iname or iname in pname):
+                session.add(ProductPrice(business_id=bid, product_id=p.id, price=amt,
+                                         price_date=d, source="receipt", receipt_id=receipt.id))
+                if not p.unit_price or (p.price_updated is None or d >= p.price_updated):
+                    p.unit_price = amt
+                    p.price_updated = d
+                    session.add(p)
+                break
+
+
 def _attach_expense(session: Session, bid, receipt: Receipt):
     """영수증을 매입·비용관리(DailyExpense)에 반영.
     같은 (날짜·거래처·결제수단)의 영수증 지출 행이 있으면 금액 합산 (natural key 유니크 제약 대응)."""
@@ -421,6 +466,10 @@ def _attach_expense(session: Session, bid, receipt: Receipt):
     session.flush()
     receipt.daily_expense_id = expense.id
     receipt.status = "classified"
+    try:
+        _record_item_prices(session, bid, receipt, vendor)
+    except Exception:
+        pass
     _sync_pl(session, bid, d)
 
 

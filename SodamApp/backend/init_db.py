@@ -71,6 +71,11 @@ def _run_migrations():
         ("purchaseorder", "completed_at", "TIMESTAMP"),
         # 2026-07-23: 주거래처 플래그 (자재관리 > 주거래처)
         ("vendor", "is_primary", "BOOLEAN DEFAULT FALSE"),
+        # 2026-07-23: 품목 상세 필드 (중량·규격단위·수량·단가기준일)
+        ("product", "weight", "VARCHAR"),
+        ("product", "unit", "VARCHAR"),
+        ("product", "pack_qty", "FLOAT DEFAULT 1"),
+        ("product", "price_updated", "DATE"),
         ("inventorycheck", "items_json", "TEXT"),
         # 2026-04-27: bank-sync 자동 분류 → 매출관리/매입관리(DailyExpense) 연동
         ("banktransaction", "linked_daily_id", "INTEGER"),

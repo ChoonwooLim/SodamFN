@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../../api';
+import { specOf } from './ItemsManagement';
 import {
     PackageSearch, RefreshCw, ShoppingCart, AlertTriangle,
     ChevronDown, Package, CheckCircle2, ClipboardList,
@@ -197,7 +198,7 @@ export default function MaterialStockManagement() {
                                                         <div key={p.id} className={`flex items-center gap-3 px-5 py-3 ${short ? 'bg-red-50/40' : ''}`}>
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                                                                {p.spec && <p className="text-[11px] text-slate-400">{p.spec}</p>}
+                                                                {specOf(p) && <p className="text-[11px] text-slate-400">{specOf(p)}</p>}
                                                             </div>
                                                             <input
                                                                 type="number" min="0" inputMode="decimal"

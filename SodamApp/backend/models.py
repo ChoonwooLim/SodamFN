@@ -104,17 +104,33 @@ class Product(SQLModel, table=True):
     product_code: Optional[str] = None  # 업체별 제품코드 (예: MRS01, KST02)
     name: str
     category: Optional[str] = None
-    spec: Optional[str] = None  # 규격 (용량, 단위 등)
+    spec: Optional[str] = None  # 규격 (용량, 단위 등 — 자유 텍스트, 하위호환)
+    weight: Optional[str] = None      # 중량 수치 (예: "20", "500")
+    unit: Optional[str] = None        # 규격 단위 (kg, g, L, ml, 개, 봉, box 등)
+    pack_qty: float = Field(default=1.0)  # 수량 (묶음/단위당 수량)
     unit_price: int = 0
+    price_updated: Optional[datetime.date] = None  # 단가 기준일 (영수증 자동추출/수동 수정)
     tax_type: str = Field(default="taxable")  # taxable(과세), tax_free(면세), zero_rated(영세)
     manufacturer: Optional[str] = None  # 제조사
     note: Optional[str] = None  # 비고
     image_url: Optional[str] = None  # 제품 이미지 URL
-    
+
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id")
     vendor: Optional[Vendor] = Relationship(back_populates="products")
-    
+
     inventory: Optional["Inventory"] = Relationship(back_populates="product")
+
+
+class ProductPrice(SQLModel, table=True):
+    """품목 단가 이력 — 영수증 자동추출·수동 수정 시 구매일자별 기록"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    product_id: int = Field(foreign_key="product.id", index=True)
+    price: int = 0
+    price_date: datetime.date = Field(default_factory=datetime.date.today, index=True)
+    source: str = Field(default="manual")  # manual / receipt
+    receipt_id: Optional[int] = None       # 영수증 출처 (FK 미설정 — 영수증 삭제와 독립)
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 class DeliveryImage(SQLModel, table=True):
     """배달앱/상품관리용 이미지"""

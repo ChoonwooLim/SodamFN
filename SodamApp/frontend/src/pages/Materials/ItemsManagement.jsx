@@ -13,7 +13,21 @@ const TAX_TYPES = [
     { id: 'zero_rated', label: '영세' },
 ];
 
-const EMPTY_FORM = { name: '', spec: '', unit_price: '', tax_type: 'taxable', note: '' };
+const FORM_TAX_TYPES = [{ id: 'auto', label: '자동분류' }, ...TAX_TYPES];
+
+// 규격 단위 (개, 봉, kg, g, L, ml 등)
+const UNITS = ['kg', 'g', 'L', 'ml', '개', '봉', '팩', 'box', 'EA', '포', '병', '통', '묶음', '판', '단'];
+
+const EMPTY_FORM = { name: '', weight: '', unit: 'kg', pack_qty: 1, unit_price: '', tax_type: 'auto', note: '' };
+
+// 중량+규격+수량 표시 (예: 20kg, 2kg ×3) — 구버전은 spec 텍스트 폴백
+export const specOf = (p) => {
+    if (p.weight && p.unit) {
+        return `${p.weight}${p.unit}${p.pack_qty > 1 ? ` ×${p.pack_qty}` : ''}`;
+    }
+    if (p.unit && !p.weight) return `${p.pack_qty > 1 ? p.pack_qty : 1}${p.unit}`;
+    return p.spec || '';
+};
 
 export default function MaterialItemsManagement() {
     const [catalog, setCatalog] = useState([]);
@@ -66,7 +80,9 @@ export default function MaterialItemsManagement() {
             await api.post('/products', {
                 vendor_id: selected.vendor.id,
                 name: addForm.name.trim(),
-                spec: addForm.spec.trim() || null,
+                weight: String(addForm.weight).trim() || null,
+                unit: addForm.unit || null,
+                pack_qty: Number(addForm.pack_qty) || 1,
                 unit_price: Number(addForm.unit_price) || 0,
                 tax_type: addForm.tax_type,
                 note: addForm.note.trim() || null,
@@ -81,8 +97,13 @@ export default function MaterialItemsManagement() {
     const startEdit = (p) => {
         setEditingId(p.id);
         setEditForm({
-            name: p.name, spec: p.spec || '', unit_price: p.unit_price || '',
-            tax_type: p.tax_type || 'taxable', note: p.note || '',
+            name: p.name,
+            weight: p.weight || '',
+            unit: p.unit || (p.weight ? 'kg' : ''),
+            pack_qty: p.pack_qty || 1,
+            unit_price: p.unit_price || '',
+            tax_type: p.tax_type || 'auto',
+            note: p.note || (p.spec && !p.weight ? `규격: ${p.spec}` : ''),
         });
     };
 
@@ -92,7 +113,9 @@ export default function MaterialItemsManagement() {
         try {
             await api.put(`/products/${editingId}`, {
                 name: editForm.name.trim(),
-                spec: editForm.spec.trim(),
+                weight: String(editForm.weight).trim(),
+                unit: editForm.unit || '',
+                pack_qty: Number(editForm.pack_qty) || 1,
                 unit_price: Number(editForm.unit_price) || 0,
                 tax_type: editForm.tax_type,
                 note: editForm.note.trim(),
@@ -245,36 +268,71 @@ export default function MaterialItemsManagement() {
                                 {/* 추가 폼 */}
                                 {showAdd && (
                                     <div className="px-5 py-4 bg-cyan-50/50 border-b border-cyan-100">
-                                        <div className="grid grid-cols-2 sm:grid-cols-[1fr_120px_110px_90px] gap-2 mb-2">
-                                            <input autoFocus placeholder="품명 *" value={addForm.name}
-                                                onChange={e => setAddForm({ ...addForm, name: e.target.value })}
-                                                className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
-                                            <input placeholder="규격 (예: 1box/10kg)" value={addForm.spec}
-                                                onChange={e => setAddForm({ ...addForm, spec: e.target.value })}
-                                                className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
-                                            <input placeholder="단가(원)" type="number" inputMode="numeric" value={addForm.unit_price}
-                                                onChange={e => setAddForm({ ...addForm, unit_price: e.target.value })}
-                                                className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
-                                            <select value={addForm.tax_type}
-                                                onChange={e => setAddForm({ ...addForm, tax_type: e.target.value })}
-                                                className="px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none">
-                                                {TAX_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                                            </select>
+                                        <div className="grid grid-cols-2 sm:grid-cols-[1fr_90px_100px_80px] gap-2 mb-2">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">품명 *</label>
+                                                <input autoFocus placeholder="예: 쌀" value={addForm.name}
+                                                    onChange={e => setAddForm({ ...addForm, name: e.target.value })}
+                                                    className="mt-0.5 w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">중량</label>
+                                                <input placeholder="예: 20" inputMode="decimal" value={addForm.weight}
+                                                    onChange={e => setAddForm({ ...addForm, weight: e.target.value })}
+                                                    className="mt-0.5 w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">규격(단위)</label>
+                                                <select value={addForm.unit}
+                                                    onChange={e => setAddForm({ ...addForm, unit: e.target.value })}
+                                                    className="mt-0.5 w-full px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none">
+                                                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">수량</label>
+                                                <input type="number" min="1" inputMode="numeric" value={addForm.pack_qty}
+                                                    onChange={e => setAddForm({ ...addForm, pack_qty: e.target.value })}
+                                                    className="mt-0.5 w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
+                                            </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <input placeholder="비고 (선택)" value={addForm.note}
-                                                onChange={e => setAddForm({ ...addForm, note: e.target.value })}
-                                                onKeyDown={e => e.key === 'Enter' && addProduct()}
-                                                className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
-                                            <button onClick={addProduct} disabled={saving || !addForm.name.trim()}
-                                                className="px-4 py-2.5 rounded-xl bg-cyan-600 text-white text-sm font-bold hover:bg-cyan-700 disabled:opacity-40 transition-all">
-                                                등록
-                                            </button>
-                                            <button onClick={() => { setShowAdd(false); setAddForm(EMPTY_FORM); }}
-                                                className="px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
-                                                <X size={16} />
-                                            </button>
+                                        <div className="grid grid-cols-2 sm:grid-cols-[120px_110px_1fr_auto] gap-2 items-end">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">단가(원)</label>
+                                                <input placeholder="영수증 자동반영" type="number" inputMode="numeric" value={addForm.unit_price}
+                                                    onChange={e => setAddForm({ ...addForm, unit_price: e.target.value })}
+                                                    className="mt-0.5 w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">과세</label>
+                                                <select value={addForm.tax_type}
+                                                    onChange={e => setAddForm({ ...addForm, tax_type: e.target.value })}
+                                                    className="mt-0.5 w-full px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none">
+                                                    {FORM_TAX_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-400">비고</label>
+                                                <input placeholder="선택 입력" value={addForm.note}
+                                                    onChange={e => setAddForm({ ...addForm, note: e.target.value })}
+                                                    onKeyDown={e => e.key === 'Enter' && addProduct()}
+                                                    className="mt-0.5 w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/30" />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={addProduct} disabled={saving || !addForm.name.trim()}
+                                                    className="px-4 py-2.5 rounded-xl bg-cyan-600 text-white text-sm font-bold hover:bg-cyan-700 disabled:opacity-40 transition-all">
+                                                    등록
+                                                </button>
+                                                <button onClick={() => { setShowAdd(false); setAddForm(EMPTY_FORM); }}
+                                                    className="px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
                                         </div>
+                                        <p className="mt-2 text-[10px] text-slate-400">
+                                            과세를 <b>자동분류</b>로 두면 품명 기준으로 면세(미가공 농축수산물)/과세를 자동 판정합니다.
+                                            단가는 영수증 업로드 시 자동 반영되며 구매일자별로 갱신됩니다.
+                                        </p>
                                     </div>
                                 )}
 
@@ -289,35 +347,46 @@ export default function MaterialItemsManagement() {
                                         {selected.products.map(p => (
                                             editingId === p.id ? (
                                                 <div key={p.id} className="px-5 py-3.5 bg-amber-50/50">
-                                                    <div className="grid grid-cols-2 sm:grid-cols-[1fr_120px_110px_90px] gap-2 mb-2">
-                                                        <input value={editForm.name}
+                                                    <div className="grid grid-cols-2 sm:grid-cols-[1fr_90px_100px_80px] gap-2 mb-2">
+                                                        <input value={editForm.name} placeholder="품명"
                                                             onChange={e => setEditForm({ ...editForm, name: e.target.value })}
                                                             className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
-                                                        <input value={editForm.spec} placeholder="규격"
-                                                            onChange={e => setEditForm({ ...editForm, spec: e.target.value })}
-                                                            className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
-                                                        <input type="number" value={editForm.unit_price} placeholder="단가"
+                                                        <input value={editForm.weight} placeholder="중량" inputMode="decimal"
+                                                            onChange={e => setEditForm({ ...editForm, weight: e.target.value })}
+                                                            className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
+                                                        <select value={editForm.unit}
+                                                            onChange={e => setEditForm({ ...editForm, unit: e.target.value })}
+                                                            className="px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none">
+                                                            <option value="">단위</option>
+                                                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                                        </select>
+                                                        <input type="number" min="1" value={editForm.pack_qty} placeholder="수량"
+                                                            onChange={e => setEditForm({ ...editForm, pack_qty: e.target.value })}
+                                                            className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-[120px_110px_1fr_auto] gap-2">
+                                                        <input type="number" value={editForm.unit_price} placeholder="단가(원)"
                                                             onChange={e => setEditForm({ ...editForm, unit_price: e.target.value })}
-                                                            className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
+                                                            className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
                                                         <select value={editForm.tax_type}
                                                             onChange={e => setEditForm({ ...editForm, tax_type: e.target.value })}
                                                             className="px-2 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none">
-                                                            {TAX_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                                                            {FORM_TAX_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                                                         </select>
-                                                    </div>
-                                                    <div className="flex gap-2">
                                                         <input value={editForm.note} placeholder="비고"
                                                             onChange={e => setEditForm({ ...editForm, note: e.target.value })}
                                                             onKeyDown={e => e.key === 'Enter' && saveEdit()}
-                                                            className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
-                                                        <button onClick={saveEdit} disabled={saving}
-                                                            className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-1">
-                                                            <Check size={15} /> 저장
-                                                        </button>
-                                                        <button onClick={() => setEditingId(null)}
-                                                            className="px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
-                                                            <X size={16} />
-                                                        </button>
+                                                            className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/40" />
+                                                        <div className="flex gap-2">
+                                                            <button onClick={saveEdit} disabled={saving}
+                                                                className="px-4 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 transition-all flex items-center gap-1">
+                                                                <Check size={15} /> 저장
+                                                            </button>
+                                                            <button onClick={() => setEditingId(null)}
+                                                                className="px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -328,14 +397,19 @@ export default function MaterialItemsManagement() {
                                                             {p.product_code && <span className="ml-2 text-[10px] font-mono text-slate-300">{p.product_code}</span>}
                                                         </p>
                                                         <p className="text-[11px] text-slate-400 mt-0.5">
-                                                            {p.spec && <span>{p.spec} · </span>}
-                                                            <span className={p.tax_type === 'tax_free' ? 'text-amber-500' : ''}>{taxLabel(p.tax_type)}</span>
+                                                            {specOf(p) && <span className="font-medium text-slate-500">{specOf(p)} · </span>}
+                                                            <span className={p.tax_type === 'tax_free' ? 'text-amber-500 font-bold' : ''}>{taxLabel(p.tax_type)}</span>
                                                             {p.note && <span> · {p.note}</span>}
                                                         </p>
                                                     </div>
-                                                    <span className="text-sm font-bold text-slate-700 shrink-0">
-                                                        {p.unit_price > 0 ? `${formatNumber(p.unit_price)}원` : <span className="text-slate-300 font-normal text-xs">단가 미등록</span>}
-                                                    </span>
+                                                    <div className="flex flex-col items-end shrink-0">
+                                                        <span className="text-sm font-bold text-slate-700">
+                                                            {p.unit_price > 0 ? `${formatNumber(p.unit_price)}원` : <span className="text-slate-300 font-normal text-xs">단가 미등록</span>}
+                                                        </span>
+                                                        {p.price_updated && (
+                                                            <span className="text-[9px] text-slate-300">{p.price_updated.slice(5).replace('-', '/')} 기준</span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                         <button onClick={() => { startEdit(p); setShowAdd(false); }}
                                                             className="w-9 h-9 rounded-xl text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 flex items-center justify-center transition-all">

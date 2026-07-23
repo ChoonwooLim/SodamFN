@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
+import { specOf } from './ItemsManagement';
 import {
     ShoppingCart, Phone, MessageCircle, Copy, ChevronDown, Search,
     Check, Minus, Plus, RefreshCw, ArrowLeft, History,
@@ -134,7 +135,7 @@ export default function MaterialOrderForm() {
                 const p = productIndex[pid];
                 if (!p) return;
                 (byVendor[p.vendor.id] = byVendor[p.vendor.id] || []).push({
-                    product_id: p.id, name: p.name, spec: p.spec,
+                    product_id: p.id, name: p.name, spec: specOf(p) || null,
                     quantity: qty, unit_price: p.unit_price || 0,
                 });
             });
@@ -500,7 +501,7 @@ export default function MaterialOrderForm() {
                                                                 <button onClick={() => toggleItem(p.id)} className="flex-1 min-w-0 text-left">
                                                                     <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
                                                                     <p className="text-[11px] text-slate-400">
-                                                                        {p.spec && <span>{p.spec} · </span>}
+                                                                        {specOf(p) && <span>{specOf(p)} · </span>}
                                                                         {p.unit_price > 0 ? `${formatNumber(p.unit_price)}원` : '단가 미등록'}
                                                                     </p>
                                                                 </button>
