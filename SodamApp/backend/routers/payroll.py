@@ -520,8 +520,13 @@ def calculate_payroll(req: PayrollCalculateRequest, bid = Depends(get_bid_from_t
         
         existing = service.session.exec(apply_bid_filter(select(Payroll), Payroll, bid).where(Payroll.staff_id == req.staff_id, Payroll.month == req.month)).first()
         # bid filter applied via select stmt above
+        # 급여 레코드의 사업장은 직원 소속이 SSOT — 슈퍼어드민(bid=None) 세션에서 산출해도
+        # business_id NULL 적재 금지 (NULL이면 직원앱 bid 필터 조회에서 not_found 되는 실사고 7/23)
+        owner_bid = staff.business_id if (staff and staff.business_id is not None) else bid
         if not existing:
-            existing = Payroll(staff_id=req.staff_id, month=req.month, business_id=bid)
+            existing = Payroll(staff_id=req.staff_id, month=req.month, business_id=owner_bid)
+        elif existing.business_id is None and owner_bid is not None:
+            existing.business_id = owner_bid
             
         special_bonus = req.special_bonus or 0
 

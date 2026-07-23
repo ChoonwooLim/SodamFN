@@ -348,75 +348,75 @@ UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니�
 <claude-mem-context>
 # Memory Context
 
-# [SodamFN] recent context, 2026-07-04 9:49am GMT+9
+# [SodamFN] recent context, 2026-07-23 6:30pm GMT+9
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (22,557t read) | 537,227t work | 96% savings
+Stats: 50 obs (19,896t read) | 453,109t work | 96% savings
 
-### Jul 4, 2026
-S56 Add 2026소득분석 folder to .gitignore to protect sensitive salary and income data from version control (Jul 4, 6:29 AM)
-S72 Start session and review SodamFN project status, infrastructure health, and roadmap priorities (Jul 4, 8:21 AM)
-S73 Complete the Coupang data fix work ("쿠팡데이터 수지 수정 작업중 오류 났었어. 진현상황 체크하고 마무리 해줘") — resolve remaining code review issues and deploy to production. (Jul 4, 8:51 AM)
-S74 Complete Coupang data collection fix work ("쿠팡데이터 수지 수정 작업중 오류 났었어. 진현상황 체크하고 마무리 해줘") — resolve blocking code review issues, merge to main, and deploy to production. (Jul 4, 9:05 AM)
-S75 Complete Coupang cookie data collection fix and provide operational instructions for using the newly deployed cookie input UX feature. (Jul 4, 9:06 AM)
-S76 Fix non-functional Coupang Eats integration ("안되는데?" / "It's not working?") — cookies fail validation immediately after registration with 401/403 errors (Jul 4, 9:07 AM)
-353 9:17a 🔵 Windows sandbox blocks file reads to project skill directories with deny ACLs
-354 " 🔵 SodamFN project session initialization workflow and database schema discovered
-355 " 🔵 Status="failed" Flag Set by _record_failure() But Never Checked Before Operations
-356 " 🔵 Project audit skill defines systematic quality review across 5 technical dimensions
-357 " 🔵 Frontend design skill enforces context gathering protocol before any design work
-358 9:18a 🔵 earliest_cookie_expiry() Finds Minimum Expiry; Mixed-Validity Cookies Cause Auth Failures
-359 " 🔵 Project design context and accessibility standards established in .impeccable.md
-361 " 🔵 Backend infrastructure integrations and external service dependencies mapped
-362 9:19a 🔵 Windows Korean locale encoding incompatibility blocks DevWorkLog queries
-364 " ✅ Added Cookie Merge Logic with Poison Detection Tests
-363 " 🔵 Comprehensive architectural documentation and recent operational progress retrieved
-366 " 🔵 Uncommitted changes for Coupang Eats cookie re-entry feature with expanded test coverage
-365 " ✅ Test-Driven Fix: 4 New Tests Added and Failing (RED Phase)
-367 9:20a ✅ Implemented merge_rotated_cookies() Function with Poison Detection
-368 " 🔴 Coupang Eats cookie merge logic prevents server-side invalidation poison from corrupting stored credentials
-369 " ✅ Integrated merge_rotated_cookies() into Manual-Cookies Endpoint
-370 " 🔵 Backend and frontend security patterns follow industry standards with encrypted credentials and JWT authentication
-371 " 🔵 Cookie merge fix validated: all 13 test cases passing including poison-prevention tests
-372 " 🔵 JWT and environment configuration present; production safety concern: uvicorn reload=True in main.py
-373 9:21a 🔵 Production deployment uses gunicorn with auto-generated SECRET_KEY; uvicorn reload=True only in development
-375 " 🔵 JWT_SECRET_KEY configuration inconsistency: auth.py warns on default, tenant_filter.py silently uses default
-377 " 🔵 CORS configured with origin whitelist (good), but allow_methods and allow_headers use wildcard permissiveness
-378 9:22a 🔵 Cron schedule: well-designed staggered batch collection with dual health watch monitoring (KST)
-379 " 🔵 Frontend and staff app use Vite with React 19; concurrent dev enables full-stack testing; no frontend test suite configured
-382 " 🔵 Test suite collection partially blocked: 5 tests fail to import due to missing optional dependencies (boto3, easycodefpy)
-385 9:23a 🔵 Frontend and staff app builds complete successfully; opportunity for code-splitting to reduce chunk sizes >500kB
-387 " 🔵 Test collection failures due to uninstalled optional dependencies declared in requirements.txt
-390 " 🔵 Test suite: 298/308 pass (96.8%); 10 failures due to database state pollution and test isolation issues
-395 9:25a 🔴 ROOT CAUSE: load_dotenv(override=True) overwrites monkeypatched DATABASE_URL, test fixtures connect to PRODUCTION PostgreSQL instead of isolated SQLite
-S77 Verify and fix Coupang Eats cookie registration issue causing 401/403 errors in settlement dashboard after manual re-registration (Jul 4, 9:31 AM)
-410 9:36a 🔵 Coupang authentication cookies successfully stored and verified
-411 9:38a 🔵 SodamFN Coupang Eats backend container running with manual cookies endpoint functional
-412 9:39a 🔵 Stored Coupang Eats cookies validated as active with successful whoami and balance API calls
-S79 Security audit of SodamFN backend — identified multi-tenant isolation, JWT configuration, test database isolation, credential management, and password policy vulnerabilities without making code changes (Jul 4, 9:40 AM)
-413 9:42a 🔵 Partial cookie functionality: whoami and balance work, expected_settlement and orders endpoints fail with authentication errors
-414 " 🔵 fetch_orders() API requires datetime.datetime objects, not datetime.date; probe script has type mismatch
-415 9:43a ✅ Probe script fixed: convert datetime.date to datetime.datetime for fetch_orders() compatibility
-416 " 🔵 Selective cookie degradation: whoami and balance work, but expected_settlement, orders, and settlements all return HTTP 403
-417 " ✅ Created diagnostic script to inspect Akamai and auth cookie validation state markers
-418 9:44a 🔵 Critical: _abck cookie validation failed (~-1 marker indicates unvalidated state)
-S78 Diagnose and fix Coupang Eats API access issues after manual cookie re-registration; identify why settlement/order endpoints return 403 while basic auth works (Jul 4, 9:45 AM)
-S80 Security audit of SodamFN backend (5 critical/high findings documented) — user now initiating systematic debugging phase to address vulnerabilities before implementing fixes (Jul 4, 9:46 AM)
-419 9:46a 🔵 Baemin module codebase structure mapped — 505 lines across services, routers, frontend, tests
-420 " 🔵 Baemin module development timeline — Phase 1 (cookies) complete, Phase 2a (excel) deployed, health monitoring recently added
-421 9:47a 🔵 Baemin cron_baemin orchestration — daily 04:30 fan-out to all active businesses via _run_sync
-422 " 🔵 Baemin router (_run_sync, sync_manual) and service (fetch_orders, fetch_settlements) API boundaries mapped
-423 " 🔵 pytest execution blocked — confirms P1 test-DB-pollution issue prevents safe local testing
-424 " 🔵 _run_sync error handling chain — 3-tier exception catching with CookieInvalidError marked as status=cookie_invalid
-425 " 🔵 Baemin dashboard and debug endpoints — 7-day sales aggregation + cookie probe + raw API inspection (superadmin-only)
-426 " 🔵 BaeminClient authentication — curl_cffi impersonation, HAR-derived terminalId/fingerprint, x-e-request header refresh requirements
-427 " 🔵 _run_sync multi-session pattern — separate Session() contexts for fetch, upsert, sync, reflect, and logging stages
-428 9:48a 🔵 Baemin auto-collection completely non-functional — credentials marked cookie_invalid since 2026-05-14, HTTP 403 (HTML block page) on every attempt
-429 " 🔵 BaeminCredential and BaeminSyncLog state tracking — cookie expiry estimation, failure counter, manual cookie validation flow
-430 " 🔵 Manual sync endpoint validates date range (1-91 days max), delegates to _run_sync with triggered_by='manual'
+### Jul 23, 2026
+2320 1:35p ✅ Applied responsive padding to ingredient tab button for consistency
+2321 1:36p ✅ Built, committed, and deployed recipe mobile layout fixes to main branch
+S368 Fix broken recipe management mobile layout; identified and resolved three issues; refined sidebar mobile UX (Jul 23, 1:36 PM)
+2322 1:39p ✅ Hid app preview links from mobile sidebar footer
+2323 1:40p ✅ Recipe management fixes deployed; sidebar mobile refinement built and pushed
+S369 Fix broken recipe management mobile layout; deploy sidebar mobile UX refinement; update on overall project progress (Jul 23, 1:40 PM)
+2324 1:42p ✅ Sidebar mobile UX refinement deployed to production
+S370 Mobile-first responsive design optimization for SodamFN admin and staff apps, plus product image capture/upload and display workflow across purchasing interfaces (Jul 23, 1:42 PM)
+2325 1:43p 🔵 App layout structure: sidebar integration and bottom navigation
+2326 1:44p 🔵 Launched parallel mobile audits of financial and materials/product pages
+2327 1:48p ✅ Menu reorganization: Materials/Purchasing elevated to primary workflow section
+2328 " 🔵 ProfitLoss page uses responsive table layouts with overflow-x handling
+2329 1:49p ✅ Sidebar responsive menu: desktop tools hidden on mobile via flag filtering
+2330 " ✅ Frontend build verified: menu and responsive navigation changes deployed
+2331 1:50p ✅ RecipeBook responsive padding simplified: remove mobile hamburger menu spacing workaround
+2332 1:51p ✅ Batch mobile-first responsive improvements: grids, overflow, touch targets across 8 pages
+2333 1:52p ✅ Batch 2 mobile improvements: materials management touch targets, flex wrapping, responsive grids
+2334 1:53p ✅ Batch 3 mobile final fixes: table overflow, hidden labels, CSS flex-wrap
+2335 1:54p ✅ HRDashboard: hide labor law guidance panel on mobile
+2336 " ✅ Materials API: add image_url to product catalog response
+2337 " ✅ Materials API: add image_url to staff product catalog
+S371 Comprehensive mobile-first responsive design optimization for SodamFN admin and staff apps, including product image capture/upload workflow and deployment verification (Jul 23, 1:56 PM)
+S372 Session-end documentation and archival for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END to finalize work and commit session documentation. (Jul 23, 1:59 PM)
+2345 2:04p ✅ Session closure completed with full documentation
+2346 2:21p 🔵 SodamFN Project Architecture Inventory
+2347 2:22p 🔵 Phase 1 Payroll Calculation Engine Implementation Scope
+2348 " 🔵 Phase 1 Compliance and Document Management Integration
+2349 2:23p 🟣 Materials &amp; Purchasing Management System Completed
+2350 " 🔴 Four System Bugs Fixed: Product Visibility, FK Constraint, Mobile CSS, Staff App Deployment
+2351 " ✅ Documentation Suite Updated with Session Completion Records
+2352 2:24p ✅ Project Architecture Snapshot Documented in DevWorkLog HEAD
+S373 Session-end documentation, archival, and knowledge base synchronization for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END after completing major feature work, bug fixes, and comprehensive documentation updates, concluding with wiki synchronization to capture learnings for future sessions. (Jul 23, 2:26 PM)
+2353 2:28p ✅ LLM Wiki Updated with Session Learnings — Ollama Models &amp; SodamFN Architecture
+S374 Session startup and project context loading for SodamFN — reviewing infrastructure, recent work logs, and deployment status (Jul 23, 2:30 PM)
+2354 5:58p 🔵 SodamFN Multi-Service Infrastructure Topology
+S375 Mobile layout fixes for delivery app dashboard and purchase summary — 2 screens patched, responsive CSS modernized, deployed to main (Jul 23, 5:59 PM)
+2355 5:59p 🔵 Design System and User Context Documentation (.impeccable.md)
+2356 " 🔵 PurchaseSummary Component — Delivery App Fee Visualization
+2357 6:00p 🔄 PurchaseSummary Delivery Fee Grid — Inline Styles to Tailwind CSS
+2358 6:01p 🔄 PurchaseSummary Fee Breakdown — Layout Overflow Prevention & Responsive Improvements
+2359 " 🔵 Delivery App Fee Data Visualization — Multi-Component Infrastructure
+2360 6:02p 🔵 DeliveryAppDashboard — Inline Style Object + Media Query Pattern (Legacy)
+2361 " 🔵 DeliveryAppDashboard Table Structure — Complex Multi-Column Layout with display:contents
+2362 6:03p ✅ DeliveryAppDashboard Header — Mobile Responsiveness Improvement
+S376 SodamFN mobile UI fixes and responsive menu reorganization — two commits deployed to main branch (Jul 23, 6:06 PM)
+2385 6:19p ✅ Settings UI Refactor & PC-Only Menu Flags
+2386 6:20p 🔵 Expense TOP 5 Feature Located in Dashboard & Documentation
+2387 6:21p 🔵 Expense TOP 5 Backend Implementation via /analytics/cost Endpoint
+2388 " 🔴 Expense TOP 5 Query Filters Out Non-Expense Vendors
+2389 6:22p 🔴 Vendor Category Filter Uses IS DISTINCT FROM for NULL Safety
+2390 " ✅ Landing Page Mobile Typography Improvements for Korean Text
+2391 6:23p 🔵 Cost TOP 5 Query Verification: Bug Fix Confirmed Against Production Data
+2392 " ✅ Dashboard Cost Fix & Landing Typography Deployed to Production
+S377 Fix dashboard Expense TOP 5 showing incorrect data + resolve landing page hero title wrapping on mobile (Jul 23, 6:24 PM)
+2393 6:29p 🔵 Payroll display logic in Payslip component conditional on hasPayroll flag
+2394 " 🔵 Payslip component fetches payroll data from /payroll/staff API endpoint
+2395 " 🔵 Backend payroll API returns "not_found" when Payroll record missing from database
+2396 " 🔵 June 2026 Payroll records exist in database but many have business_id=NULL
+2397 6:30p 🔵 apply_bid_filter() excludes Payroll records with business_id=NULL when user has assigned bid
+2398 " 🔵 Payroll creation in codebase explicitly assigns business_id when creating records
 
-Access 537k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 453k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>
