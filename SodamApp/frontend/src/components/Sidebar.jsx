@@ -499,19 +499,22 @@ export default function Sidebar() {
             <div className="p-3 space-y-0.5">
                 <div className="mx-2 mb-2 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)' }} />
 
+                {/* 앱 미리보기 링크 — 폰 화면(모바일)에서는 무의미하므로 데스크톱에서만 표시 */}
                 {isSuperAdmin && !isViewingBusiness && (
-                    <Link
-                        to="/admin-app-preview"
-                        className={`sidebar-menu-item ${location.pathname === '/admin-app-preview' ? 'active-super' : ''}`}
-                    >
-                        <Shield size={16} />
-                        <span>수퍼관리자앱</span>
-                        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(245,158,11,0.15)', color: '#FBBF24' }}>SUPER</span>
-                    </Link>
+                    <div className="hidden md:block">
+                        <Link
+                            to="/admin-app-preview"
+                            className={`sidebar-menu-item ${location.pathname === '/admin-app-preview' ? 'active-super' : ''}`}
+                        >
+                            <Shield size={16} />
+                            <span>수퍼관리자앱</span>
+                            <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(245,158,11,0.15)', color: '#FBBF24' }}>SUPER</span>
+                        </Link>
+                    </div>
                 )}
 
                 {(user.role === 'admin' || isViewingBusiness) && (
-                    <>
+                    <div className="hidden md:block space-y-0.5">
                         <Link
                             to="/staff-app-preview"
                             className={`sidebar-menu-item ${location.pathname === '/staff-app-preview' ? 'active' : ''}`}
@@ -528,7 +531,7 @@ export default function Sidebar() {
                             <span>관리자 앱</span>
                             <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-bold" style={{ background: 'rgba(139,92,246,0.15)', color: '#C4B5FD' }}>WEB</span>
                         </Link>
-                    </>
+                    </div>
                 )}
 
                 {/* Brand Footer */}
