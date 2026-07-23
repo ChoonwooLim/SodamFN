@@ -129,8 +129,8 @@ export default function RecipeBook() {
 
     return (
         <div className="min-h-screen bg-slate-50/80 pb-32">
-            {/* Hero */}
-            <div className="max-w-5xl mx-auto px-6 pt-8 pb-2">
+            {/* Hero — 모바일에서는 햄버거 메뉴와 겹치지 않게 아래로 */}
+            <div className="max-w-5xl mx-auto px-6 pt-16 md:pt-8 pb-2">
                 <div className="flex items-center gap-3 mb-1">
                     <button onClick={() => navigate(-1)} className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20 border-none cursor-pointer text-white hover:shadow-xl transition-all">
                         <ChevronLeft size={20} />
@@ -150,11 +150,11 @@ export default function RecipeBook() {
             {/* Main Tabs */}
             <div className="max-w-5xl mx-auto px-6 pt-3 pb-1">
                 <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-                    <button onClick={() => handleMainTabChange('product')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold border-none cursor-pointer transition-all ${isProduct ? 'bg-white text-slate-800 shadow-md' : 'bg-transparent text-slate-400 hover:text-slate-600'}`}>
+                    <button onClick={() => handleMainTabChange('product')} className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap border-none cursor-pointer transition-all ${isProduct ? 'bg-white text-slate-800 shadow-md' : 'bg-transparent text-slate-400 hover:text-slate-600'}`}>
                         <ShoppingBag size={16} /> 상품 레시피
                         <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${isProduct ? 'bg-orange-100 text-orange-600' : 'bg-slate-200 text-slate-400'}`}>{productCount}</span>
                     </button>
-                    <button onClick={() => handleMainTabChange('ingredient')} className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold border-none cursor-pointer transition-all ${!isProduct ? 'bg-white text-slate-800 shadow-md' : 'bg-transparent text-slate-400 hover:text-slate-600'}`}>
+                    <button onClick={() => handleMainTabChange('ingredient')} className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-sm font-bold whitespace-nowrap border-none cursor-pointer transition-all ${!isProduct ? 'bg-white text-slate-800 shadow-md' : 'bg-transparent text-slate-400 hover:text-slate-600'}`}>
                         <Wheat size={16} /> 재료 레시피
                         <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${!isProduct ? 'bg-orange-100 text-orange-600' : 'bg-slate-200 text-slate-400'}`}>{ingredientCount}</span>
                     </button>
@@ -203,10 +203,10 @@ export default function RecipeBook() {
                                         {r.image_url ? (
                                             <img src={r.image_url} alt={r.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                         ) : (
-                                            <span className="text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm">{r.emoji || '🍽️'}</span>
+                                            <span className="recipe-emoji text-5xl relative z-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-sm">{r.emoji || '🍽️'}</span>
                                         )}
                                         {isProduct && r.price > 0 && (
-                                            <span className="absolute bottom-2 right-2 text-[12px] font-extrabold text-slate-700 bg-white/85 px-2 py-0.5 rounded-md shadow-sm">{r.price.toLocaleString('ko-KR')}원</span>
+                                            <span className="recipe-price absolute bottom-2 right-2 text-[12px] font-extrabold text-slate-700 bg-white/85 px-2 py-0.5 rounded-md shadow-sm">{r.price.toLocaleString('ko-KR')}원</span>
                                         )}
                                     </div>
                                     <div className="p-3.5">

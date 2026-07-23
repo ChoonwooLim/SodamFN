@@ -85,8 +85,16 @@
         min-width: 0;
     }
 
-    /* Mobile: emoji size adjust */
-    .recipe-grid-layout > div > div:first-child span {
+    /* Mobile: emoji size adjust — 이모지에만 적용 (가격 배지 제외) */
+    .recipe-grid-layout > div > div:first-child .recipe-emoji {
         font-size: 2rem !important;
+    }
+
+    /* Mobile: 가격 배지는 작게 유지 */
+    .recipe-grid-layout > div > div:first-child .recipe-price {
+        font-size: 10px !important;
+        bottom: 2px !important;
+        right: 2px !important;
+        padding: 1px 5px !important;
     }
 }
