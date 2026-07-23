@@ -38,8 +38,8 @@ const StoreMaterials = React.lazy(() => import('./pages/ProductManagement/StoreM
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const PlatformLanding = React.lazy(() => import('./pages/PlatformLanding'));
 const StaffAppPreview = React.lazy(() => import('./pages/StaffAppPreview'));
-const PurchaseRequests = React.lazy(() => import('./pages/PurchaseRequests'));
 const MaterialOrderForm = React.lazy(() => import('./pages/Materials/OrderForm'));
+const MaterialOrderManage = React.lazy(() => import('./pages/Materials/OrderManage'));
 const MaterialItems = React.lazy(() => import('./pages/Materials/ItemsManagement'));
 const MaterialStock = React.lazy(() => import('./pages/Materials/StockManagement'));
 const MaterialReceipts = React.lazy(() => import('./pages/Materials/Receipts'));
@@ -191,8 +191,9 @@ export default function App() {
               <Route path="/finance/hometax" element={<ProtectedRoute adminOnly><HomeTaxCollect /></ProtectedRoute>} />
               <Route path="/hr/notifications" element={<ProtectedRoute adminOnly><KakaoNotifications /></ProtectedRoute>} />
               <Route path="/finance/cashbill" element={<ProtectedRoute adminOnly><CashBill /></ProtectedRoute>} />
-              <Route path="/purchase-requests" element={<ProtectedRoute adminOnly><PurchaseRequests /></ProtectedRoute>} />
+              <Route path="/purchase-requests" element={<Navigate to="/materials/order-manage?tab=staff" replace />} />
               <Route path="/materials/order-form" element={<ProtectedRoute adminOnly><MaterialOrderForm /></ProtectedRoute>} />
+              <Route path="/materials/order-manage" element={<ProtectedRoute adminOnly><MaterialOrderManage /></ProtectedRoute>} />
               <Route path="/materials/items" element={<ProtectedRoute adminOnly><MaterialItems /></ProtectedRoute>} />
               <Route path="/materials/inventory" element={<ProtectedRoute adminOnly><MaterialStock /></ProtectedRoute>} />
               <Route path="/materials/receipts" element={<ProtectedRoute adminOnly><MaterialReceipts /></ProtectedRoute>} />

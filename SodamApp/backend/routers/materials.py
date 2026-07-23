@@ -279,7 +279,12 @@ def list_orders(
         stmt = stmt.where(PurchaseOrder.status == status)
     stmt = stmt.order_by(PurchaseOrder.created_at.desc()).limit(min(limit, 200))
     orders = session.exec(stmt).all()
-    return {"status": "success", "data": [_order_to_dict(o) for o in orders]}
+    biz = session.get(Business, bid) if bid else None
+    return {
+        "status": "success",
+        "business_name": biz.name if biz else "셈하나",
+        "data": [_order_to_dict(o) for o in orders],
+    }
 
 
 @router.patch("/orders/{order_id}")

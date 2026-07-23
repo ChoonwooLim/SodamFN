@@ -4,7 +4,7 @@ import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import {
     ShoppingCart, Phone, MessageCircle, Copy, ChevronDown, Search,
-    Check, Minus, Plus, RefreshCw, ArrowLeft, History, Trash2,
+    Check, Minus, Plus, RefreshCw, ArrowLeft, History,
     ClipboardList, AlertTriangle, PackageOpen, CheckCircle2,
     FileDown, Share2,
 } from 'lucide-react';
@@ -23,13 +23,11 @@ export default function MaterialOrderForm() {
     const [catalog, setCatalog] = useState([]);
     const [businessName, setBusinessName] = useState('셈하나');
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState('compose');          // compose | history
     const [view, setView] = useState('cart');           // cart | orders (요청서 결과)
     const [cart, setCart] = useState({});               // { productId: qty }
     const [openVendors, setOpenVendors] = useState(new Set());
     const [search, setSearch] = useState('');
     const [createdOrders, setCreatedOrders] = useState([]);
-    const [historyOrders, setHistoryOrders] = useState([]);
     const [staffRequests, setStaffRequests] = useState([]);
     const [staffOpen, setStaffOpen] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -56,13 +54,6 @@ export default function MaterialOrderForm() {
         setLoading(false);
     };
 
-    const fetchHistory = async () => {
-        try {
-            const res = await api.get('/materials/orders?limit=30');
-            if (res.data.status === 'success') setHistoryOrders(res.data.data);
-        } catch (e) { console.error(e); }
-    };
-
     const fetchStaffRequests = async () => {
         try {
             const res = await api.get('/purchase-requests');
@@ -74,7 +65,6 @@ export default function MaterialOrderForm() {
 
     useEffect(() => {
         fetchCatalog();
-        fetchHistory();
         fetchStaffRequests();
     }, []);
 
@@ -156,7 +146,6 @@ export default function MaterialOrderForm() {
                 setCreatedOrders(res.data.data);
                 setView('orders');
                 setCart({});
-                fetchHistory();
                 window.scrollTo({ top: 0 });
             }
         } catch (e) {
@@ -191,7 +180,6 @@ export default function MaterialOrderForm() {
             if (res.data.status === 'success') {
                 const updated = res.data.data;
                 listSetter(prev => prev.map(o => (o.id === updated.id ? updated : o)));
-                fetchHistory();
             }
         } catch (e) { console.error(e); }
     };
@@ -231,22 +219,6 @@ export default function MaterialOrderForm() {
         showToast(fromKakao
             ? '요청서가 복사되었습니다. 카카오톡 대화방에 붙여넣기 하세요.'
             : '요청서가 복사되었습니다.');
-    };
-
-    const updateStatus = async (order, status) => {
-        try {
-            await api.patch(`/materials/orders/${order.id}`, { status });
-            fetchHistory();
-        } catch (e) { alert('상태 변경 실패'); }
-    };
-
-    const deleteOrder = async (order) => {
-        if (!window.confirm(`${order.vendor_name} 요청서를 삭제할까요?`)) return;
-        try {
-            await api.delete(`/materials/orders/${order.id}`);
-            setCreatedOrders(prev => prev.filter(o => o.id !== order.id));
-            fetchHistory();
-        } catch (e) { alert('삭제 실패'); }
     };
 
     // ─── 통합요청서 PDF ───
@@ -320,8 +292,8 @@ export default function MaterialOrderForm() {
         () => createdOrders.reduce((s, o) => s + (o.total_amount || 0), 0),
         [createdOrders]);
 
-    // ─── 요청서 카드 (결과/이력 공용) ───
-    const OrderCard = ({ order, listSetter, compact = false }) => {
+    // ─── 요청서 카드 ───
+    const OrderCard = ({ order, listSetter }) => {
         const st = STATUS_LABEL[order.status] || STATUS_LABEL.draft;
         return (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -364,7 +336,7 @@ export default function MaterialOrderForm() {
                         </button>
                     </div>
                 </div>
-                {!compact && (
+                {(
                     <div className="px-5 py-3">
                         <table className="w-full text-sm">
                             <thead>
@@ -403,32 +375,6 @@ export default function MaterialOrderForm() {
                         </table>
                     </div>
                 )}
-                {compact && (
-                    <div className="px-5 py-2.5 text-xs text-slate-500 flex items-center justify-between gap-2 flex-wrap">
-                        <span className="truncate">
-                            {order.items.slice(0, 3).map(it => `${it.name} ×${it.quantity}`).join(', ')}
-                            {order.items.length > 3 && ` 외 ${order.items.length - 3}건`}
-                        </span>
-                        <span className="flex items-center gap-2 shrink-0">
-                            <Link to={`/materials/receipts?order_id=${order.id}`}
-                                className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-500 font-bold hover:bg-rose-100 transition-all">
-                                영수증 첨부
-                            </Link>
-                            {order.status !== 'completed' && order.status !== 'canceled' && (
-                                <button onClick={() => updateStatus(order, 'completed')}
-                                    className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 font-bold hover:bg-emerald-100 transition-all">
-                                    구매 완료
-                                </button>
-                            )}
-                            {order.status === 'draft' && (
-                                <button onClick={() => deleteOrder(order)}
-                                    className="px-2 py-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all">
-                                    <Trash2 size={14} />
-                                </button>
-                            )}
-                        </span>
-                    </div>
-                )}
             </div>
         );
     };
@@ -448,20 +394,14 @@ export default function MaterialOrderForm() {
                             <p className="text-xs text-slate-400 mt-0.5">품목 수량을 입력하면 거래처별 요청서가 만들어집니다</p>
                         </div>
                     </div>
-                    <div className="flex bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-                        <button onClick={() => { setTab('compose'); }}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'compose' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}>
-                            요청서 작성
-                        </button>
-                        <button onClick={() => { setTab('history'); fetchHistory(); }}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${tab === 'history' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}>
-                            <History size={14} /> 요청 이력
-                        </button>
-                    </div>
+                    <Link to="/materials/order-manage"
+                        className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-all">
+                        <History size={15} /> 구매요청서 관리
+                    </Link>
                 </header>
 
                 {/* 직원 구매요청 대기 배너 */}
-                {tab === 'compose' && staffRequests.length > 0 && (
+                {view === 'cart' && staffRequests.length > 0 && (
                     <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
                         <button onClick={() => setStaffOpen(!staffOpen)}
                             className="w-full flex items-center gap-2.5 px-4 py-3 text-left">
@@ -481,16 +421,16 @@ export default function MaterialOrderForm() {
                                         </span>
                                     </div>
                                 ))}
-                                <Link to="/purchase-requests" className="inline-block text-xs font-bold text-amber-700 hover:underline pl-1">
-                                    직원 구매요청 관리로 이동 →
+                                <Link to="/materials/order-manage?tab=staff" className="inline-block text-xs font-bold text-amber-700 hover:underline pl-1">
+                                    구매요청서 관리에서 처리 →
                                 </Link>
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* ── 작성 탭 ── */}
-                {tab === 'compose' && view === 'cart' && (
+                {/* ── 작성 화면 ── */}
+                {view === 'cart' && (
                     <>
                         {/* 검색 */}
                         <div className="relative mb-4">
@@ -620,7 +560,7 @@ export default function MaterialOrderForm() {
                 )}
 
                 {/* ── 요청서 결과 화면 ── */}
-                {tab === 'compose' && view === 'orders' && (
+                {view === 'orders' && (
                     <>
                         <div className="flex items-center gap-3 mb-5 flex-wrap">
                             <button onClick={() => setView('cart')}
@@ -753,21 +693,6 @@ export default function MaterialOrderForm() {
                     </>
                 )}
 
-                {/* ── 이력 탭 ── */}
-                {tab === 'history' && (
-                    <div className="space-y-3">
-                        {historyOrders.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                                <History size={30} className="mx-auto mb-3 text-slate-300" />
-                                아직 작성된 구매요청서가 없습니다.
-                            </div>
-                        ) : (
-                            historyOrders.map(order => (
-                                <OrderCard key={order.id} order={order} listSetter={setHistoryOrders} compact />
-                            ))
-                        )}
-                    </div>
-                )}
             </div>
 
             {/* 토스트 */}
