@@ -1028,6 +1028,26 @@ class PurchaseOrder(SQLModel, table=True):
     status: str = Field(default="draft")  # draft, sent, completed, canceled
     sent_via: Optional[str] = None        # phone, kakao, copy
     sent_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None  # 구매(입고) 완료 시각
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
+class Receipt(SQLModel, table=True):
+    """영수증 보관함 — 구매 영수증 원본 이미지 + AI 추출/분류 결과 (자재관리 > 영수증 보관함)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    image_url: str
+    storage_key: Optional[str] = None
+    receipt_date: Optional[datetime.date] = Field(default=None, index=True)
+    vendor_name: Optional[str] = Field(default=None, index=True)
+    amount: int = 0
+    category: Optional[str] = None       # EXPENSE_CATEGORIES id (원재료비 등)
+    payment_method: str = "Card"         # Card, Cash
+    memo: Optional[str] = None
+    status: str = Field(default="pending")  # pending(확인 필요) / classified(매입 반영됨)
+    ocr_json: Optional[str] = None       # AI 추출 raw 결과
+    purchase_order_id: Optional[int] = Field(default=None, foreign_key="purchaseorder.id", index=True)
+    daily_expense_id: Optional[int] = Field(default=None, foreign_key="dailyexpense.id")
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 

@@ -335,7 +335,9 @@ export default function MaterialOrderForm() {
                             )}
                         </div>
                         <p className="text-xs text-slate-400 mt-0.5">
-                            {order.order_date} · {order.item_count}개 품목
+                            요청 {order.order_date}
+                            {order.completed_at && <span className="text-emerald-500 font-bold"> · 완료 {order.completed_at.slice(0, 10)}</span>}
+                            {' · '}{order.item_count}개 품목
                             {order.total_amount > 0 && ` · 예상 ${formatNumber(order.total_amount)}원`}
                         </p>
                     </div>
@@ -408,10 +410,14 @@ export default function MaterialOrderForm() {
                             {order.items.length > 3 && ` 외 ${order.items.length - 3}건`}
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
+                            <Link to={`/materials/receipts?order_id=${order.id}`}
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-500 font-bold hover:bg-rose-100 transition-all">
+                                영수증 첨부
+                            </Link>
                             {order.status !== 'completed' && order.status !== 'canceled' && (
                                 <button onClick={() => updateStatus(order, 'completed')}
                                     className="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 font-bold hover:bg-emerald-100 transition-all">
-                                    입고 완료
+                                    구매 완료
                                 </button>
                             )}
                             {order.status === 'draft' && (
@@ -650,9 +656,14 @@ export default function MaterialOrderForm() {
                                 {/* 문서 헤더 */}
                                 <div style={{ borderBottom: '3px solid #0f172a', paddingBottom: '16px', marginBottom: '8px' }}>
                                     <div style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-0.5px' }}>물품 구매 요청서</div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '13px', color: '#475569' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', marginTop: '10px', fontSize: '13px', color: '#475569' }}>
                                         <span>요청 사업장 : <b style={{ color: '#0f172a' }}>{businessName}</b></span>
-                                        <span>요청일 : <b style={{ color: '#0f172a' }}>{createdOrders[0]?.order_date || new Date().toISOString().slice(0, 10)}</b></span>
+                                        <span>구매 요청일 : <b style={{ color: '#0f172a' }}>{createdOrders[0]?.order_date || new Date().toISOString().slice(0, 10)}</b></span>
+                                        <span>구매 완료일 : <b style={{ color: '#0f172a' }}>
+                                            {createdOrders.every(o => o.completed_at)
+                                                ? (createdOrders[0]?.completed_at || '').slice(0, 10)
+                                                : '＿＿＿＿＿＿'}
+                                        </b></span>
                                     </div>
                                 </div>
                                 <div style={{ fontSize: '12px', color: '#64748b', margin: '12px 0 20px' }}>

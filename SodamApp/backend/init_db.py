@@ -67,6 +67,8 @@ def init_db():
 def _run_migrations():
     """Auto-add missing columns to existing tables. Supports both SQLite and PostgreSQL."""
     migrations = [
+        # 2026-07-23: 구매요청서 구매완료일 (자재관리)
+        ("purchaseorder", "completed_at", "TIMESTAMP"),
         ("inventorycheck", "items_json", "TEXT"),
         # 2026-04-27: bank-sync 자동 분류 → 매출관리/매입관리(DailyExpense) 연동
         ("banktransaction", "linked_daily_id", "INTEGER"),

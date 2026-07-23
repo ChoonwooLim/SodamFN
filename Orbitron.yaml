@@ -79,6 +79,11 @@ services:
         value: "qwen2.5:7b"  # PSU 안정 범위 (14b는 크래시 위험)
       - key: AI_CLASSIFY_TIMEOUT_SEC
         value: "30"
+      # 영수증 AI 추출 (자재관리 > 영수증 보관함, 2026-07-23)
+      - key: OLLAMA_RECEIPT_MODELS
+        value: "gemma4:e4b,qwen2.5vl:7b"  # 실측 정확도순 (e4b=합계 정확 35s, qwen=폴백 10s)
+      - key: OLLAMA_RECEIPT_TIMEOUT_SEC
+        value: "90"
       # 이동식 단말기 카드매출 (코페이 등) 수수료율 — 매출 역산용
       - key: KOPAY_COMMISSION_RATE
         value: "0.0275"  # 2.75% (코페이 정산 명세 기준 조정 가능)

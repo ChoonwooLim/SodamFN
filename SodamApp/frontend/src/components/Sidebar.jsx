@@ -178,6 +178,7 @@ export default function Sidebar() {
         { icon: ShoppingCart, label: '구매요청서 작성', path: '/materials/order-form', color: 'text-teal-400' },
         { icon: Package, label: '거래처·품목 관리', path: '/materials/items', color: 'text-cyan-400' },
         { icon: PackageSearch, label: '재고관리', path: '/materials/inventory', color: 'text-emerald-400' },
+        { icon: Receipt, label: '영수증 보관함', path: '/materials/receipts', color: 'text-rose-400' },
         { icon: ClipboardList, label: '직원 구매요청', path: '/purchase-requests', color: 'text-amber-400' },
         { icon: ShoppingBag, label: '매입·비용관리', path: '/purchase', color: 'text-orange-400' },
         { icon: FileCheck, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-blue-400' },
