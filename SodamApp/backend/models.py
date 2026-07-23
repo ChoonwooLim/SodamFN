@@ -1013,6 +1013,24 @@ class PurchaseRequest(SQLModel, table=True):
     business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
 
 
+class PurchaseOrder(SQLModel, table=True):
+    """물품 구매 요청서 — 관리자가 거래처별로 작성·전송 (자재관리 > 구매요청서 작성)"""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    business_id: Optional[int] = Field(default=None, foreign_key="business.id", index=True)
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendor.id", index=True)
+    vendor_name: str = ""       # 스냅샷 (거래처 삭제/병합 대비)
+    vendor_phone: Optional[str] = None
+    order_date: datetime.date = Field(default_factory=datetime.date.today, index=True)
+    items_json: str = "[]"      # [{product_id, name, spec, quantity, unit_price, amount}]
+    item_count: int = 0
+    total_amount: int = 0
+    memo: Optional[str] = None
+    status: str = Field(default="draft")  # draft, sent, completed, canceled
+    sent_via: Optional[str] = None        # phone, kakao, copy
+    sent_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+
 class EmergencyContact(SQLModel, table=True):
     """비상연락처"""
     id: Optional[int] = Field(default=None, primary_key=True)

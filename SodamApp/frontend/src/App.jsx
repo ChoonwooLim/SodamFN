@@ -39,6 +39,9 @@ const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const PlatformLanding = React.lazy(() => import('./pages/PlatformLanding'));
 const StaffAppPreview = React.lazy(() => import('./pages/StaffAppPreview'));
 const PurchaseRequests = React.lazy(() => import('./pages/PurchaseRequests'));
+const MaterialOrderForm = React.lazy(() => import('./pages/Materials/OrderForm'));
+const MaterialItems = React.lazy(() => import('./pages/Materials/ItemsManagement'));
+const MaterialStock = React.lazy(() => import('./pages/Materials/StockManagement'));
 const EmergencyContactsAdmin = React.lazy(() => import('./pages/EmergencyContacts'));
 const AnnouncementsAdmin = React.lazy(() => import('./pages/Announcements'));
 const BoardManagement = React.lazy(() => import('./pages/BoardManagement'));
@@ -187,6 +190,9 @@ export default function App() {
               <Route path="/hr/notifications" element={<ProtectedRoute adminOnly><KakaoNotifications /></ProtectedRoute>} />
               <Route path="/finance/cashbill" element={<ProtectedRoute adminOnly><CashBill /></ProtectedRoute>} />
               <Route path="/purchase-requests" element={<ProtectedRoute adminOnly><PurchaseRequests /></ProtectedRoute>} />
+              <Route path="/materials/order-form" element={<ProtectedRoute adminOnly><MaterialOrderForm /></ProtectedRoute>} />
+              <Route path="/materials/items" element={<ProtectedRoute adminOnly><MaterialItems /></ProtectedRoute>} />
+              <Route path="/materials/inventory" element={<ProtectedRoute adminOnly><MaterialStock /></ProtectedRoute>} />
               <Route path="/emergency-contacts" element={<ProtectedRoute adminOnly><EmergencyContactsAdmin /></ProtectedRoute>} />
               <Route path="/announcements" element={<ProtectedRoute adminOnly><AnnouncementsAdmin /></ProtectedRoute>} />
               <Route path="/board" element={<ProtectedRoute adminOnly><BoardManagement /></ProtectedRoute>} />

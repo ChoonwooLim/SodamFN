@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Gauge, Briefcase, Send, MessageCircle, Sparkles, Lightbulb, Link2 } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Gauge, Briefcase, Send, MessageCircle, Sparkles, Lightbulb, Link2, Boxes, ShoppingCart, PackageSearch } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -12,6 +12,7 @@ export default function Sidebar() {
     const [boardOpen, setBoardOpen] = useState(false);
     const [hrOpen, setHrOpen] = useState(false);
     const [plOpen, setPlOpen] = useState(false);
+    const [matOpen, setMatOpen] = useState(false);
     const [productOpen, setProductOpen] = useState(false);
     const [salesGuideOpen, setSalesGuideOpen] = useState(false);
     const [salesGuideAlerts, setSalesGuideAlerts] = useState(0);
@@ -24,12 +25,14 @@ export default function Sidebar() {
     useEffect(() => { setMobileOpen(false); }, [location.pathname]);
 
     useEffect(() => {
-        const boardPaths = ['/board', '/open-checklist', '/inventory-check-admin'];
+        const boardPaths = ['/board', '/open-checklist'];
         if (boardPaths.some(p => location.pathname.startsWith(p))) setBoardOpen(true);
         const hrPaths = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'];
         if (hrPaths.some(p => location.pathname.startsWith(p))) setHrOpen(true);
-        const plPaths = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration', '/auto-collection'];
+        const plPaths = ['/finance/profitloss', '/revenue', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration', '/auto-collection'];
         if (plPaths.some(p => location.pathname.startsWith(p))) setPlOpen(true);
+        const matPaths = ['/materials', '/purchase', '/purchase-requests', '/inventory-check-admin', '/vendor-settings'];
+        if (matPaths.some(p => location.pathname.startsWith(p))) setMatOpen(true);
         const productPaths = ['/products/'];
         if (productPaths.some(p => location.pathname.startsWith(p))) setProductOpen(true);
         if (location.pathname.startsWith('/sales-guide')) setSalesGuideOpen(true);
@@ -160,7 +163,6 @@ export default function Sidebar() {
     const plSubItems = [
         { icon: Receipt, label: '손익계산서', path: '/finance/profitloss', color: 'text-emerald-400' },
         { icon: BarChart3, label: '매출관리', path: '/revenue', color: 'text-blue-400' },
-        { icon: ShoppingBag, label: '비용관리', path: '/purchase', color: 'text-orange-400' },
         { icon: Truck, label: '배달앱관리', path: '/finance/delivery', color: 'text-amber-400' },
         { icon: CreditCard, label: '카드관리', path: '/finance/card-sales', color: 'text-violet-400' },
         { icon: FileText, label: '전자세금계산서', path: '/finance/tax-invoice', color: 'text-rose-400' },
@@ -170,6 +172,16 @@ export default function Sidebar() {
         { icon: Link2, label: '외부 연동', path: '/external-integration', color: 'text-blue-400',
           alerts: extIntegrationAlerts },
         { icon: Gauge, label: '자동수집 상태', path: '/auto-collection', color: 'text-teal-400' },
+    ];
+
+    const matSubItems = [
+        { icon: ShoppingCart, label: '구매요청서 작성', path: '/materials/order-form', color: 'text-teal-400' },
+        { icon: Package, label: '거래처·품목 관리', path: '/materials/items', color: 'text-cyan-400' },
+        { icon: PackageSearch, label: '재고관리', path: '/materials/inventory', color: 'text-emerald-400' },
+        { icon: ClipboardList, label: '직원 구매요청', path: '/purchase-requests', color: 'text-amber-400' },
+        { icon: ShoppingBag, label: '매입·비용관리', path: '/purchase', color: 'text-orange-400' },
+        { icon: FileCheck, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-blue-400' },
+        { icon: Building2, label: '거래처 관리', path: '/vendor-settings', color: 'text-violet-400' },
     ];
 
     const superAdminMenuItems = [
@@ -198,7 +210,6 @@ export default function Sidebar() {
     const boardSubItems = [
         { icon: ClipboardList, label: '공지/건의/소통', path: '/board', color: 'text-amber-400' },
         { icon: ClipboardList, label: '오픈 체크리스트', path: '/open-checklist', color: 'text-emerald-400' },
-        { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: 'text-cyan-400' },
     ];
 
     const hrSubItems = [
@@ -234,7 +245,6 @@ export default function Sidebar() {
         ]
         : user.role === 'admin'
         ? [
-            { icon: Settings, label: '거래처 관리', path: '/vendor-settings' },
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
             { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
@@ -251,9 +261,10 @@ export default function Sidebar() {
         window.location.href = '/';
     };
 
-    const isBoardActive = ['/board', '/open-checklist', '/inventory-check-admin'].some(p => location.pathname.startsWith(p));
+    const isBoardActive = ['/board', '/open-checklist'].some(p => location.pathname.startsWith(p));
     const isHrActive = ['/employees', '/hr/retirement', '/hr/dashboard', '/hr/job-posting', '/hr/fax', '/hr/notifications', '/yearend'].some(p => location.pathname === p || (p !== '/employees' && location.pathname.startsWith(p)));
-    const isPLActive = ['/finance/profitloss', '/revenue', '/purchase', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration'].some(p => location.pathname.startsWith(p));
+    const isPLActive = ['/finance/profitloss', '/revenue', '/finance/card-sales', '/finance/delivery', '/finance/bank-sync', '/finance/tax-invoice', '/finance/statement', '/finance/hometax', '/finance/cashbill', '/external-integration'].some(p => location.pathname.startsWith(p));
+    const isMatActive = ['/materials', '/purchase', '/purchase-requests', '/inventory-check-admin', '/vendor-settings'].some(p => location.pathname.startsWith(p));
     const isProductActive = productSubItems.some(item => location.pathname === item.path);
     const isSalesGuideActive = location.pathname.startsWith('/sales-guide');
 
@@ -300,7 +311,7 @@ export default function Sidebar() {
                             const SubIcon = sub.icon;
                             const isSubActive = sub.path.includes('?')
                                 ? (location.pathname + location.search) === sub.path
-                                : location.pathname === sub.path || location.pathname.startsWith(sub.path);
+                                : location.pathname === sub.path || location.pathname.startsWith(sub.path + '/');
                             return (
                                 <Link
                                     key={sub.path}
@@ -465,6 +476,7 @@ export default function Sidebar() {
                             ),
                             PieChart, plOpen, setPlOpen, isPLActive, plSubItems, 'emerald'
                         )}
+                        {renderSubmenu('자재관리', Boxes, matOpen, setMatOpen, isMatActive, matSubItems, 'teal')}
                         {renderSubmenu('직원관리', Users, hrOpen, setHrOpen, isHrActive, hrSubItems, 'indigo')}
                         {renderSubmenu('통합게시판', ClipboardList, boardOpen, setBoardOpen, isBoardActive, boardSubItems, 'blue')}
                     </>
