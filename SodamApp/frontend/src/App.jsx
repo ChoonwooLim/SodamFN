@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
+import InstallBanner from './components/InstallBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './hooks/useToast';
 import { BusinessConfigProvider } from './hooks/useBusinessConfig';
@@ -145,6 +146,7 @@ const Layout = ({ children }) => {
         {isAdmin && (
           <div className="md:hidden">
             <BottomNav />
+            <InstallBanner />
           </div>
         )}
       </div>

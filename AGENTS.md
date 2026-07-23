@@ -348,45 +348,17 @@ UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니�
 <claude-mem-context>
 # Memory Context
 
-# [SodamFN] recent context, 2026-07-23 6:30pm GMT+9
+# [SodamFN] recent context, 2026-07-23 6:50pm GMT+9
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (19,896t read) | 453,109t work | 96% savings
+Stats: 50 obs (21,622t read) | 518,691t work | 96% savings
 
 ### Jul 23, 2026
-2320 1:35p ✅ Applied responsive padding to ingredient tab button for consistency
-2321 1:36p ✅ Built, committed, and deployed recipe mobile layout fixes to main branch
-S368 Fix broken recipe management mobile layout; identified and resolved three issues; refined sidebar mobile UX (Jul 23, 1:36 PM)
-2322 1:39p ✅ Hid app preview links from mobile sidebar footer
-2323 1:40p ✅ Recipe management fixes deployed; sidebar mobile refinement built and pushed
-S369 Fix broken recipe management mobile layout; deploy sidebar mobile UX refinement; update on overall project progress (Jul 23, 1:40 PM)
-2324 1:42p ✅ Sidebar mobile UX refinement deployed to production
-S370 Mobile-first responsive design optimization for SodamFN admin and staff apps, plus product image capture/upload and display workflow across purchasing interfaces (Jul 23, 1:42 PM)
-2325 1:43p 🔵 App layout structure: sidebar integration and bottom navigation
-2326 1:44p 🔵 Launched parallel mobile audits of financial and materials/product pages
-2327 1:48p ✅ Menu reorganization: Materials/Purchasing elevated to primary workflow section
-2328 " 🔵 ProfitLoss page uses responsive table layouts with overflow-x handling
-2329 1:49p ✅ Sidebar responsive menu: desktop tools hidden on mobile via flag filtering
-2330 " ✅ Frontend build verified: menu and responsive navigation changes deployed
-2331 1:50p ✅ RecipeBook responsive padding simplified: remove mobile hamburger menu spacing workaround
-2332 1:51p ✅ Batch mobile-first responsive improvements: grids, overflow, touch targets across 8 pages
-2333 1:52p ✅ Batch 2 mobile improvements: materials management touch targets, flex wrapping, responsive grids
-2334 1:53p ✅ Batch 3 mobile final fixes: table overflow, hidden labels, CSS flex-wrap
-2335 1:54p ✅ HRDashboard: hide labor law guidance panel on mobile
-2336 " ✅ Materials API: add image_url to product catalog response
-2337 " ✅ Materials API: add image_url to staff product catalog
 S371 Comprehensive mobile-first responsive design optimization for SodamFN admin and staff apps, including product image capture/upload workflow and deployment verification (Jul 23, 1:56 PM)
 S372 Session-end documentation and archival for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END to finalize work and commit session documentation. (Jul 23, 1:59 PM)
-2345 2:04p ✅ Session closure completed with full documentation
-2346 2:21p 🔵 SodamFN Project Architecture Inventory
-2347 2:22p 🔵 Phase 1 Payroll Calculation Engine Implementation Scope
-2348 " 🔵 Phase 1 Compliance and Document Management Integration
-2349 2:23p 🟣 Materials &amp; Purchasing Management System Completed
-2350 " 🔴 Four System Bugs Fixed: Product Visibility, FK Constraint, Mobile CSS, Staff App Deployment
-2351 " ✅ Documentation Suite Updated with Session Completion Records
 2352 2:24p ✅ Project Architecture Snapshot Documented in DevWorkLog HEAD
 S373 Session-end documentation, archival, and knowledge base synchronization for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END after completing major feature work, bug fixes, and comprehensive documentation updates, concluding with wiki synchronization to capture learnings for future sessions. (Jul 23, 2:26 PM)
 2353 2:28p ✅ LLM Wiki Updated with Session Learnings — Ollama Models &amp; SodamFN Architecture
@@ -403,6 +375,7 @@ S375 Mobile layout fixes for delivery app dashboard and purchase summary — 2 s
 2362 6:03p ✅ DeliveryAppDashboard Header — Mobile Responsiveness Improvement
 S376 SodamFN mobile UI fixes and responsive menu reorganization — two commits deployed to main branch (Jul 23, 6:06 PM)
 2385 6:19p ✅ Settings UI Refactor & PC-Only Menu Flags
+S377 Fix dashboard Expense TOP 5 showing incorrect data + resolve landing page hero title wrapping on mobile (Jul 23, 6:19 PM)
 2386 6:20p 🔵 Expense TOP 5 Feature Located in Dashboard & Documentation
 2387 6:21p 🔵 Expense TOP 5 Backend Implementation via /analytics/cost Endpoint
 2388 " 🔴 Expense TOP 5 Query Filters Out Non-Expense Vendors
@@ -410,13 +383,40 @@ S376 SodamFN mobile UI fixes and responsive menu reorganization — two commits 
 2390 " ✅ Landing Page Mobile Typography Improvements for Korean Text
 2391 6:23p 🔵 Cost TOP 5 Query Verification: Bug Fix Confirmed Against Production Data
 2392 " ✅ Dashboard Cost Fix & Landing Typography Deployed to Production
-S377 Fix dashboard Expense TOP 5 showing incorrect data + resolve landing page hero title wrapping on mobile (Jul 23, 6:24 PM)
+S378 Fix June 2026 salary not displaying in employee app despite calculation and payment marked complete (Jul 23, 6:24 PM)
 2393 6:29p 🔵 Payroll display logic in Payslip component conditional on hasPayroll flag
 2394 " 🔵 Payslip component fetches payroll data from /payroll/staff API endpoint
 2395 " 🔵 Backend payroll API returns "not_found" when Payroll record missing from database
 2396 " 🔵 June 2026 Payroll records exist in database but many have business_id=NULL
 2397 6:30p 🔵 apply_bid_filter() excludes Payroll records with business_id=NULL when user has assigned bid
 2398 " 🔵 Payroll creation in codebase explicitly assigns business_id when creating records
+2399 " 🔵 Payroll calculation endpoint creates records with business_id set from authenticated user's bid
+2400 " 🔴 Fixed Payroll.business_id=NULL issue preventing June salary display in staff app
+2401 6:31p 🔵 9 June 2026 Payroll records with NULL business_id can be safely backfilled to business_id=1
+2402 " 🔴 Backfilled 9 June 2026 Payroll records: NULL business_id → business_id=1
+2403 6:32p ✅ Deployed fix: Payroll business_id NULL issue blocking June salary in staff app
+2404 " 🔵 Systemic pattern: superadmin (bid=None) write operations must derive scope from owned entity's business_id
+S379 Implement automatic home screen installation prompt for mobile employees after login in staff app (PWA Add-to-Home-Screen feature) (Jul 23, 6:33 PM)
+2405 6:38p 🟣 Promotional Video Planning Blueprint for Semhana App Generated
+2406 6:39p 🟣 Document Quality Validation and Publishing Infrastructure Tested
+2407 " 🔄 Document Generation Script Refactored to Fix Quality Audit Issues
+2408 " 🔵 Quality Audit Results: Geometry Alignment Fixed, Accessibility Improved
+2409 6:40p 🔵 PDF Rendering Failure: LibreOffice LibPNG Write Error Traced
+2414 6:41p 🔵 PDF Render Process Stalled: LibreOffice Converting but No Output Generated
+2410 " 🔵 PWA Installation Patterns Not Found in staff-app
+2411 6:42p 🔵 PWA Manifest Configured but Installation Prompt Handler Missing
+2412 " 🔵 Login Flow Does Not Trigger PWA Installation Prompt
+2413 " 🔵 PWA Installation Infrastructure Exists But Not Triggered After Login
+2415 " 🟣 Implemented PWA Home Screen Installation Prompt Post-Login
+2416 6:44p ✅ PWA Installation Banner Build Verification Successful
+2417 " ✅ PWA Installation Banner Feature Committed and Pushed to Main
+2419 6:46p 🔄 Refactored Word document numbering generation and added checklist support
+S380 .gitignore cleanup to prevent temporary session artifacts from being auto-committed to version control (Jul 23, 6:46 PM)
+2420 " ✅ Integrated checklist and numbering functions into document generation script
+2421 " 🟣 Generated promotional video planning document (SEMHANA)
+2422 6:48p ✅ Promotional Video Plan Document Layout Refinement
+2423 6:49p 🟣 SEMHANA promotional video production plan document created
+2424 6:50p ✅ Promotional video production plan document committed to repository
 
-Access 453k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 519k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

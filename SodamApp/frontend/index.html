@@ -30,6 +30,21 @@
 
 <body>
   <div id="root"></div>
+
+  <!-- PWA 설치 프롬프트 조기 캡처 — 번들 로드 전에 발화해도 InstallBanner에서 사용 -->
+  <script>
+    window.__deferredA2HS = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__deferredA2HS = e;
+      window.dispatchEvent(new Event('a2hs-ready'));
+    });
+    window.addEventListener('appinstalled', function () {
+      window.__deferredA2HS = null;
+      window.dispatchEvent(new Event('a2hs-installed'));
+    });
+  </script>
+
   <script type="module" src="/src/main.jsx"></script>
 
   <!-- Service Worker: only register in production, unregister in dev -->
