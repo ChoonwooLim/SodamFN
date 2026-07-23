@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
@@ -6,6 +6,7 @@ import {
     ShoppingCart, Phone, MessageCircle, Copy, ChevronDown, Search,
     Check, Minus, Plus, RefreshCw, ArrowLeft, History, Trash2,
     ClipboardList, AlertTriangle, PackageOpen, CheckCircle2,
+    FileDown, Share2,
 } from 'lucide-react';
 
 // 상태 칩
@@ -33,6 +34,8 @@ export default function MaterialOrderForm() {
     const [staffOpen, setStaffOpen] = useState(false);
     const [creating, setCreating] = useState(false);
     const [toast, setToast] = useState(null);
+    const [pdfBusy, setPdfBusy] = useState(false);
+    const docRef = useRef(null);
 
     const showToast = (msg) => {
         setToast(msg);
@@ -245,6 +248,77 @@ export default function MaterialOrderForm() {
             fetchHistory();
         } catch (e) { alert('삭제 실패'); }
     };
+
+    // ─── 통합요청서 PDF ───
+    const buildPdf = async () => {
+        const { default: html2canvas } = await import('html2canvas');
+        const { default: jsPDF } = await import('jspdf');
+        const canvas = await html2canvas(docRef.current, {
+            scale: 2, backgroundColor: '#ffffff', useCORS: true,
+        });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const imgH = (canvas.height * pageW) / canvas.width;
+        let heightLeft = imgH;
+        let position = 0;
+        pdf.addImage(imgData, 'PNG', 0, position, pageW, imgH);
+        heightLeft -= pageH;
+        while (heightLeft > 0) {
+            position -= pageH;
+            pdf.addPage();
+            pdf.addImage(imgData, 'PNG', 0, position, pageW, imgH);
+            heightLeft -= pageH;
+        }
+        return pdf;
+    };
+
+    const pdfFileName = () =>
+        `구매요청서_${businessName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+    const markAllSent = (via) => {
+        createdOrders.forEach(o => { if (o.status === 'draft') markSent(o, via, setCreatedOrders); });
+    };
+
+    const downloadPdf = async () => {
+        if (!docRef.current || pdfBusy) return;
+        setPdfBusy(true);
+        try {
+            const pdf = await buildPdf();
+            pdf.save(pdfFileName());
+            showToast('통합요청서 PDF가 저장되었습니다.');
+        } catch (e) { alert('PDF 생성 실패: ' + e.message); }
+        setPdfBusy(false);
+    };
+
+    const sharePdf = async () => {
+        if (!docRef.current || pdfBusy) return;
+        setPdfBusy(true);
+        try {
+            const pdf = await buildPdf();
+            const blob = pdf.output('blob');
+            const file = new File([blob], pdfFileName(), { type: 'application/pdf' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: '물품 구매 요청서' });
+                    markAllSent('kakao');
+                    showToast('공유 완료 — 전송됨으로 기록했습니다.');
+                } catch (e) {
+                    if (e.name !== 'AbortError') throw e;
+                }
+            } else {
+                // PC 등 파일 공유 미지원 기기 폴백
+                pdf.save(pdfFileName());
+                showToast('PDF를 저장했습니다. 카톡 대화방에서 파일 첨부로 보내세요.');
+            }
+        } catch (e) { alert('PDF 공유 실패: ' + e.message); }
+        setPdfBusy(false);
+    };
+
+    const grandTotal = useMemo(
+        () => createdOrders.reduce((s, o) => s + (o.total_amount || 0), 0),
+        [createdOrders]);
 
     // ─── 요청서 카드 (결과/이력 공용) ───
     const OrderCard = ({ order, listSetter, compact = false }) => {
@@ -539,16 +613,124 @@ export default function MaterialOrderForm() {
                 {/* ── 요청서 결과 화면 ── */}
                 {tab === 'compose' && view === 'orders' && (
                     <>
-                        <div className="flex items-center gap-3 mb-5">
+                        <div className="flex items-center gap-3 mb-5 flex-wrap">
                             <button onClick={() => setView('cart')}
                                 className="flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
                                 <ArrowLeft size={15} /> 새 요청서
                             </button>
                             <div className="flex items-center gap-2 text-sm font-bold text-emerald-600">
                                 <CheckCircle2 size={17} />
-                                거래처별 요청서 {createdOrders.length}건이 만들어졌습니다 — 전화하거나 카톡으로 보내세요
+                                요청서 {createdOrders.length}건 생성 완료 — 통합요청서를 PDF로 보내거나, 거래처별로 개별 전송하세요
                             </div>
                         </div>
+
+                        {/* 통합요청서 액션 바 */}
+                        <div className="flex items-center gap-2 mb-4 flex-wrap">
+                            <button onClick={sharePdf} disabled={pdfBusy}
+                                className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-black active:scale-95 transition-all shadow-sm disabled:opacity-50"
+                                style={{ background: '#FEE500', color: '#191919' }}>
+                                {pdfBusy ? <RefreshCw size={16} className="animate-spin" /> : <Share2 size={16} />}
+                                카톡으로 PDF 전송
+                            </button>
+                            <button onClick={downloadPdf} disabled={pdfBusy}
+                                className="flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 active:scale-95 transition-all shadow-sm disabled:opacity-50">
+                                {pdfBusy ? <RefreshCw size={16} className="animate-spin" /> : <FileDown size={16} />}
+                                PDF 저장
+                            </button>
+                            <span className="text-xs text-slate-400">통합요청서 1장에 모든 거래처 품목이 담깁니다</span>
+                        </div>
+
+                        {/* 통합요청서 문서 (PDF 캡처 영역 — html2canvas 호환 위해 인라인 hex 스타일) */}
+                        <div className="mb-8 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto bg-white">
+                            <div ref={docRef} style={{
+                                width: '720px', margin: '0 auto', padding: '44px 48px',
+                                background: '#ffffff', color: '#0f172a',
+                                fontFamily: "'Pretendard', 'Malgun Gothic', sans-serif",
+                            }}>
+                                {/* 문서 헤더 */}
+                                <div style={{ borderBottom: '3px solid #0f172a', paddingBottom: '16px', marginBottom: '8px' }}>
+                                    <div style={{ fontSize: '26px', fontWeight: 900, letterSpacing: '-0.5px' }}>물품 구매 요청서</div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '13px', color: '#475569' }}>
+                                        <span>요청 사업장 : <b style={{ color: '#0f172a' }}>{businessName}</b></span>
+                                        <span>요청일 : <b style={{ color: '#0f172a' }}>{createdOrders[0]?.order_date || new Date().toISOString().slice(0, 10)}</b></span>
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#64748b', margin: '12px 0 20px' }}>
+                                    아래와 같이 물품 구매를 요청드립니다. 확인 부탁드립니다.
+                                </div>
+
+                                {/* 거래처별 섹션 */}
+                                {createdOrders.map((order, oi) => (
+                                    <div key={order.id} style={{ marginBottom: '22px' }}>
+                                        <div style={{
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                                            background: '#f1f5f9', borderLeft: '4px solid #0e7490',
+                                            padding: '8px 12px', marginBottom: '0',
+                                        }}>
+                                            <span style={{ fontSize: '15px', fontWeight: 800 }}>
+                                                {oi + 1}. {order.vendor_name}
+                                            </span>
+                                            <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                                {order.vendor_phone ? `☎ ${order.vendor_phone}` : ''}
+                                            </span>
+                                        </div>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                            <thead>
+                                                <tr style={{ background: '#f8fafc', color: '#64748b', fontSize: '11px' }}>
+                                                    <th style={{ textAlign: 'left', padding: '7px 12px', borderBottom: '1px solid #e2e8f0', fontWeight: 700 }}>품목</th>
+                                                    <th style={{ textAlign: 'left', padding: '7px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, width: '110px' }}>규격</th>
+                                                    <th style={{ textAlign: 'right', padding: '7px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, width: '60px' }}>수량</th>
+                                                    <th style={{ textAlign: 'right', padding: '7px 8px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, width: '90px' }}>단가</th>
+                                                    <th style={{ textAlign: 'right', padding: '7px 12px', borderBottom: '1px solid #e2e8f0', fontWeight: 700, width: '100px' }}>금액</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {order.items.map((it, i) => (
+                                                    <tr key={i}>
+                                                        <td style={{ padding: '7px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 600 }}>{it.name}</td>
+                                                        <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{it.spec || '-'}</td>
+                                                        <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700 }}>{it.quantity}</td>
+                                                        <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#64748b' }}>
+                                                            {it.unit_price > 0 ? formatNumber(it.unit_price) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '7px 12px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                                                            {it.amount > 0 ? formatNumber(it.amount) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {order.total_amount > 0 && (
+                                                    <tr>
+                                                        <td colSpan={4} style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 700, fontSize: '12px', color: '#475569', borderBottom: '2px solid #e2e8f0' }}>소계</td>
+                                                        <td style={{ padding: '7px 12px', textAlign: 'right', fontWeight: 800, borderBottom: '2px solid #e2e8f0' }}>{formatNumber(order.total_amount)}원</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ))}
+
+                                {/* 총 합계 */}
+                                <div style={{
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    background: '#0f172a', color: '#ffffff', padding: '12px 16px',
+                                    borderRadius: '8px', marginTop: '4px',
+                                }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 700 }}>
+                                        거래처 {createdOrders.length}곳 · 품목 {createdOrders.reduce((s, o) => s + o.item_count, 0)}개
+                                    </span>
+                                    <span style={{ fontSize: '17px', fontWeight: 900 }}>
+                                        {grandTotal > 0 ? `합계 ${formatNumber(grandTotal)}원` : ''}
+                                    </span>
+                                </div>
+
+                                <div style={{ marginTop: '20px', fontSize: '11px', color: '#94a3b8', textAlign: 'center' }}>
+                                    {businessName} · 셈하나(SEMHANA) 자재관리에서 작성됨
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 거래처별 개별 전송 */}
+                        <h2 className="text-sm font-bold text-slate-500 mb-3">거래처별 개별 전송</h2>
                         <div className="space-y-4">
                             {createdOrders.map(order => (
                                 <OrderCard key={order.id} order={order} listSetter={setCreatedOrders} />
