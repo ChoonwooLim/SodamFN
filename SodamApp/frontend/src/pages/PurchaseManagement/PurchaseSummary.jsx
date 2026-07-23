@@ -91,7 +91,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                     <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">🛵 배달앱 수수료 상세</h3>
                     {summary.delivery_fees && summary.delivery_fees.length > 0 ? (
                         <>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
                                 {(() => {
                                     const ORDER = ['쿠팡이츠', '배달의민족', '요기요', '땡겨요'];
                                     const sorted = [...summary.delivery_fees].sort((a, b) => {
@@ -106,7 +106,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                                         <div key={df.channel} style={{
                                             background: `linear-gradient(135deg, ${color}10, ${color}05)`,
                                             border: `1px solid ${color}30`,
-                                            borderRadius: 12, padding: '14px 16px',
+                                            borderRadius: 12, padding: '14px 16px', minWidth: 0,
                                         }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                                                 <span style={{ fontSize: 15, fontWeight: 800, color }}>{df.label}</span>
@@ -114,7 +114,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                                                     {df.fee_rate}%
                                                 </span>
                                             </div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 14px', fontSize: 13 }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '6px 14px', fontSize: 13 }}>
                                                 <div>
                                                     <div style={{ color: '#94a3b8', fontSize: 11 }}>매출</div>
                                                     <div style={{ fontWeight: 700, color: '#1e293b' }}>{formatNumber(df.total_sales)}원</div>
@@ -147,12 +147,12 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
                                                                     fontSize: 12, padding: '3px 0',
                                                                     borderBottom: '1px solid #f1f5f9',
                                                                 }}>
-                                                                    <span style={{ color: '#475569', flex: 1 }}>{key}</span>
+                                                                    <span style={{ color: '#475569', flex: 1, minWidth: 0, wordBreak: 'keep-all' }}>{key}</span>
                                                                     <span style={{
                                                                         fontWeight: 700,
                                                                         color: isCredit ? '#0f172a' : '#ef4444',
                                                                         fontVariantNumeric: 'tabular-nums',
-                                                                        minWidth: 100, textAlign: 'right',
+                                                                        whiteSpace: 'nowrap', textAlign: 'right', marginLeft: 8,
                                                                     }}>
                                                                         {isCredit ? '+' : '-'}{formatNumber(absVal)}원
                                                                     </span>
