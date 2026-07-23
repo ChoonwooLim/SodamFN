@@ -348,35 +348,20 @@ UI/프론트엔드 작업 시 `.impeccable.md` 파일을 반드시 참조합니�
 <claude-mem-context>
 # Memory Context
 
-# [SodamFN] recent context, 2026-07-23 6:50pm GMT+9
+# [SodamFN] recent context, 2026-07-23 7:06pm GMT+9
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (21,622t read) | 518,691t work | 96% savings
+Stats: 50 obs (20,315t read) | 501,560t work | 96% savings
 
 ### Jul 23, 2026
-S371 Comprehensive mobile-first responsive design optimization for SodamFN admin and staff apps, including product image capture/upload workflow and deployment verification (Jul 23, 1:56 PM)
-S372 Session-end documentation and archival for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END to finalize work and commit session documentation. (Jul 23, 1:59 PM)
-2352 2:24p ✅ Project Architecture Snapshot Documented in DevWorkLog HEAD
 S373 Session-end documentation, archival, and knowledge base synchronization for SodamFN materials management system implementation (2026-07-23). Primary session invoked /END after completing major feature work, bug fixes, and comprehensive documentation updates, concluding with wiki synchronization to capture learnings for future sessions. (Jul 23, 2:26 PM)
-2353 2:28p ✅ LLM Wiki Updated with Session Learnings — Ollama Models &amp; SodamFN Architecture
 S374 Session startup and project context loading for SodamFN — reviewing infrastructure, recent work logs, and deployment status (Jul 23, 2:30 PM)
-2354 5:58p 🔵 SodamFN Multi-Service Infrastructure Topology
 S375 Mobile layout fixes for delivery app dashboard and purchase summary — 2 screens patched, responsive CSS modernized, deployed to main (Jul 23, 5:59 PM)
-2355 5:59p 🔵 Design System and User Context Documentation (.impeccable.md)
-2356 " 🔵 PurchaseSummary Component — Delivery App Fee Visualization
-2357 6:00p 🔄 PurchaseSummary Delivery Fee Grid — Inline Styles to Tailwind CSS
-2358 6:01p 🔄 PurchaseSummary Fee Breakdown — Layout Overflow Prevention & Responsive Improvements
-2359 " 🔵 Delivery App Fee Data Visualization — Multi-Component Infrastructure
-2360 6:02p 🔵 DeliveryAppDashboard — Inline Style Object + Media Query Pattern (Legacy)
-2361 " 🔵 DeliveryAppDashboard Table Structure — Complex Multi-Column Layout with display:contents
-2362 6:03p ✅ DeliveryAppDashboard Header — Mobile Responsiveness Improvement
 S376 SodamFN mobile UI fixes and responsive menu reorganization — two commits deployed to main branch (Jul 23, 6:06 PM)
-2385 6:19p ✅ Settings UI Refactor & PC-Only Menu Flags
 S377 Fix dashboard Expense TOP 5 showing incorrect data + resolve landing page hero title wrapping on mobile (Jul 23, 6:19 PM)
-2386 6:20p 🔵 Expense TOP 5 Feature Located in Dashboard & Documentation
 2387 6:21p 🔵 Expense TOP 5 Backend Implementation via /analytics/cost Endpoint
 2388 " 🔴 Expense TOP 5 Query Filters Out Non-Expense Vendors
 2389 6:22p 🔴 Vendor Category Filter Uses IS DISTINCT FROM for NULL Safety
@@ -410,13 +395,28 @@ S379 Implement automatic home screen installation prompt for mobile employees af
 2415 " 🟣 Implemented PWA Home Screen Installation Prompt Post-Login
 2416 6:44p ✅ PWA Installation Banner Build Verification Successful
 2417 " ✅ PWA Installation Banner Feature Committed and Pushed to Main
+S380 .gitignore cleanup to prevent temporary session artifacts from being auto-committed to version control (Jul 23, 6:45 PM)
 2419 6:46p 🔄 Refactored Word document numbering generation and added checklist support
-S380 .gitignore cleanup to prevent temporary session artifacts from being auto-committed to version control (Jul 23, 6:46 PM)
+S381 Create a comprehensive promotional video production plan for SEMHANA app that will inspire viewers to adopt the product (Jul 23, 6:46 PM)
 2420 " ✅ Integrated checklist and numbering functions into document generation script
 2421 " 🟣 Generated promotional video planning document (SEMHANA)
 2422 6:48p ✅ Promotional Video Plan Document Layout Refinement
 2423 6:49p 🟣 SEMHANA promotional video production plan document created
 2424 6:50p ✅ Promotional video production plan document committed to repository
+2425 7:00p 🔵 Admin app PWA configuration already supports installable shortcuts
+2426 " 🔵 Admin app bottom navigation component already fully implemented
+2427 7:01p 🔵 Service worker registration uses environment-aware strategy for cache management
+2428 " 🟣 PWA installation prompt capture implemented for custom InstallBanner UI
+2429 " 🟣 InstallBanner component created for cross-platform PWA installation UI
+2430 " ✅ InstallBanner component integrated into App.jsx layout
+2431 " 🔵 Admin frontend builds successfully with InstallBanner integration
+2432 7:02p ✅ PWA installation banner feature committed and pushed to production
+S382 Add home screen installation (A2HS) prompt banner to admin app, enabling users to install it as a mobile shortcut (Jul 23, 7:02 PM)
+2433 " 🟣 DOCX-to-Markdown converter for SEMHANA promotional film planning document
+2434 7:04p ✅ Refine DOCX-to-Markdown converter output formatting and whitespace handling
+2435 " ✅ Further refine DOCX-to-Markdown converter for multi-line quotes and special markers
+2436 7:05p ✅ Refine multi-line blockquote formatting in DOCX-to-Markdown converter
+2437 " 🔵 DOCX-to-Markdown conversion completed and validated
 
-Access 519k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 502k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

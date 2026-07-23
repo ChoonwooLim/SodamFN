@@ -20,7 +20,7 @@ if (IS_DEV) {
     });
 } else {
     // === PRODUCTION MODE ===
-    const CACHE_NAME = 'sodam-fn-v2';
+    const CACHE_NAME = 'sodam-fn-v3';
 
     const STATIC_ASSETS = [
         '/',
