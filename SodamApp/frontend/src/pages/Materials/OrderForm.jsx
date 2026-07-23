@@ -480,19 +480,19 @@ export default function MaterialOrderForm() {
                                                         const checked = qty > 0;
                                                         return (
                                                             <div key={p.id}
-                                                                className={`flex items-center gap-3 px-5 py-3 transition-colors ${checked ? 'bg-teal-50/50' : ''}`}>
+                                                                className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-4 sm:px-5 py-3 transition-colors ${checked ? 'bg-teal-50/50' : ''}`}>
                                                                 <button onClick={() => toggleItem(p.id)}
                                                                     className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${checked ? 'bg-teal-500 border-teal-500' : 'border-slate-300 hover:border-teal-400'}`}>
                                                                     {checked && <Check size={14} className="text-white" strokeWidth={3} />}
                                                                 </button>
-                                                                <button onClick={() => toggleItem(p.id)} className="flex-1 min-w-0 text-left">
-                                                                    <p className="text-sm font-semibold text-slate-800 truncate">{p.name}</p>
-                                                                    <p className="text-[11px] text-slate-400">
+                                                                <button onClick={() => toggleItem(p.id)} className="flex-1 min-w-[45%] text-left">
+                                                                    <p className="text-sm font-semibold text-slate-800">{p.name}</p>
+                                                                    <p className="text-[11px] text-slate-400 whitespace-nowrap">
                                                                         {specOf(p) && <span>{specOf(p)} · </span>}
                                                                         {p.unit_price > 0 ? `${formatNumber(p.unit_price)}원` : '단가 미등록'}
                                                                     </p>
                                                                 </button>
-                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                <div className="flex items-center gap-1 shrink-0 ml-auto">
                                                                     <button onClick={() => setQty(p.id, Math.max(0, qty - 1))}
                                                                         className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all">
                                                                         <Minus size={15} />
