@@ -129,3 +129,7 @@
 | 2026-07-04 | 재무제표 탭 무한 "산출 중…" 프리즈 (프로덕션) | api.js baseURL에 /api 포함인데 statements 호출만 /api/ 접두 중복 → /api/api 404 + 조용한 catch | 경로 수정 + 에러 배너·재시도 버튼, 전 코드베이스 동일 패턴 0건 확인 | SodamApp/frontend/src/pages/ProfitLoss/index.jsx |
 | 2026-07-14 | 감가상각비 과대 계상 (자산대장 취득원가 2배 추정) | 7/4 사장님 추정 취득가(5,000만×2+3,000만)가 실제의 2배 수준 | 취득원가 50% 정정(대장 note 이력 보존) + 2025-01~2026-07 백필 (월 217만→108만, 5월~ 50만→25만) | SodamApp/backend DB FixedAsset, services/financial_statements_service.py |
 | 2026-07-14 | P/L 사업장 교차 오염 — 슈퍼어드민 조회만으로 전 사업장 수치 뒤섞임 | sync 함수들이 business_id=None이면 전 사업장 원천 합산을 임의 사업장 P/L 레코드(.first())에 기록 (조회-시-재집계가 쓰기 유발) | 6개 sync 함수에 사업장별 fan-out 가드 + biz=1 재동기화(1~6월 기준값 일치 검증)·biz=2 시드 재생성·biz=3 오염필드 초기화 | services/profit_loss_service.py |
+| 2026-07-23 | 품목 추가해도 화면에 안 나타남 | create_product가 business_id 미저장 → 테넌트 필터에 걸러짐 | bid 저장 + NULL 데이터 수리 (다른 create 라우터도 동일 패턴 주의) | routers/products.py |
+| 2026-07-23 | 영수증 삭제 시 FK 위반 | detach가 참조 해제 전에 지출 행 삭제 | daily_expense_id 해제 flush 후 삭제 | routers/materials.py |
+| 2026-07-23 | 레시피 관리 모바일 가격 배지 거대 깨짐 | 모바일 CSS가 이미지영역 모든 span에 이모지용 2rem 강제 | .recipe-emoji/.recipe-price 클래스 분리 | pages/RecipeBook.jsx, RecipeBook.css |
+| 2026-07-23 | 직원앱에 새 기능 미반영 | wrangler OAuth 만료로 Pages 배포 장기 실패 | CF API 토큰 발급→pm2 env 주입→수동 배포+자동화 복구 | Orbitron 서버 pm2 |

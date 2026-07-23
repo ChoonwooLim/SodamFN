@@ -153,3 +153,4 @@
 | 2026-07-04 | 비유동자산 대장(FixedAsset)+감가상각 자동 반영 (개업 2021-05, 추가집기 2024-07) | feat(fs) | models.py, services/profit_loss_service.py, financial_statements_service.py |
 | 2026-07-04 | 국민카드 파서 + 은행 원장 분류 100%(withholding_tax·cash_deposit 등 신설) | feat(purchase) | services/purchase_parser.py, routers/bank_sync.py |
 | 2026-07-14 | 손익계산서 반기·분기 모니터링 (연간\|반기별\|분기별 모드, 기간 비교 카드+합계·월평균, 월평균 기준 증감배지) + 정식 결산보고서 리디자인 (로마숫자 계정·회계 이중선·흑자/적자 스탬프) | feat(pl) | SodamApp/frontend/src/pages/ProfitLoss/index.jsx, ProfitLoss.css |
+| 2026-07-23 | 자재관리 통합 시스템 — 구매요청서(단위·PDF·카톡·요청/완료일·날짜별 관리), 주거래처, 품목(과세 자동분류·단가 이력·제품 사진), 재고, 영수증 보관함(AI 분류·중복 차단·날짜별), 직원앱 통합, 바텀내비 중앙 촬영 버튼, 모바일 전면 최적화 | feat(materials) | backend/routers/materials.py, services/receipt_ocr_service.py, services/tax_classifier.py, frontend/src/pages/Materials/*, staff-app/src/pages/PurchaseRequest.jsx, components/BottomNav.jsx |
