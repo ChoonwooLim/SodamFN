@@ -192,16 +192,17 @@ export default function PlatformLandingPage() {
                     </motion.div>
 
                     <motion.h1 variants={fadeUp} className="text-5xl md:text-7xl font-black mb-6 leading-tight">
-                        셈<span className="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">하나</span>
-                        <span className="text-white/20 mx-3">|</span>
-                        <span className="text-white/80">SEM</span><span className="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">HANA</span>
+                        <span className="whitespace-nowrap">셈<span className="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">하나</span></span>
+                        <span className="text-white/20 mx-3 hidden md:inline">|</span>
+                        <br className="md:hidden" />
+                        <span className="whitespace-nowrap"><span className="text-white/80">SEM</span><span className="bg-gradient-to-r from-amber-400 to-amber-500 bg-clip-text text-transparent">HANA</span></span>
                     </motion.h1>
 
-                    <motion.p variants={fadeUp} className="text-lg md:text-2xl text-slate-300 mb-4 leading-relaxed">
+                    <motion.p variants={fadeUp} className="text-lg md:text-2xl text-slate-300 mb-4 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                         급여, 매출, 손익, 출퇴근을 <span className="text-white font-bold">하나</span>로 관리하세요
                     </motion.p>
-                    <motion.p variants={fadeUp} className="text-sm md:text-base text-slate-500 mb-10 max-w-2xl mx-auto">
-                        세무사 수준의 급여계산, 실시간 매출분석, GPS 출퇴근, 전자계약까지.<br className="hidden md:block" />
+                    <motion.p variants={fadeUp} className="text-sm md:text-base text-slate-500 mb-10 max-w-2xl mx-auto" style={{ wordBreak: 'keep-all' }}>
+                        세무사 수준의 급여계산, 실시간 매출분석, GPS 출퇴근, 전자계약까지.{' '}<br className="hidden md:block" />
                         매달 22만원 세무사 비용을 절약하고, 매장 운영에만 집중하세요.
                     </motion.p>
 

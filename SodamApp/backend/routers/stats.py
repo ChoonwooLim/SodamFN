@@ -166,6 +166,11 @@ def get_cost_breakdown(year: int = 2026, month: int = 1, _admin: User = Depends(
             .where(
                 DailyExpense.date >= start_date,
                 DailyExpense.date <= end_date,
+                # DailyExpense에는 매출 반영 행(매장 카드·배달앱 매출)도 적재되므로
+                # 지출 거래처만 집계 — 개인가계부는 사업용 지출 순위에서 제외
+                # (is_distinct_from: category NULL 거래처는 유지)
+                Vendor.vendor_type == "expense",
+                Vendor.category.is_distinct_from("개인가계부"),
             )
             .group_by(Vendor.id)
             .order_by(func.sum(DailyExpense.amount).desc())
