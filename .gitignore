@@ -68,3 +68,4 @@ SodamApp/backend/scripts/maintenance/*_backup.csv
 
 # 원본 복원 임시 추출물 (실데이터 — 커밋 금지)
 /_tmp/
+영수증모음/
