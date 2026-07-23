@@ -49,6 +49,7 @@ const PayrollPaper = ({ staff, payroll, business, staffPrivate, scale = 1, isPri
     } : {
         width: '210mm',
         height: '297mm',
+        flexShrink: 0,
         transform: `scale(${scale})`,
         transformOrigin: 'center center',
         backgroundColor: 'white',
@@ -369,8 +370,8 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
             if (!containerRef.current) return;
 
             const container = containerRef.current;
-            const availableHeight = container.clientHeight - 4;
-            const availableWidth = container.clientWidth - 4;
+            const availableHeight = container.clientHeight - 8;
+            const availableWidth = container.clientWidth - 8;
             const contentHeight = 297 * 3.78; // A4 height in px at 96dpi
             const contentWidth = 210 * 3.78;  // A4 width in px at 96dpi
 
@@ -398,7 +399,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
 
     return (
         <>
-            <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-0 sm:p-2 no-print">
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[90] p-0 sm:p-2 no-print">
                 <div
                     className="bg-white sm:rounded-xl shadow-2xl overflow-hidden flex flex-col w-full h-full sm:h-[98vh] sm:my-auto"
                     style={{ maxWidth: 'min(98vh * 210/297, 98vw)' }}
@@ -425,7 +426,7 @@ export default function PayrollStatement({ staff, payroll, onClose }) {
                     {/* Preview Content Container - Scaled */}
                     <div
                         ref={containerRef}
-                        className="flex-1 bg-slate-100 flex items-start sm:items-center justify-center overflow-hidden p-1 sm:p-0"
+                        className="flex-1 bg-slate-100 flex items-center justify-center overflow-hidden p-1 sm:p-0"
                     >
                         <PayrollPaper staff={staff} payroll={payroll} business={business} staffPrivate={staffPrivate} scale={scale} isPrint={false} />
                     </div>

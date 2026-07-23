@@ -449,6 +449,7 @@
     flex: 1;
     max-width: 150px;
     justify-content: center;
+    white-space: nowrap;
 }
 
 .product-summary-btn:hover {
@@ -490,10 +491,26 @@
     }
 }
 
-/* Responsive */
+/* Responsive — 좌우 여백 최소화 + 2줄 고정 레이아웃 (1줄: 체크·순번·이름·금액 / 2줄: 버튼들) */
 @media (max-width: 640px) {
     .vendor-settings-page {
-        padding: 12px;
+        padding: 0;
+    }
+
+    .vendor-settings-container {
+        padding: 1.25rem 0.75rem 7rem;
+    }
+
+    .vendor-add-section {
+        padding: 16px 12px;
+    }
+
+    .vendor-categories {
+        padding: 12px 0 16px;
+    }
+
+    .store-nested-container {
+        padding: 6px;
     }
 
     .vendor-add-form-row {
@@ -507,26 +524,36 @@
 
     .vendor-item-compact {
         flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px;
+    }
+
+    .vendor-info-group {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 8px;
     }
 
     .vendor-name-display {
-        min-width: auto;
-        width: 100%;
-        order: 1;
+        flex: 1;
+        min-width: 0;
+        word-break: keep-all;
     }
 
-    .vendor-order {
-        order: 0;
+    .vendor-monthly-amount {
+        white-space: nowrap;
     }
 
     .item-input-compact {
-        order: 2;
-        width: 100%;
-        margin-top: 8px;
+        flex: 1 1 100%;
+    }
+
+    .product-summary-btn {
+        flex: 0 0 auto;
+        padding: 8px 14px;
     }
 
     .vendor-actions-compact {
-        order: 3;
         margin-left: auto;
     }
 }

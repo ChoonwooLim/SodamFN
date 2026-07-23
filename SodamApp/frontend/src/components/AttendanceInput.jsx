@@ -322,7 +322,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
             </div>
 
             {/* Calendar grid: 7 columns, Sun-Sat */}
-            <div className="grid grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
                 {calendarGrid.map((cell) => {
                     const { dateStr, day, dow, isPrevMonth, isNextMonth } = cell;
                     const isSun = dow === 0;
@@ -334,7 +334,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                     // Next month cells: show as empty/disabled
                     if (isNextMonth) {
                         return (
-                            <div key={dateStr} className="p-2 rounded-xl border border-dashed border-slate-100 bg-slate-50/30 opacity-30 min-h-[72px] sm:min-h-[80px]">
+                            <div key={dateStr} className="p-1.5 sm:p-2 rounded-xl border border-dashed border-slate-100 bg-slate-50/30 opacity-30 min-h-[72px] sm:min-h-[80px]">
                                 <div className="text-[10px] font-bold text-slate-300">{day}</div>
                             </div>
                         );
@@ -344,13 +344,13 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                     if (isPrevMonth) {
                         const hasData = data.hours > 0;
                         return (
-                            <div key={dateStr} className={`group p-2 rounded-xl border shadow-sm transition-all flex flex-col min-h-[72px] sm:min-h-[80px] ${hasData ? 'bg-violet-50 border-violet-200 ring-1 ring-violet-100' : 'bg-slate-50/50 border-dashed border-slate-200 opacity-40'}`}>
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className={`text-[10px] font-black ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-violet-400'}`}>
+                            <div key={dateStr} className={`group p-1.5 sm:p-2 rounded-xl border shadow-sm transition-all flex flex-col min-h-[72px] sm:min-h-[80px] ${hasData ? 'bg-violet-50 border-violet-200 ring-1 ring-violet-100' : 'bg-slate-50/50 border-dashed border-slate-200 opacity-40'}`}>
+                                <div className="flex flex-wrap justify-between items-start gap-y-0.5 mb-1">
+                                    <span className={`text-[10px] font-black whitespace-nowrap ${isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-violet-400'}`}>
                                         {day} {DOW_LABELS[dow]}
                                     </span>
                                     {hasData && (
-                                        <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500 text-white font-bold">이월</span>
+                                        <span className="text-[8px] px-1 py-0.5 rounded bg-violet-500 text-white font-bold whitespace-nowrap">이월</span>
                                     )}
                                 </div>
                                 <div className="relative mt-auto">
@@ -365,11 +365,11 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
 
                     // Current month cells (editable)
                     return (
-                        <div key={dateStr} className={`group p-2 rounded-xl border shadow-sm transition-all hover:shadow-md flex flex-col min-h-[72px] sm:min-h-[80px] ${getStatusStyle(data.status, isGlobalHoliday, isCarryover)} ${!isGlobalHoliday && !isCarryover && data.status === 'Normal' && (isSun ? 'bg-red-50/30' : isSat ? 'bg-blue-50/30' : 'bg-white')}`}>
-                            <div className="flex justify-between items-start mb-1">
+                        <div key={dateStr} className={`group p-1.5 sm:p-2 rounded-xl border shadow-sm transition-all hover:shadow-md flex flex-col min-h-[72px] sm:min-h-[80px] ${getStatusStyle(data.status, isGlobalHoliday, isCarryover)} ${!isGlobalHoliday && !isCarryover && data.status === 'Normal' && (isSun ? 'bg-red-50/30' : isSat ? 'bg-blue-50/30' : 'bg-white')}`}>
+                            <div className="flex flex-wrap justify-between items-start gap-y-0.5 mb-1">
                                 <button
                                     onClick={() => toggleCompanyHoliday(dateStr)}
-                                    className={`text-[10px] font-black hover:underline decoration-2 ${isGlobalHoliday ? 'text-amber-700' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-400'}`}
+                                    className={`text-[10px] font-black whitespace-nowrap hover:underline decoration-2 ${isGlobalHoliday ? 'text-amber-700' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-400'}`}
                                     title="임시공휴일 설정"
                                 >
                                     {day} {DOW_LABELS[dow]}
@@ -377,7 +377,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                                 <button
                                     onClick={() => !isSun && toggleStatus(dateStr)}
                                     disabled={isGlobalHoliday || isSun}
-                                    className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold transition-colors ${isGlobalHoliday ? 'bg-amber-200 text-amber-800' :
+                                    className={`text-[9px] px-1 sm:px-1.5 py-0.5 rounded-md font-bold whitespace-nowrap transition-colors ${isGlobalHoliday ? 'bg-amber-200 text-amber-800' :
                                         isSun ? 'bg-red-100 text-red-600' :
                                             data.status === 'Absence' ? 'bg-red-500 text-white' :
                                                 data.status === 'Holiday' ? 'bg-blue-500 text-white' :
@@ -394,7 +394,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
                                     min="0"
                                     max="13"
                                     disabled={isGlobalHoliday || isSun || data.status !== 'Normal'}
-                                    className={`w-full text-center font-black text-xl p-0 bg-transparent outline-none ${(isGlobalHoliday || isSun || data.status !== 'Normal') ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                    className={`w-full text-center font-black text-lg sm:text-xl p-0 bg-transparent outline-none ${(isGlobalHoliday || isSun || data.status !== 'Normal') ? 'opacity-30 cursor-not-allowed' : ''}`}
                                     value={data.hours || ''}
                                     onChange={(e) => handleHourChange(dateStr, e.target.value)}
                                     placeholder="0"
@@ -409,7 +409,7 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     );
 
     const infoSection = (
-        <div className="px-6 py-2 bg-indigo-50/50 border-t border-indigo-100">
+        <div className="px-4 sm:px-6 py-2 bg-indigo-50/50 border-t border-indigo-100">
             <p className="text-[11px] text-indigo-700 font-medium flex items-center gap-2">
                 <span className="bg-indigo-600 text-white px-1.5 rounded-sm text-[9px]">INFO</span>
                 전월 마지막 주의 이월 근무일은 보라색으로 표시되며, 1주차 주휴수당 계산에 자동 합산됩니다. 월말 미완성 주는 익월정산 처리됩니다.
@@ -418,8 +418,8 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     );
 
     const specialBonusSection = (
-        <div className="px-6 py-3 bg-violet-50/50 border-t border-violet-100">
-            <div className="flex items-center gap-3">
+        <div className="px-4 sm:px-6 py-3 bg-violet-50/50 border-t border-violet-100">
+            <div className="flex flex-wrap items-center gap-3">
                 <label className="text-xs font-bold text-violet-700 whitespace-nowrap">특별수당</label>
                 <div className="relative flex-1 max-w-[200px]">
                     <input
@@ -437,8 +437,8 @@ const AttendanceInput = ({ isOpen, onClose, staffId, staffName, month, onCalcula
     );
 
     const overridesSection = (
-        <div className="px-6 py-3 bg-white border-t border-slate-200">
-            <p className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3 bg-white border-t border-slate-200">
+            <p className="text-xs font-bold text-slate-700 mb-2 flex flex-wrap items-center justify-between gap-1">
                 <span>세무사 산출(연말정산 등) 수동 덮어쓰기 (선택입력)</span>
                 <span className="text-[10px] text-slate-400 font-normal italic">* 입력한 항목만 덮어씌워지며 빈칸은 자동 계산됩니다.</span>
             </p>

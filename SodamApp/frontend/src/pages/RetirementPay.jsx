@@ -67,6 +67,10 @@ export default function RetirementPay() {
         }
     };
 
+    const fmtTenure = (days) => days >= 365
+        ? `${Math.floor(days / 365)}년 ${Math.floor((days % 365) / 30)}개월`
+        : `${days}일`;
+
     const statusBadge = (status) => {
         const colors = {
             '지급완료': { bg: '#dcfce7', color: '#16a34a' },
@@ -90,7 +94,7 @@ export default function RetirementPay() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-5xl mx-auto px-6 py-8 pb-32 space-y-6">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-32 space-y-6">
             <header className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
@@ -117,9 +121,74 @@ export default function RetirementPay() {
                     <p className="text-slate-500 font-bold">퇴사자가 없습니다</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden card-animate">
+                <>
+                {/* 모바일: 카드 리스트 (테이블 압축 깨짐 방지) */}
+                <div className="sm:hidden space-y-3">
+                    {data.map((item, idx) => (
+                        <div key={idx} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 card-animate" style={{ animationDelay: `${idx * 0.05}s` }}>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                                <div className="text-base font-extrabold text-slate-900">
+                                    {item.staff_name}
+                                    {item.under_one_year && (
+                                        <span className="ml-2 text-[11px] text-amber-600 font-semibold">⚠️ 1년 미만</span>
+                                    )}
+                                </div>
+                                {statusBadge(item.status)}
+                            </div>
+                            <div className="text-xs text-slate-500 mb-3">
+                                {item.start_date} ~ {item.end_date || '퇴사일 미등록'} · 근속 {fmtTenure(item.work_days)}
+                            </div>
+                            <div className="grid grid-cols-3 gap-1 bg-slate-50 rounded-xl py-2.5 px-2 mb-3 text-center">
+                                <div>
+                                    <div className="text-[11px] text-slate-400 font-semibold mb-0.5">적립액</div>
+                                    <div className="text-[13px] font-bold text-slate-700 tabular-nums">
+                                        {item.under_one_year
+                                            ? <span className="text-amber-600">환입 대상</span>
+                                            : item.accrued_amount > 0 ? formatCurrency(item.accrued_amount) : '-'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-slate-400 font-semibold mb-0.5">지급액</div>
+                                    <div className={`text-[13px] font-bold tabular-nums ${item.paid_amount > 0 ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {item.paid_amount > 0 ? formatCurrency(item.paid_amount) : '-'}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-[11px] text-slate-400 font-semibold mb-0.5">차액</div>
+                                    <div className={`text-[13px] font-bold tabular-nums ${item.difference > 0 ? 'text-red-600' : item.difference < 0 ? 'text-green-600' : 'text-slate-400'}`}>
+                                        {item.difference !== 0 ? `${item.difference > 0 ? '+' : ''}${formatNumber(item.difference)}원` : '-'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => navigate(`/retirement-calc/${item.staff_id}`)}
+                                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-[13px] font-bold bg-slate-100 text-slate-600 border border-slate-200 active:scale-95 transition-transform"
+                                >
+                                    <FileText size={15} /> 명세서
+                                </button>
+                                <button
+                                    onClick={() => openModal(item)}
+                                    className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white active:scale-95 transition-transform ${item.status === '미등록' ? 'bg-violet-600' : 'bg-blue-500'}`}
+                                >
+                                    {item.status === '미등록' ? '퇴직금 등록' : '수정'}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    {/* 모바일 합계 카드 */}
+                    <div className="bg-slate-900 text-white rounded-2xl p-4 flex items-center justify-between">
+                        <span className="text-sm font-bold text-slate-300">적립 합계</span>
+                        <span className="text-base font-extrabold tabular-nums">
+                            {formatCurrency(data.reduce((a, c) => a + c.accrued_amount, 0))}
+                        </span>
+                    </div>
+                </div>
+
+                {/* 데스크톱: 테이블 */}
+                <div className="hidden sm:block bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden card-animate">
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, whiteSpace: 'nowrap' }}>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
                                     <th style={{ textAlign: 'left', padding: '12px', color: '#64748b', fontWeight: 700 }}>직원명</th>
@@ -147,9 +216,7 @@ export default function RetirementPay() {
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>{item.start_date}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>{item.end_date || '-'}</td>
                                         <td style={{ padding: '12px', textAlign: 'center', color: '#334155' }}>
-                                            {item.work_days >= 365
-                                                ? `${Math.floor(item.work_days / 365)}년 ${Math.floor((item.work_days % 365) / 30)}개월`
-                                                : `${item.work_days}일`}
+                                            {fmtTenure(item.work_days)}
                                         </td>
                                         <td style={{ padding: '12px', textAlign: 'right', color: '#334155', fontWeight: 600 }}>
                                             {item.under_one_year ? (
@@ -209,6 +276,7 @@ export default function RetirementPay() {
                         </table>
                     </div>
                 </div>
+                </>
             )}
 
             {/* Modal */}
@@ -219,7 +287,8 @@ export default function RetirementPay() {
                 }}
                     onClick={() => setShowModal(null)}>
                     <div style={{
-                        background: 'white', borderRadius: 20, padding: 32, width: '90%', maxWidth: 480,
+                        background: 'white', borderRadius: 20, padding: 'clamp(20px, 5vw, 32px)', width: '92%', maxWidth: 480,
+                        maxHeight: '90vh', overflowY: 'auto',
                         boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
                     }}
                         onClick={e => e.stopPropagation()}>
@@ -228,14 +297,10 @@ export default function RetirementPay() {
                             {showModal.staff_name} 퇴직금 {showModal.status === '미등록' ? '등록' : '수정'}
                         </h3>
 
-                        <div style={{ display: 'flex', gap: 8, padding: '8px 12px', background: '#f1f5f9', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 12px', background: '#f1f5f9', borderRadius: 12, marginBottom: 16, fontSize: 13 }}>
                             <span style={{ color: '#64748b' }}>입사일: <b style={{ color: '#1e293b' }}>{showModal.start_date}</b></span>
                             <span style={{ color: '#64748b' }}>|</span>
-                            <span style={{ color: '#64748b' }}>근속: <b style={{ color: '#1e293b' }}>
-                                {showModal.work_days >= 365
-                                    ? `${Math.floor(showModal.work_days / 365)}년 ${Math.floor((showModal.work_days % 365) / 30)}개월`
-                                    : `${showModal.work_days}일`}
-                            </b></span>
+                            <span style={{ color: '#64748b' }}>근속: <b style={{ color: '#1e293b' }}>{fmtTenure(showModal.work_days)}</b></span>
                         </div>
 
                         {showModal.under_one_year ? (
