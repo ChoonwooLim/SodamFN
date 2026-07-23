@@ -124,6 +124,7 @@ export default function MaterialOrderForm() {
                 if (!p) return;
                 (byVendor[p.vendor.id] = byVendor[p.vendor.id] || []).push({
                     product_id: p.id, name: p.name, spec: specOf(p) || null,
+                    note: p.note || null,
                     quantity: qty, unit_price: p.unit_price || 0,
                 });
             });

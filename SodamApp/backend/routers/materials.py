@@ -36,6 +36,7 @@ class OrderItemIn(BaseModel):
     product_id: Optional[int] = None
     name: str
     spec: Optional[str] = None
+    note: Optional[str] = None
     quantity: float
     unit_price: int = 0
 
@@ -241,6 +242,7 @@ def create_orders(
                 "product_id": it.product_id,
                 "name": it.name,
                 "spec": it.spec,
+                "note": it.note,
                 "quantity": it.quantity,
                 "unit_price": it.unit_price,
                 "amount": int(round(it.quantity * it.unit_price)),
@@ -285,10 +287,29 @@ def list_orders(
     stmt = stmt.order_by(PurchaseOrder.created_at.desc()).limit(min(limit, 200))
     orders = session.exec(stmt).all()
     biz = session.get(Business, bid) if bid else None
+
+    # 전화 주문 시 상세 표시용 — 품목의 비고/규격을 최신 마스터 정보로 보강
+    pids = {i.get("product_id")
+            for o in orders for i in json.loads(o.items_json or "[]") if i.get("product_id")}
+    pmap = {}
+    if pids:
+        pmap = {p.id: p for p in session.exec(select(Product).where(Product.id.in_(pids))).all()}
+    data = []
+    for o in orders:
+        d = _order_to_dict(o)
+        for it in d["items"]:
+            p = pmap.get(it.get("product_id"))
+            if p:
+                if not it.get("note"):
+                    it["note"] = p.note
+                if not it.get("spec"):
+                    it["spec"] = _staff_spec(p)
+        data.append(d)
+
     return {
         "status": "success",
         "business_name": biz.name if biz else "셈하나",
-        "data": [_order_to_dict(o) for o in orders],
+        "data": data,
     }
 
 
@@ -420,13 +441,17 @@ def staff_create_orders(
             if not it.name.strip() or it.quantity <= 0:
                 continue
             price = 0
+            note = None
+            spec = it.spec
             if it.product_id:
                 p = session.get(Product, it.product_id)
                 if p:
                     price = p.unit_price or 0
+                    note = p.note
+                    spec = spec or _staff_spec(p)
             items.append({
-                "product_id": it.product_id, "name": it.name.strip(), "spec": it.spec,
-                "quantity": it.quantity, "unit_price": price,
+                "product_id": it.product_id, "name": it.name.strip(), "spec": spec,
+                "note": note, "quantity": it.quantity, "unit_price": price,
                 "amount": int(round(price * it.quantity)),
             })
         if not items:
