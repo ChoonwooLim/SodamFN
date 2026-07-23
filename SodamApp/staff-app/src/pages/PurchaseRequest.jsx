@@ -13,8 +13,16 @@ const STATUS_LABEL = {
     canceled: { text: '취소', cls: 'badge-danger' },
 };
 
-const ORDER_UNITS = ['개', 'box'];
+const ORDER_UNITS = ['개', 'box', 'kg', 'g'];
 const qtyLabel = (it) => `${it.quantity}${it.unit === 'box' ? ' box' : (it.unit || '')}`;
+// 품목 규격 텍스트로 기본 주문 단위 추정 (예: "20kg" → kg, "1box" → box)
+const defaultUnitFromSpec = (spec) => {
+    const s = (spec || '').toLowerCase();
+    if (/box|박스/.test(s)) return 'box';
+    if (/\d\s*kg/.test(s)) return 'kg';
+    if (/\d\s*g(?!\w)/.test(s)) return 'g';
+    return '개';
+};
 
 export default function PurchaseRequest() {
     const navigate = useNavigate();
@@ -61,7 +69,7 @@ export default function PurchaseRequest() {
     const setQty = (pid, qty) => {
         setCart(prev => {
             const next = { ...prev };
-            if (qty > 0) next[pid] = { qty, unit: prev[pid]?.unit || '개' };
+            if (qty > 0) next[pid] = { qty, unit: prev[pid]?.unit || defaultUnitFromSpec(productIndex[pid]?.spec) };
             else delete next[pid];
             return next;
         });
@@ -166,7 +174,7 @@ export default function PurchaseRequest() {
                         {isOpen && products.map(p => {
                             const entry = cart[p.id];
                             const qty = entry?.qty || 0;
-                            const unit = entry?.unit || '개';
+                            const unit = entry?.unit || defaultUnitFromSpec(p.spec);
                             const checked = qty > 0;
                             return (
                                 <div key={p.id} style={{
@@ -205,8 +213,8 @@ export default function PurchaseRequest() {
                                         <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', marginLeft: 4 }}>
                                             {ORDER_UNITS.map(u => (
                                                 <button key={u} onClick={() => setUnit(p.id, u)} style={{
-                                                    padding: '0 8px', height: 32, border: 'none', cursor: 'pointer',
-                                                    fontSize: '0.68rem', fontWeight: 700,
+                                                    padding: '0 5px', height: 32, border: 'none', cursor: 'pointer',
+                                                    fontSize: '0.65rem', fontWeight: 700,
                                                     background: unit === u ? (checked ? '#1e293b' : '#e2e8f0') : '#fff',
                                                     color: unit === u ? (checked ? '#fff' : '#475569') : '#94a3b8',
                                                 }}>{u}</button>

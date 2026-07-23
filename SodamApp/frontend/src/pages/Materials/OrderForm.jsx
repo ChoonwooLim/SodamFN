@@ -20,9 +20,15 @@ const STATUS_LABEL = {
 
 const SENT_VIA_LABEL = { phone: '전화', kakao: '카톡', copy: '복사' };
 
-// 주문 단위 (개 낱개 / box 박스)
-const ORDER_UNITS = ['개', 'box'];
-const defaultUnit = (p) => (/box|박스/i.test(p?.unit || '') ? 'box' : '개');
+// 주문 단위: 개(낱개) / box / kg / g — 채소류는 중량(kg·g) 주문 지원
+const ORDER_UNITS = ['개', 'box', 'kg', 'g'];
+const defaultUnit = (p) => {
+    const u = (p?.unit || '').toLowerCase();
+    if (/box|박스/.test(u)) return 'box';
+    if (u === 'kg') return 'kg';
+    if (u === 'g') return 'g';
+    return '개';
+};
 // "3개" / "3 box" 표기
 export const qtyLabel = (it) =>
     `${it.quantity}${it.unit === 'box' ? ' box' : (it.unit || '')}`;
@@ -506,7 +512,7 @@ export default function MaterialOrderForm() {
                                                                     <div className="flex rounded-xl overflow-hidden border border-slate-200 ml-1">
                                                                         {ORDER_UNITS.map(u => (
                                                                             <button key={u} onClick={() => setUnit(p.id, u)}
-                                                                                className={`px-2.5 h-9 text-[11px] font-bold transition-colors ${unit === u && checked
+                                                                                className={`px-2 h-9 text-[10px] font-bold transition-colors ${unit === u && checked
                                                                                     ? 'bg-slate-800 text-white'
                                                                                     : unit === u
                                                                                         ? 'bg-slate-200 text-slate-600'
