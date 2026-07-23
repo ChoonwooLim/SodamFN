@@ -133,3 +133,8 @@
 | 2026-07-23 | 영수증 삭제 시 FK 위반 | detach가 참조 해제 전에 지출 행 삭제 | daily_expense_id 해제 flush 후 삭제 | routers/materials.py |
 | 2026-07-23 | 레시피 관리 모바일 가격 배지 거대 깨짐 | 모바일 CSS가 이미지영역 모든 span에 이모지용 2rem 강제 | .recipe-emoji/.recipe-price 클래스 분리 | pages/RecipeBook.jsx, RecipeBook.css |
 | 2026-07-23 | 직원앱에 새 기능 미반영 | wrangler OAuth 만료로 Pages 배포 장기 실패 | CF API 토큰 발급→pm2 env 주입→수동 배포+자동화 복구 | Orbitron 서버 pm2 |
+| 2026-07-23 | 배달앱관리 페이지 모바일 4열 짓눌림 | 모바일 미디어쿼리가 JSX 카멜케이스 문자열 attribute-selector — DOM과 매칭 불가한 죽은 코드 | 클래스 기반 반응형 그리드로 교체 | pages/DeliveryAppDashboard.jsx, PurchaseManagement/PurchaseSummary.jsx |
+| 2026-07-23 | 급여명세서 미리보기 모바일 깨짐 | A4 용지가 flex 아이템으로 shrink + items-start와 center 스케일 원점 불일치 + 햄버거(z-60)가 모달(z-50) 위 | flexShrink:0, 중앙정렬 통일, z-[90] | components/PayrollStatement.jsx |
+| 2026-07-23 | 대시보드 지출 TOP5에 매출 거래처 표시 | DailyExpense에 매출 반영 행도 적재되는데 /analytics/cost에 vendor_type 필터 없음 | expense만 집계 + 개인가계부 제외(is_distinct_from, NULL 카테고리 유지) | routers/stats.py |
+| 2026-07-23 | 직원앱 확정 급여 대신 예상치 표시 (6월) | 슈퍼어드민(bid=None) 세션 산출 → Payroll.business_id NULL → 직원앱 bid 필터에서 not_found | 6월 9건 백필 + 생성·갱신 시 staff.business_id SSOT 강제 | routers/payroll.py |
+| 2026-07-23 | 관리자 앱 PWA 설치 안 됨 (Chrome '홈 화면에 추가'만) | manifest icon purpose 'any maskable' 결합형 등 설치성 판정 실패 | any/maskable 분리 4항목, id·scope 명시, start_url /dashboard, SW v3 — CDP 설치성 검증 통과 | frontend/public/manifest.json, sw.js |

@@ -2145,3 +2145,28 @@ subagent-driven TDD 7 task, **21 테스트 통과**, final whole-branch review *
 - 인프라: wrangler OAuth 만료로 직원앱 배포 장기 실패 발견→CLOUDFLARE_API_TOKEN pm2 주입 복구. Play Console 신규 계정 생성(신원확인 대기)
 
 ---
+
+## 2026-07-23 (저녁 세션)
+
+### 작업 요약
+
+| 카테고리 | 작업 내용 | 상태 |
+|----------|----------|------|
+| fix | 모바일 UI 정비 2차 — 배달앱 수수료 상세(비용관리·배달앱관리)·거래처 관리·급여명세서 미리보기·퇴직금 관리(모바일 카드 리스트 재설계)·근태 달력 셀 | 완료 |
+| refactor | 메뉴 정리 — 게시판 구매요청 탭·환경설정 거래처 탭 제거, 설정 탭 2열 그리드, 퇴직금·연말정산 PC 전용(사이드바 desktop 플래그 체계 신설) | 완료 |
+| fix | 대시보드 지출 TOP5에 매출 거래처 혼입(vendor_type 필터 부재) + 랜딩 히어로 글자 단위 줄바꿈 | 완료 |
+| fix | 직원앱 급여명세서 not_found — Payroll business_id NULL(슈퍼어드민 산출) 6월 9건 백필 + 생성부 staff 소속 SSOT | 완료 |
+| feat | 직원앱·관리자앱 홈 화면 설치(A2HS) 유도 배너 + 관리자 매니페스트 설치성 정렬(Chrome 설치 검증 통과 확인) | 완료 |
+| chore | .tmp/ gitignore 추가·추적 제거 | 완료 |
+
+### 세부 내용
+
+- **배달앱 수수료 모바일**(7b10dc92): PurchaseSummary 2열 고정 그리드 → 1열(sm+ 2열), 수수료 행 minWidth 고정폭 제거. DeliveryAppDashboard의 attribute-selector 미디어쿼리는 JSX 문자열 매칭이라 **처음부터 동작 안 하던 죽은 코드** → 클래스 기반 반응형으로 교체.
+- **모바일 UI 4화면**(3d6bb9d2): 거래처 관리 누적 여백 축소+2줄 고정 행, 급여명세서 A4 flex-shrink 짓눌림 차단+중앙정렬+z-[90](햄버거 겹침), 퇴직금 관리 모바일 카드 리스트 신설(테이블은 sm+ 전용), 근태 달력 셀 flex-wrap+nowrap.
+- **메뉴 정리**(3d6bb9d2·cbc5fdf8): 게시판 구매요청 탭 삭제(자재관리 이관 중복), 환경설정 거래처·품목 탭 삭제, 설정 탭 가로스크롤→2열 그리드, Sidebar 서브메뉴 desktop:true 플래그(hidden md:flex) 신설 → 퇴직금·연말정산 PC 전용 + MoreMenu 퇴직금 제거.
+- **지출 TOP5 버그**(7e0724fb): DailyExpense에 매출 반영 행도 적재되는데 /analytics/cost에 거래처 유형 필터 없음 → vendor_type='expense'+개인가계부 제외(is_distinct_from). 실DB 검증: 신한카드 1,034만(매출)→(주)유창 343만(원재료비).
+- **직원앱 급여 not_found**(9d7ca4d2): 슈퍼어드민(bid=None) 세션 급여 산출 시 Payroll.business_id NULL 적재 → 직원앱 bid 필터에서 제외. 2026-06 9건 백필 + 생성·갱신 시 staff.business_id SSOT 강제.
+- **A2HS 설치 배너**(0c7061d4·d65c3949·6d933089): 두 앱 공통 — beforeinstallprompt 조기 캡처(window.__deferredA2HS), Android 원탭 설치/iOS 안내, standalone 미표시·3일 스누즈. 관리자 매니페스트 purpose 'any maskable' 결합형 → any/maskable 분리, id·scope 명시, start_url '/'→'/dashboard'. CDP getInstallabilityErrors로 두 앱 모두 '오류 없음' 검증.
+- 병렬 세션: 셈하나 홍보영상 제작 기획서 완성(6ee8ff49·8ff34376, docs/marketing).
+
+---

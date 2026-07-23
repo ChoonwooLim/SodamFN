@@ -305,6 +305,7 @@ const phases = [
                 items: [
                     { text: 'PWA 기반 직원용 앱 (출퇴근, 급여명세서)', done: true },
                     { text: 'PWA 기반 관리자 앱 (인사·매출·급여 관리)', done: true },
+                    { text: '홈 화면 설치(A2HS) 유도 배너 — 직원앱·관리자앱 공통, Android 원탭 설치 + iOS 안내 + 관리자 매니페스트 설치성 정렬(설치 검증 통과)', done: true },
                     { text: 'React Native 네이티브 앱 (iOS/Android)', done: false },
                     { text: '사장님 전용 앱 (실시간 매출/출퇴근 알림)', done: false },
                     { text: '오프라인 모드 지원', done: false },
