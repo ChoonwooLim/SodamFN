@@ -11,6 +11,7 @@ import {
 const STATUS_CHIP = {
     classified: { text: '매입 반영됨', cls: 'bg-emerald-50 text-emerald-600' },
     pending: { text: '확인 필요', cls: 'bg-amber-50 text-amber-600' },
+    duplicate: { text: '중복·미반영', cls: 'bg-slate-200 text-slate-500' },
 };
 
 export default function MaterialReceipts() {
@@ -88,6 +89,7 @@ export default function MaterialReceipts() {
             category: r.category || '',
             payment_method: r.payment_method || 'Card',
             memo: r.memo || '',
+            force_attach: false,
         });
     };
 
@@ -102,6 +104,7 @@ export default function MaterialReceipts() {
                 category: editForm.category,
                 payment_method: editForm.payment_method,
                 memo: editForm.memo,
+                force_attach: editForm.force_attach || false,
             });
             if (res.data.status === 'success') {
                 const updated = res.data.data;
@@ -109,7 +112,9 @@ export default function MaterialReceipts() {
                 setSelected(updated);
                 showToast(updated.status === 'classified'
                     ? '저장 완료 — 매입·비용관리에 반영되었습니다.'
-                    : '저장 완료 — 거래처명과 금액을 입력하면 매입에 반영됩니다.');
+                    : updated.status === 'duplicate'
+                        ? '저장 완료 — 중복 상태라 매입에는 반영하지 않았습니다.'
+                        : '저장 완료 — 거래처명과 금액을 입력하면 매입에 반영됩니다.');
             }
         } catch (e) { alert('저장에 실패했습니다.'); }
         setSaving(false);
@@ -182,7 +187,7 @@ export default function MaterialReceipts() {
                         검색
                     </button>
                     <div className="flex gap-1">
-                        {[['', '전체'], ['classified', '반영됨'], ['pending', '확인 필요']].map(([v, label]) => (
+                        {[['', '전체'], ['classified', '반영됨'], ['pending', '확인 필요'], ['duplicate', '중복']].map(([v, label]) => (
                             <button key={v} onClick={() => setStatusFilter(v)}
                                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${statusFilter === v ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
                                 {label}
@@ -321,11 +326,22 @@ export default function MaterialReceipts() {
                                         className="mt-1 w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-400/30" />
                                 </div>
 
-                                <div className={`flex items-start gap-2 px-3.5 py-3 rounded-xl text-xs ${selected.status === 'classified' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                <div className={`flex items-start gap-2 px-3.5 py-3 rounded-xl text-xs ${selected.status === 'classified' ? 'bg-emerald-50 text-emerald-700' : selected.status === 'duplicate' ? 'bg-slate-100 text-slate-600' : 'bg-amber-50 text-amber-700'}`}>
                                     {selected.status === 'classified'
                                         ? <><CheckCircle2 size={14} className="shrink-0 mt-0.5" /><span>매입·비용관리에 반영되어 있습니다. 수정 후 저장하면 지출 내역도 함께 갱신됩니다.</span></>
-                                        : <><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>아직 매입에 반영되지 않았습니다. 거래처명과 금액을 입력하고 저장하면 자동 반영됩니다.</span></>}
+                                        : selected.status === 'duplicate'
+                                            ? <><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>카드/계좌이체 내역과 <b>중복으로 감지되어 매입에 반영하지 않았습니다</b> (영수증만 보관). {selected.memo}</span></>
+                                            : <><AlertTriangle size={14} className="shrink-0 mt-0.5" /><span>아직 매입에 반영되지 않았습니다. 거래처명과 금액을 입력하고 저장하면 자동 반영됩니다.</span></>}
                                 </div>
+
+                                {selected.status === 'duplicate' && (
+                                    <label className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-red-200 bg-red-50/50 text-xs text-red-600 font-bold cursor-pointer">
+                                        <input type="checkbox" checked={editForm.force_attach || false}
+                                            onChange={e => setEditForm({ ...editForm, force_attach: e.target.checked })}
+                                            className="w-4 h-4 accent-red-500" />
+                                        중복이 아님을 확인했습니다 — 저장 시 매입에 반영 (이중 계산 주의!)
+                                    </label>
+                                )}
 
                                 <div className="flex gap-2 pt-1">
                                     <button onClick={saveDetail} disabled={saving}

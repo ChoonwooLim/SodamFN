@@ -354,6 +354,7 @@ class ReceiptPatch(BaseModel):
     category: Optional[str] = None
     payment_method: Optional[str] = None  # Card, Cash
     memo: Optional[str] = None
+    force_attach: Optional[bool] = None  # 중복(duplicate) 영수증을 사용자가 확인 후 매입 반영
 
 
 def _receipt_to_dict(r: Receipt) -> dict:
@@ -432,6 +433,46 @@ def _record_item_prices(session: Session, bid, receipt: Receipt, vendor: Vendor)
                     p.price_updated = d
                     session.add(p)
                 break
+
+
+def _find_duplicate(session: Session, bid, d, amount, exclude_receipt_id=None):
+    """같은 날짜·금액의 기존 내역 탐지 — 계좌이체/카드사용내역과의 이중 반영 방지.
+
+    순서: ① 이미 업로드된 영수증 ② 지출내역(은행/카드 동기화·수동)
+    ③ 카드 승인내역(CardPurchase) ④ 계좌 출금(BankTransaction)."""
+    if not d or not amount:
+        return None
+
+    r_stmt = apply_bid_filter(select(Receipt), Receipt, bid).where(
+        Receipt.receipt_date == d, Receipt.amount == amount)
+    if exclude_receipt_id:
+        r_stmt = r_stmt.where(Receipt.id != exclude_receipt_id)
+    dup_r = session.exec(r_stmt).first()
+    if dup_r:
+        return f"이미 업로드된 영수증(#{dup_r.id} {dup_r.vendor_name or ''})"
+
+    exp = session.exec(apply_bid_filter(select(DailyExpense), DailyExpense, bid).where(
+        DailyExpense.date == d, DailyExpense.amount == amount,
+        DailyExpense.source != "receipt")).first()
+    if exp:
+        return f"지출내역({exp.source}: {exp.vendor_name})"
+
+    from models import CardPurchase, BankTransaction
+    card_stmt = select(CardPurchase).where(
+        CardPurchase.approval_date == d, CardPurchase.amount == amount,
+        CardPurchase.status == "승인")
+    if bid:
+        card_stmt = card_stmt.where(CardPurchase.business_id == bid)
+    card = session.exec(card_stmt).first()
+    if card:
+        return f"카드승인({card.card_corp} {card.merchant_name or ''})"
+
+    bt = session.exec(select(BankTransaction).where(
+        BankTransaction.trans_date == d, BankTransaction.out_amount == amount)).first()
+    if bt:
+        return f"계좌이체({(bt.remark1 or '').strip()})"
+
+    return None
 
 
 def _attach_expense(session: Session, bid, receipt: Receipt):
@@ -537,12 +578,25 @@ async def upload_receipt(
     session.add(receipt)
     session.flush()
 
-    if receipt.vendor_name and receipt.amount > 0:
+    # 계좌이체/카드내역 이중 반영 방지 — 같은 날짜·금액 내역이 있으면 보관만 하고 매입 미반영
+    dup_reason = None
+    try:
+        dup_reason = _find_duplicate(session, bid, receipt.receipt_date, receipt.amount,
+                                     exclude_receipt_id=receipt.id)
+    except Exception:
+        pass
+
+    if dup_reason:
+        receipt.status = "duplicate"
+        receipt.memo = f"중복 감지: {dup_reason}"
+        session.add(receipt)
+    elif receipt.vendor_name and receipt.amount > 0:
         _attach_expense(session, bid, receipt)
 
     session.commit()
     session.refresh(receipt)
-    return {"status": "success", "data": _receipt_to_dict(receipt), "extracted": bool(raw)}
+    return {"status": "success", "data": _receipt_to_dict(receipt), "extracted": bool(raw),
+            "duplicate": bool(dup_reason)}
 
 
 @router.get("/receipts")
@@ -607,7 +661,8 @@ def patch_receipt(
     if payload.memo is not None:
         receipt.memo = payload.memo or None
 
-    if receipt.vendor_name and receipt.amount > 0:
+    # 중복 감지 영수증(카드/계좌이체 내역과 중복)은 사용자가 명시적으로 확인(force_attach)해야만 매입 반영
+    if receipt.vendor_name and receipt.amount > 0 and (receipt.status != "duplicate" or payload.force_attach):
         _attach_expense(session, bid, receipt)
 
     session.add(receipt)
