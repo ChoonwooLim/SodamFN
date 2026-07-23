@@ -69,7 +69,7 @@ export default function MoreMenu() {
             title: '인사/노무',
             items: [
                 { icon: Users, label: '직원 관리', path: '/employees', color: '#6366f1', bg: '#eef2ff' },
-                { icon: Wallet, label: '퇴직금 관리', path: '/hr/retirement', color: '#a855f7', bg: '#faf5ff' },
+                // 퇴직금 관리 — 표 중심 화면이라 PC 메뉴 전용 (사장님 지시 7/23)
             ]
         },
         {

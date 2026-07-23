@@ -218,10 +218,11 @@ export default function Sidebar() {
         { icon: Gauge, label: 'HR 대시보드', path: '/hr/dashboard', color: 'text-indigo-400' },
         { icon: UserCircle, label: '인사기록관리', path: '/employees', color: 'text-emerald-400' },
         { icon: Briefcase, label: '구인등록', path: '/hr/job-posting', color: 'text-orange-400' },
-        { icon: Wallet, label: '퇴직금 지급관리', path: '/hr/retirement', color: 'text-blue-400' },
+        // desktop: true — 표·문서 중심 화면이라 PC에서만 메뉴 노출 (사장님 지시 7/23)
+        { icon: Wallet, label: '퇴직금 지급관리', path: '/hr/retirement', color: 'text-blue-400', desktop: true },
         { icon: Send, label: '팩스 전송', path: '/hr/fax', color: 'text-violet-400' },
         { icon: MessageCircle, label: '알림톡 관리', path: '/hr/notifications', color: 'text-yellow-400' },
-        { icon: FileCheck, label: '연말정산 지원', path: '/yearend', color: 'text-teal-400' },
+        { icon: FileCheck, label: '연말정산 지원', path: '/yearend', color: 'text-teal-400', desktop: true },
     ];
 
     const salesGuideSubItems = [
@@ -319,7 +320,7 @@ export default function Sidebar() {
                                 <Link
                                     key={sub.path}
                                     to={sub.path}
-                                    className={`sidebar-sub-item ${isSubActive ? 'active' : ''} ${sub.nested ? 'ml-5 border-l border-slate-700/60 pl-3' : ''}`}
+                                    className={`sidebar-sub-item ${isSubActive ? 'active' : ''} ${sub.nested ? 'ml-5 border-l border-slate-700/60 pl-3' : ''} ${sub.desktop ? 'hidden md:flex' : ''}`}
                                 >
                                     <SubIcon size={14} className={isSubActive ? 'text-white' : sub.color} />
                                     <span className="flex-1">{sub.label}</span>

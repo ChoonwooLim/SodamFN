@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { Wallet, Save, Building2, MapPin, Navigation, Loader2, Settings as SettingsIcon, Users, Stamp, Check } from 'lucide-react';
-import VendorSettings from './VendorSettings';
 import ContractSettings from './ContractSettings';
 import CompanyInfoSettings from './CompanyInfoSettings';
 import GoogleMapPicker from '../components/GoogleMapPicker';
@@ -10,7 +9,6 @@ import api from '../api';
 
 const TABS = [
     { key: 'company', label: '회사정보 관리' },
-    { key: 'vendor', label: '거래처 및 품목 관리' },
     { key: 'contract', label: '전자계약서 양식' },
     { key: 'payment', label: '급여 출금계좌' },
     { key: 'location', label: '매장 위치 관리' },
@@ -208,7 +206,7 @@ export default function Settings() {
 
     return (
         <div className="min-h-screen bg-slate-50">
-            <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-32">
                 <header className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-lg shadow-slate-500/20">
@@ -221,13 +219,13 @@ export default function Settings() {
                     </div>
                 </header>
 
-                {/* Tabs */}
-                <div className="flex gap-2 mb-8 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {/* Tabs — 모바일: 2열 그리드로 전체 노출 (가로 스크롤 제거), 데스크톱: 줄바꿈 pill */}
+                <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-8">
                     {TABS.map(tab => (
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+                            className={`px-3 sm:px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap text-center transition-all ${
                                 activeTab === tab.key
                                     ? 'bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-sm'
                                     : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -241,10 +239,6 @@ export default function Settings() {
                 {/* Content Area */}
                 {activeTab === 'company' ? (
                     <CompanyInfoSettings />
-                ) : activeTab === 'vendor' ? (
-                    <div className="-mt-2">
-                        <VendorSettings />
-                    </div>
                 ) : activeTab === 'contract' ? (
                     <ContractSettings />
                 ) : activeTab === 'location' ? (
