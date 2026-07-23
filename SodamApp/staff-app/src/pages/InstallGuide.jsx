@@ -22,7 +22,7 @@ function detectEnv() {
 
 export default function InstallGuide() {
     const env = useRef(detectEnv()).current;
-    const [deferredPrompt, setDeferredPrompt] = useState(null);
+    const [deferredPrompt, setDeferredPrompt] = useState(() => window.__deferredA2HS || null);
     const [installed, setInstalled] = useState(env.isStandalone);
     const [copied, setCopied] = useState(false);
 

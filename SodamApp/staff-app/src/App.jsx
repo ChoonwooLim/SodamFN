@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, useState } from 'react';
 import BottomTab from './components/BottomTab';
+import InstallBanner from './components/InstallBanner';
 import Onboarding from './pages/Onboarding';
 
 const Login = lazy(() => import('./pages/Login'));
@@ -100,6 +101,7 @@ export default function App() {
         </Routes>
       </Suspense>
       {onboarded && <ConditionalBottomTab />}
+      {onboarded && <ConditionalInstallBanner />}
     </BrowserRouter>
   );
 }
@@ -108,4 +110,12 @@ function ConditionalBottomTab() {
   const loc = window.location.pathname;
   if (loc === '/install' || loc === '/login') return null;
   return <BottomTab />;
+}
+
+function ConditionalInstallBanner() {
+  const loc = window.location.pathname;
+  // 로그인 후 화면에서만 설치 유도 (가이드/로그인 페이지 제외)
+  if (loc === '/install' || loc === '/login') return null;
+  if (!localStorage.getItem('token')) return null;
+  return <InstallBanner />;
 }
