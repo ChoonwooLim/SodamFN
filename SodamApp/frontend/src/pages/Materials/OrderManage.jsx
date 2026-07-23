@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
+import { qtyLabel } from './OrderForm';
 import {
     ClipboardList, Phone, MessageCircle, RefreshCw, Trash2, Calendar,
     ShoppingCart, CheckCircle2, UserCircle, Receipt as ReceiptIcon, ChevronDown,
@@ -71,7 +72,7 @@ export default function OrderManage() {
     // ─── 전송/상태 ───
     const buildMessage = (order) => {
         const lines = order.items.map((it, i) =>
-            `${i + 1}. ${it.name}${it.spec ? ` (${it.spec})` : ''} × ${it.quantity}`);
+            `${i + 1}. ${it.name}${it.spec ? ` (${it.spec})` : ''} × ${qtyLabel(it)}`);
         return [
             `[${businessName}] 물품 구매 요청서 (${order.order_date})`,
             '',
@@ -228,7 +229,7 @@ export default function OrderManage() {
                                                         {it.unit_price > 0 && (
                                                             <span className="text-xs text-slate-400 shrink-0">{formatNumber(it.unit_price)}원</span>
                                                         )}
-                                                        <span className="text-lg font-black text-slate-900 shrink-0">×{it.quantity}</span>
+                                                        <span className="text-lg font-black text-slate-900 shrink-0">×{qtyLabel(it)}</span>
                                                     </div>
                                                 ))}
                                                 {order.total_amount > 0 && (

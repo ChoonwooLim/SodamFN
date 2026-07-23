@@ -38,6 +38,7 @@ class OrderItemIn(BaseModel):
     spec: Optional[str] = None
     note: Optional[str] = None
     quantity: float
+    unit: Optional[str] = None   # 주문 단위: 개 / box
     unit_price: int = 0
 
 
@@ -244,6 +245,7 @@ def create_orders(
                 "spec": it.spec,
                 "note": it.note,
                 "quantity": it.quantity,
+                "unit": it.unit,
                 "unit_price": it.unit_price,
                 "amount": int(round(it.quantity * it.unit_price)),
             }
@@ -374,6 +376,7 @@ class StaffOrderItem(BaseModel):
     name: str
     spec: Optional[str] = None
     quantity: float
+    unit: Optional[str] = None   # 주문 단위: 개 / box
 
 
 class StaffOrderIn(BaseModel):
@@ -451,8 +454,8 @@ def staff_create_orders(
                     spec = spec or _staff_spec(p)
             items.append({
                 "product_id": it.product_id, "name": it.name.strip(), "spec": spec,
-                "note": note, "quantity": it.quantity, "unit_price": price,
-                "amount": int(round(price * it.quantity)),
+                "note": note, "quantity": it.quantity, "unit": it.unit,
+                "unit_price": price, "amount": int(round(price * it.quantity)),
             })
         if not items:
             continue
@@ -486,7 +489,7 @@ def staff_create_orders(
             lines = []
             for o in created:
                 for i in json.loads(o.items_json):
-                    lines.append(f"• {i['name']} {i['quantity']}")
+                    lines.append(f"• {i['name']} {i['quantity']}{i.get('unit') or ''}")
             NotificationService.send_purchase_request(
                 phone_num=setting.value, staff_name=requested_by,
                 items_text="\n".join(lines)[:500],
@@ -521,7 +524,8 @@ def staff_list_orders(
         "completed_at": o.completed_at.isoformat() if o.completed_at else None,
         "requested_by": o.requested_by,
         "items": [
-            {"name": i.get("name"), "quantity": i.get("quantity"), "spec": i.get("spec")}
+            {"name": i.get("name"), "quantity": i.get("quantity"),
+             "unit": i.get("unit"), "spec": i.get("spec")}
             for i in json.loads(o.items_json or "[]")
         ],
     } for o in orders]}

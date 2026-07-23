@@ -13,6 +13,9 @@ const STATUS_LABEL = {
     canceled: { text: '취소', cls: 'badge-danger' },
 };
 
+const ORDER_UNITS = ['개', 'box'];
+const qtyLabel = (it) => `${it.quantity}${it.unit === 'box' ? ' box' : (it.unit || '')}`;
+
 export default function PurchaseRequest() {
     const navigate = useNavigate();
     const [catalog, setCatalog] = useState([]);
@@ -58,9 +61,13 @@ export default function PurchaseRequest() {
     const setQty = (pid, qty) => {
         setCart(prev => {
             const next = { ...prev };
-            if (qty > 0) next[pid] = qty; else delete next[pid];
+            if (qty > 0) next[pid] = { qty, unit: prev[pid]?.unit || '개' };
+            else delete next[pid];
             return next;
         });
+    };
+    const setUnit = (pid, unit) => {
+        setCart(prev => ({ ...prev, [pid]: { qty: prev[pid]?.qty || 1, unit } }));
     };
 
     const selectedCount = Object.keys(cart).length
@@ -76,11 +83,12 @@ export default function PurchaseRequest() {
         try {
             // 거래처별 묶음 + 직접 입력 묶음
             const byVendor = {};
-            Object.entries(cart).forEach(([pid, qty]) => {
+            Object.entries(cart).forEach(([pid, entry]) => {
                 const p = productIndex[pid];
                 if (!p) return;
                 (byVendor[p.vendorId] = byVendor[p.vendorId] || []).push({
-                    product_id: p.id, name: p.name, spec: p.spec || null, quantity: qty,
+                    product_id: p.id, name: p.name, spec: p.spec || null,
+                    quantity: entry.qty, unit: entry.unit || '개',
                 });
             });
             const orders = Object.entries(byVendor).map(([vid, items]) => ({
@@ -156,7 +164,9 @@ export default function PurchaseRequest() {
                                 style={{ marginLeft: 'auto', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                         </button>
                         {isOpen && products.map(p => {
-                            const qty = cart[p.id] || 0;
+                            const entry = cart[p.id];
+                            const qty = entry?.qty || 0;
+                            const unit = entry?.unit || '개';
                             const checked = qty > 0;
                             return (
                                 <div key={p.id} style={{
@@ -191,6 +201,17 @@ export default function PurchaseRequest() {
                                             background: '#14b8a6', color: '#fff', cursor: 'pointer',
                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         }}><Plus size={14} /></button>
+                                        {/* 주문 단위: 개 / box */}
+                                        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', marginLeft: 4 }}>
+                                            {ORDER_UNITS.map(u => (
+                                                <button key={u} onClick={() => setUnit(p.id, u)} style={{
+                                                    padding: '0 8px', height: 32, border: 'none', cursor: 'pointer',
+                                                    fontSize: '0.68rem', fontWeight: 700,
+                                                    background: unit === u ? (checked ? '#1e293b' : '#e2e8f0') : '#fff',
+                                                    color: unit === u ? (checked ? '#fff' : '#475569') : '#94a3b8',
+                                                }}>{u}</button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -260,7 +281,7 @@ export default function PurchaseRequest() {
                                         <span className={`badge ${st.cls}`} style={{ fontSize: '0.7rem' }}>{st.text}</span>
                                     </div>
                                     <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: 4 }}>
-                                        {o.items.map(i => `${i.name} ×${i.quantity}`).join(', ')}
+                                        {o.items.map(i => `${i.name} ×${qtyLabel(i)}`).join(', ')}
                                     </div>
                                     <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
                                         {o.order_date}{o.completed_at ? ` · 구매완료 ${o.completed_at.slice(0, 10)}` : ''}

@@ -20,12 +20,19 @@ const STATUS_LABEL = {
 
 const SENT_VIA_LABEL = { phone: '전화', kakao: '카톡', copy: '복사' };
 
+// 주문 단위 (개 낱개 / box 박스)
+const ORDER_UNITS = ['개', 'box'];
+const defaultUnit = (p) => (/box|박스/i.test(p?.unit || '') ? 'box' : '개');
+// "3개" / "3 box" 표기
+export const qtyLabel = (it) =>
+    `${it.quantity}${it.unit === 'box' ? ' box' : (it.unit || '')}`;
+
 export default function MaterialOrderForm() {
     const [catalog, setCatalog] = useState([]);
     const [businessName, setBusinessName] = useState('셈하나');
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('cart');           // cart | orders (요청서 결과)
-    const [cart, setCart] = useState({});               // { productId: qty }
+    const [cart, setCart] = useState({});               // { productId: { qty, unit } }
     const [openVendors, setOpenVendors] = useState(new Set());
     const [search, setSearch] = useState('');
     const [createdOrders, setCreatedOrders] = useState([]);
@@ -65,22 +72,15 @@ export default function MaterialOrderForm() {
             if (raw) {
                 const prefill = JSON.parse(raw);
                 sessionStorage.removeItem('materialOrderPrefill');
-                setCart(prev => ({ ...prefill, ...prev }));
+                const converted = {};
+                Object.entries(prefill).forEach(([pid, v]) => {
+                    converted[pid] = typeof v === 'object' ? v : { qty: v, unit: null };
+                });
+                setCart(prev => ({ ...converted, ...prev }));
                 showToast('부족 품목이 요청서에 담겼습니다.');
             }
         } catch (e) { /* ignore */ }
     }, [loading]);
-
-    // ─── 장바구니 조작 ───
-    const setQty = (pid, qty) => {
-        setCart(prev => {
-            const next = { ...prev };
-            if (qty > 0) next[pid] = qty;
-            else delete next[pid];
-            return next;
-        });
-    };
-    const toggleItem = (pid) => setQty(pid, cart[pid] ? 0 : 1);
 
     const productIndex = useMemo(() => {
         const idx = {};
@@ -88,15 +88,33 @@ export default function MaterialOrderForm() {
         return idx;
     }, [catalog]);
 
+    // ─── 장바구니 조작 ───
+    const setQty = (pid, qty) => {
+        setCart(prev => {
+            const next = { ...prev };
+            if (qty > 0) next[pid] = { qty, unit: prev[pid]?.unit || defaultUnit(productIndex[pid]) };
+            else delete next[pid];
+            return next;
+        });
+    };
+    const toggleItem = (pid) => setQty(pid, cart[pid] ? 0 : 1);
+    // 단위 선택 시 미선택 품목이면 수량 1로 자동 담기
+    const setUnit = (pid, unit) => {
+        setCart(prev => ({
+            ...prev,
+            [pid]: { qty: prev[pid]?.qty || 1, unit },
+        }));
+    };
+
     const summary = useMemo(() => {
         const vendorIds = new Set();
         let count = 0, amount = 0;
-        Object.entries(cart).forEach(([pid, qty]) => {
+        Object.entries(cart).forEach(([pid, entry]) => {
             const p = productIndex[pid];
             if (!p) return;
             vendorIds.add(p.vendor.id);
             count += 1;
-            amount += Math.round((p.unit_price || 0) * qty);
+            amount += Math.round((p.unit_price || 0) * (entry.qty || 0));
         });
         return { vendors: vendorIds.size, items: count, amount };
     }, [cart, productIndex]);
@@ -119,13 +137,14 @@ export default function MaterialOrderForm() {
         setCreating(true);
         try {
             const byVendor = {};
-            Object.entries(cart).forEach(([pid, qty]) => {
+            Object.entries(cart).forEach(([pid, entry]) => {
                 const p = productIndex[pid];
                 if (!p) return;
                 (byVendor[p.vendor.id] = byVendor[p.vendor.id] || []).push({
                     product_id: p.id, name: p.name, spec: specOf(p) || null,
                     note: p.note || null,
-                    quantity: qty, unit_price: p.unit_price || 0,
+                    quantity: entry.qty, unit: entry.unit || defaultUnit(p),
+                    unit_price: p.unit_price || 0,
                 });
             });
             const orders = Object.entries(byVendor).map(([vid, items]) => ({
@@ -148,7 +167,7 @@ export default function MaterialOrderForm() {
     // ─── 전송 ───
     const buildMessage = (order) => {
         const lines = order.items.map((it, i) =>
-            `${i + 1}. ${it.name}${it.spec ? ` (${it.spec})` : ''} × ${it.quantity}`);
+            `${i + 1}. ${it.name}${it.spec ? ` (${it.spec})` : ''} × ${qtyLabel(it)}`);
         return [
             `[${businessName}] 물품 구매 요청서 (${order.order_date})`,
             '',
@@ -344,7 +363,7 @@ export default function MaterialOrderForm() {
                                             {it.name}
                                             {it.spec && <span className="text-slate-400 font-normal text-xs ml-1.5">{it.spec}</span>}
                                         </td>
-                                        <td className="py-2 text-right font-bold text-slate-900">{it.quantity}</td>
+                                        <td className="py-2 text-right font-bold text-slate-900">{qtyLabel(it)}</td>
                                         <td className="py-2 text-right text-slate-500 hidden sm:table-cell">
                                             {it.unit_price > 0 ? formatNumber(it.unit_price) : '-'}
                                         </td>
@@ -449,7 +468,9 @@ export default function MaterialOrderForm() {
                                             {isOpen && (
                                                 <div className="border-t border-slate-100 divide-y divide-slate-50">
                                                     {products.map(p => {
-                                                        const qty = cart[p.id] || 0;
+                                                        const entry = cart[p.id];
+                                                        const qty = entry?.qty || 0;
+                                                        const unit = entry?.unit || defaultUnit(p);
                                                         const checked = qty > 0;
                                                         return (
                                                             <div key={p.id}
@@ -481,6 +502,19 @@ export default function MaterialOrderForm() {
                                                                         className="w-9 h-9 rounded-xl bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 active:scale-95 transition-all">
                                                                         <Plus size={15} />
                                                                     </button>
+                                                                    {/* 주문 단위 선택: 개(낱개) / box */}
+                                                                    <div className="flex rounded-xl overflow-hidden border border-slate-200 ml-1">
+                                                                        {ORDER_UNITS.map(u => (
+                                                                            <button key={u} onClick={() => setUnit(p.id, u)}
+                                                                                className={`px-2.5 h-9 text-[11px] font-bold transition-colors ${unit === u && checked
+                                                                                    ? 'bg-slate-800 text-white'
+                                                                                    : unit === u
+                                                                                        ? 'bg-slate-200 text-slate-600'
+                                                                                        : 'bg-white text-slate-400 hover:bg-slate-50'}`}>
+                                                                                {u}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         );
@@ -604,7 +638,7 @@ export default function MaterialOrderForm() {
                                                     <tr key={i}>
                                                         <td style={{ padding: '7px 12px', borderBottom: '1px solid #f1f5f9', fontWeight: 600 }}>{it.name}</td>
                                                         <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', color: '#64748b' }}>{it.spec || '-'}</td>
-                                                        <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700 }}>{it.quantity}</td>
+                                                        <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', fontWeight: 700 }}>{qtyLabel(it)}</td>
                                                         <td style={{ padding: '7px 8px', borderBottom: '1px solid #f1f5f9', textAlign: 'right', color: '#64748b' }}>
                                                             {it.unit_price > 0 ? formatNumber(it.unit_price) : '-'}
                                                         </td>
