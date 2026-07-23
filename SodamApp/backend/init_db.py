@@ -69,6 +69,8 @@ def _run_migrations():
     migrations = [
         # 2026-07-23: 구매요청서 구매완료일 (자재관리)
         ("purchaseorder", "completed_at", "TIMESTAMP"),
+        # 2026-07-23: 구매요청서 작성 직원명 (직원 앱 통합)
+        ("purchaseorder", "requested_by", "VARCHAR"),
         # 2026-07-23: 주거래처 플래그 (자재관리 > 주거래처)
         ("vendor", "is_primary", "BOOLEAN DEFAULT FALSE"),
         # 2026-07-23: 품목 상세 필드 (중량·규격단위·수량·단가기준일)

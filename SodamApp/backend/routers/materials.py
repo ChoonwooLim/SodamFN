@@ -19,7 +19,7 @@ from models import (
     User as AuthUser, Business, Vendor, Product, Inventory,
     PurchaseOrder, Receipt, DailyExpense, ProductPrice,
 )
-from routers.auth import get_admin_user
+from routers.auth import get_admin_user, get_current_user
 from tenant_filter import get_bid_from_token, apply_bid_filter
 
 router = APIRouter(prefix="/api/materials", tags=["materials"])
@@ -71,6 +71,7 @@ def _order_to_dict(o: PurchaseOrder) -> dict:
         "sent_via": o.sent_via,
         "sent_at": o.sent_at.isoformat() if o.sent_at else None,
         "completed_at": o.completed_at.isoformat() if o.completed_at else None,
+        "requested_by": o.requested_by,
         "created_at": o.created_at.isoformat() if o.created_at else None,
     }
 
@@ -343,6 +344,162 @@ def delete_order(
     session.delete(order)
     session.commit()
     return {"status": "success"}
+
+
+# ─── 직원용 (직원 앱 구매요청 — 단가 미노출) ───
+
+class StaffOrderItem(BaseModel):
+    product_id: Optional[int] = None
+    name: str
+    spec: Optional[str] = None
+    quantity: float
+
+
+class StaffOrderIn(BaseModel):
+    vendor_id: Optional[int] = None   # None = 직접 입력 품목 묶음
+    items: List[StaffOrderItem]
+
+
+class StaffOrdersCreate(BaseModel):
+    staff_name: Optional[str] = None
+    orders: List[StaffOrderIn]
+
+
+def _staff_spec(p: Product) -> str:
+    if p.weight and p.unit:
+        qty = p.pack_qty or 1
+        return f"{p.weight}{p.unit}" + (f" ×{qty:g}" if qty > 1 else "")
+    return p.spec or ""
+
+
+@router.get("/staff/catalog")
+def staff_catalog(
+    session: Session = Depends(get_session),
+    _user: AuthUser = Depends(get_current_user),
+    bid=Depends(get_bid_from_token),
+):
+    """직원 앱용 품목 카탈로그 — 단가 미노출, 품목 보유 거래처만."""
+    vendors = session.exec(
+        apply_bid_filter(select(Vendor).where(Vendor.vendor_type == "expense"), Vendor, bid)
+    ).all()
+    products = session.exec(apply_bid_filter(select(Product), Product, bid)).all()
+    by_vendor = {}
+    for p in products:
+        by_vendor.setdefault(p.vendor_id, []).append(p)
+
+    data = []
+    for v in sorted(vendors, key=lambda x: (not x.is_primary, x.order_index or 0, x.name)):
+        plist = by_vendor.get(v.id)
+        if not plist:
+            continue
+        data.append({
+            "vendor": {"id": v.id, "name": v.name, "is_primary": bool(v.is_primary)},
+            "products": [
+                {"id": p.id, "name": p.name, "spec": _staff_spec(p)}
+                for p in sorted(plist, key=lambda x: x.name)
+            ],
+        })
+    return {"status": "success", "data": data}
+
+
+@router.post("/staff/orders")
+def staff_create_orders(
+    payload: StaffOrdersCreate,
+    session: Session = Depends(get_session),
+    user: AuthUser = Depends(get_current_user),
+    bid=Depends(get_bid_from_token),
+):
+    """직원 앱에서 구매요청서 작성 — 관리자 '구매요청서 관리' 이력에 합류."""
+    requested_by = (payload.staff_name or "").strip() or getattr(user, "username", None) or "직원"
+
+    created = []
+    for o in payload.orders:
+        vendor = session.get(Vendor, o.vendor_id) if o.vendor_id else None
+        items = []
+        for it in o.items:
+            if not it.name.strip() or it.quantity <= 0:
+                continue
+            price = 0
+            if it.product_id:
+                p = session.get(Product, it.product_id)
+                if p:
+                    price = p.unit_price or 0
+            items.append({
+                "product_id": it.product_id, "name": it.name.strip(), "spec": it.spec,
+                "quantity": it.quantity, "unit_price": price,
+                "amount": int(round(price * it.quantity)),
+            })
+        if not items:
+            continue
+        order = PurchaseOrder(
+            business_id=bid,
+            vendor_id=vendor.id if vendor else None,
+            vendor_name=vendor.name if vendor else "직접 입력",
+            vendor_phone=vendor.phone if vendor else None,
+            items_json=json.dumps(items, ensure_ascii=False),
+            item_count=len(items),
+            total_amount=sum(i["amount"] for i in items),
+            status="draft",
+            requested_by=requested_by,
+        )
+        session.add(order)
+        session.flush()
+        created.append(order)
+
+    if not created:
+        raise HTTPException(status_code=400, detail="요청 품목이 없습니다.")
+    session.commit()
+
+    # 관리자 알림 (기존 직원 구매요청과 동일 채널 — 실패해도 요청은 유지)
+    try:
+        from models import GlobalSetting
+        from services.notification_service import NotificationService
+        setting = session.exec(
+            select(GlobalSetting).where(GlobalSetting.key == "admin_phone")
+        ).first()
+        if setting and setting.value:
+            lines = []
+            for o in created:
+                for i in json.loads(o.items_json):
+                    lines.append(f"• {i['name']} {i['quantity']}")
+            NotificationService.send_purchase_request(
+                phone_num=setting.value, staff_name=requested_by,
+                items_text="\n".join(lines)[:500],
+            )
+    except Exception:
+        pass
+
+    for o in created:
+        session.refresh(o)
+    return {"status": "success", "data": [_order_to_dict(o) for o in created]}
+
+
+@router.get("/staff/orders")
+def staff_list_orders(
+    requester: Optional[str] = None,
+    limit: int = 20,
+    session: Session = Depends(get_session),
+    _user: AuthUser = Depends(get_current_user),
+    bid=Depends(get_bid_from_token),
+):
+    """직원 앱용 요청 이력 — 금액 미노출 축약 응답."""
+    stmt = apply_bid_filter(select(PurchaseOrder), PurchaseOrder, bid)
+    if requester:
+        stmt = stmt.where(PurchaseOrder.requested_by == requester)
+    stmt = stmt.order_by(PurchaseOrder.created_at.desc()).limit(min(limit, 50))
+    orders = session.exec(stmt).all()
+    return {"status": "success", "data": [{
+        "id": o.id,
+        "vendor_name": o.vendor_name,
+        "status": o.status,
+        "order_date": o.order_date.isoformat() if o.order_date else None,
+        "completed_at": o.completed_at.isoformat() if o.completed_at else None,
+        "requested_by": o.requested_by,
+        "items": [
+            {"name": i.get("name"), "quantity": i.get("quantity"), "spec": i.get("spec")}
+            for i in json.loads(o.items_json or "[]")
+        ],
+    } for o in orders]}
 
 
 # ─── Receipts (영수증 보관함) ───

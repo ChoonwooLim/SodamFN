@@ -6,7 +6,7 @@ import { specOf } from './ItemsManagement';
 import {
     ShoppingCart, Phone, MessageCircle, Copy, ChevronDown, Search,
     Check, Minus, Plus, RefreshCw, ArrowLeft, History,
-    ClipboardList, AlertTriangle, PackageOpen, CheckCircle2,
+    ClipboardList, PackageOpen, CheckCircle2,
     FileDown, Share2,
 } from 'lucide-react';
 
@@ -29,8 +29,6 @@ export default function MaterialOrderForm() {
     const [openVendors, setOpenVendors] = useState(new Set());
     const [search, setSearch] = useState('');
     const [createdOrders, setCreatedOrders] = useState([]);
-    const [staffRequests, setStaffRequests] = useState([]);
-    const [staffOpen, setStaffOpen] = useState(false);
     const [creating, setCreating] = useState(false);
     const [toast, setToast] = useState(null);
     const [pdfBusy, setPdfBusy] = useState(false);
@@ -55,18 +53,8 @@ export default function MaterialOrderForm() {
         setLoading(false);
     };
 
-    const fetchStaffRequests = async () => {
-        try {
-            const res = await api.get('/purchase-requests');
-            if (res.data.status === 'success') {
-                setStaffRequests(res.data.data.filter(r => r.status === 'pending'));
-            }
-        } catch (e) { console.error(e); }
-    };
-
     useEffect(() => {
         fetchCatalog();
-        fetchStaffRequests();
     }, []);
 
     // 재고관리 화면에서 "부족 품목 담기"로 넘어온 프리필
@@ -400,35 +388,6 @@ export default function MaterialOrderForm() {
                         <History size={15} /> 구매요청서 관리
                     </Link>
                 </header>
-
-                {/* 직원 구매요청 대기 배너 */}
-                {view === 'cart' && staffRequests.length > 0 && (
-                    <div className="mb-5 bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
-                        <button onClick={() => setStaffOpen(!staffOpen)}
-                            className="w-full flex items-center gap-2.5 px-4 py-3 text-left">
-                            <AlertTriangle size={16} className="text-amber-500 shrink-0" />
-                            <span className="flex-1 text-sm font-bold text-amber-800">
-                                직원 구매요청 대기 {staffRequests.length}건 — 요청서 작성 시 참고하세요
-                            </span>
-                            <ChevronDown size={16} className={`text-amber-400 transition-transform ${staffOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        {staffOpen && (
-                            <div className="px-4 pb-3 space-y-2">
-                                {staffRequests.map(r => (
-                                    <div key={r.id} className="bg-white rounded-xl px-4 py-2.5 text-sm">
-                                        <span className="font-bold text-slate-800">{r.staff_name}</span>
-                                        <span className="text-slate-500 ml-2">
-                                            {(r.items || []).map(it => `${it.name} ${it.quantity || ''}`.trim()).join(', ')}
-                                        </span>
-                                    </div>
-                                ))}
-                                <Link to="/materials/order-manage?tab=staff" className="inline-block text-xs font-bold text-amber-700 hover:underline pl-1">
-                                    구매요청서 관리에서 처리 →
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {/* ── 작성 화면 ── */}
                 {view === 'cart' && (

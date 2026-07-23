@@ -1046,6 +1046,7 @@ class PurchaseOrder(SQLModel, table=True):
     sent_via: Optional[str] = None        # phone, kakao, copy
     sent_at: Optional[datetime.datetime] = None
     completed_at: Optional[datetime.datetime] = None  # 구매(입고) 완료 시각
+    requested_by: Optional[str] = None    # 작성 직원명 (직원 앱에서 작성 시)
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
 

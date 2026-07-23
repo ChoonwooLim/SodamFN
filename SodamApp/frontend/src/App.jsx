@@ -191,7 +191,7 @@ export default function App() {
               <Route path="/finance/hometax" element={<ProtectedRoute adminOnly><HomeTaxCollect /></ProtectedRoute>} />
               <Route path="/hr/notifications" element={<ProtectedRoute adminOnly><KakaoNotifications /></ProtectedRoute>} />
               <Route path="/finance/cashbill" element={<ProtectedRoute adminOnly><CashBill /></ProtectedRoute>} />
-              <Route path="/purchase-requests" element={<Navigate to="/materials/order-manage?tab=staff" replace />} />
+              <Route path="/purchase-requests" element={<Navigate to="/materials/order-manage" replace />} />
               <Route path="/materials/order-form" element={<ProtectedRoute adminOnly><MaterialOrderForm /></ProtectedRoute>} />
               <Route path="/materials/order-manage" element={<ProtectedRoute adminOnly><MaterialOrderManage /></ProtectedRoute>} />
               <Route path="/materials/items" element={<ProtectedRoute adminOnly><MaterialItems /></ProtectedRoute>} />

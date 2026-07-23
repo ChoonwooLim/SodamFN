@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import {
-    ClipboardList, Phone, MessageCircle, Copy, RefreshCw, Trash2,
-    ShoppingCart, Users, CheckCircle2, XCircle, Receipt as ReceiptIcon,
+    ClipboardList, Phone, MessageCircle, RefreshCw, Trash2,
+    ShoppingCart, CheckCircle2, UserCircle, Receipt as ReceiptIcon,
 } from 'lucide-react';
 
 const STATUS_LABEL = {
@@ -17,12 +17,9 @@ const SENT_VIA_LABEL = { phone: '전화', kakao: '카톡', copy: '복사' };
 const FILTERS = [['', '전체'], ['draft', '작성됨'], ['sent', '전송됨'], ['completed', '구매완료']];
 
 export default function OrderManage() {
-    const [searchParams] = useSearchParams();
-    const [tab, setTab] = useState(searchParams.get('tab') === 'staff' ? 'staff' : 'orders');
     const [orders, setOrders] = useState([]);
     const [businessName, setBusinessName] = useState('셈하나');
     const [statusFilter, setStatusFilter] = useState('');
-    const [staffRequests, setStaffRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState(null);
 
@@ -41,14 +38,7 @@ export default function OrderManage() {
         setLoading(false);
     };
 
-    const fetchStaff = async () => {
-        try {
-            const res = await api.get('/purchase-requests');
-            if (res.data.status === 'success') setStaffRequests(res.data.data);
-        } catch (e) { console.error(e); }
-    };
-
-    useEffect(() => { fetchOrders(); fetchStaff(); }, []);
+    useEffect(() => { fetchOrders(); }, []);
 
     // ─── 전송/상태 ───
     const buildMessage = (order) => {
@@ -99,22 +89,6 @@ export default function OrderManage() {
         } catch (e) { alert('삭제 실패'); }
     };
 
-    // ─── 직원 요청 처리 ───
-    const updateStaffStatus = async (id, status) => {
-        try {
-            await api.put(`/purchase-requests/${id}/status`, { status });
-            fetchStaff();
-        } catch (e) { alert('상태 변경 실패'); }
-    };
-
-    const staffBadge = (status) => {
-        if (status === 'completed') return <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold">완료</span>;
-        if (status === 'rejected') return <span className="px-2 py-1 bg-red-50 text-red-500 rounded-full text-[10px] font-bold">반려</span>;
-        return <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold animate-pulse">대기</span>;
-    };
-
-    const pendingStaff = staffRequests.filter(r => r.status === 'pending').length;
-
     return (
         <div className="min-h-screen bg-slate-50">
             <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 pb-32">
@@ -126,7 +100,7 @@ export default function OrderManage() {
                         </div>
                         <div>
                             <h1 className="text-xl font-bold text-slate-900 tracking-tight">구매요청서 관리</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">작성된 요청서의 전송·구매완료 처리와 직원 구매요청을 관리합니다</p>
+                            <p className="text-xs text-slate-400 mt-0.5">사장님·직원이 작성한 요청서의 전송과 구매완료를 관리합니다</p>
                         </div>
                     </div>
                     <Link to="/materials/order-form"
@@ -135,23 +109,8 @@ export default function OrderManage() {
                     </Link>
                 </header>
 
-                {/* 탭 */}
-                <div className="flex bg-white border border-slate-200 rounded-xl p-1 shadow-sm mb-4 w-fit">
-                    <button onClick={() => setTab('orders')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'orders' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}>
-                        요청서 이력
-                    </button>
-                    <button onClick={() => setTab('staff')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-1.5 ${tab === 'staff' ? 'bg-slate-900 text-white shadow' : 'text-slate-500 hover:text-slate-700'}`}>
-                        <Users size={14} /> 직원 구매요청
-                        {pendingStaff > 0 && (
-                            <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-[9px] font-bold rounded-full bg-red-500 text-white">{pendingStaff}</span>
-                        )}
-                    </button>
-                </div>
-
-                {/* ── 요청서 이력 탭 ── */}
-                {tab === 'orders' && (
+                {/* ── 요청서 이력 ── */}
+                {(
                     <>
                         <div className="flex gap-1.5 mb-4">
                             {FILTERS.map(([v, label]) => (
@@ -183,6 +142,11 @@ export default function OrderManage() {
                                         <div key={order.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
                                             <div className="flex items-center gap-2.5 flex-wrap">
                                                 <h3 className="text-sm font-bold text-slate-900">{order.vendor_name}</h3>
+                                                {order.requested_by && (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600">
+                                                        <UserCircle size={11} /> {order.requested_by}
+                                                    </span>
+                                                )}
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${st.cls}`}>{st.text}</span>
                                                 {order.sent_via && (
                                                     <span className="text-[10px] text-slate-400">{SENT_VIA_LABEL[order.sent_via] || order.sent_via} 전송</span>
@@ -233,48 +197,6 @@ export default function OrderManage() {
                     </>
                 )}
 
-                {/* ── 직원 구매요청 탭 ── */}
-                {tab === 'staff' && (
-                    <div className="space-y-3">
-                        {staffRequests.length === 0 ? (
-                            <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                                <Users size={30} className="mx-auto mb-3 text-slate-300" />
-                                직원 구매요청이 없습니다. 직원 앱에서 요청하면 여기에 표시됩니다.
-                            </div>
-                        ) : (
-                            staffRequests.map(r => (
-                                <div key={r.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4">
-                                    <div className="flex items-center gap-2.5">
-                                        <h3 className="text-sm font-bold text-slate-900">{r.staff_name || '직원'}</h3>
-                                        {staffBadge(r.status)}
-                                        <span className="ml-auto text-xs text-slate-400">
-                                            {r.created_at ? r.created_at.slice(0, 10) : ''}
-                                        </span>
-                                    </div>
-                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                        {(r.items || []).map((it, i) => (
-                                            <span key={i} className="px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-lg text-xs text-slate-600">
-                                                {it.name} {it.quantity && <b>{it.quantity}</b>}{it.note && <span className="text-slate-400"> ({it.note})</span>}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    {r.status === 'pending' && (
-                                        <div className="flex gap-2 mt-3">
-                                            <button onClick={() => updateStaffStatus(r.id, 'completed')}
-                                                className="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-all">
-                                                <CheckCircle2 size={13} /> 구매 완료
-                                            </button>
-                                            <button onClick={() => updateStaffStatus(r.id, 'rejected')}
-                                                className="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-500 text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-all">
-                                                <XCircle size={13} /> 반려
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
             </div>
 
             {toast && (
