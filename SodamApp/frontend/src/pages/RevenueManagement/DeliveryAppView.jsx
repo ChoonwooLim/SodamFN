@@ -35,7 +35,7 @@ export function DeliveryAppView({ isMobile, plYear, deliveryAppData }) {
             </h3>
 
             {/* Grand Total Summary */}
-            <div className="grid grid-cols-5 gap-3 mb-5">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
                 {[
                     { label: '📊 총 주문매출', value: formatNumber(grandSales), unit: '원', color: 'text-slate-800', bg: 'bg-white border-slate-100' },
                     { label: '🧾 총 수수료', value: '-' + formatNumber(grandFees), unit: '원', color: 'text-rose-500', bg: 'bg-white border-slate-100' },

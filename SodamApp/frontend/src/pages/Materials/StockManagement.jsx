@@ -238,7 +238,7 @@ export default function MaterialStockManagement() {
                 )}
 
                 {/* 하단 안내 */}
-                <div className="mt-6 flex items-start gap-2.5 px-4 py-3.5 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-700">
+                <div className="mt-6 hidden sm:flex items-start gap-2.5 px-4 py-3.5 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-700">
                     <ClipboardList size={15} className="shrink-0 mt-0.5" />
                     <p>
                         숫자를 수정하면 자동 저장됩니다. <b>안전재고</b>를 설정해 두면 현재고가 그 아래로 내려갈 때

@@ -126,6 +126,7 @@ def get_catalog(
                 "price_updated": p.price_updated.isoformat() if p.price_updated else None,
                 "tax_type": p.tax_type,
                 "note": p.note,
+                "image_url": p.image_url,
                 "current_stock": inv.current_stock if inv else 0.0,
                 "safety_stock": inv.safety_stock if inv else 0.0,
             })
@@ -419,7 +420,7 @@ def staff_catalog(
         data.append({
             "vendor": {"id": v.id, "name": v.name, "is_primary": bool(v.is_primary)},
             "products": [
-                {"id": p.id, "name": p.name, "spec": _staff_spec(p)}
+                {"id": p.id, "name": p.name, "spec": _staff_spec(p), "image_url": p.image_url}
                 for p in sorted(plist, key=lambda x: x.name)
             ],
         })

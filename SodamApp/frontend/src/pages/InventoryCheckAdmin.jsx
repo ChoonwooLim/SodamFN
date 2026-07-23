@@ -119,7 +119,7 @@ export default function InventoryCheckAdmin() {
         <div className="min-h-screen bg-slate-50">
             <div className="max-w-5xl mx-auto px-6 py-8 pb-32">
                 {/* Header */}
-                <header className="flex items-center justify-between mb-8">
+                <header className="flex flex-wrap items-center justify-between gap-3 mb-8">
                     <div className="flex items-center gap-3">
                         <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
                             <Package size={20} className="text-white" />
@@ -146,7 +146,7 @@ export default function InventoryCheckAdmin() {
                             {inventoryItems.map(item => (
                                 editingItem?.id === item.id ? (
                                     <div key={item.id} className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-                                        <div className="grid grid-cols-5 gap-2 mb-2">
+                                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
                                             <input value={editingItem.emoji}
                                                 onChange={e => setEditingItem({ ...editingItem, emoji: e.target.value })}
                                                 className="p-2 rounded-lg border text-center text-lg" placeholder="이모지" />
@@ -193,7 +193,7 @@ export default function InventoryCheckAdmin() {
 
                             {showAddForm ? (
                                 <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200">
-                                    <div className="grid grid-cols-5 gap-2 mb-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-2">
                                         <input value={newItem.emoji}
                                             onChange={e => setNewItem({ ...newItem, emoji: e.target.value })}
                                             className="p-2 rounded-lg border text-center text-lg" placeholder="📦" />

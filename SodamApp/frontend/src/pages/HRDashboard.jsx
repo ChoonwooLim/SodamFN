@@ -423,7 +423,7 @@ export default function HRDashboard() {
                                             <p className="text-[10px] text-slate-400 mt-1">직원이 신청하면 여기에 표시됩니다.</p>
                                         </div>
                                     ) : (
-                                        <table className="w-full">
+                                        <table className="w-full min-w-[560px]">
                                             <thead className="sticky top-0 bg-slate-50/90 backdrop-blur">
                                                 <tr>
                                                     <th className="text-left px-5 py-2.5 text-[11px] font-bold text-slate-500">직원</th>
@@ -473,7 +473,7 @@ export default function HRDashboard() {
                                     {leaveData.length === 0 ? (
                                         <div className="py-8 text-center text-xs text-slate-400">연차 데이터가 없습니다.</div>
                                     ) : (
-                                        <table className="w-full">
+                                        <table className="w-full min-w-[560px]">
                                             <thead className="sticky top-0 bg-slate-50/90 backdrop-blur">
                                                 <tr>
                                                     <th className="text-left px-5 py-2.5 text-[11px] font-bold text-slate-500">이름</th>
@@ -526,7 +526,7 @@ export default function HRDashboard() {
                 </div>
 
                 {/* 노동법 핵심 안내 — 사업장 규모별 */}
-                <LaborLawPanel scale={employeeScale} isSimpleMode={isSimpleMode} expandedLaw={expandedLaw} setExpandedLaw={setExpandedLaw} />
+                <div className="hidden md:block"><LaborLawPanel scale={employeeScale} isSimpleMode={isSimpleMode} expandedLaw={expandedLaw} setExpandedLaw={setExpandedLaw} /></div>
             </div>
         </div>
     );

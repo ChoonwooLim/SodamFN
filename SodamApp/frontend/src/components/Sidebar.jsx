@@ -240,19 +240,20 @@ export default function Sidebar() {
                 { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
                 { icon: Settings, label: '설정', path: '/settings' },
             ] : []),
-            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
-            { icon: Palette, label: '디자인 계획서', path: '/design-plan' },
-            { icon: Brain, label: 'AI 시스템 설계', path: '/ai-system-design' },
-            { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
+            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap', desktop: true },
+            { icon: Palette, label: '디자인 계획서', path: '/design-plan', desktop: true },
+            { icon: Brain, label: 'AI 시스템 설계', path: '/ai-system-design', desktop: true },
+            { icon: Rocket, label: '앱 전송관리', path: '/deploy', desktop: true },
         ]
         : user.role === 'admin'
         ? [
             { icon: BookOpen, label: '사용 매뉴얼', path: '/manual' },
             { icon: Settings, label: '설정', path: '/settings' },
-            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap' },
-            { icon: Palette, label: '디자인 계획서', path: '/design-plan' },
-            { icon: Brain, label: 'AI 시스템 설계', path: '/ai-system-design' },
-            { icon: Rocket, label: '앱 전송관리', path: '/deploy' },
+            // 개발/기획 도구 — 모바일에서는 숨김 (desktop 플래그)
+            { icon: Rocket, label: '셈하나 로드맵', path: '/roadmap', desktop: true },
+            { icon: Palette, label: '디자인 계획서', path: '/design-plan', desktop: true },
+            { icon: Brain, label: 'AI 시스템 설계', path: '/ai-system-design', desktop: true },
+            { icon: Rocket, label: '앱 전송관리', path: '/deploy', desktop: true },
         ]
         : [
             { icon: Settings, label: '설정', path: '/settings' },
@@ -484,13 +485,16 @@ export default function Sidebar() {
                     </>
                 )}
 
-                {/* Section: Tools */}
+                {/* Section: Tools — desktop 플래그 항목은 모바일에서 숨김 */}
                 {bottomMenuItems.length > 0 && (
                     <>
                         <div className="px-3 pt-4 pb-1.5">
                             <span className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.1em]">도구</span>
                         </div>
-                        {bottomMenuItems.map(renderMenuItem)}
+                        {bottomMenuItems.filter(i => !i.desktop).map(renderMenuItem)}
+                        <div className="hidden md:block space-y-0.5">
+                            {bottomMenuItems.filter(i => i.desktop).map(renderMenuItem)}
+                        </div>
                     </>
                 )}
             </nav>

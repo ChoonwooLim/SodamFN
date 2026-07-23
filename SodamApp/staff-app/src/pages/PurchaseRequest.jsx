@@ -190,6 +190,10 @@ export default function PurchaseRequest() {
                                     }}>
                                         {checked && <Check size={15} color="#fff" strokeWidth={3} />}
                                     </button>
+                                    {p.image_url && (
+                                        <img src={p.image_url} alt="" loading="lazy"
+                                            style={{ width: 38, height: 38, borderRadius: 10, objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }} />
+                                    )}
                                     <button onClick={() => setQty(p.id, checked ? 0 : 1)}
                                         style={{ flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                                         <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{p.name}</span>

@@ -129,8 +129,8 @@ export default function RecipeBook() {
 
     return (
         <div className="min-h-screen bg-slate-50/80 pb-32">
-            {/* Hero — 모바일에서는 햄버거 메뉴와 겹치지 않게 아래로 */}
-            <div className="max-w-5xl mx-auto px-6 pt-16 md:pt-8 pb-2">
+            {/* Hero */}
+            <div className="max-w-5xl mx-auto px-6 pt-8 pb-2">
                 <div className="flex items-center gap-3 mb-1">
                     <button onClick={() => navigate(-1)} className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20 border-none cursor-pointer text-white hover:shadow-xl transition-all">
                         <ChevronLeft size={20} />

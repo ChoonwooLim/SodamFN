@@ -181,7 +181,7 @@ export default function PrimaryVendors() {
                     </div>
                 )}
 
-                <div className="mt-6 flex items-start gap-2.5 px-4 py-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700">
+                <div className="mt-6 hidden sm:flex items-start gap-2.5 px-4 py-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-xs text-amber-700">
                     <TrendingUp size={15} className="shrink-0 mt-0.5" />
                     <p>
                         주거래처는 <b>구매요청서 작성·품목 관리에서도 ★ 표시와 함께 맨 위에</b> 정렬됩니다.

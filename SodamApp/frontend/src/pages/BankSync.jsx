@@ -1626,7 +1626,7 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
                 {loading ? (
                     <div className="p-12 text-center">
                         <Loader2 size={24} className="animate-spin mx-auto text-slate-400" />
@@ -1634,7 +1634,7 @@ function TransactionsTab({ txs, accounts, total, loading, summary, filter, setFi
                 ) : txs.length === 0 ? (
                     <div className="p-12 text-center text-slate-400 text-sm">거래내역이 없습니다.</div>
                 ) : (
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm min-w-[640px]">
                         <thead className="bg-slate-50 text-xs text-slate-500 uppercase tracking-wider">
                             <tr>
                                 <th className="text-left px-4 py-3 font-semibold">날짜</th>

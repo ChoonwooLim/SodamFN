@@ -44,7 +44,7 @@ export function PurchaseSummary({ categoryData, cardData, bankData, topVendors, 
             </div>
 
             {/* Card + Bank (left) + Delivery Fee (right) — 2 columns */}
-            <div className="grid grid-cols-[3.5fr_6.5fr] gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-[3.5fr_6.5fr] gap-4">
                 {/* LEFT: Card Company + Bank Transfer */}
                 <div className="flex flex-col gap-4">
                     {/* Card Company Breakdown */}

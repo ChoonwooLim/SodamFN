@@ -362,7 +362,7 @@ export default function DeliveryImages() {
             />
           </div>
 
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             {CATEGORIES.map(c => (
               <button
                 key={c}

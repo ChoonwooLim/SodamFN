@@ -173,16 +173,16 @@ export function PurchaseTable({
                                                         <div className="text-sm font-bold text-slate-800 tabular-nums">{formatNumber(item.amount)}원</div>
                                                         <div className="flex items-center gap-1 mt-1 justify-end">
                                                             <button
-                                                                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors"
+                                                                className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors"
                                                                 onClick={() => toggleCategory(item)}
                                                                 title={isHouseholdMode ? "사업비용으로 변경" : "개인비용으로 변경"}
                                                             >
                                                                 <ArrowRightLeft size={13} />
                                                             </button>
-                                                            <button className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => openEditModal(item)} title="수정">
+                                                            <button className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => openEditModal(item)} title="수정">
                                                                 <Edit3 size={13} />
                                                             </button>
-                                                            <button className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => handleDelete(item.id)} title="삭제">
+                                                            <button className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 border-none cursor-pointer flex items-center justify-center transition-colors" onClick={() => handleDelete(item.id)} title="삭제">
                                                                 <Trash2 size={13} />
                                                             </button>
                                                         </div>

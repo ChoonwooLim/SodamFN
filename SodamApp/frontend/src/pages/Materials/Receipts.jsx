@@ -205,7 +205,7 @@ export default function MaterialReceipts() {
                             className="w-full pl-10 pr-3 py-2.5 bg-slate-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-400/30"
                         />
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
                         <Calendar size={14} />
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                             className="px-2 py-2 bg-slate-50 rounded-lg text-xs focus:outline-none" />

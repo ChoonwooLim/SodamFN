@@ -99,8 +99,8 @@ export default function YearEnd() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="bg-white rounded-lg border border-slate-200 overflow-x-auto">
+        <table className="w-full text-sm min-w-[720px]">
           <thead className="bg-slate-50 text-slate-700">
             <tr>
               <th className="text-left px-4 py-3">직원</th>

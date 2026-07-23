@@ -227,7 +227,7 @@ export default function OrderManage() {
                                                             )}
                                                         </div>
                                                         {it.unit_price > 0 && (
-                                                            <span className="text-xs text-slate-400 shrink-0">{formatNumber(it.unit_price)}원</span>
+                                                            <span className="hidden sm:inline text-xs text-slate-400 shrink-0">{formatNumber(it.unit_price)}원</span>
                                                         )}
                                                         <span className="text-lg font-black text-slate-900 shrink-0">×{qtyLabel(it)}</span>
                                                     </div>

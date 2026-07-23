@@ -4,7 +4,7 @@ import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import {
     Package, Phone, Plus, Trash2, Pencil, Check, X, RefreshCw,
-    Building2, Search, ChevronRight, Star,
+    Building2, Search, ChevronRight, Star, Camera,
 } from 'lucide-react';
 
 const TAX_TYPES = [
@@ -132,6 +132,24 @@ export default function MaterialItemsManagement() {
             await api.delete(`/products/${p.id}`);
             await fetchCatalog();
         } catch (e) { alert('삭제에 실패했습니다.'); }
+    };
+
+    // 제품 사진 촬영/업로드 → 품목에 연결
+    const uploadPhoto = async (p, file) => {
+        if (!file) return;
+        setSaving(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await api.post('/products/upload-image', fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            if (res.data?.url) {
+                await api.put(`/products/${p.id}`, { image_url: res.data.url });
+                await fetchCatalog();
+            }
+        } catch (e) { alert('사진 업로드에 실패했습니다.'); }
+        setSaving(false);
     };
 
     const taxLabel = (t) => (TAX_TYPES.find(x => x.id === t)?.label || '과세');
@@ -329,7 +347,7 @@ export default function MaterialItemsManagement() {
                                                 </button>
                                             </div>
                                         </div>
-                                        <p className="mt-2 text-[10px] text-slate-400">
+                                        <p className="mt-2 hidden sm:block text-[10px] text-slate-400">
                                             과세를 <b>자동분류</b>로 두면 품명 기준으로 면세(미가공 농축수산물)/과세를 자동 판정합니다.
                                             단가는 영수증 업로드 시 자동 반영되며 구매일자별로 갱신됩니다.
                                         </p>
@@ -390,7 +408,18 @@ export default function MaterialItemsManagement() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div key={p.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors group">
+                                                <div key={p.id} className="flex items-center gap-3 px-4 sm:px-5 py-3.5 hover:bg-slate-50/60 transition-colors group">
+                                                    {/* 제품 사진 (탭하면 촬영/업로드) */}
+                                                    <label className="relative w-11 h-11 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0 cursor-pointer flex items-center justify-center"
+                                                        title={p.image_url ? '사진 변경' : '제품 사진 촬영/업로드'}>
+                                                        {p.image_url ? (
+                                                            <img src={p.image_url} alt={p.name} loading="lazy" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <Camera size={16} className="text-slate-300" />
+                                                        )}
+                                                        <input type="file" accept="image/*" capture="environment" hidden
+                                                            onChange={e => { uploadPhoto(p, e.target.files?.[0]); e.target.value = ''; }} />
+                                                    </label>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-semibold text-slate-800">
                                                             {p.name}
@@ -412,11 +441,11 @@ export default function MaterialItemsManagement() {
                                                     </div>
                                                     <div className="flex items-center gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                                         <button onClick={() => { startEdit(p); setShowAdd(false); }}
-                                                            className="w-9 h-9 rounded-xl text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 flex items-center justify-center transition-all">
+                                                            className="w-10 h-10 rounded-xl text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 flex items-center justify-center transition-all">
                                                             <Pencil size={15} />
                                                         </button>
                                                         <button onClick={() => deleteProduct(p)}
-                                                            className="w-9 h-9 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all">
+                                                            className="w-10 h-10 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-all">
                                                             <Trash2 size={15} />
                                                         </button>
                                                     </div>

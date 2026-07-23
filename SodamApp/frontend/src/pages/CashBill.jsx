@@ -310,7 +310,7 @@ export default function CashBill() {
                                 value={form.item_name}
                                 onChange={(e) => setForm({ ...form, item_name: e.target.value })} />
 
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <input className={inputCls} placeholder="거래일 YYYYMMDD"
                                     value={form.trade_date}
                                     onChange={(e) => setForm({ ...form, trade_date: e.target.value.replace(/\D/g, '').slice(0, 8) })} />

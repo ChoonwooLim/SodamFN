@@ -328,7 +328,7 @@ export default function MaterialOrderForm() {
                             {order.total_amount > 0 && ` · 예상 ${formatNumber(order.total_amount)}원`}
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {order.vendor_phone ? (
                             <button onClick={() => handleCall(order, listSetter)}
                                 className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500 text-white text-sm font-bold hover:bg-emerald-600 active:scale-95 transition-all shadow-sm">
@@ -485,6 +485,10 @@ export default function MaterialOrderForm() {
                                                                     className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition-all ${checked ? 'bg-teal-500 border-teal-500' : 'border-slate-300 hover:border-teal-400'}`}>
                                                                     {checked && <Check size={14} className="text-white" strokeWidth={3} />}
                                                                 </button>
+                                                                {p.image_url && (
+                                                                    <img src={p.image_url} alt="" loading="lazy"
+                                                                        className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                                                                )}
                                                                 <button onClick={() => toggleItem(p.id)} className="flex-1 min-w-[45%] text-left">
                                                                     <p className="text-sm font-semibold text-slate-800">{p.name}</p>
                                                                     <p className="text-[11px] text-slate-400 whitespace-nowrap">
@@ -494,7 +498,7 @@ export default function MaterialOrderForm() {
                                                                 </button>
                                                                 <div className="flex items-center gap-1 shrink-0 ml-auto">
                                                                     <button onClick={() => setQty(p.id, Math.max(0, qty - 1))}
-                                                                        className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all">
+                                                                        className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 active:scale-95 transition-all">
                                                                         <Minus size={15} />
                                                                     </button>
                                                                     <input
@@ -502,17 +506,17 @@ export default function MaterialOrderForm() {
                                                                         value={qty === 0 ? '' : qty}
                                                                         placeholder="0"
                                                                         onChange={e => setQty(p.id, Math.max(0, Number(e.target.value) || 0))}
-                                                                        className="w-14 h-9 text-center text-sm font-bold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                                                                        className="w-14 h-10 text-center text-sm font-bold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
                                                                     />
                                                                     <button onClick={() => setQty(p.id, qty + 1)}
-                                                                        className="w-9 h-9 rounded-xl bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 active:scale-95 transition-all">
+                                                                        className="w-10 h-10 rounded-xl bg-teal-500 text-white flex items-center justify-center hover:bg-teal-600 active:scale-95 transition-all">
                                                                         <Plus size={15} />
                                                                     </button>
                                                                     {/* 주문 단위 선택: 개(낱개) / box */}
                                                                     <div className="flex rounded-xl overflow-hidden border border-slate-200 ml-1">
                                                                         {ORDER_UNITS.map(u => (
                                                                             <button key={u} onClick={() => setUnit(p.id, u)}
-                                                                                className={`px-2 h-9 text-[10px] font-bold transition-colors ${unit === u && checked
+                                                                                className={`px-2 h-10 text-[10px] font-bold transition-colors ${unit === u && checked
                                                                                     ? 'bg-slate-800 text-white'
                                                                                     : unit === u
                                                                                         ? 'bg-slate-200 text-slate-600'

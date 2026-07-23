@@ -524,7 +524,7 @@ export default function TaxInvoice() {
                                             </button>
                                         )}
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                         <input
                                             className={inputCls}
                                             placeholder="수량"

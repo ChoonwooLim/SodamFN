@@ -46,6 +46,17 @@ export default function MoreMenu() {
 
     const menuSections = [
         {
+            title: '자재/구매',
+            items: [
+                { icon: ShoppingBag, label: '구매요청서 작성', path: '/materials/order-form', color: '#0d9488', bg: '#f0fdfa' },
+                { icon: ClipboardList, label: '구매요청서 관리', path: '/materials/order-manage', color: '#0f766e', bg: '#ecfdf5' },
+                { icon: Receipt, label: '영수증 보관함', path: '/materials/receipts', color: '#e11d48', bg: '#fff1f2' },
+                { icon: Store, label: '주거래처', path: '/materials/primary-vendors', color: '#f59e0b', bg: '#fffbeb' },
+                { icon: Package, label: '품목 관리', path: '/materials/items', color: '#06b6d4', bg: '#ecfeff' },
+                { icon: Package, label: '재고관리', path: '/materials/inventory', color: '#22c55e', bg: '#f0fdf4' },
+            ]
+        },
+        {
             title: '매출/재무',
             items: [
                 { icon: BarChart3, label: '매출 관리', path: '/revenue', color: '#3b82f6', bg: '#eff6ff' },
@@ -70,14 +81,13 @@ export default function MoreMenu() {
                 { icon: Store, label: '매장 홍보물', path: '/products/store-materials', color: '#64748b', bg: '#f8fafc' },
                 { icon: CheckSquare, label: '오픈 체크리스트', path: '/open-checklist', color: '#22c55e', bg: '#f0fdf4' },
                 { icon: Store, label: '거래처 관리', path: '/vendor-settings', color: '#475569', bg: '#f1f5f9' },
-                { icon: Package, label: '재고 점검', path: '/inventory-check-admin', color: '#06b6d4', bg: '#ecfeff' },
+                { icon: Package, label: '오픈 재고 체크', path: '/inventory-check-admin', color: '#06b6d4', bg: '#ecfeff' },
             ]
         },
         {
             title: '소통/관리',
             items: [
                 { icon: Bell, label: '공지/건의/소통', path: '/board', color: '#f97316', bg: '#fff7ed' },
-                { icon: ClipboardList, label: '발주 요청', path: '/purchase-requests', color: '#ef4444', bg: '#fef2f2' },
                 { icon: FileText, label: '사용 매뉴얼', path: '/manual', color: '#78716c', bg: '#fafaf9' },
                 { icon: Settings, label: '설정', path: '/settings', color: '#475569', bg: '#f1f5f9' },
             ]
