@@ -4,7 +4,7 @@ import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import {
     Package, Phone, Plus, Trash2, Pencil, Check, X, RefreshCw,
-    Building2, Search, ChevronRight,
+    Building2, Search, ChevronRight, Star,
 } from 'lucide-react';
 
 const TAX_TYPES = [
@@ -45,8 +45,9 @@ export default function MaterialItemsManagement() {
     const filteredVendors = useMemo(() => {
         const q = vendorSearch.trim().toLowerCase();
         const list = q ? catalog.filter(g => g.vendor.name.toLowerCase().includes(q)) : catalog;
-        // 품목이 등록된 거래처를 위로 (자동 수집으로 생성된 거래처가 많아 검색과 병행)
+        // 주거래처 → 품목 보유 거래처 → 이름순 (자동 수집 거래처가 많아 검색과 병행)
         return [...list].sort((a, b) =>
+            (b.vendor.is_primary === true) - (a.vendor.is_primary === true) ||
             (b.products.length > 0) - (a.products.length > 0) ||
             a.vendor.name.localeCompare(b.vendor.name, 'ko'));
     }, [catalog, vendorSearch]);
@@ -174,7 +175,10 @@ export default function MaterialItemsManagement() {
                                         onClick={() => { setSelectedVendorId(g.vendor.id); setShowAdd(false); setEditingId(null); }}
                                         className={`w-full flex items-center gap-2.5 px-4 py-3 text-left border-b border-slate-50 transition-colors ${selectedVendorId === g.vendor.id ? 'bg-cyan-50 border-l-4 border-l-cyan-500' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}`}>
                                         <div className="flex-1 min-w-0">
-                                            <p className={`text-sm truncate ${selectedVendorId === g.vendor.id ? 'font-bold text-cyan-700' : 'font-semibold text-slate-700'}`}>{g.vendor.name}</p>
+                                            <p className={`text-sm truncate flex items-center gap-1 ${selectedVendorId === g.vendor.id ? 'font-bold text-cyan-700' : 'font-semibold text-slate-700'}`}>
+                                                {g.vendor.is_primary && <Star size={11} className="text-amber-400 shrink-0" fill="#fbbf24" />}
+                                                {g.vendor.name}
+                                            </p>
                                             {g.vendor.category && <p className="text-[10px] text-slate-400">{g.vendor.category}</p>}
                                         </div>
                                         <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${g.products.length > 0 ? 'bg-slate-100 text-slate-500' : 'bg-slate-50 text-slate-300'}`}>
@@ -191,7 +195,22 @@ export default function MaterialItemsManagement() {
                                 {/* 거래처 헤더 */}
                                 <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 flex-wrap">
                                     <div className="flex-1 min-w-[140px]">
-                                        <h2 className="text-base font-bold text-slate-900">{selected.vendor.name}</h2>
+                                        <h2 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await api.patch(`/vendors/${selected.vendor.id}`, { is_primary: !selected.vendor.is_primary });
+                                                        await fetchCatalog();
+                                                    } catch (e) { alert('주거래처 변경 실패'); }
+                                                }}
+                                                title={selected.vendor.is_primary ? '주거래처 해제' : '주거래처 등록'}
+                                                className="active:scale-90 transition-transform">
+                                                <Star size={17}
+                                                    className={selected.vendor.is_primary ? 'text-amber-400' : 'text-slate-300 hover:text-amber-300'}
+                                                    fill={selected.vendor.is_primary ? '#fbbf24' : 'none'} />
+                                            </button>
+                                            {selected.vendor.name}
+                                        </h2>
                                         <p className="text-xs text-slate-400 mt-0.5">
                                             {selected.vendor.category || '분류 미지정'}
                                             {selected.vendor.item && ` · ${selected.vendor.item}`}

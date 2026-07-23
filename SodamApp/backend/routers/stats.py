@@ -248,6 +248,7 @@ class VendorPatch(BaseModel):
     phone: str = None
     address: str = None
     business_reg_number: str = None
+    is_primary: bool = None  # 주거래처 여부
 
 @router.patch("/vendors/{vendor_id}")
 def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(get_admin_user), bid = Depends(get_bid_from_token), session: Session = Depends(get_session)):
@@ -275,6 +276,8 @@ def patch_vendor(vendor_id: int, payload: VendorPatch, _admin: User = Depends(ge
             vendor.address = payload.address
         if payload.business_reg_number is not None:
             vendor.business_reg_number = payload.business_reg_number
+        if payload.is_primary is not None:
+            vendor.is_primary = payload.is_primary
 
         session.add(vendor)
         session.commit()

@@ -82,6 +82,7 @@ class Vendor(SQLModel, table=True):
     name: str = Field(index=True)
     category: Optional[str] = None  # 세부 카테고리 (식자재, 소모품, 비품 등)
     vendor_type: str = Field(default="expense")  # "revenue" or "expense"
+    is_primary: bool = Field(default=False)  # 주거래처 여부 (자재관리 > 주거래처 메뉴)
     order_index: int = Field(default=0)  # 표시 순서
     contact_info: Optional[str] = None
     item: Optional[str] = None  # 취급 품목

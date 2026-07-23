@@ -532,7 +532,10 @@ export default function MaterialOrderForm() {
                                                     return next;
                                                 })}
                                                 className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50/60 transition-colors">
-                                                <span className="font-bold text-slate-900">{vendor.name}</span>
+                                                <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                                                    {vendor.is_primary && <span className="text-amber-400" title="주거래처">★</span>}
+                                                    {vendor.name}
+                                                </span>
                                                 {vendor.category && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">{vendor.category}</span>}
                                                 <span className="text-xs text-slate-400">{products.length}개 품목</span>
                                                 {selCount > 0 && (

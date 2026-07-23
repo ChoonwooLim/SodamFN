@@ -106,7 +106,7 @@ def get_catalog(
         by_vendor.setdefault(p.vendor_id, []).append(p)
 
     data = []
-    for v in sorted(vendors, key=lambda x: (x.order_index or 0, x.name)):
+    for v in sorted(vendors, key=lambda x: (not x.is_primary, x.order_index or 0, x.name)):
         items = []
         for p in sorted(by_vendor.get(v.id, []), key=lambda x: x.name):
             inv = inv_map.get(p.id)
@@ -129,6 +129,8 @@ def get_catalog(
                 "category": v.category,
                 "phone": v.phone,
                 "item": v.item,
+                "contact_info": v.contact_info,
+                "is_primary": bool(v.is_primary),
             },
             "products": items,
         })
@@ -138,6 +140,49 @@ def get_catalog(
         "business_name": biz.name if biz else "셈하나",
         "data": data,
     }
+
+
+# ─── 주거래처 ───
+
+@router.get("/primary-vendors")
+def get_primary_vendors(
+    session: Session = Depends(get_session),
+    _admin: AuthUser = Depends(get_admin_user),
+    bid=Depends(get_bid_from_token),
+):
+    """주거래처 목록 + 거래 요약 (이번달/최근 3개월 매입, 품목 수, 최근 거래일)."""
+    vendors = session.exec(
+        apply_bid_filter(select(Vendor).where(Vendor.is_primary == True), Vendor, bid)  # noqa: E712
+    ).all()
+
+    today = datetime.date.today()
+    since = today - datetime.timedelta(days=90)
+    month_start = today.replace(day=1)
+
+    data = []
+    for v in sorted(vendors, key=lambda x: (x.order_index or 0, x.name)):
+        product_count = len(session.exec(
+            select(Product.id).where(Product.vendor_id == v.id)
+        ).all())
+        rows = session.exec(
+            select(DailyExpense).where(
+                DailyExpense.vendor_id == v.id, DailyExpense.date >= since
+            )
+        ).all()
+        last_purchase = max((r.date for r in rows), default=None)
+        data.append({
+            "id": v.id,
+            "name": v.name,
+            "category": v.category,
+            "phone": v.phone,
+            "item": v.item,
+            "contact_info": v.contact_info,
+            "product_count": product_count,
+            "month_total": sum(r.amount for r in rows if r.date >= month_start),
+            "recent3m_total": sum(r.amount for r in rows),
+            "last_purchase": last_purchase.isoformat() if last_purchase else None,
+        })
+    return {"status": "success", "data": data}
 
 
 # ─── Inventory ───

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api';
-import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Gauge, Briefcase, Send, MessageCircle, Sparkles, Lightbulb, Link2, Boxes, ShoppingCart, PackageSearch } from 'lucide-react';
+import { LayoutDashboard, Receipt, Settings, Users, UserCircle, LogOut, ShoppingBag, FileSignature, CreditCard, BarChart3, BookOpen, Menu, X, Smartphone, Home, ClipboardList, Rocket, Monitor, ChevronDown, ChevronUp, Package, Shield, Building2, FileText, FileCheck, Bell, TrendingUp, Wallet, ArrowLeftRight, Truck, PieChart, Palette, Store, Brain, Gauge, Briefcase, Send, MessageCircle, Sparkles, Lightbulb, Link2, Boxes, ShoppingCart, PackageSearch, Star } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -176,6 +176,7 @@ export default function Sidebar() {
 
     const matSubItems = [
         { icon: ShoppingCart, label: '구매요청서 작성', path: '/materials/order-form', color: 'text-teal-400' },
+        { icon: Star, label: '주거래처', path: '/materials/primary-vendors', color: 'text-yellow-400' },
         { icon: Package, label: '거래처·품목 관리', path: '/materials/items', color: 'text-cyan-400' },
         { icon: PackageSearch, label: '재고관리', path: '/materials/inventory', color: 'text-emerald-400' },
         { icon: Receipt, label: '영수증 보관함', path: '/materials/receipts', color: 'text-rose-400' },
