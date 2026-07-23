@@ -26,33 +26,37 @@ export default function MaterialItemsManagement() {
     const [editForm, setEditForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
 
-    const fetchCatalog = async (keepSelection = true) => {
+    const fetchCatalog = async () => {
         try {
             const res = await api.get('/materials/catalog');
-            if (res.data.status === 'success') {
-                setCatalog(res.data.data);
-                if (!keepSelection || !selectedVendorId) {
-                    const first = res.data.data.find(g => g.products.length > 0) || res.data.data[0];
-                    if (first) setSelectedVendorId(first.vendor.id);
-                }
-            }
+            if (res.data.status === 'success') setCatalog(res.data.data);
         } catch (e) { console.error(e); }
         setLoading(false);
     };
 
-    useEffect(() => { fetchCatalog(false); }, []);
+    useEffect(() => { fetchCatalog(); }, []);
+
+    // 이 화면은 주거래처만 표시 (주거래처 메뉴에서 별표 등록)
+    const primaries = useMemo(() => catalog.filter(g => g.vendor.is_primary), [catalog]);
+
+    // 선택된 거래처가 주거래처 목록에 없으면 첫 항목으로 보정
+    useEffect(() => {
+        if (primaries.length === 0) return;
+        if (!primaries.some(g => g.vendor.id === selectedVendorId)) {
+            const first = primaries.find(g => g.products.length > 0) || primaries[0];
+            setSelectedVendorId(first.vendor.id);
+        }
+    }, [primaries, selectedVendorId]);
 
     const filteredVendors = useMemo(() => {
         const q = vendorSearch.trim().toLowerCase();
-        const list = q ? catalog.filter(g => g.vendor.name.toLowerCase().includes(q)) : catalog;
-        // 주거래처 → 품목 보유 거래처 → 이름순 (자동 수집 거래처가 많아 검색과 병행)
+        const list = q ? primaries.filter(g => g.vendor.name.toLowerCase().includes(q)) : primaries;
         return [...list].sort((a, b) =>
-            (b.vendor.is_primary === true) - (a.vendor.is_primary === true) ||
             (b.products.length > 0) - (a.products.length > 0) ||
             a.vendor.name.localeCompare(b.vendor.name, 'ko'));
-    }, [catalog, vendorSearch]);
+    }, [primaries, vendorSearch]);
 
-    const selected = catalog.find(g => g.vendor.id === selectedVendorId);
+    const selected = primaries.find(g => g.vendor.id === selectedVendorId);
 
     // ─── CRUD ───
     const addProduct = async () => {
@@ -119,28 +123,34 @@ export default function MaterialItemsManagement() {
                             <Package size={20} className="text-white" />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">거래처·품목 관리</h1>
-                            <p className="text-xs text-slate-400 mt-0.5">거래처별 취급 품목의 규격·단가를 관리합니다</p>
+                            <h1 className="text-xl font-bold text-slate-900 tracking-tight">주거래처·품목 관리</h1>
+                            <p className="text-xs text-slate-400 mt-0.5">주거래처별 취급 품목의 규격·단가를 관리합니다</p>
                         </div>
                     </div>
-                    <Link to="/vendor-settings"
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
-                        <Building2 size={15} /> 거래처 추가/정보 수정 <ChevronRight size={14} />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link to="/materials/primary-vendors"
+                            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
+                            <Star size={15} className="text-amber-400" fill="#fbbf24" /> 주거래처 등록 <ChevronRight size={14} />
+                        </Link>
+                        <Link to="/vendor-settings"
+                            className="flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">
+                            <Building2 size={15} /> 거래처 정보 수정 <ChevronRight size={14} />
+                        </Link>
+                    </div>
                 </header>
 
                 {loading ? (
                     <div className="text-center py-20 text-slate-400">
                         <RefreshCw size={24} className="animate-spin mx-auto mb-3" /> 불러오는 중...
                     </div>
-                ) : catalog.length === 0 ? (
+                ) : primaries.length === 0 ? (
                     <div className="text-center py-20 text-slate-400 bg-white rounded-2xl border border-slate-200">
-                        <Building2 size={32} className="mx-auto mb-3 text-slate-300" />
-                        <p className="font-bold text-slate-500 mb-1">등록된 지출 거래처가 없습니다</p>
-                        <p className="text-xs mb-4">거래처 관리에서 거래처를 먼저 등록해 주세요.</p>
-                        <Link to="/vendor-settings"
-                            className="inline-block px-4 py-2.5 bg-cyan-500 text-white rounded-xl text-sm font-bold hover:bg-cyan-600 transition-all">
-                            거래처 관리로 이동
+                        <Star size={32} className="mx-auto mb-3 text-slate-300" />
+                        <p className="font-bold text-slate-500 mb-1">등록된 주거래처가 없습니다</p>
+                        <p className="text-xs mb-4">주거래처 메뉴에서 자주 거래하는 곳에 별표를 등록하면 여기에 표시됩니다.</p>
+                        <Link to="/materials/primary-vendors"
+                            className="inline-block px-4 py-2.5 bg-amber-400 text-slate-900 rounded-xl text-sm font-bold hover:bg-amber-300 transition-all">
+                            주거래처 등록하러 가기
                         </Link>
                     </div>
                 ) : (
@@ -151,9 +161,9 @@ export default function MaterialItemsManagement() {
                                 value={selectedVendorId || ''}
                                 onChange={e => setSelectedVendorId(Number(e.target.value))}
                                 className="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 shadow-sm">
-                                {catalog.map(g => (
+                                {filteredVendors.map(g => (
                                     <option key={g.vendor.id} value={g.vendor.id}>
-                                        {g.vendor.name} ({g.products.length})
+                                        ★ {g.vendor.name} ({g.products.length})
                                     </option>
                                 ))}
                             </select>
