@@ -1,12 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../api';
 import { formatNumber } from '../../utils/format';
 import { EXPENSE_CATEGORIES } from '../../utils/constants';
 import {
     Receipt as ReceiptIcon, Camera, Search, RefreshCw, X, Trash2,
-    CheckCircle2, AlertTriangle, Save, Calendar, ExternalLink,
+    CheckCircle2, AlertTriangle, Save, Calendar, ExternalLink, ChevronDown,
 } from 'lucide-react';
+
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const dateLabel = (key) => {
+    if (key === 'unknown') return '날짜 미확인';
+    const d = new Date(key + 'T00:00:00');
+    const base = `${key} (${WEEKDAYS[d.getDay()]})`;
+    return key === todayStr() ? `오늘 · ${base}` : base;
+};
 
 const STATUS_CHIP = {
     classified: { text: '매입 반영됨', cls: 'bg-emerald-50 text-emerald-600' },
@@ -29,9 +41,28 @@ export default function MaterialReceipts() {
     const [editForm, setEditForm] = useState({});
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState(null);
+    const [openDates, setOpenDates] = useState(() => new Set([todayStr()]));
     const fileRef = useRef(null);
 
     const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+    // 검색/필터 사용 중에는 모든 날짜 그룹을 펼침
+    const filterActive = Boolean(q.trim() || dateFrom || dateTo || statusFilter);
+
+    // 날짜별 그룹 (최신 날짜 먼저, 날짜 미확인은 맨 아래)
+    const groups = useMemo(() => {
+        const map = new Map();
+        receipts.forEach(r => {
+            const key = r.receipt_date || 'unknown';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(r);
+        });
+        return [...map.entries()].sort((a, b) => {
+            if (a[0] === 'unknown') return 1;
+            if (b[0] === 'unknown') return -1;
+            return b[0].localeCompare(a[0]);
+        });
+    }, [receipts]);
 
     const fetchReceipts = async (params = {}) => {
         setLoading(true);
@@ -208,31 +239,65 @@ export default function MaterialReceipts() {
                         <p className="text-xs">물품 구매 후 [영수증 촬영/업로드] 버튼으로 올려주세요.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {receipts.map(r => {
-                            const chip = STATUS_CHIP[r.status] || STATUS_CHIP.pending;
+                    <div className="space-y-3">
+                        {groups.map(([dateKey, list]) => {
+                            const isOpen = filterActive || openDates.has(dateKey);
+                            const total = list.reduce((s, r) => s + (r.status === 'classified' ? (r.amount || 0) : 0), 0);
+                            const needCheck = list.filter(r => r.status === 'pending').length;
                             return (
-                                <button key={r.id} onClick={() => openDetail(r)}
-                                    className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left hover:shadow-md hover:-translate-y-0.5 transition-all">
-                                    <div className="h-36 bg-slate-100 overflow-hidden">
-                                        <img src={r.image_url} alt="영수증" loading="lazy"
-                                            className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="p-3">
-                                        <div className="flex items-center justify-between gap-1 mb-1">
-                                            <span className="text-sm font-bold text-slate-800 truncate">
-                                                {r.vendor_name || '거래처 미확인'}
+                                <div key={dateKey} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                    <button
+                                        onClick={() => setOpenDates(prev => {
+                                            const next = new Set(prev);
+                                            next.has(dateKey) ? next.delete(dateKey) : next.add(dateKey);
+                                            return next;
+                                        })}
+                                        className="w-full flex items-center gap-3 px-5 py-3.5 text-left hover:bg-slate-50/60 transition-colors">
+                                        <Calendar size={15} className="text-rose-400 shrink-0" />
+                                        <span className="font-bold text-slate-900 text-sm">{dateLabel(dateKey)}</span>
+                                        <span className="text-xs text-slate-400">{list.length}장</span>
+                                        {total > 0 && (
+                                            <span className="text-xs font-bold text-slate-600">{formatNumber(total)}원</span>
+                                        )}
+                                        {needCheck > 0 && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600">
+                                                확인 필요 {needCheck}
                                             </span>
-                                            <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${chip.cls}`}>{chip.text}</span>
+                                        )}
+                                        <ChevronDown size={16}
+                                            className={`ml-auto text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {isOpen && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 px-4 pb-4 pt-1">
+                                            {list.map(r => {
+                                                const chip = STATUS_CHIP[r.status] || STATUS_CHIP.pending;
+                                                return (
+                                                    <button key={r.id} onClick={() => openDetail(r)}
+                                                        className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-left hover:shadow-md hover:-translate-y-0.5 transition-all">
+                                                        <div className="h-36 bg-slate-100 overflow-hidden">
+                                                            <img src={r.image_url} alt="영수증" loading="lazy"
+                                                                className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div className="p-3">
+                                                            <div className="flex items-center justify-between gap-1 mb-1">
+                                                                <span className="text-sm font-bold text-slate-800 truncate">
+                                                                    {r.vendor_name || '거래처 미확인'}
+                                                                </span>
+                                                                <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${chip.cls}`}>{chip.text}</span>
+                                                            </div>
+                                                            <p className="text-base font-black text-slate-900">
+                                                                {r.amount > 0 ? `${formatNumber(r.amount)}원` : <span className="text-slate-300 text-xs font-normal">금액 미확인</span>}
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-400 mt-0.5">
+                                                                {r.receipt_date || '날짜 미확인'}{r.category ? ` · ${r.category}` : ''}
+                                                            </p>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
-                                        <p className="text-base font-black text-slate-900">
-                                            {r.amount > 0 ? `${formatNumber(r.amount)}원` : <span className="text-slate-300 text-xs font-normal">금액 미확인</span>}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5">
-                                            {r.receipt_date || '날짜 미확인'}{r.category ? ` · ${r.category}` : ''}
-                                        </p>
-                                    </div>
-                                </button>
+                                    )}
+                                </div>
                             );
                         })}
                     </div>
